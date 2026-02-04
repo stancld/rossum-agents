@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.0.0rc4] - 2026-02-04
+## [1.0.0rc5] - 2026-02-04
 
 ### Added
 - Added message-level `mcp_mode` parameter to override chat's mode per-message and persist for subsequent messages
