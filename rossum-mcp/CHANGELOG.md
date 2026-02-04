@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Added
+- Added `get_mcp_mode` tool to query current MCP operation mode (read-only or read-write)
+- Added `set_mcp_mode` tool to dynamically switch MCP mode at runtime without server restart
+
 
 ## [1.0.1] - 2026-01-31
 
