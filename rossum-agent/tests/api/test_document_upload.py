@@ -125,10 +125,14 @@ class TestAgentServiceDocumentStorage:
 
     def test_save_documents_to_output_dir(self) -> None:
         """Test that documents are saved correctly to output directory."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service._output_dir = Path(tmpdir)
+            ctx = _RequestContext()
+            ctx.output_dir = Path(tmpdir)
+            _request_context.set(ctx)
 
             pdf_content = b"%PDF-1.4 test content"
             data = base64.b64encode(pdf_content).decode()
@@ -148,10 +152,14 @@ class TestAgentServiceDocumentStorage:
 
     def test_save_multiple_documents(self) -> None:
         """Test saving multiple documents."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service._output_dir = Path(tmpdir)
+            ctx = _RequestContext()
+            ctx.output_dir = Path(tmpdir)
+            _request_context.set(ctx)
 
             docs = []
             for i in range(3):
@@ -174,8 +182,12 @@ class TestAgentServiceDocumentStorage:
 
     def test_save_documents_no_output_dir(self) -> None:
         """Test that saving documents without output dir logs warning."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
-        service._output_dir = None
+        ctx = _RequestContext()
+        ctx.output_dir = None
+        _request_context.set(ctx)
 
         data = base64.b64encode(b"PDF").decode()
         docs = [
@@ -194,8 +206,12 @@ class TestBuildUpdatedHistoryWithDocuments:
 
     def test_history_includes_document_info(self) -> None:
         """Test that document filenames are included in history."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
-        service._last_memory = None
+        ctx = _RequestContext()
+        ctx.last_memory = None
+        _request_context.set(ctx)
 
         data = base64.b64encode(b"PDF").decode()
         docs = [
