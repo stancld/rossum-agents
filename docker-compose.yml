@@ -55,6 +55,18 @@ services:
       redis:
         condition: service_healthy
 
+  rossum-agent-api:
+    extends: rossum-agent-base
+    command: ["uv", "run", "rossum-agent-api", "--host", "0.0.0.0"]
+    environment:
+      - AWS_PROFILE=${AWS_PROFILE}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
 networks:
   rossum-network:
     driver: bridge
