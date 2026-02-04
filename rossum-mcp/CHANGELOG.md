@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [1.1.0] - 2026-02-04
 
 ### Added
 - Added `get_mcp_mode` tool to query current MCP operation mode (read-only or read-write)
