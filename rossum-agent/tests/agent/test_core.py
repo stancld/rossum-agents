@@ -1618,68 +1618,6 @@ class TestExtractTextFromPrompt:
         assert result == "Valid"
 
 
-class TestCheckRequestScope:
-    """Test RossumAgent._check_request_scope method."""
-
-    def _create_agent(self) -> RossumAgent:
-        """Helper to create an agent with mocked dependencies."""
-        mock_client = MagicMock()
-        mock_mcp_connection = AsyncMock()
-        config = AgentConfig()
-        return RossumAgent(
-            client=mock_client,
-            mcp_connection=mock_mcp_connection,
-            system_prompt="Test prompt",
-            config=config,
-        )
-
-    def test_returns_none_for_in_scope_request(self):
-        """Test that in-scope requests return None (proceed)."""
-        agent = self._create_agent()
-
-        with patch("rossum_agent.agent.core.classify_request") as mock_classify:
-            from rossum_agent.agent.request_classifier import ClassificationResult, RequestScope
-
-            mock_classify.return_value = ClassificationResult(
-                scope=RequestScope.IN_SCOPE, raw_response="IN_SCOPE", input_tokens=10, output_tokens=5
-            )
-
-            result = agent._check_request_scope("List queues")
-
-        assert result is None
-        assert agent._total_input_tokens == 10
-        assert agent._total_output_tokens == 5
-
-    def test_returns_rejection_step_for_out_of_scope_request(self):
-        """Test that out-of-scope requests return rejection step."""
-        agent = self._create_agent()
-
-        with (
-            patch("rossum_agent.agent.core.classify_request") as mock_classify,
-            patch("rossum_agent.agent.core.generate_rejection_response") as mock_rejection,
-        ):
-            from rossum_agent.agent.request_classifier import (
-                ClassificationResult,
-                RejectionResult,
-                RequestScope,
-            )
-
-            mock_classify.return_value = ClassificationResult(
-                scope=RequestScope.OUT_OF_SCOPE, raw_response="OUT_OF_SCOPE", input_tokens=10, output_tokens=5
-            )
-            mock_rejection.return_value = RejectionResult(
-                response="I can help with Rossum tasks.", input_tokens=20, output_tokens=15
-            )
-
-            result = agent._check_request_scope("What's the weather?")
-
-        assert result is not None
-        assert result.is_final is True
-        assert result.final_answer == "I can help with Rossum tasks."
-        assert result.input_tokens == 30  # 10 + 20
-        assert result.output_tokens == 20  # 5 + 15
-
-
 class TestAgentRunRequestDelay:
     """Test RossumAgent.run() request delay behavior."""
 
@@ -1732,40 +1670,6 @@ class TestAgentRunRequestDelay:
         # Should have delays for step 2 and 3 (not step 1)
         assert len(sleep_calls) == 2
         assert all(d == 1.0 for d in sleep_calls)
-
-
-class TestAgentRunOutOfScope:
-    """Test RossumAgent.run() out-of-scope handling."""
-
-    def _create_agent(self) -> RossumAgent:
-        """Helper to create an agent."""
-        mock_client = MagicMock()
-        mock_mcp_connection = AsyncMock()
-        config = AgentConfig()
-        return RossumAgent(
-            client=mock_client,
-            mcp_connection=mock_mcp_connection,
-            system_prompt="Test prompt",
-            config=config,
-        )
-
-    @pytest.mark.asyncio
-    async def test_run_yields_rejection_for_out_of_scope(self):
-        """Test that run() yields rejection and returns for out-of-scope requests."""
-        agent = self._create_agent()
-
-        rejection_step = AgentStep(
-            step_number=1, final_answer="I focus on Rossum tasks.", is_final=True, input_tokens=30, output_tokens=20
-        )
-
-        with patch.object(agent, "_check_request_scope", return_value=rejection_step):
-            steps = []
-            async for step in agent.run("What's the weather?"):
-                steps.append(step)
-
-        assert len(steps) == 1
-        assert steps[0].is_final is True
-        assert steps[0].final_answer == "I focus on Rossum tasks."
 
 
 class TestAgentAddAssistantMessage:
