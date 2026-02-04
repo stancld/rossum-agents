@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from rossum_agent.agent.core import RossumAgent, create_agent
@@ -41,6 +43,18 @@ if TYPE_CHECKING:
     from rossum_agent.agent.types import UserContent
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _RequestContext:
+    """Per-request context for agent execution."""
+
+    output_dir: Path | None = None
+    sub_agent_queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent] | None = None
+    last_memory: AgentMemory | None = None
+
+
+_request_context: contextvars.ContextVar[_RequestContext] = contextvars.ContextVar("request_context")
 
 
 def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentProgressEvent:
@@ -133,28 +147,36 @@ class AgentService:
     """Service for running the Rossum Agent.
 
     Manages MCP connection lifecycle and agent execution for API requests.
+    Uses contextvars for per-request state to support concurrent requests.
     """
 
     def __init__(self) -> None:
         """Initialize agent service."""
-        self._output_dir: Path | None = None
-        self._sub_agent_queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent] | None = None
-        self._last_memory: AgentMemory | None = None
+
+    def _get_context(self) -> _RequestContext:
+        """Get the current request context, creating if needed."""
+        try:
+            return _request_context.get()
+        except LookupError:
+            ctx = _RequestContext()
+            _request_context.set(ctx)
+            return ctx
 
     @property
     def output_dir(self) -> Path | None:
         """Get the output directory for the current run."""
-        return self._output_dir
+        return self._get_context().output_dir
 
     def _on_sub_agent_progress(self, progress: SubAgentProgress) -> None:
         """Callback for sub-agent progress updates.
 
         Converts the progress to an event and puts it on the queue for streaming.
         """
-        if self._sub_agent_queue is not None:
+        ctx = self._get_context()
+        if ctx.sub_agent_queue is not None:
             event = convert_sub_agent_progress_to_event(progress)
             try:
-                self._sub_agent_queue.put_nowait(event)
+                ctx.sub_agent_queue.put_nowait(event)
             except asyncio.QueueFull:
                 logger.warning("Sub-agent progress queue full, dropping event")
 
@@ -163,10 +185,11 @@ class AgentService:
 
         Converts the text to an event and puts it on the queue for streaming.
         """
-        if self._sub_agent_queue is not None:
+        ctx = self._get_context()
+        if ctx.sub_agent_queue is not None:
             event = SubAgentTextEvent(tool_name=text.tool_name, text=text.text, is_final=text.is_final)
             try:
-                self._sub_agent_queue.put_nowait(event)
+                ctx.sub_agent_queue.put_nowait(event)
             except asyncio.QueueFull:
                 logger.warning("Sub-agent text queue full, dropping event")
 
@@ -196,16 +219,19 @@ class AgentService:
         if documents:
             logger.info(f"Including {len(documents)} documents in the prompt")
 
-        self._output_dir = create_session_output_dir()
-        set_session_output_dir(self._output_dir)
-        set_output_dir(self._output_dir)
+        ctx = _RequestContext()
+        _request_context.set(ctx)
+
+        ctx.output_dir = create_session_output_dir()
+        set_session_output_dir(ctx.output_dir)
+        set_output_dir(ctx.output_dir)
         set_rossum_credentials(rossum_api_base_url, rossum_api_token)
-        logger.info(f"Created session output directory: {self._output_dir}")
+        logger.info(f"Created session output directory: {ctx.output_dir}")
 
         if documents:
             self._save_documents_to_output_dir(documents)
 
-        self._sub_agent_queue = asyncio.Queue(maxsize=100)
+        ctx.sub_agent_queue = asyncio.Queue(maxsize=100)
         set_progress_callback(self._on_sub_agent_progress)
         set_text_callback(self._on_sub_agent_text)
 
@@ -237,9 +263,9 @@ class AgentService:
 
                 try:
                     async for step in agent.run(user_content):
-                        while not self._sub_agent_queue.empty():
+                        while not ctx.sub_agent_queue.empty():
                             try:
-                                sub_event = self._sub_agent_queue.get_nowait()
+                                sub_event = ctx.sub_agent_queue.get_nowait()
                                 yield sub_event
                             except asyncio.QueueEmpty:
                                 break
@@ -251,14 +277,14 @@ class AgentService:
                             total_input_tokens = agent._total_input_tokens
                             total_output_tokens = agent._total_output_tokens
 
-                    while not self._sub_agent_queue.empty():
+                    while not ctx.sub_agent_queue.empty():
                         try:
-                            sub_event = self._sub_agent_queue.get_nowait()
+                            sub_event = ctx.sub_agent_queue.get_nowait()
                             yield sub_event
                         except asyncio.QueueEmpty:
                             break
 
-                    self._last_memory = agent.memory
+                    ctx.last_memory = agent.memory
 
                     yield StreamDoneEvent(
                         total_steps=total_steps,
@@ -281,7 +307,6 @@ class AgentService:
             set_text_callback(None)
             set_output_dir(None)
             set_rossum_credentials(None, None)
-            self._sub_agent_queue = None
 
     def _save_documents_to_output_dir(self, documents: list[DocumentContent]) -> None:
         """Save uploaded documents to the output directory.
@@ -291,12 +316,13 @@ class AgentService:
         """
         import base64  # noqa: PLC0415 - import here to avoid circular import at module level
 
-        if self._output_dir is None:
+        ctx = self._get_context()
+        if ctx.output_dir is None:
             logger.warning("Cannot save documents: output directory not set")
             return
 
         for doc in documents:
-            file_path = self._output_dir / doc.filename
+            file_path = ctx.output_dir / doc.filename
             try:
                 file_data = base64.b64decode(doc.data)
                 file_path.write_bytes(file_data)
@@ -320,6 +346,7 @@ class AgentService:
         if not images and not documents:
             return prompt
 
+        ctx = self._get_context()
         content: list[ImageBlockParam | TextBlockParam] = []
         if images:
             for img in images:
@@ -333,8 +360,8 @@ class AgentService:
                         },
                     }
                 )
-        if documents and self._output_dir:
-            doc_paths = [str(self._output_dir / doc.filename) for doc in documents]
+        if documents and ctx.output_dir:
+            doc_paths = [str(ctx.output_dir / doc.filename) for doc in documents]
             doc_info = "\n".join(f"- {path}" for path in doc_paths)
             content.append({"type": "text", "text": f"[Uploaded documents available for processing:\n{doc_info}]"})
         content.append({"type": "text", "text": prompt})
@@ -416,9 +443,10 @@ class AgentService:
             images: Optional list of images included with the user prompt.
             documents: Optional list of documents included with the user prompt.
         """
-        if self._last_memory is not None:
+        ctx = self._get_context()
+        if ctx.last_memory is not None:
             lean_history: list[dict[str, Any]] = []
-            for step_dict in self._last_memory.to_dict():
+            for step_dict in ctx.last_memory.to_dict():
                 if step_dict.get("type") == "task_step":
                     lean_history.append(step_dict)
                 elif step_dict.get("type") == "memory_step":
