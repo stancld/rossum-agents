@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Added `get_mcp_mode` tool to query current MCP operation mode (read-only or read-write)
 - Added `set_mcp_mode` tool to dynamically switch MCP mode at runtime without server restart
+- Added `create_rule` tool for creating business rules with trigger conditions and actions
+- Added `update_rule` tool for full update (PUT) of business rules
+- Added `patch_rule` tool for partial update (PATCH) of business rules
 
 
 ## [1.0.1] - 2026-01-31
