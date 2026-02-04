@@ -80,6 +80,7 @@ uv sync --extra streamlit  # Streamlit UI only
 | `AWS_DEFAULT_REGION` | No | AWS region (default: `us-east-1`) |
 | `REDIS_HOST` | No | Redis host for chat persistence |
 | `REDIS_PORT` | No | Redis port (default: `6379`) |
+| `ROSSUM_MCP_MODE` | No | MCP mode: `read-only` (default) or `read-write` |
 
 ## Usage
 
@@ -216,6 +217,10 @@ flowchart TB
 | `GET /api/v1/chats/{id}/files/{name}` | Download file |
 
 API docs: `/api/docs` (Swagger) or `/api/redoc`
+
+**MCP Mode:** Chat sessions support mode switching via the `mcp_mode` parameter:
+- Set at chat creation: `POST /api/v1/chats` with `{"mcp_mode": "read-write"}`
+- Override per message: `POST /api/v1/chats/{id}/messages` with `{"content": "...", "mcp_mode": "read-write"}`
 
 </details>
 

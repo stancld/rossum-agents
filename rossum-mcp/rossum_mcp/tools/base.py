@@ -13,10 +13,29 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 BASE_URL = os.environ.get("ROSSUM_API_BASE_URL", "").rstrip("/")
-MODE = os.environ.get("ROSSUM_MCP_MODE", "read-write").lower()
 
 # Marker used to indicate omitted fields in list responses
 TRUNCATED_MARKER = "<omitted>"
+
+VALID_MODES = ("read-only", "read-write")
+
+_mcp_mode = os.environ.get("ROSSUM_MCP_MODE", "read-write").lower()
+if _mcp_mode not in VALID_MODES:
+    raise ValueError(f"Invalid ROSSUM_MCP_MODE: {_mcp_mode}. Must be one of: {VALID_MODES}")
+
+
+def get_mcp_mode() -> str:
+    """Return the current MCP mode."""
+    return _mcp_mode
+
+
+def set_mcp_mode(mode: str) -> None:
+    """Set the MCP mode (case-insensitive)."""
+    global _mcp_mode
+    normalized = mode.lower()
+    if normalized not in VALID_MODES:
+        raise ValueError(f"Invalid mode '{mode}'. Must be one of: {VALID_MODES}")
+    _mcp_mode = normalized
 
 
 def build_resource_url(resource_type: str, resource_id: int) -> str:
@@ -26,7 +45,7 @@ def build_resource_url(resource_type: str, resource_id: int) -> str:
 
 def is_read_write_mode() -> bool:
     """Check if server is in read-write mode."""
-    return MODE == "read-write"
+    return _mcp_mode == "read-write"
 
 
 def truncate_dict_fields(data: dict[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
