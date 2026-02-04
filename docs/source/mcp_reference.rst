@@ -458,6 +458,117 @@ list_rules
      # List enabled rules for a specific schema
      enabled_schema_rules = await server.list_rules(schema_id=12345, enabled=True)
 
+create_rule
+^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_rule(name: str, schema_id: int, trigger_condition: str, actions: list[dict], enabled: bool = True, queue_ids: list[int] | None = None)``
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.create_new_rule(rule_data)``
+
+**API Endpoint:**
+  ``POST /v1/rules``
+
+**Request Body:**
+  - ``name``: Rule name
+  - ``schema``: Schema URL
+  - ``trigger_condition``: TxScript formula string (e.g., ``"field.amount > 10000"``)
+  - ``actions``: List of actions with required fields: ``id``, ``type``, ``event``, ``payload``
+  - ``enabled``: Whether the rule is active (default: True)
+  - ``queues``: List of queue URLs to limit rule to specific queues (optional)
+
+**Action types:** ``show_message``, ``add_automation_blocker``, ``add_validation_source``, ``change_queue``, ``send_email``, ``hide_field``, ``show_field``, ``show_hide_field``, ``change_status``, ``add_label``, ``remove_label``, ``custom``
+
+**Event:** ``validation``
+
+**Implementation:**
+  Creates a new business rule. Rules automate field operations based on trigger conditions.
+  Actions define what happens when conditions are met (e.g., set field value, show message).
+
+**Common Use Cases:**
+
+  .. code-block:: python
+
+     # Create a validation rule
+     rule = await server.create_rule(
+         name="High Value Alert",
+         schema_id=12345,
+         trigger_condition="field.amount > 10000",
+         actions=[{"id": "alert1", "type": "show_message", "event": "validation", "payload": {"type": "error", "content": "High value invoice", "schema_id": "amount"}}]
+     )
+
+update_rule
+^^^^^^^^^^^
+
+**MCP Tool:**
+  ``update_rule(rule_id: int, name: str, trigger_condition: str, actions: list[dict], enabled: bool, queue_ids: list[int] | None = None)``
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient._http_client.update(Resource.Rule, rule_id, rule_data)``
+
+**API Endpoint:**
+  ``PUT /v1/rules/{id}``
+
+**Request Body:**
+  - ``name``: Rule name (required)
+  - ``trigger_condition``: TxScript formula string (required)
+  - ``actions``: List of actions (required)
+  - ``enabled``: Whether the rule is active (required)
+  - ``queues``: List of queue URLs to limit rule to specific queues (optional)
+
+**Implementation:**
+  Full update (PUT) of a business rule. All fields are required.
+  Schema cannot be changed after creation.
+
+**Common Use Cases:**
+
+  .. code-block:: python
+
+     # Full update of a rule
+     rule = await server.update_rule(
+         rule_id=67890,
+         name="Updated High Value Alert",
+         trigger_condition="field.amount > 5000",
+         actions=[{"id": "alert1", "type": "show_message", "event": "validation", "payload": {"type": "warning", "content": "Medium value invoice", "schema_id": "amount"}}],
+         enabled=True
+     )
+
+patch_rule
+^^^^^^^^^^
+
+**MCP Tool:**
+  ``patch_rule(rule_id: int, name: str | None, trigger_condition: str | None, actions: list[dict] | None, enabled: bool | None, queue_ids: list[int] | None = None)``
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.update_part_rule(rule_id, rule_data)``
+
+**API Endpoint:**
+  ``PATCH /v1/rules/{id}``
+
+**Request Body:**
+  - ``name``: Rule name (optional)
+  - ``trigger_condition``: TxScript formula string (optional)
+  - ``actions``: List of actions (optional)
+  - ``enabled``: Whether the rule is active (optional)
+  - ``queues``: List of queue URLs (optional, empty list removes all queue associations)
+
+**Implementation:**
+  Partial update (PATCH) of a business rule. Only provided fields are updated.
+
+**Common Use Cases:**
+
+  .. code-block:: python
+
+     # Disable a rule
+     rule = await server.patch_rule(rule_id=67890, enabled=False)
+
+     # Update only the trigger condition
+     rule = await server.patch_rule(
+         rule_id=67890,
+         trigger_condition="field.amount > 20000"
+     )
+
 update_hook
 ^^^^^^^^^^^
 

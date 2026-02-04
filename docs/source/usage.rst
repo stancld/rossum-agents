@@ -1434,6 +1434,131 @@ logic with trigger conditions (TxScript formulas) and actions that execute when 
    # List only enabled rules
    enabled_rules = list_rules(enabled=True)
 
+create_rule
+^^^^^^^^^^^
+
+Creates a new business rule. Rules automate field operations based on trigger conditions.
+
+**Parameters:**
+
+- ``name`` (string, required): Rule name
+- ``schema_id`` (integer, required): Schema ID to associate the rule with
+- ``trigger_condition`` (string, required): TxScript formula (e.g., ``"field.amount > 10000"``)
+- ``actions`` (array, required): List of actions with required fields: ``id`` (unique string), ``type``, ``event``, ``payload``
+- ``enabled`` (boolean, optional): Whether the rule is enabled (default: true)
+- ``queue_ids`` (array of integers, optional): List of queue IDs to limit the rule to specific queues
+
+**Action types:** ``show_message``, ``add_automation_blocker``, ``add_validation_source``, ``change_queue``, ``send_email``, ``hide_field``, ``show_field``, ``show_hide_field``, ``change_status``, ``add_label``, ``remove_label``, ``custom``
+
+**Event:** ``validation``
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "id": 67890,
+     "name": "High Value Alert",
+     "url": "https://elis.rossum.ai/api/v1/rules/67890",
+     "schema": "https://elis.rossum.ai/api/v1/schemas/12345",
+     "trigger_condition": "field.amount > 10000",
+     "actions": [{"id": "alert1", "type": "show_message", "event": "validation", "payload": {"type": "error", "content": "High value invoice", "schema_id": "amount"}}],
+     "enabled": true
+   }
+
+**Example usage:**
+
+.. code-block:: python
+
+   # Create a simple validation rule
+   rule = create_rule(
+       name="High Value Alert",
+       schema_id=12345,
+       trigger_condition="field.amount > 10000",
+       actions=[{"id": "alert1", "type": "show_message", "event": "validation", "payload": {"type": "error", "content": "High value invoice", "schema_id": "amount"}}]
+   )
+
+**Note:** This operation is only available in read-write mode.
+
+update_rule
+^^^^^^^^^^^
+
+Full update (PUT) of a business rule. All fields are required.
+
+**Parameters:**
+
+- ``rule_id`` (integer, required): Rule ID to update
+- ``name`` (string, required): Rule name
+- ``trigger_condition`` (string, required): TxScript formula
+- ``actions`` (array, required): List of actions
+- ``enabled`` (boolean, required): Whether the rule is enabled
+- ``queue_ids`` (array of integers, optional): List of queue IDs to limit the rule to specific queues
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "id": 67890,
+     "name": "Updated Rule",
+     "url": "https://elis.rossum.ai/api/v1/rules/67890",
+     "schema": "https://elis.rossum.ai/api/v1/schemas/12345",
+     "trigger_condition": "field.amount > 5000",
+     "actions": [...],
+     "enabled": true
+   }
+
+**Example usage:**
+
+.. code-block:: python
+
+   # Full update of a rule
+   rule = update_rule(
+       rule_id=67890,
+       name="Updated High Value Alert",
+       trigger_condition="field.amount > 5000",
+       actions=[{"id": "alert1", "type": "show_message", "event": "validation", "payload": {"type": "warning", "content": "Check value", "schema_id": "amount"}}],
+       enabled=True
+   )
+
+**Note:** This operation is only available in read-write mode.
+
+patch_rule
+^^^^^^^^^^
+
+Partial update (PATCH) of a business rule. Only provided fields are updated.
+
+**Parameters:**
+
+- ``rule_id`` (integer, required): Rule ID to update
+- ``name`` (string, optional): Rule name
+- ``trigger_condition`` (string, optional): TxScript formula
+- ``actions`` (array, optional): List of actions
+- ``enabled`` (boolean, optional): Whether the rule is enabled
+- ``queue_ids`` (array of integers, optional): List of queue IDs (empty list removes all queue associations)
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "id": 67890,
+     "name": "Patched Rule",
+     "enabled": false
+   }
+
+**Example usage:**
+
+.. code-block:: python
+
+   # Disable a rule
+   rule = patch_rule(rule_id=67890, enabled=False)
+
+   # Update only the name
+   rule = patch_rule(rule_id=67890, name="New Rule Name")
+
+**Note:** This operation is only available in read-write mode.
+
 delete_rule
 ^^^^^^^^^^^
 

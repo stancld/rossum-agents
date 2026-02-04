@@ -139,6 +139,9 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
         tools=[
             ToolInfo("get_rule", "Retrieve rule details"),
             ToolInfo("list_rules", "List validation rules"),
+            ToolInfo("create_rule", "Create validation rule", read_only=False),
+            ToolInfo("update_rule", "Full update rule (PUT)", read_only=False),
+            ToolInfo("patch_rule", "Partial update rule (PATCH)", read_only=False),
             ToolInfo("delete_rule", "Delete rule", read_only=False),
         ],
         keywords=["rule", "validation", "constraint"],
