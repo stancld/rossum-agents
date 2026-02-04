@@ -7,13 +7,13 @@ All notable changes to this project will be documented in this file.
 ## [1.0.0rc4] - 2026-02-04
 
 ### Added
+- Added message-level `mcp_mode` parameter to override chat's mode per-message and persist for subsequent messages
 - Added token usage visibility with breakdown by main agent vs sub-agents in API responses and Streamlit UI
 - Added dynamic tool loading to reduce initial context usage (~8K → ~800 tokens) [#113](https://github.com/stancld/rossum-agents/pull/113)
 - Added `load_tool_category(["queues", "schemas"])` internal tool to load MCP tools on-demand [#113](https://github.com/stancld/rossum-agents/pull/113)
 - Added automatic pre-loading of tool categories based on keywords in user's first message [#113](https://github.com/stancld/rossum-agents/pull/113)
 - Added read-only mode support - write tools (`read_only=false`) are excluded when MCP runs in read-only mode [#141](https://github.com/stancld/rossum-agents/pull/141)
 - Added PDF document upload support for both REST API and Streamlit UI. Documents are stored in session output directory for agent use (e.g., upload to Rossum) [#102](https://github.com/stancld/rossum-agents/pull/102)
-- Added lightweight request classifier using Claude Haiku to filter out-of-scope requests before invoking the main agent
 - Added skills system for dynamic skill loading from markdown files [#73](https://github.com/stancld/rossum-agents/pull/73)
 - Added `hook-debugging` skill for systematic hook debugging workflow [#73](https://github.com/stancld/rossum-agents/pull/73)
 - Added `rossum-deployment` skill for workspace deployment workflows [#73](https://github.com/stancld/rossum-agents/pull/73)
