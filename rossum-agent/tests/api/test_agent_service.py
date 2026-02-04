@@ -514,12 +514,16 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
 
     def test_build_history_uses_stored_memory(self):
         """Test that build_updated_history uses _last_memory when available."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
+        ctx = _RequestContext()
+        _request_context.set(ctx)
 
         memory = AgentMemory()
         memory.add_task("What is 2+2?")
         memory.steps.append(MemoryStep(step_number=1, text="The answer is 4."))
-        service._last_memory = memory
+        ctx.last_memory = memory
 
         updated = service.build_updated_history(existing_history=[], user_prompt="ignored", final_response="ignored")
 
@@ -531,7 +535,11 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
 
     def test_build_history_strips_tool_calls_for_lean_context(self):
         """Test that tool calls and results are stripped from history for lean context."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
+        ctx = _RequestContext()
+        _request_context.set(ctx)
 
         memory = AgentMemory()
         memory.add_task("Check the weather")
@@ -544,7 +552,7 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
             )
         )
         memory.steps.append(MemoryStep(step_number=2, text="It's rainy in NYC."))
-        service._last_memory = memory
+        ctx.last_memory = memory
 
         updated = service.build_updated_history(existing_history=[], user_prompt="ignored", final_response="ignored")
 
@@ -558,7 +566,11 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
 
     def test_build_history_skips_memory_steps_without_text(self):
         """Test that memory steps without text are skipped."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
+        ctx = _RequestContext()
+        _request_context.set(ctx)
 
         memory = AgentMemory()
         memory.add_task("Do something")
@@ -571,7 +583,7 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
             )
         )
         memory.steps.append(MemoryStep(step_number=2, text="Final answer"))
-        service._last_memory = memory
+        ctx.last_memory = memory
 
         updated = service.build_updated_history(existing_history=[], user_prompt="ignored", final_response="ignored")
 
@@ -582,8 +594,12 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
 
     def test_build_history_falls_back_when_no_memory(self):
         """Test fallback to legacy behavior when _last_memory is None."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
-        service._last_memory = None
+        ctx = _RequestContext()
+        ctx.last_memory = None
+        _request_context.set(ctx)
 
         existing = [{"role": "user", "content": "Previous"}]
         updated = service.build_updated_history(
@@ -597,7 +613,11 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
 
     def test_build_history_preserves_thinking_blocks(self):
         """Test that thinking_blocks are preserved in lean history for extended thinking continuity."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
+        ctx = _RequestContext()
+        _request_context.set(ctx)
 
         memory = AgentMemory()
         memory.add_task("Analyze this document")
@@ -613,7 +633,7 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
                 tool_results=[ToolResult(tool_call_id="tc1", name="get_doc", content="doc content")],
             )
         )
-        service._last_memory = memory
+        ctx.last_memory = memory
 
         updated = service.build_updated_history(existing_history=[], user_prompt="ignored", final_response="ignored")
 
@@ -628,7 +648,11 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
 
     def test_build_history_includes_step_with_only_thinking_blocks(self):
         """Test that memory steps with only thinking_blocks (no text) are preserved."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
+        ctx = _RequestContext()
+        _request_context.set(ctx)
 
         memory = AgentMemory()
         memory.add_task("Process request")
@@ -640,7 +664,7 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
                 tool_calls=[ToolCall(id="tc1", name="tool", arguments={})],
             )
         )
-        service._last_memory = memory
+        ctx.last_memory = memory
 
         updated = service.build_updated_history(existing_history=[], user_prompt="ignored", final_response="ignored")
 
@@ -878,7 +902,13 @@ class TestAgentServiceBuildUpdatedHistoryWithImages:
 
     def test_build_history_with_images(self):
         """Test building history with images included."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
+        ctx = _RequestContext()
+        ctx.last_memory = None
+        _request_context.set(ctx)
+
         existing = [{"role": "user", "content": "Previous message"}]
         images = [ImageContent(media_type="image/png", data="aGVsbG8=")]
 
@@ -901,7 +931,13 @@ class TestAgentServiceBuildUpdatedHistoryWithImages:
 
     def test_build_history_without_images(self):
         """Test building history without images returns text-only content."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
+        ctx = _RequestContext()
+        ctx.last_memory = None
+        _request_context.set(ctx)
+
         existing = []
 
         updated = service.build_updated_history(
@@ -1061,8 +1097,12 @@ class TestAgentServiceSubAgentCallbacks:
 
     def test_on_sub_agent_progress_with_queue(self):
         """Test _on_sub_agent_progress puts event on queue."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
-        service._sub_agent_queue = asyncio.Queue(maxsize=100)
+        ctx = _RequestContext()
+        ctx.sub_agent_queue = asyncio.Queue(maxsize=100)
+        _request_context.set(ctx)
 
         progress = SubAgentProgress(
             tool_name="test_tool",
@@ -1075,15 +1115,19 @@ class TestAgentServiceSubAgentCallbacks:
 
         service._on_sub_agent_progress(progress)
 
-        assert service._sub_agent_queue.qsize() == 1
-        event = service._sub_agent_queue.get_nowait()
+        assert ctx.sub_agent_queue.qsize() == 1
+        event = ctx.sub_agent_queue.get_nowait()
         assert isinstance(event, SubAgentProgressEvent)
         assert event.tool_name == "test_tool"
 
     def test_on_sub_agent_progress_without_queue(self):
         """Test _on_sub_agent_progress does nothing when queue is None."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
-        service._sub_agent_queue = None
+        ctx = _RequestContext()
+        ctx.sub_agent_queue = None
+        _request_context.set(ctx)
 
         progress = SubAgentProgress(
             tool_name="test_tool",
@@ -1098,10 +1142,14 @@ class TestAgentServiceSubAgentCallbacks:
 
     def test_on_sub_agent_progress_queue_full(self, caplog):
         """Test _on_sub_agent_progress logs warning when queue is full."""
-        service = AgentService()
-        service._sub_agent_queue = asyncio.Queue(maxsize=1)
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
-        service._sub_agent_queue.put_nowait(
+        service = AgentService()
+        ctx = _RequestContext()
+        ctx.sub_agent_queue = asyncio.Queue(maxsize=1)
+        _request_context.set(ctx)
+
+        ctx.sub_agent_queue.put_nowait(
             SubAgentProgressEvent(
                 tool_name="existing", iteration=1, max_iterations=1, tool_calls=["tool"], status="running"
             )
@@ -1125,15 +1173,19 @@ class TestAgentServiceSubAgentCallbacks:
 
     def test_on_sub_agent_text_with_queue(self):
         """Test _on_sub_agent_text puts event on queue."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
-        service._sub_agent_queue = asyncio.Queue(maxsize=100)
+        ctx = _RequestContext()
+        ctx.sub_agent_queue = asyncio.Queue(maxsize=100)
+        _request_context.set(ctx)
 
         text = SubAgentText(tool_name="analyze_hook", text="Analyzing...", is_final=False)
 
         service._on_sub_agent_text(text)
 
-        assert service._sub_agent_queue.qsize() == 1
-        event = service._sub_agent_queue.get_nowait()
+        assert ctx.sub_agent_queue.qsize() == 1
+        event = ctx.sub_agent_queue.get_nowait()
         assert isinstance(event, SubAgentTextEvent)
         assert event.tool_name == "analyze_hook"
         assert event.text == "Analyzing..."
@@ -1141,8 +1193,12 @@ class TestAgentServiceSubAgentCallbacks:
 
     def test_on_sub_agent_text_without_queue(self):
         """Test _on_sub_agent_text does nothing when queue is None."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
         service = AgentService()
-        service._sub_agent_queue = None
+        ctx = _RequestContext()
+        ctx.sub_agent_queue = None
+        _request_context.set(ctx)
 
         text = SubAgentText(tool_name="test_tool", text="Hello", is_final=True)
 
@@ -1150,10 +1206,14 @@ class TestAgentServiceSubAgentCallbacks:
 
     def test_on_sub_agent_text_queue_full(self, caplog):
         """Test _on_sub_agent_text logs warning when queue is full."""
-        service = AgentService()
-        service._sub_agent_queue = asyncio.Queue(maxsize=1)
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
-        service._sub_agent_queue.put_nowait(SubAgentTextEvent(tool_name="existing", text="x", is_final=False))
+        service = AgentService()
+        ctx = _RequestContext()
+        ctx.sub_agent_queue = asyncio.Queue(maxsize=1)
+        _request_context.set(ctx)
+
+        ctx.sub_agent_queue.put_nowait(SubAgentTextEvent(tool_name="existing", text="x", is_final=False))
 
         text = SubAgentText(tool_name="new_tool", text="Hello", is_final=True)
 
