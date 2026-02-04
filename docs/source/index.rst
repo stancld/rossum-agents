@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **56 tools** organized into ten categories:
+The MCP server provides **59 tools** organized into ten categories:
 
 **Document Processing**
 
@@ -108,6 +108,9 @@ The MCP server provides **56 tools** organized into ten categories:
 * **list_hook_logs** - List hook execution logs for debugging and monitoring
 * **get_rule** - Get business rule details
 * **list_rules** - List business rules with trigger conditions and actions
+* **create_rule** - Create business rules with trigger conditions and actions
+* **update_rule** - Full update of business rules (PUT)
+* **patch_rule** - Partial update of business rules (PATCH)
 
 **Relations Management**
 
