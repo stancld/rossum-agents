@@ -220,6 +220,26 @@ class TestMessageRequest:
         with pytest.raises(ValidationError):
             MessageRequest(content="Too many images", images=images)
 
+    def test_message_request_mcp_mode_default_none(self):
+        """Test mcp_mode defaults to None."""
+        request = MessageRequest(content="test")
+        assert request.mcp_mode is None
+
+    def test_message_request_mcp_mode_read_only(self):
+        """Test mcp_mode accepts read-only."""
+        request = MessageRequest(content="test", mcp_mode="read-only")
+        assert request.mcp_mode == "read-only"
+
+    def test_message_request_mcp_mode_read_write(self):
+        """Test mcp_mode accepts read-write."""
+        request = MessageRequest(content="test", mcp_mode="read-write")
+        assert request.mcp_mode == "read-write"
+
+    def test_message_request_mcp_mode_invalid(self):
+        """Test invalid mcp_mode is rejected."""
+        with pytest.raises(ValidationError):
+            MessageRequest(content="test", mcp_mode="invalid")
+
 
 class TestImageContent:
     """Tests for ImageContent schema."""

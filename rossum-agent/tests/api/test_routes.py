@@ -336,6 +336,64 @@ class TestSendMessageEndpoint:
         assert call_kwargs["metadata"] is original_metadata
         assert call_kwargs["metadata"].mcp_mode == "read-write"
 
+    @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
+    def test_send_message_uses_message_level_mcp_mode(
+        self, mock_httpx, client, mock_chat_service, mock_agent_service, valid_headers, mock_run_agent_factory
+    ):
+        """Test that per-message mcp_mode overrides chat's mcp_mode."""
+        mock_httpx.return_value = create_mock_httpx_client()
+
+        original_metadata = ChatMetadata(mcp_mode="read-only")
+        mock_chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=original_metadata)
+        mock_chat_service.save_messages.return_value = True
+
+        run_agent_calls, mock_run_agent = mock_run_agent_factory()
+        mock_agent_service.run_agent = mock_run_agent
+        mock_agent_service.build_updated_history.return_value = []
+
+        response = client.post(
+            "/api/v1/chats/chat_123/messages",
+            headers=valid_headers,
+            json={"content": "Hello", "mcp_mode": "read-write"},
+        )
+
+        assert response.status_code == 200
+        response.text  # Consume streaming response
+
+        assert len(run_agent_calls) == 1
+        assert run_agent_calls[0]["mcp_mode"] == "read-write"
+
+        mock_chat_service.save_messages.assert_called_once()
+        save_kwargs = mock_chat_service.save_messages.call_args.kwargs
+        assert save_kwargs["metadata"].mcp_mode == "read-write"
+
+    @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
+    def test_send_message_falls_back_to_chat_mcp_mode(
+        self, mock_httpx, client, mock_chat_service, mock_agent_service, valid_headers, mock_run_agent_factory
+    ):
+        """Test that message without mcp_mode uses chat's mcp_mode."""
+        mock_httpx.return_value = create_mock_httpx_client()
+
+        original_metadata = ChatMetadata(mcp_mode="read-write")
+        mock_chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=original_metadata)
+        mock_chat_service.save_messages.return_value = True
+
+        run_agent_calls, mock_run_agent = mock_run_agent_factory()
+        mock_agent_service.run_agent = mock_run_agent
+        mock_agent_service.build_updated_history.return_value = []
+
+        response = client.post(
+            "/api/v1/chats/chat_123/messages",
+            headers=valid_headers,
+            json={"content": "Hello"},
+        )
+
+        assert response.status_code == 200
+        response.text  # Consume streaming response
+
+        assert len(run_agent_calls) == 1
+        assert run_agent_calls[0]["mcp_mode"] == "read-write"
+
 
 class TestOpenAPIDocumentation:
     """Tests for OpenAPI documentation endpoints."""
