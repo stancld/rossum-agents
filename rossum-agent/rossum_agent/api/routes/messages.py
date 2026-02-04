@@ -157,6 +157,11 @@ async def send_message(
 
     history = chat_data.messages
     mcp_mode = chat_data.metadata.mcp_mode
+    # Use message-level mode if provided, otherwise use chat's mode
+    if message.mcp_mode is not None:
+        mcp_mode = message.mcp_mode
+        # Update chat metadata with new mode for future messages
+        chat_data.metadata.mcp_mode = mcp_mode
     user_prompt = message.content
     images: list[ImageContent] | None = message.images
     documents: list[DocumentContent] | None = message.documents

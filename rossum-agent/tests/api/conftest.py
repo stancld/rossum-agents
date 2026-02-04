@@ -6,9 +6,10 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from rossum_agent.api.models.schemas import StepEvent, StreamDoneEvent
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
 
 @pytest.fixture
@@ -129,3 +130,25 @@ def reset_route_service_getters() -> Generator[None, None, None]:
         messages_module._get_agent_service = original_messages_agent
         files_module._get_chat_service = original_files_chat
         files_module._get_file_service = original_files_file
+
+
+@pytest.fixture
+def mock_run_agent_factory() -> Callable[[], tuple[list, Callable]]:
+    """Factory fixture for creating mock run_agent generators with call tracking.
+
+    Returns a factory function that creates:
+        - A list to capture call kwargs
+        - An async generator function that yields standard success events
+    """
+
+    def create_mock() -> tuple[list, Callable]:
+        calls: list[dict] = []
+
+        async def mock_run_agent(*args, **kwargs):
+            calls.append(kwargs)
+            yield StepEvent(type="final_answer", step_number=1, content="Done!", is_final=True)
+            yield StreamDoneEvent(total_steps=1, input_tokens=100, output_tokens=50)
+
+        return calls, mock_run_agent
+
+    return create_mock

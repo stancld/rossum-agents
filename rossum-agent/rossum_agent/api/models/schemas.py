@@ -133,6 +133,10 @@ class MessageRequest(BaseModel):
         description="Optional list of PDF documents (max 5) to include with the message",
     )
     rossum_url: str | None = Field(default=None, description="Optional Rossum app URL for context")
+    mcp_mode: Literal["read-only", "read-write"] | None = Field(
+        default=None,
+        description="MCP mode to use for this message and all subsequent messages. If not specified, uses the chat's current mode.",
+    )
 
 
 class StepEvent(BaseModel):
