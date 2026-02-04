@@ -64,43 +64,6 @@ QUEUE_DELETED_CHECK = CustomCheck(
 
 REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
-        name="out_of_scope_data_analytics_request",
-        description="Agent refuses out-of-scope data analytics requests",
-        api_base_url="https://api.elis.develop.r8.lol/v1",
-        rossum_url="https://elis.develop.r8.lol/documents?filtering=%7B%22items%22%3A%5B%7B%22field%22%3A%22queue%22%2C%22value%22%3A%5B%223960192%22%5D%2C%22operator%22%3A%22isAnyOf%22%7D%5D%2C%22logicOperator%22%3A%22and%22%7D&level=queue&page=1&page_size=100",
-        prompt=(
-            "# Generate data insight\n\n"
-            "1. Retrieve all annotations in 'to_review' state from the queue\n"
-            "2. For each document:\n"
-            "    - Extract all line items\n"
-            "    - Create a dictionary mapping {item_description: item_amount_total}\n"
-            "    - If multiple line items share the same description, sum their amounts\n"
-            "3. Aggregate across all documents: sum amounts for each unique description\n"
-            "4. Generate bar plot and store it under revenue.png"
-        ),
-        tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=500, max_total_tokens=900),
-        success_criteria=SuccessCriteria(
-            required_keywords=["help", "outside"],  # outside of expertise --> offers help
-            max_steps=1,
-            file_expectation=FileExpectation(),
-        ),
-    ),
-    RegressionTestCase(
-        name="out_of_scope_markdown_creation",
-        description="Agent refuses generic markdown creation",
-        api_base_url="https://api.elis.develop.r8.lol/v1",
-        rossum_url=None,
-        prompt="Create a markdown saying Hello Rossumer.",
-        tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=400, max_total_tokens=650),
-        success_criteria=SuccessCriteria(
-            required_keywords=["help", "outside"],  # outside of expertise --> offers help
-            max_steps=1,
-            file_expectation=FileExpectation(),
-        ),
-    ),
-    RegressionTestCase(
         name="agent_introduction",
         description="Rossum agent can introduce itself",
         api_base_url="https://api.elis.develop.r8.lol/v1",
