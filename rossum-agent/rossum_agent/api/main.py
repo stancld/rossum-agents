@@ -119,7 +119,7 @@ app.add_middleware(RequestSizeLimitMiddleware)
 
 def _build_cors_origin_regex() -> str:
     """Build CORS origin regex including any additional allowed hosts."""
-    patterns = [r".*\.rossum\.app"]
+    patterns = [r".*\.rossum\.(app|ai)"]
     additional_hosts = os.environ.get("ADDITIONAL_ALLOWED_ROSSUM_HOSTS", "")
     if additional_hosts:
         patterns.extend(p.strip() for p in additional_hosts.split(",") if p.strip())
