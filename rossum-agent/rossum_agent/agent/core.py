@@ -75,7 +75,6 @@ from rossum_agent.agent.models import (
     ToolResult,
     truncate_content,
 )
-from rossum_agent.agent.request_classifier import RequestScope, classify_request, generate_rejection_response
 from rossum_agent.api.models.schemas import TokenUsageBreakdown
 from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
 from rossum_agent.rossum_mcp_integration import MCPConnection, mcp_tools_to_anthropic_format
@@ -769,32 +768,6 @@ class RossumAgent:
                     text_parts.append(text)
         return " ".join(text_parts)
 
-    def _check_request_scope(self, prompt: UserContent) -> AgentStep | None:
-        """Check if request is in scope, return rejection step if out of scope."""
-        text = self._extract_text_from_prompt(prompt)
-        result = classify_request(self.client, text)
-        self._total_input_tokens += result.input_tokens
-        self._total_output_tokens += result.output_tokens
-        self._main_agent_input_tokens += result.input_tokens
-        self._main_agent_output_tokens += result.output_tokens
-        if result.scope == RequestScope.OUT_OF_SCOPE:
-            rejection = generate_rejection_response(self.client, text)
-            total_input = result.input_tokens + rejection.input_tokens
-            total_output = result.output_tokens + rejection.output_tokens
-            self._total_input_tokens += rejection.input_tokens
-            self._total_output_tokens += rejection.output_tokens
-            self._main_agent_input_tokens += rejection.input_tokens
-            self._main_agent_output_tokens += rejection.output_tokens
-            return AgentStep(
-                step_number=1,
-                final_answer=rejection.response,
-                is_final=True,
-                input_tokens=total_input,
-                output_tokens=total_output,
-                step_type=StepType.FINAL_ANSWER,
-            )
-        return None
-
     def _inject_preload_info(self, prompt: UserContent, preload_result: str) -> UserContent:
         """Inject preload result info into the user prompt."""
         suffix = (
@@ -820,10 +793,6 @@ class RossumAgent:
 
         Rate limiting is handled with exponential backoff and jitter.
         """
-        if rejection := self._check_request_scope(prompt):
-            yield rejection
-            return
-
         loop = asyncio.get_event_loop()
         mcp_mode = get_mcp_mode()
         set_mcp_connection(self.mcp_connection, loop, mcp_mode)
