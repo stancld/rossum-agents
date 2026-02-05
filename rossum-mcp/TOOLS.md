@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 56 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 59 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ## Document Processing (6 tools)
 
@@ -416,7 +416,7 @@ Retrieves engine fields for a specific engine or all engine fields.
 
 ---
 
-## Extensions & Rules (9 tools)
+## Extensions & Rules (14 tools)
 
 ### get_hook
 
@@ -499,6 +499,112 @@ Lists all business rules.
 - `schema_id` (integer, optional): Filter by schema ID
 - `organization_id` (integer, optional): Filter by organization ID
 - `enabled` (boolean, optional): Filter by enabled status
+
+### create_rule
+
+Creates a new business rule. Rules automate field operations based on trigger conditions.
+
+**Parameters:**
+- `name` (string, required): Rule name
+- `schema_id` (integer, required): Schema ID to associate the rule with
+- `trigger_condition` (string, required): TxScript formula (e.g., `"field.amount > 10000"`)
+- `actions` (array, required): List of actions with required fields: `id` (unique string), `type`, `event`, `payload`
+- `enabled` (boolean, optional): Whether the rule is enabled (default: true)
+- `queue_ids` (array of integers, optional): List of queue IDs to limit the rule to specific queues
+
+**Action types:** `show_message`, `add_automation_blocker`, `add_validation_source`, `change_queue`, `send_email`, `hide_field`, `show_field`, `show_hide_field`, `change_status`, `add_label`, `remove_label`, `custom`
+
+**Event:** `validation`
+
+**Example:**
+```json
+{
+  "name": "High Value Alert",
+  "schema_id": 12345,
+  "trigger_condition": "field.amount > 10000",
+  "actions": [
+    {
+      "id": "show_high_value_message",
+      "type": "show_message",
+      "event": "validation",
+      "payload": {"type": "error", "content": "High value invoice detected", "schema_id": "amount"}
+    }
+  ],
+  "enabled": true,
+  "queue_ids": [101, 102]
+}
+```
+
+**Returns:**
+```json
+{
+  "id": 67890,
+  "name": "High Value Alert",
+  "url": "https://elis.rossum.ai/api/v1/rules/67890",
+  "schema": "https://elis.rossum.ai/api/v1/schemas/12345",
+  "trigger_condition": "field.amount > 10000",
+  "actions": [...],
+  "enabled": true
+}
+```
+
+### update_rule
+
+Full update (PUT) of a business rule. All fields are required.
+
+**Parameters:**
+- `rule_id` (integer, required): Rule ID to update
+- `name` (string, required): Rule name
+- `trigger_condition` (string, required): TxScript formula
+- `actions` (array, required): List of actions with required fields: `id`, `type`, `event`, `payload`
+- `enabled` (boolean, required): Whether the rule is enabled
+- `queue_ids` (array of integers, optional): List of queue IDs to limit the rule to specific queues
+
+**Example:**
+```json
+{
+  "rule_id": 67890,
+  "name": "Updated High Value Alert",
+  "trigger_condition": "field.amount > 5000",
+  "actions": [
+    {
+      "id": "alert1",
+      "type": "show_message",
+      "event": "validation",
+      "payload": {"type": "warning", "content": "Check this value", "schema_id": "amount"}
+    }
+  ],
+  "enabled": true,
+  "queue_ids": [101, 102]
+}
+```
+
+### patch_rule
+
+Partial update (PATCH) of a business rule. Only provided fields are updated.
+
+**Parameters:**
+- `rule_id` (integer, required): Rule ID to update
+- `name` (string, optional): Rule name
+- `trigger_condition` (string, optional): TxScript formula
+- `actions` (array, optional): List of actions
+- `enabled` (boolean, optional): Whether the rule is enabled
+- `queue_ids` (array of integers, optional): List of queue IDs (empty list removes all queue associations)
+
+**Example:**
+```python
+# Disable a rule
+patch_rule(rule_id=67890, enabled=False)
+
+# Update only the trigger condition
+patch_rule(rule_id=67890, trigger_condition="field.amount > 20000")
+
+# Assign rule to specific queues
+patch_rule(rule_id=67890, queue_ids=[101, 102])
+
+# Remove all queue associations (rule applies to all queues using its schema)
+patch_rule(rule_id=67890, queue_ids=[])
+```
 
 ### delete_hook
 
@@ -661,7 +767,7 @@ Lists all available tool categories with descriptions, tool names, and keywords 
 - `email_templates` - Email templates (3 tools)
 - `document_relations` - Document relations (2 tools)
 - `relations` - Annotation relations (2 tools)
-- `rules` - Validation rules (3 tools)
+- `rules` - Validation rules (6 tools)
 - `users` - User management (3 tools)
 - `workspaces` - Workspace management (4 tools)
 

@@ -131,6 +131,7 @@ The agent provides internal tools and access to 50+ MCP tools via dynamic loadin
 - `debug_hook` - Expert debugging with Opus sub-agent
 
 **Schema:**
+- `create_schema_with_subagent` - Create new schemas via Opus sub-agent
 - `patch_schema_with_subagent` - Safe schema modifications via Opus
 
 **Deployment:**

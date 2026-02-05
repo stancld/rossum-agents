@@ -16,6 +16,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 - `load_skill("rossum-deployment")` → sandbox, deploy, cross-org, migrate
 - `load_skill("hook-debugging")` → debug/fix function hooks
 - `load_skill("organization-setup")` → new customer onboarding, queue templates
+- `load_skill("schema-creation")` → create new schemas from scratch
 - `load_skill("schema-patching")` → modify schemas, add/remove fields, formulas
 - `load_skill("schema-pruning")` → bulk remove unwanted fields from schema
 - `load_skill("ui-settings")` → update queue UI settings, annotation list columns
