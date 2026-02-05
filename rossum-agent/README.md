@@ -94,8 +94,20 @@ rossum-agent
 ### REST API
 
 ```bash
-rossum-agent-api --host 0.0.0.0 --port 8000
+# Development (uvicorn)
+rossum-agent-api --host 0.0.0.0 --port 8000 --reload
+
+# Production (gunicorn)
+rossum-agent-api --server gunicorn --host 0.0.0.0 --port 8000 --workers 4
 ```
+
+| Option | Server | Description |
+|--------|--------|-------------|
+| `--server` | both | Backend: `uvicorn` (default) or `gunicorn` |
+| `--host` | both | Host to bind to (default: 127.0.0.1) |
+| `--port` | both | Port to listen on (default: 8000) |
+| `--workers` | both | Number of worker processes (default: 1) |
+| `--reload` | uvicorn | Enable auto-reload for development |
 
 ### Python SDK
 

@@ -14,6 +14,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 from rossum_agent.api.main import (
     MAX_REQUEST_SIZE,
+    _run_gunicorn,
     app,
     get_agent_service,
     get_chat_service,
@@ -302,3 +303,111 @@ class TestMainCLI:
             call_args = mock_run.call_args
             assert call_args[0][0] == "rossum_agent.api.main:app"
             assert call_args[1]["workers"] == 4
+
+    def test_main_default_server_is_uvicorn(self):
+        """Test that default server is uvicorn for backwards compatibility."""
+        with (
+            patch.object(sys, "argv", ["rossum-agent-api"]),
+            patch.object(uvicorn, "run") as mock_run,
+        ):
+            main()
+
+            mock_run.assert_called_once()
+
+
+class TestMainCLIGunicorn:
+    """Tests for CLI entry point with gunicorn."""
+
+    def test_main_runs_gunicorn(self):
+        """Test that main runs gunicorn with correct parameters."""
+        mock_app_class = MagicMock()
+        mock_app_instance = MagicMock()
+        mock_app_class.return_value = mock_app_instance
+
+        with (
+            patch.object(
+                sys, "argv", ["rossum-agent-api", "--server", "gunicorn", "--host", "127.0.0.1", "--port", "8080"]
+            ),
+            patch.dict(
+                "sys.modules", {"gunicorn": MagicMock(), "gunicorn.app": MagicMock(), "gunicorn.app.base": MagicMock()}
+            ),
+            patch("rossum_agent.api.main._run_gunicorn") as mock_run_gunicorn,
+        ):
+            main()
+
+            mock_run_gunicorn.assert_called_once()
+            args = mock_run_gunicorn.call_args[0][0]
+            assert args.server == "gunicorn"
+            assert args.host == "127.0.0.1"
+            assert args.port == 8080
+
+    def test_main_gunicorn_rejects_reload(self):
+        """Test that gunicorn exits with error when --reload is used."""
+        import argparse
+
+        args = argparse.Namespace(
+            host="127.0.0.1",
+            port=8000,
+            reload=True,
+            workers=1,
+            server="gunicorn",
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            _run_gunicorn(args)
+
+        assert exc_info.value.code == 1
+
+    def test_main_workers_flag_works_with_both_servers(self):
+        """Test that --workers flag works with both uvicorn and gunicorn."""
+        with (
+            patch.object(sys, "argv", ["rossum-agent-api", "--workers", "4"]),
+            patch.object(uvicorn, "run") as mock_uvicorn_run,
+        ):
+            main()
+            assert mock_uvicorn_run.call_args[1]["workers"] == 4
+
+        with (
+            patch.object(sys, "argv", ["rossum-agent-api", "--server", "gunicorn", "--workers", "4"]),
+            patch("rossum_agent.api.main._run_gunicorn") as mock_run_gunicorn,
+        ):
+            main()
+            args = mock_run_gunicorn.call_args[0][0]
+            assert args.workers == 4
+
+    def test_run_gunicorn_standalone_application(self):
+        """Test that StandaloneApplication is configured correctly."""
+        import argparse
+
+        from gunicorn.app.base import BaseApplication
+        from rossum_agent.api.main import (
+            GUNICORN_GRACEFUL_TIMEOUT,
+            GUNICORN_KEEPALIVE,
+            GUNICORN_TIMEOUT,
+        )
+
+        args = argparse.Namespace(
+            host="127.0.0.1",
+            port=8000,
+            reload=False,
+            workers=2,
+            server="gunicorn",
+        )
+
+        captured_app = None
+
+        def mock_run(self):
+            nonlocal captured_app
+            captured_app = self
+
+        with patch.object(BaseApplication, "run", mock_run):
+            _run_gunicorn(args)
+
+        assert captured_app is not None
+        assert captured_app.app_uri == "rossum_agent.api.main:app"
+        assert captured_app.options["bind"] == "127.0.0.1:8000"
+        assert captured_app.options["workers"] == 2
+        assert captured_app.options["worker_class"] == "uvicorn.workers.UvicornWorker"
+        assert captured_app.options["timeout"] == GUNICORN_TIMEOUT
+        assert captured_app.options["graceful_timeout"] == GUNICORN_GRACEFUL_TIMEOUT
+        assert captured_app.options["keepalive"] == GUNICORN_KEEPALIVE

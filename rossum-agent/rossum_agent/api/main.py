@@ -9,7 +9,9 @@ import sys
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
+import uvicorn
 from fastapi import FastAPI, Request, status
+from gunicorn.app.base import BaseApplication
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -28,6 +30,11 @@ from rossum_agent.api.services.file_service import FileService
 logger = logging.getLogger(__name__)
 
 MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10 MB (supports image uploads)
+
+# Gunicorn defaults
+GUNICORN_TIMEOUT = 120
+GUNICORN_GRACEFUL_TIMEOUT = 30
+GUNICORN_KEEPALIVE = 5
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -151,22 +158,7 @@ app.include_router(messages.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
 
 
-def main() -> None:
-    """CLI entry point for the API server."""
-    parser = argparse.ArgumentParser(description="Run the Rossum Agent API server")
-    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default: 8000)")
-    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
-    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes (default: 1)")
-
-    args = parser.parse_args()
-
-    try:
-        import uvicorn  # noqa: PLC0415
-    except ImportError:
-        print("Error: uvicorn is required. Install with: uv pip install 'rossum-agent[api]'")
-        sys.exit(1)
-
+def _run_uvicorn(args: argparse.Namespace) -> None:
     uvicorn.run(
         "rossum_agent.api.main:app",
         host=args.host,
@@ -174,6 +166,60 @@ def main() -> None:
         reload=args.reload,
         workers=args.workers if not args.reload else 1,
     )
+
+
+def _run_gunicorn(args: argparse.Namespace) -> None:
+    """Run the server with gunicorn using UvicornWorker."""
+    if args.reload:
+        print("Error: --reload is not supported with gunicorn. Use uvicorn for development.")
+        sys.exit(1)
+
+    class StandaloneApplication(BaseApplication):
+        def __init__(self, app_uri: str, options: dict | None = None):
+            self.app_uri = app_uri
+            self.options = options or {}
+            super().__init__()
+
+        def load_config(self) -> None:
+            for key, value in self.options.items():
+                if key in self.cfg.settings and value is not None:
+                    self.cfg.set(key.lower(), value)
+
+        def load(self):
+            return self.app_uri
+
+    options = {
+        "bind": f"{args.host}:{args.port}",
+        "workers": args.workers,
+        "worker_class": "uvicorn.workers.UvicornWorker",
+        "timeout": GUNICORN_TIMEOUT,
+        "graceful_timeout": GUNICORN_GRACEFUL_TIMEOUT,
+        "keepalive": GUNICORN_KEEPALIVE,
+    }
+
+    StandaloneApplication("rossum_agent.api.main:app", options).run()
+
+
+def main() -> None:
+    """CLI entry point for the API server."""
+    parser = argparse.ArgumentParser(description="Run the Rossum Agent API server")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default: 8000)")
+    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes (default: 1)")
+    parser.add_argument(
+        "--server",
+        choices=["uvicorn", "gunicorn"],
+        default="uvicorn",
+        help="Server backend to use (default: uvicorn)",
+    )
+
+    args = parser.parse_args()
+
+    if args.server == "gunicorn":
+        _run_gunicorn(args)
+    else:
+        _run_uvicorn(args)
 
 
 if __name__ == "__main__":
