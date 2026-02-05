@@ -48,6 +48,7 @@ rossum-agent-api = "rossum_agent.api.main:main"
 [project.optional-dependencies]
 api = [
     "fastapi>=0.115.0",
+    "gunicorn>=23.0.0",
     "pydantic>2.0.0",
     "python-multipart>=0.0.22",
     "redis>=7.0.0",
@@ -79,6 +80,7 @@ tests = [
 all = [
     "coverage>=7.0.0",
     "fastapi>=0.115.0",
+    "gunicorn>=23.0.0",
     "httpx>=0.27.0",
     "myst-parser>=2.0.0",
     "pydantic>2.0.0",
