@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Added task tracking system (`create_task`, `update_task`, `list_tasks` tools) for real-time progress visibility on multi-step operations, streamed via SSE `task_snapshot` events [#157](https://github.com/stancld/rossum-agents/pull/157)
+- Added `search_elis_docs` sub-agent tool with `elis_openapi_jq` and `elis_openapi_grep` for querying the Rossum API OpenAPI specification directly [#154](https://github.com/stancld/rossum-agents/pull/154)
 - Added Gunicorn server support for production deployments via `--server gunicorn` CLI flag [#152](https://github.com/stancld/rossum-agents/pull/152)
   - Gunicorn is now bundled with the `api` extra
   - Uses UvicornWorker for ASGI compatibility

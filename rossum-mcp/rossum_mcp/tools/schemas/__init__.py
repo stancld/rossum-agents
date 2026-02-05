@@ -157,9 +157,13 @@ Important: Datapoints inside a tuple MUST have an "id" field. Section-level data
     ) -> Schema | dict:
         return await ops.patch_schema(client, schema_id, operation, node_id, node_data, parent_id, position)
 
-    @mcp.tool(description="Get lightweight tree structure of schema with only ids, labels, categories, and types.")
-    async def get_schema_tree_structure(schema_id: int) -> list[dict] | dict:
-        return await ops.get_schema_tree_structure(client, schema_id)
+    @mcp.tool(
+        description="Get lightweight tree structure of schema with only ids, labels, categories, and types. Accepts schema_id or queue_id (resolves to schema automatically)."
+    )
+    async def get_schema_tree_structure(
+        schema_id: int | None = None, queue_id: int | None = None
+    ) -> list[dict] | dict:
+        return await ops.get_schema_tree_structure(client, schema_id=schema_id, queue_id=queue_id)
 
     @mcp.tool(
         description="""Remove multiple fields from schema at once. Efficient for pruning unwanted fields during setup.

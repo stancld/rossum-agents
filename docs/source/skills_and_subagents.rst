@@ -202,6 +202,61 @@ Sub-Agents
 
 Sub-agents are Opus-powered components that handle complex iterative tasks requiring deep reasoning and tool use loops.
 
+Elis API Documentation Sub-Agent
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Invoked via the ``search_elis_docs`` tool. Searches the Rossum API OpenAPI specification for endpoint details, schemas, and usage examples.
+
+**Capabilities:**
+
+- Queries OpenAPI spec using jq for structured lookups (``elis_openapi_jq``)
+- Free-text search across spec descriptions and field names (``elis_openapi_grep``)
+- Opus analyzes results and synthesizes actionable responses
+- Caches OpenAPI spec locally with 24-hour TTL
+
+**Usage:**
+
+.. code-block:: python
+
+   search_elis_docs(query="How do I create an annotation via API?")
+
+Returns JSON with:
+
+- Analysis of relevant API endpoints
+- Request/response schemas
+- Required fields and parameters
+- Code examples where applicable
+
+**When to use:**
+
+- API questions: endpoints, HTTP methods, request bodies
+- Schema definitions: field types, required properties, enums
+- Programmatic integration: "How do I POST to /v1/queues?"
+
+For extension setup guides and workflow tutorials, use ``search_knowledge_base`` instead.
+
+Direct OpenAPI Search Tools
+"""""""""""""""""""""""""""
+
+The agent also exposes the underlying search tools directly for quick lookups without sub-agent overhead:
+
+``elis_openapi_jq(jq_query)``
+   Query the OpenAPI spec with jq. Returns JSON result.
+
+   .. code-block:: python
+
+      elis_openapi_jq(jq_query='.paths | keys | map(select(contains("queue")))')
+      elis_openapi_jq(jq_query='.paths["/v1/queues/{id}"]')
+      elis_openapi_jq(jq_query='.components.schemas.Queue')
+
+``elis_openapi_grep(pattern, case_insensitive=True)``
+   Free-text search across spec descriptions, summaries, operationIds, and field names. Supports regex.
+
+   .. code-block:: python
+
+      elis_openapi_grep(pattern="pagination")
+      elis_openapi_grep(pattern="annotation_status")
+
 Hook Debug Sub-Agent
 ^^^^^^^^^^^^^^^^^^^^
 

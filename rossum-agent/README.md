@@ -123,6 +123,11 @@ The agent provides internal tools and access to 50+ MCP tools via dynamic loadin
 - `write_file` - Save reports, documentation, analysis results
 - `search_knowledge_base` - Search Rossum docs with AI analysis
 
+**API Reference:**
+- `elis_openapi_jq` - Query Rossum API OpenAPI spec with jq
+- `elis_openapi_grep` - Free-text search in API spec
+- `search_elis_docs` - AI-powered search of API documentation
+
 **Hook Analysis:**
 - `evaluate_python_hook` - Execute hooks in sandboxed environment
 - `debug_hook` - Expert debugging with Opus sub-agent

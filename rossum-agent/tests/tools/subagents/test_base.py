@@ -66,6 +66,28 @@ class TestSubAgentResult:
         assert result.output_tokens == 50
         assert result.iterations_used == 3
 
+    def test_tool_calls_defaults_to_none(self):
+        """Test that tool_calls defaults to None when not provided."""
+        result = SubAgentResult(
+            analysis="Test",
+            input_tokens=0,
+            output_tokens=0,
+            iterations_used=1,
+        )
+        assert result.tool_calls is None
+
+    def test_tool_calls_with_value(self):
+        """Test that tool_calls can be set."""
+        calls = [{"tool": "test_tool", "input": {"key": "val"}}]
+        result = SubAgentResult(
+            analysis="Test",
+            input_tokens=0,
+            output_tokens=0,
+            iterations_used=1,
+            tool_calls=calls,
+        )
+        assert result.tool_calls == calls
+
 
 class TestSaveIterationContext:
     """Test save_iteration_context function."""
@@ -256,6 +278,43 @@ class TestSubAgent:
             assert result.output_tokens == 125
             assert result.iterations_used == 2
             assert mock_client.messages.create.call_count == 2
+            assert result.tool_calls == [{"tool": "test_tool", "input": {}}]
+
+    def test_run_no_tool_calls_returns_none(self):
+        """Test that run returns tool_calls=None when no tools are used."""
+        config = SubAgentConfig(
+            tool_name="test",
+            system_prompt="prompt",
+            tools=[],
+            max_iterations=5,
+        )
+        agent = ConcreteSubAgent(config)
+
+        mock_text_block = MagicMock()
+        mock_text_block.text = "Direct answer"
+        mock_text_block.type = "text"
+
+        mock_response = MagicMock()
+        mock_response.content = [mock_text_block]
+        mock_response.stop_reason = "end_of_turn"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_response
+
+        with (
+            patch(
+                "rossum_agent.tools.subagents.base.create_bedrock_client",
+                return_value=mock_client,
+            ),
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage"),
+            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
+        ):
+            result = agent.run("Test message")
+
+            assert result.tool_calls is None
 
     def test_run_reports_token_usage(self):
         """Test that token usage is reported via callback."""
@@ -417,6 +476,48 @@ class TestSubAgent:
             assert result.output_tokens == 100
             mock_logger.warning.assert_called()
             assert "max iterations" in mock_logger.warning.call_args[0][0]
+
+    def test_run_max_iterations_tracks_tool_calls(self):
+        """Test that tool_calls are tracked when max iterations is reached."""
+        config = SubAgentConfig(
+            tool_name="test",
+            system_prompt="prompt",
+            tools=[{"name": "tool"}],
+            max_iterations=2,
+        )
+        agent = ConcreteSubAgent(config)
+
+        mock_tool_block = MagicMock(spec=["type", "name", "input", "id"])
+        mock_tool_block.type = "tool_use"
+        mock_tool_block.name = "tool"
+        mock_tool_block.input = {"q": "test"}
+        mock_tool_block.id = "tool_1"
+
+        mock_response = MagicMock()
+        mock_response.content = [mock_tool_block]
+        mock_response.stop_reason = "tool_use"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_response
+
+        with (
+            patch(
+                "rossum_agent.tools.subagents.base.create_bedrock_client",
+                return_value=mock_client,
+            ),
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage"),
+            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
+            patch("rossum_agent.tools.subagents.base.logger"),
+        ):
+            result = agent.run("Test")
+
+            assert result.tool_calls == [
+                {"tool": "tool", "input": {"q": "test"}},
+                {"tool": "tool", "input": {"q": "test"}},
+            ]
 
     def test_process_response_block_concrete_impl(self):
         """Test that ConcreteSubAgent's process_response_block returns None."""
