@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [1.1.1] - 2026-02-05
 
 ### Fixed
 - Fixed `create_schema` and `patch_schema` failing with HTTP 400 when schema contains invalid `ui_configuration.type` values (e.g., 'area', 'textarea'). Invalid values are now automatically sanitized before API calls.
