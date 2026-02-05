@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.0.0rc5] - 2026-02-04
+## [1.0.0rc6] - 2026-02-05
 
 ### Added
 - Added `create_schema_with_subagent` tool for creating new schemas from scratch via Opus sub-agent

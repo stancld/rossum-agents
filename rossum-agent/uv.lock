@@ -2230,7 +2230,7 @@ wheels = [
 
 [[package]]
 name = "rossum-agent"
-version = "1.0.0rc5"
+version = "1.0.0rc6"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -2346,7 +2346,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32" },
     { name = "rossum-api", specifier = ">=3.8.0" },
     { name = "rossum-deploy", specifier = ">=0.1.0" },
-    { name = "rossum-mcp", specifier = ">=1.0.1" },
+    { name = "rossum-mcp", specifier = ">=1.1.1" },
     { name = "slowapi", marker = "extra == 'all'", specifier = ">=0.1.9" },
     { name = "slowapi", marker = "extra == 'api'", specifier = ">=0.1.9" },
     { name = "sphinx", marker = "extra == 'all'", specifier = ">=7.0.0" },
@@ -2400,16 +2400,16 @@ wheels = [
 
 [[package]]
 name = "rossum-mcp"
-version = "1.0.1"
+version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastmcp" },
     { name = "pydantic" },
     { name = "rossum-api" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/41/cc/bc4ec633332f3f02c6009fa0e4883288d6b8f092cd3460d7c374a44741d8/rossum_mcp-1.0.1.tar.gz", hash = "sha256:1a3fd74ba0af8fbd18f6a573724dd9e73948734803913009568b6314a2564f42", size = 34618, upload-time = "2026-01-31T12:45:40.944Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/49/c260bdea10cefd37184e79d6c18e31d692e17d2f4e1bfe235e658f523bdb/rossum_mcp-1.1.1.tar.gz", hash = "sha256:5fc5cc6167ce7ebbad567a7dbfee14faf37df72881621b0e0986d87d50e3423b", size = 38070, upload-time = "2026-02-05T08:39:16.784Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3d/46/680132c705bef9a1a5d9b368951efd78ee0241205ee40d9bc5c8fc8a10d2/rossum_mcp-1.0.1-py3-none-any.whl", hash = "sha256:9dcecc311f1d10fb1c2d2da94e5fcef165cf610d713a2865f6b9a254ae97a92e", size = 36668, upload-time = "2026-01-31T12:45:39.607Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/71/8fd49b8748d3c7850e675ffb8d8d05b945b49abc425bb1b8e704d1a72cba/rossum_mcp-1.1.1-py3-none-any.whl", hash = "sha256:273e63ac7c8e6c921210b412bd010fd9cce89c1b46c2767da4f522eab217247e", size = 42301, upload-time = "2026-02-05T08:39:15.768Z" },
 ]
 
 [[package]]
