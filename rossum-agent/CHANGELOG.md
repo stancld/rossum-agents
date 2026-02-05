@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
   - Gunicorn is now bundled with the `api` extra
   - Uses UvicornWorker for ASGI compatibility
 
+### Changed
+- Refactored API to use FastAPI's `app.state` for service instances instead of module-level globals [#153](https://github.com/stancld/rossum-agents/pull/153)
+
 
 ## [1.0.0] - 2025-02-05
 
