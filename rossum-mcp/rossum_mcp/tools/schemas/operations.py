@@ -19,6 +19,7 @@ from rossum_mcp.tools.schemas.pruning import (
     _extract_schema_tree,
     _remove_fields_from_content,
 )
+from rossum_mcp.tools.schemas.validation import sanitize_schema_content
 
 if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
@@ -72,7 +73,8 @@ async def create_schema(client: AsyncRossumAPIClient, name: str, content: list[d
         return {"error": "create_schema is not available in read-only mode"}
 
     logger.debug(f"Creating schema: name={name}")
-    schema_data = {"name": name, "content": content}
+    sanitized_content = sanitize_schema_content(content)
+    schema_data = {"name": name, "content": sanitized_content}
     schema: Schema = await client.create_new_schema(schema_data)
     return schema
 
@@ -120,7 +122,8 @@ async def patch_schema(
     except ValueError as e:
         return {"error": str(e)}
 
-    await client._http_client.update(Resource.Schema, schema_id, {"content": patched_content})
+    sanitized_content = sanitize_schema_content(patched_content)
+    await client._http_client.update(Resource.Schema, schema_id, {"content": sanitized_content})
     updated_schema: Schema = await client.retrieve_schema(schema_id)
     return updated_schema
 
