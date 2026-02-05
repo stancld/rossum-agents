@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,24 +17,19 @@ from rossum_agent.api.models.schemas import (
     StepEvent,
     StreamDoneEvent,
 )
-from rossum_agent.api.routes import chats, files, health, messages
-from rossum_agent.api.routes.chats import get_chat_service_dep as chats_get_chat_service_dep
-from rossum_agent.api.routes.health import get_chat_service_dep as health_get_chat_service_dep
 from rossum_agent.redis_storage import ChatData, ChatMetadata
 
 from .conftest import create_mock_httpx_client
 
 
 @pytest.fixture
-def client(mock_chat_service, mock_agent_service):
-    """Create test client with mocked services."""
-    health.set_chat_service_getter(lambda: mock_chat_service)
-    chats.set_chat_service_getter(lambda: mock_chat_service)
-    messages.set_chat_service_getter(lambda: mock_chat_service)
-    messages.set_agent_service_getter(lambda: mock_agent_service)
-    files.set_chat_service_getter(lambda: mock_chat_service)
+def client(mock_chat_service, mock_agent_service, mock_file_service):
+    """Create test client with mocked services injected via app.state."""
+    app.state.chat_service = mock_chat_service
+    app.state.agent_service = mock_agent_service
+    app.state.file_service = mock_file_service
 
-    with TestClient(app) as client:
+    with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 
 
@@ -420,19 +415,23 @@ class TestOpenAPIDocumentation:
         assert response.status_code == 200
 
 
-class TestServiceGetterDeps:
-    """Tests for service getter dependency functions.
+class TestServiceDependencies:
+    """Tests for service dependency functions."""
 
-    Note: The autouse fixture reset_route_service_getters handles resetting
-    the service getter state before and after each test.
-    """
+    def test_services_not_initialized_error(self):
+        """Test that accessing services without initialization raises RuntimeError."""
+        from rossum_agent.api.dependencies import get_agent_service, get_chat_service, get_file_service
+        from starlette.datastructures import State
 
-    def test_chats_get_chat_service_dep_raises_when_not_configured(self):
-        """Test that chats get_chat_service_dep raises RuntimeError when not configured."""
-        with pytest.raises(RuntimeError, match="Chat service getter not configured"):
-            chats_get_chat_service_dep()
+        mock_request = MagicMock()
+        mock_request.app = MagicMock()
+        mock_request.app.state = State()
 
-    def test_health_get_chat_service_dep_raises_when_not_configured(self):
-        """Test that health get_chat_service_dep raises RuntimeError when not configured."""
-        with pytest.raises(RuntimeError, match="Chat service getter not configured"):
-            health_get_chat_service_dep()
+        with pytest.raises(RuntimeError, match="Chat service not initialized"):
+            get_chat_service(mock_request)
+
+        with pytest.raises(RuntimeError, match="Agent service not initialized"):
+            get_agent_service(mock_request)
+
+        with pytest.raises(RuntimeError, match="File service not initialized"):
+            get_file_service(mock_request)

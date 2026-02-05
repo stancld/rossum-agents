@@ -6,10 +6,34 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from rossum_agent.api.main import app
 from rossum_agent.api.models.schemas import StepEvent, StreamDoneEvent
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
+
+
+@pytest.fixture(autouse=True)
+def reset_app_state() -> Generator[None, None, None]:
+    """Reset app.state before and after each test to ensure isolation.
+
+    This fixture is autouse to ensure test isolation - each test starts with
+    fresh app.state and doesn't leak state to other tests.
+    """
+    original_state = {}
+    for attr in ("chat_service", "agent_service", "file_service"):
+        if hasattr(app.state, attr):
+            original_state[attr] = getattr(app.state, attr)
+            delattr(app.state, attr)
+
+    try:
+        yield
+    finally:
+        for attr in ("chat_service", "agent_service", "file_service"):
+            if hasattr(app.state, attr):
+                delattr(app.state, attr)
+        for attr, value in original_state.items():
+            setattr(app.state, attr, value)
 
 
 @pytest.fixture
@@ -68,68 +92,6 @@ def create_mock_httpx_client(
 def mock_httpx_success() -> AsyncMock:
     """Create mocked httpx client for successful auth."""
     return create_mock_httpx_client()
-
-
-@pytest.fixture(autouse=True)
-def reset_main_service_singletons() -> Generator[None, None, None]:
-    """Reset service singletons in main module before and after each test.
-
-    This fixture is autouse to ensure test isolation - each test starts with
-    fresh singleton state and doesn't leak state to other tests.
-    """
-    import rossum_agent.api.main as main_module
-
-    original_chat = main_module._chat_service
-    original_agent = main_module._agent_service
-    original_file = main_module._file_service
-
-    main_module._chat_service = None
-    main_module._agent_service = None
-    main_module._file_service = None
-
-    try:
-        yield
-    finally:
-        main_module._chat_service = original_chat
-        main_module._agent_service = original_agent
-        main_module._file_service = original_file
-
-
-@pytest.fixture(autouse=True)
-def reset_route_service_getters() -> Generator[None, None, None]:
-    """Reset service getter functions in route modules before and after each test.
-
-    This ensures route modules don't leak configured getters between tests.
-    Each test starts with service getters set to None (unconfigured state).
-    """
-    import rossum_agent.api.routes.chats as chats_module
-    import rossum_agent.api.routes.files as files_module
-    import rossum_agent.api.routes.health as health_module
-    import rossum_agent.api.routes.messages as messages_module
-
-    original_health_chat = health_module._get_chat_service
-    original_chats_chat = chats_module._get_chat_service
-    original_messages_chat = messages_module._get_chat_service
-    original_messages_agent = messages_module._get_agent_service
-    original_files_chat = files_module._get_chat_service
-    original_files_file = files_module._get_file_service
-
-    health_module._get_chat_service = None
-    chats_module._get_chat_service = None
-    messages_module._get_chat_service = None
-    messages_module._get_agent_service = None
-    files_module._get_chat_service = None
-    files_module._get_file_service = None
-
-    try:
-        yield
-    finally:
-        health_module._get_chat_service = original_health_chat
-        chats_module._get_chat_service = original_chats_chat
-        messages_module._get_chat_service = original_messages_chat
-        messages_module._get_agent_service = original_messages_agent
-        files_module._get_chat_service = original_files_chat
-        files_module._get_file_service = original_files_file
 
 
 @pytest.fixture

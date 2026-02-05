@@ -7,11 +7,15 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from typing import Annotated  # noqa: TC003 - Required at runtime for FastAPI dependency injection
+from typing import Annotated
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, Request, status
+
+from rossum_agent.api.services.agent_service import AgentService
+from rossum_agent.api.services.chat_service import ChatService
+from rossum_agent.api.services.file_service import FileService
 
 logger = logging.getLogger(__name__)
 
@@ -186,3 +190,24 @@ async def get_validated_credentials(
     except httpx.RequestError as e:
         logger.error(f"Failed to connect to Rossum API: {e}")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to connect to Rossum API") from e
+
+
+def get_chat_service(request: Request) -> ChatService:
+    """Get the ChatService from app state."""
+    if not hasattr(request.app.state, "chat_service"):
+        raise RuntimeError("Chat service not initialized - ensure lifespan context is used")
+    return request.app.state.chat_service
+
+
+def get_agent_service(request: Request) -> AgentService:
+    """Get the AgentService from app state."""
+    if not hasattr(request.app.state, "agent_service"):
+        raise RuntimeError("Agent service not initialized - ensure lifespan context is used")
+    return request.app.state.agent_service
+
+
+def get_file_service(request: Request) -> FileService:
+    """Get the FileService from app state."""
+    if not hasattr(request.app.state, "file_service"):
+        raise RuntimeError("File service not initialized - ensure lifespan context is used")
+    return request.app.state.file_service
