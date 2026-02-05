@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
-- Added Gunicorn server support for production deployments via `--server gunicorn` CLI flag
+- Added Gunicorn server support for production deployments via `--server gunicorn` CLI flag [#152](https://github.com/stancld/rossum-agents/pull/152)
   - Gunicorn is now bundled with the `api` extra
   - Uses UvicornWorker for ASGI compatibility
 
