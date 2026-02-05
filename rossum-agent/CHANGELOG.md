@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+
+## [1.0.0] - 2025-02-05
+
 ### Added
 - Added `create_schema_with_subagent` tool for creating new schemas from scratch via Opus sub-agent [#151](https://github.com/stancld/rossum-agents/pull/151)
 - Added `schema-creation` skill documenting content array structure (sections, datapoints, multivalues, tuples) [#151](https://github.com/stancld/rossum-agents/pull/151)
