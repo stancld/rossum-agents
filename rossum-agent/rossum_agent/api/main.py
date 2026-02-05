@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10 MB (supports image uploads)
 
-# Gunicorn defaults
 GUNICORN_TIMEOUT = 120
 GUNICORN_GRACEFUL_TIMEOUT = 30
 GUNICORN_KEEPALIVE = 5
@@ -60,33 +59,17 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
     )
 
 
-_chat_service: ChatService | None = None
-_agent_service: AgentService | None = None
-_file_service: FileService | None = None
+def _init_services(app: FastAPI) -> None:
+    """Initialize services and store them in app.state.
 
-
-def get_chat_service() -> ChatService:
-    """Get the shared ChatService instance."""
-    global _chat_service
-    if _chat_service is None:
-        _chat_service = ChatService()
-    return _chat_service
-
-
-def get_agent_service() -> AgentService:
-    """Get the shared AgentService instance."""
-    global _agent_service
-    if _agent_service is None:
-        _agent_service = AgentService()
-    return _agent_service
-
-
-def get_file_service() -> FileService:
-    """Get the shared FileService instance."""
-    global _file_service
-    if _file_service is None:
-        _file_service = FileService(get_chat_service().storage)
-    return _file_service
+    Skips initialization if services are already set (e.g., during testing).
+    """
+    if not hasattr(app.state, "chat_service"):
+        app.state.chat_service = ChatService()
+    if not hasattr(app.state, "agent_service"):
+        app.state.agent_service = AgentService()
+    if not hasattr(app.state, "file_service"):
+        app.state.file_service = FileService(app.state.chat_service.storage)
 
 
 @asynccontextmanager
@@ -95,8 +78,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     logger.info("Rossum Agent API starting up...")
 
-    chat_service = get_chat_service()
-    if chat_service.is_connected():
+    _init_services(app)
+
+    if app.state.chat_service.is_connected():
         logger.info("Redis connection established")
     else:
         logger.warning("Redis connection failed - some features may not work")
@@ -104,8 +88,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     yield
 
     logger.info("Rossum Agent API shutting down...")
-    if _chat_service is not None:
-        _chat_service.storage.close()
+    app.state.chat_service.storage.close()
 
 
 app = FastAPI(
@@ -144,13 +127,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-health.set_chat_service_getter(get_chat_service)
-chats.set_chat_service_getter(get_chat_service)
-messages.set_chat_service_getter(get_chat_service)
-messages.set_agent_service_getter(get_agent_service)
-files.set_chat_service_getter(get_chat_service)
-files.set_file_service_getter(get_file_service)
 
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(chats.router, prefix="/api/v1")

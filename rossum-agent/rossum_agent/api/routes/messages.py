@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable  # noqa: TC003 - Required at runtime for service getter type hints
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated
+from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from rossum_agent.api.dependencies import RossumCredentials, get_validated_credentials
+from rossum_agent.api.dependencies import (
+    RossumCredentials,
+    get_agent_service,
+    get_chat_service,
+    get_validated_credentials,
+)
 from rossum_agent.api.models.schemas import (
     DocumentContent,
     FileCreatedEvent,
@@ -23,47 +29,14 @@ from rossum_agent.api.models.schemas import (
     SubAgentProgressEvent,
     SubAgentTextEvent,
 )
-from rossum_agent.api.services.agent_service import (
-    AgentService,  # noqa: TC001 - Required at runtime for FastAPI Depends()
-)
-from rossum_agent.api.services.chat_service import (
-    ChatService,  # noqa: TC001 - Required at runtime for FastAPI Depends()
-)
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-    from pathlib import Path
+from rossum_agent.api.services.agent_service import AgentService
+from rossum_agent.api.services.chat_service import ChatService
 
 logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/chats", tags=["messages"])
-
-_get_chat_service: Callable[[], ChatService] | None = None
-_get_agent_service: Callable[[], AgentService] | None = None
-
-
-def set_chat_service_getter(getter: Callable[[], ChatService]) -> None:
-    global _get_chat_service
-    _get_chat_service = getter
-
-
-def set_agent_service_getter(getter: Callable[[], AgentService]) -> None:
-    global _get_agent_service
-    _get_agent_service = getter
-
-
-def get_chat_service_dep() -> ChatService:
-    if _get_chat_service is None:
-        raise RuntimeError("Chat service getter not configured")
-    return _get_chat_service()
-
-
-def get_agent_service_dep() -> AgentService:
-    if _get_agent_service is None:
-        raise RuntimeError("Agent service getter not configured")
-    return _get_agent_service()
 
 
 def _format_sse_event(event_type: str, data: str) -> str:
@@ -132,8 +105,8 @@ async def send_message(
     chat_id: str,
     message: MessageRequest,
     credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service_dep)] = None,  # type: ignore[assignment]
-    agent_service: Annotated[AgentService, Depends(get_agent_service_dep)] = None,  # type: ignore[assignment]
+    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
+    agent_service: Annotated[AgentService, Depends(get_agent_service)] = None,  # type: ignore[assignment]
 ) -> StreamingResponse:
     """Send a message and stream the agent's response via SSE.
 
@@ -157,10 +130,8 @@ async def send_message(
 
     history = chat_data.messages
     mcp_mode = chat_data.metadata.mcp_mode
-    # Use message-level mode if provided, otherwise use chat's mode
     if message.mcp_mode is not None:
         mcp_mode = message.mcp_mode
-        # Update chat metadata with new mode for future messages
         chat_data.metadata.mcp_mode = mcp_mode
     user_prompt = message.content
     images: list[ImageContent] | None = message.images

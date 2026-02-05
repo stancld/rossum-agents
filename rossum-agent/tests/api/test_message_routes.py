@@ -18,10 +18,6 @@ from rossum_agent.api.routes.messages import (
     _format_sse_event,
     _process_agent_event,
     _yield_file_events,
-    get_agent_service_dep,
-    get_chat_service_dep,
-    set_agent_service_getter,
-    set_chat_service_getter,
 )
 
 if TYPE_CHECKING:
@@ -79,38 +75,6 @@ async def simulate_event_generator(
 
     if done_event:
         yield f"event: done\ndata: {done_event.model_dump_json()}\n\n"
-
-
-class TestServiceGetterDeps:
-    """Tests for service getter dependency functions.
-
-    Note: The autouse fixture reset_route_service_getters handles resetting
-    the service getter state before and after each test.
-    """
-
-    def test_get_chat_service_dep_raises_when_not_configured(self):
-        """Test that get_chat_service_dep raises RuntimeError when not configured."""
-        with pytest.raises(RuntimeError, match="Chat service getter not configured"):
-            get_chat_service_dep()
-
-    def test_get_agent_service_dep_raises_when_not_configured(self):
-        """Test that get_agent_service_dep raises RuntimeError when not configured."""
-        with pytest.raises(RuntimeError, match="Agent service getter not configured"):
-            get_agent_service_dep()
-
-    def test_set_chat_service_getter(self):
-        """Test setting chat service getter."""
-        mock_service = MagicMock()
-        set_chat_service_getter(lambda: mock_service)
-        result = get_chat_service_dep()
-        assert result is mock_service
-
-    def test_set_agent_service_getter(self):
-        """Test setting agent service getter."""
-        mock_service = MagicMock()
-        set_agent_service_getter(lambda: mock_service)
-        result = get_agent_service_dep()
-        assert result is mock_service
 
 
 class TestFormatSSEEvent:

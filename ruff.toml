@@ -65,6 +65,8 @@ ignore = [
 [lint.per-file-ignores]
 "**/tests/**" = ["PLC0415"]
 "**/rossum_mcp/tools/*.py" = ["TC002"]  # FastMCP needs types at runtime for Pydantic
+"**/rossum_agent/api/routes/*.py" = ["TC001", "TC003"]  # FastAPI Depends() needs types at runtime
+"**/rossum_agent/api/dependencies.py" = ["TC001", "TC003"]  # FastAPI Depends() needs types at runtime
 
 [lint.flake8-import-conventions.aliases]
 "datetime" = "dt"
