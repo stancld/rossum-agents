@@ -4,10 +4,47 @@ from __future__ import annotations
 
 MAX_ID_LENGTH = 50
 VALID_DATAPOINT_TYPES = {"string", "number", "date", "enum", "button"}
+VALID_UI_CONFIGURATION_TYPES = {"captured", "data", "manual", "formula", "reasoning", None}
+VALID_UI_CONFIGURATION_EDIT = {"enabled", "enabled_without_warning", "disabled"}
 
 
 class SchemaValidationError(ValueError):
     """Raised when schema validation fails."""
+
+
+def _sanitize_ui_configuration(node: dict) -> None:
+    """Remove invalid ui_configuration.type values to prevent API errors."""
+    ui_config = node.get("ui_configuration")
+    if not isinstance(ui_config, dict):
+        return
+    if "type" in ui_config and ui_config["type"] not in VALID_UI_CONFIGURATION_TYPES:
+        del ui_config["type"]
+    if "edit" in ui_config and ui_config["edit"] not in VALID_UI_CONFIGURATION_EDIT:
+        del ui_config["edit"]
+    if not ui_config:
+        del node["ui_configuration"]
+
+
+def sanitize_schema_content(content: list[dict]) -> list[dict]:
+    """Sanitize schema content by removing invalid ui_configuration values.
+
+    Recursively traverses all nodes and removes invalid ui_configuration.type
+    values that would cause API errors (e.g., 'area', 'textarea').
+    """
+
+    def _traverse(node: dict) -> None:
+        _sanitize_ui_configuration(node)
+        children = node.get("children")
+        if children is not None:
+            if isinstance(children, list):
+                for child in children:
+                    _traverse(child)
+            elif isinstance(children, dict):
+                _traverse(children)
+
+    for section in content:
+        _traverse(section)
+    return content
 
 
 def _validate_id(node_id: str, context: str = "") -> None:

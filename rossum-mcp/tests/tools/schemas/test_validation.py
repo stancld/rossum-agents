@@ -127,3 +127,122 @@ class TestSchemaValidation:
         }
         with pytest.raises(schemas.SchemaValidationError, match="exceeds 50 characters"):
             schemas._validate_node(node)
+
+
+@pytest.mark.unit
+class TestSanitizeSchemaContent:
+    """Tests for sanitize_schema_content function."""
+
+    def test_removes_invalid_ui_configuration_type(self) -> None:
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "notes",
+                        "label": "Notes",
+                        "type": "string",
+                        "ui_configuration": {"type": "area"},
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        assert "ui_configuration" not in result[0]["children"][0]
+
+    def test_removes_invalid_textarea_type(self) -> None:
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "notes",
+                        "label": "Notes",
+                        "type": "string",
+                        "ui_configuration": {"type": "textarea"},
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        assert "ui_configuration" not in result[0]["children"][0]
+
+    def test_preserves_valid_ui_configuration_type(self) -> None:
+        for valid_type in ["captured", "data", "manual", "formula", "reasoning"]:
+            content = [
+                {
+                    "category": "section",
+                    "id": "header",
+                    "label": "Header",
+                    "children": [
+                        {
+                            "category": "datapoint",
+                            "id": "field",
+                            "label": "Field",
+                            "type": "string",
+                            "ui_configuration": {"type": valid_type, "edit": "disabled"},
+                        }
+                    ],
+                }
+            ]
+            result = schemas.sanitize_schema_content(content)
+            assert result[0]["children"][0]["ui_configuration"]["type"] == valid_type
+
+    def test_preserves_valid_edit_removes_invalid_type(self) -> None:
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "notes",
+                        "label": "Notes",
+                        "type": "string",
+                        "ui_configuration": {"type": "area", "edit": "disabled"},
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        assert result[0]["children"][0]["ui_configuration"] == {"edit": "disabled"}
+
+    def test_sanitizes_nested_multivalue_tuple_children(self) -> None:
+        content = [
+            {
+                "category": "section",
+                "id": "items_section",
+                "label": "Items",
+                "children": [
+                    {
+                        "category": "multivalue",
+                        "id": "line_items",
+                        "label": "Line Items",
+                        "children": {
+                            "category": "tuple",
+                            "id": "line_item",
+                            "label": "Line Item",
+                            "children": [
+                                {
+                                    "category": "datapoint",
+                                    "id": "description",
+                                    "label": "Description",
+                                    "type": "string",
+                                    "ui_configuration": {"type": "textarea"},
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        tuple_children = result[0]["children"][0]["children"]["children"]
+        assert "ui_configuration" not in tuple_children[0]

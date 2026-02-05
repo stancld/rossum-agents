@@ -46,6 +46,8 @@ from rossum_mcp.tools.schemas.pruning import (
 from rossum_mcp.tools.schemas.validation import (
     MAX_ID_LENGTH,
     VALID_DATAPOINT_TYPES,
+    VALID_UI_CONFIGURATION_EDIT,
+    VALID_UI_CONFIGURATION_TYPES,
     SchemaValidationError,
     _validate_datapoint,
     _validate_id,
@@ -53,6 +55,7 @@ from rossum_mcp.tools.schemas.validation import (
     _validate_node,
     _validate_section,
     _validate_tuple,
+    sanitize_schema_content,
 )
 
 if TYPE_CHECKING:
@@ -62,6 +65,8 @@ if TYPE_CHECKING:
 __all__ = [
     "MAX_ID_LENGTH",
     "VALID_DATAPOINT_TYPES",
+    "VALID_UI_CONFIGURATION_EDIT",
+    "VALID_UI_CONFIGURATION_TYPES",
     "DatapointType",
     "NodeCategory",
     "PatchOperation",
@@ -98,6 +103,7 @@ __all__ = [
     "patch_schema",
     "prune_schema_fields",
     "register_schema_tools",
+    "sanitize_schema_content",
     "update_schema",
 ]
 
