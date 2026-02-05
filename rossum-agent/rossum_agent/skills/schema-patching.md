@@ -57,5 +57,6 @@ Common patterns:
 
 ## Cross-Reference
 
+- Create new schemas from scratch: load `schema-creation` skill
 - Schema customization during queue creation: load `organization-setup` skill
 - Sandbox testing before production: load `rossum-deployment` skill
