@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
+- Added `create_schema_with_subagent` tool for creating new schemas from scratch via Opus sub-agent
+- Added `schema-creation` skill documenting content array structure (sections, datapoints, multivalues, tuples)
 - Added message-level `mcp_mode` parameter to override chat's mode per-message and persist for subsequent messages
 - Added token usage visibility with breakdown by main agent vs sub-agents in API responses and Streamlit UI
 - Added dynamic tool loading to reduce initial context usage (~8K → ~800 tokens) [#113](https://github.com/stancld/rossum-agents/pull/113)
