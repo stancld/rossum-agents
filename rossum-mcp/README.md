@@ -20,10 +20,7 @@
 </div>
 
 > [!NOTE]
-> This is not an official Rossum project. It is a community-developed integration built on top of the Rossum API.
-
-> [!NOTE]
-> API is stable starting from 1.0.0. Breaking changes will follow SemVer (released as 2.0.0+).
+> This is not an official Rossum project. It is a community-developed integration built on top of the Rossum API, not a product (yet).
 
 ## Quick Start
 
