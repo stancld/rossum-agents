@@ -7,10 +7,10 @@ All notable changes to this project will be documented in this file.
 ## [1.0.0rc6] - 2026-02-05
 
 ### Added
-- Added `create_schema_with_subagent` tool for creating new schemas from scratch via Opus sub-agent
-- Added `schema-creation` skill documenting content array structure (sections, datapoints, multivalues, tuples)
-- Added message-level `mcp_mode` parameter to override chat's mode per-message and persist for subsequent messages
-- Added token usage visibility with breakdown by main agent vs sub-agents in API responses and Streamlit UI
+- Added `create_schema_with_subagent` tool for creating new schemas from scratch via Opus sub-agent [#151](https://github.com/stancld/rossum-agents/pull/151)
+- Added `schema-creation` skill documenting content array structure (sections, datapoints, multivalues, tuples) [#151](https://github.com/stancld/rossum-agents/pull/151)
+- Added message-level `mcp_mode` parameter to override chat's mode per-message and persist for subsequent messages [#147](https://github.com/stancld/rossum-agents/pull/147)
+- Added token usage visibility with breakdown by main agent vs sub-agents in API responses and Streamlit UI [#141](https://github.com/stancld/rossum-agents/pull/141)
 - Added dynamic tool loading to reduce initial context usage (~8K → ~800 tokens) [#113](https://github.com/stancld/rossum-agents/pull/113)
 - Added `load_tool_category(["queues", "schemas"])` internal tool to load MCP tools on-demand [#113](https://github.com/stancld/rossum-agents/pull/113)
 - Added automatic pre-loading of tool categories based on keywords in user's first message [#113](https://github.com/stancld/rossum-agents/pull/113)
@@ -30,15 +30,15 @@ All notable changes to this project will be documented in this file.
 - Added Rossum Local Copilot integration for formula field suggestions [#102](https://github.com/stancld/rossum-agents/pull/102)
 
 ### Changed
-- Execute multiple tool calls in parallel using `asyncio.wait()` instead of sequential execution
-- Migrated knowledge base search from sync `requests` to async `httpx` with parallel webpage fetching via `asyncio.gather()`
+- Execute multiple tool calls in parallel using `asyncio.wait()` instead of sequential execution [#127](https://github.com/stancld/rossum-agents/pull/127)
+- Migrated knowledge base search from sync `requests` to async `httpx` with parallel webpage fetching via `asyncio.gather()` [#127](https://github.com/stancld/rossum-agents/pull/127)
 - Refactored sub-agents (hook_debug, schema_patching, knowledge_base) to shared `SubAgent` base class with unified iteration loop [#107](https://github.com/stancld/rossum-agents/pull/107)
 - Added token tracking to all sub-agents with counts propagated via `SubAgentResult` [#107](https://github.com/stancld/rossum-agents/pull/107)
 - Migrated default model from Sonnet 4.5 to Opus 4.5 with significantly simplified prompts [#99](https://github.com/stancld/rossum-agents/pull/99)
 - Separated model's chain-of-thought reasoning (thinking blocks) from response text (text blocks) in stream processing [#92](https://github.com/stancld/rossum-agents/pull/92)
 - Updated Streamlit UI to display thinking blocks with "🧠 **Thinking:**" label [#92](https://github.com/stancld/rossum-agents/pull/92)
 - Refactored `internal_tools.py` into modular `tools/` subpackage with separate modules for file tools, spawn MCP, knowledge base search, hook debugging, and skills [#78](https://github.com/stancld/rossum-agents/pull/78)
-- Reorganized sub-agent tools into `tools/subagents/` module (hook_debug, knowledge_base, schema_patching)
+- Reorganized sub-agent tools into `tools/subagents/` module (hook_debug, knowledge_base, schema_patching) [#102](https://github.com/stancld/rossum-agents/pull/102)
 - Improved multi-turn conversation by passing context properly [#73](https://github.com/stancld/rossum-agents/pull/73)
 - Improved sub-agent knowledge base info panel [#73](https://github.com/stancl/rossum-mcp/pull/73)
 - Made token owner selection stricter in deployment tools [#73](https://github.com/stancld/rossum-agents/pull/73)
@@ -49,8 +49,8 @@ All notable changes to this project will be documented in this file.
 - Removed test front-end from rossum-agent API as it doesn't fit the repo scope [#83](https://github.com/stancld/rossum-agents/pull/83)
 
 ### Fixed
-- Fixed concurrent API request handling by isolating per-request state with contextvars
-- Fixed `write_file` tool to accept dict/list content by auto-converting to JSON
+- Fixed concurrent API request handling by isolating per-request state with contextvars [#148](https://github.com/stancld/rossum-agents/pull/148)
+- Fixed `write_file` tool to accept dict/list content by auto-converting to JSON [#139](https://github.com/stancld/rossum-agents/pull/139)
 - Fixed displaying generated files in Streamlit UI [#73](https://github.com/stancld/rossum-agents/pull/73)
 
 
