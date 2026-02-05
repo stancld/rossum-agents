@@ -3,60 +3,32 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable  # noqa: TC003 - Required at runtime for service getter type hints
 from pathlib import Path
-from typing import Annotated  # noqa: TC003 - Required at runtime for FastAPI dependency injection
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 
-from rossum_agent.api.dependencies import RossumCredentials, get_validated_credentials
+from rossum_agent.api.dependencies import (
+    RossumCredentials,
+    get_chat_service,
+    get_file_service,
+    get_validated_credentials,
+)
 from rossum_agent.api.models.schemas import FileListResponse
-from rossum_agent.api.services.chat_service import (
-    ChatService,  # noqa: TC001 - Required at runtime for FastAPI Depends()
-)
-from rossum_agent.api.services.file_service import (
-    FileService,  # noqa: TC001 - Required at runtime for FastAPI Depends()
-)
+from rossum_agent.api.services.chat_service import ChatService
+from rossum_agent.api.services.file_service import FileService
 
 router = APIRouter(prefix="/chats/{chat_id}/files", tags=["files"])
-
-_get_chat_service: Callable[[], ChatService] | None = None
-_get_file_service: Callable[[], FileService] | None = None
-
-
-def set_chat_service_getter(getter: Callable[[], ChatService]) -> None:
-    """Set the chat service getter function."""
-    global _get_chat_service
-    _get_chat_service = getter
-
-
-def set_file_service_getter(getter: Callable[[], FileService]) -> None:
-    """Set the file service getter function."""
-    global _get_file_service
-    _get_file_service = getter
-
-
-def get_chat_service_dep() -> ChatService:
-    """Dependency function for chat service."""
-    if _get_chat_service is None:
-        raise RuntimeError("Chat service getter not configured")
-    return _get_chat_service()
-
-
-def get_file_service_dep() -> FileService:
-    """Dependency function for file service."""
-    if _get_file_service is None:
-        raise RuntimeError("File service getter not configured")
-    return _get_file_service()
 
 
 @router.get("", response_model=FileListResponse)
 async def list_files(
+    request: Request,
     chat_id: str,
     credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service_dep)] = None,  # type: ignore[assignment]
-    file_service: Annotated[FileService, Depends(get_file_service_dep)] = None,  # type: ignore[assignment]
+    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
+    file_service: Annotated[FileService, Depends(get_file_service)] = None,  # type: ignore[assignment]
 ) -> FileListResponse:
     """List all files for a chat session."""
     if not chat_service.chat_exists(credentials.user_id, chat_id):
@@ -85,11 +57,12 @@ def _sanitize_filename(filename: str) -> str:
 
 @router.get("/{filename:path}")
 async def download_file(
+    request: Request,
     chat_id: str,
     filename: str,
     credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service_dep)] = None,  # type: ignore[assignment]
-    file_service: Annotated[FileService, Depends(get_file_service_dep)] = None,  # type: ignore[assignment]
+    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
+    file_service: Annotated[FileService, Depends(get_file_service)] = None,  # type: ignore[assignment]
 ) -> Response:
     """Download a file from a chat session."""
     if not chat_service.chat_exists(credentials.user_id, chat_id):

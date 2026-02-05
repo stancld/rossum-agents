@@ -8,27 +8,19 @@ import pytest
 from fastapi.testclient import TestClient
 from rossum_agent.api.main import app
 from rossum_agent.api.models.schemas import FileInfo
-from rossum_agent.api.routes import chats, files, health, messages
-from rossum_agent.api.routes.files import (
-    _sanitize_filename,
-    get_chat_service_dep,
-    get_file_service_dep,
-)
+from rossum_agent.api.routes.files import _sanitize_filename
 
 from .conftest import create_mock_httpx_client
 
 
 @pytest.fixture
 def client(mock_chat_service, mock_file_service, mock_agent_service):
-    """Create test client with mocked services."""
-    health.set_chat_service_getter(lambda: mock_chat_service)
-    chats.set_chat_service_getter(lambda: mock_chat_service)
-    messages.set_chat_service_getter(lambda: mock_chat_service)
-    messages.set_agent_service_getter(lambda: mock_agent_service)
-    files.set_chat_service_getter(lambda: mock_chat_service)
-    files.set_file_service_getter(lambda: mock_file_service)
+    """Create test client with mocked services injected via app.state."""
+    app.state.chat_service = mock_chat_service
+    app.state.agent_service = mock_agent_service
+    app.state.file_service = mock_file_service
 
-    with TestClient(app) as client:
+    with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 
 
@@ -154,24 +146,6 @@ class TestSanitizeFilename:
         """Test that filenames are truncated to prevent DoS."""
         long_name = "a" * 500 + ".txt"
         assert len(_sanitize_filename(long_name)) == 255
-
-
-class TestServiceGetterDeps:
-    """Tests for service getter dependency functions.
-
-    Note: The autouse fixture reset_route_service_getters handles resetting
-    the service getter state before and after each test.
-    """
-
-    def test_get_chat_service_dep_raises_when_not_configured(self):
-        """Test that get_chat_service_dep raises RuntimeError when not configured."""
-        with pytest.raises(RuntimeError, match="Chat service getter not configured"):
-            get_chat_service_dep()
-
-    def test_get_file_service_dep_raises_when_not_configured(self):
-        """Test that get_file_service_dep raises RuntimeError when not configured."""
-        with pytest.raises(RuntimeError, match="File service getter not configured"):
-            get_file_service_dep()
 
 
 class TestDownloadFileInvalidFilename:

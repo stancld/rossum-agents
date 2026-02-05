@@ -8,7 +8,6 @@ import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
-import rossum_agent.api.main as main_module
 import uvicorn
 from fastapi import status
 from fastapi.testclient import TestClient
@@ -16,14 +15,10 @@ from rossum_agent.api.main import (
     MAX_REQUEST_SIZE,
     _run_gunicorn,
     app,
-    get_agent_service,
-    get_chat_service,
-    get_file_service,
     lifespan,
     main,
     rate_limit_exceeded_handler,
 )
-from rossum_agent.api.routes import health
 
 from .conftest import create_mock_httpx_client
 
@@ -33,15 +28,18 @@ class TestRequestSizeLimitMiddleware:
 
     def test_request_within_limit(self, mock_chat_service):
         """Test that requests within size limit pass through."""
-        health.set_chat_service_getter(lambda: mock_chat_service)
+        app.state.chat_service = mock_chat_service
         mock_chat_service.is_connected.return_value = True
         client = TestClient(app)
 
         response = client.get("/api/v1/health")
         assert response.status_code == status.HTTP_200_OK
 
-    def test_request_exceeds_limit(self):
+    def test_request_exceeds_limit(self, mock_chat_service, mock_agent_service, mock_file_service):
         """Test that requests exceeding size limit are rejected with 413."""
+        app.state.chat_service = mock_chat_service
+        app.state.agent_service = mock_agent_service
+        app.state.file_service = mock_file_service
         client = TestClient(app)
 
         large_content = "x" * (MAX_REQUEST_SIZE + 1)
@@ -83,63 +81,43 @@ class TestRateLimitExceededHandler:
         assert "Rate limit exceeded" in body["detail"]
 
 
-class TestServiceGetters:
-    """Tests for service getter functions.
+class TestInitServices:
+    """Tests for service initialization."""
 
-    Note: The autouse fixture reset_main_service_singletons handles resetting
-    the singleton state before and after each test.
-    """
+    def test_init_services_creates_all_services(self):
+        """Test that _init_services creates all services and stores them in app.state."""
+        from fastapi import FastAPI
+        from rossum_agent.api.main import _init_services
 
-    def test_get_chat_service_creates_singleton(self):
-        """Test that get_chat_service returns same instance."""
-        with patch("rossum_agent.api.main.ChatService") as mock_cls:
-            mock_instance = MagicMock()
-            mock_cls.return_value = mock_instance
-
-            result1 = get_chat_service()
-            result2 = get_chat_service()
-
-            mock_cls.assert_called_once()
-            assert result1 is result2
-
-    def test_get_agent_service_creates_singleton(self):
-        """Test that get_agent_service returns same instance."""
-        with patch("rossum_agent.api.main.AgentService") as mock_cls:
-            mock_instance = MagicMock()
-            mock_cls.return_value = mock_instance
-
-            result1 = get_agent_service()
-            result2 = get_agent_service()
-
-            mock_cls.assert_called_once()
-            assert result1 is result2
-
-    def test_get_file_service_creates_singleton(self):
-        """Test that get_file_service returns same instance."""
         with (
-            patch("rossum_agent.api.main.FileService") as mock_file_cls,
             patch("rossum_agent.api.main.ChatService") as mock_chat_cls,
+            patch("rossum_agent.api.main.AgentService") as mock_agent_cls,
+            patch("rossum_agent.api.main.FileService") as mock_file_cls,
         ):
             mock_chat_instance = MagicMock()
             mock_chat_instance.storage = MagicMock()
             mock_chat_cls.return_value = mock_chat_instance
 
+            mock_agent_instance = MagicMock()
+            mock_agent_cls.return_value = mock_agent_instance
+
             mock_file_instance = MagicMock()
             mock_file_cls.return_value = mock_file_instance
 
-            result1 = get_file_service()
-            result2 = get_file_service()
+            test_app = FastAPI()
+            _init_services(test_app)
 
-            mock_file_cls.assert_called_once()
-            assert result1 is result2
+            mock_chat_cls.assert_called_once()
+            mock_agent_cls.assert_called_once()
+            mock_file_cls.assert_called_once_with(mock_chat_instance.storage)
+
+            assert test_app.state.chat_service is mock_chat_instance
+            assert test_app.state.agent_service is mock_agent_instance
+            assert test_app.state.file_service is mock_file_instance
 
 
 class TestLifespan:
-    """Tests for lifespan context manager.
-
-    Note: The autouse fixture reset_main_service_singletons handles resetting
-    the singleton state before and after each test.
-    """
+    """Tests for lifespan context manager."""
 
     @pytest.mark.asyncio
     async def test_lifespan_logs_redis_connected(self, caplog):
@@ -149,6 +127,8 @@ class TestLifespan:
 
         with (
             patch("rossum_agent.api.main.ChatService", return_value=mock_chat_service),
+            patch("rossum_agent.api.main.AgentService"),
+            patch("rossum_agent.api.main.FileService"),
             caplog.at_level(logging.INFO),
         ):
             async with lifespan(app):
@@ -166,6 +146,8 @@ class TestLifespan:
 
         with (
             patch("rossum_agent.api.main.ChatService", return_value=mock_chat_service),
+            patch("rossum_agent.api.main.AgentService"),
+            patch("rossum_agent.api.main.FileService"),
             caplog.at_level(logging.WARNING),
         ):
             async with lifespan(app):
@@ -177,33 +159,21 @@ class TestLifespan:
 
     @pytest.mark.asyncio
     async def test_lifespan_closes_storage_on_shutdown(self):
-        """Test lifespan closes storage on shutdown when chat_service exists."""
+        """Test lifespan closes storage on shutdown."""
         mock_storage = MagicMock()
         mock_chat_service = MagicMock()
         mock_chat_service.storage = mock_storage
         mock_chat_service.is_connected.return_value = True
-        main_module._chat_service = mock_chat_service
-
-        async with lifespan(app):
-            pass
-
-        mock_storage.close.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_lifespan_handles_no_chat_service(self, caplog):
-        """Test lifespan handles case when chat_service is None on shutdown."""
-        mock_chat_service = MagicMock()
-        mock_chat_service.is_connected.return_value = True
 
         with (
             patch("rossum_agent.api.main.ChatService", return_value=mock_chat_service),
-            caplog.at_level(logging.DEBUG),
+            patch("rossum_agent.api.main.AgentService"),
+            patch("rossum_agent.api.main.FileService"),
         ):
             async with lifespan(app):
-                main_module._chat_service = None
+                pass
 
-        error_records = [rec for rec in caplog.records if rec.levelno >= logging.ERROR]
-        assert len(error_records) == 0
+        mock_storage.close.assert_called_once()
 
 
 class TestBuildCorsOriginRegex:
