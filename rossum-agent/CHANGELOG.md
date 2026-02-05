@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Added
+- Added Gunicorn server support for production deployments via `--server gunicorn` CLI flag
+  - Gunicorn is now bundled with the `api` extra
+  - Uses UvicornWorker for ASGI compatibility
+
 
 ## [1.0.0] - 2025-02-05
 
