@@ -17,21 +17,23 @@ Each change object in the `changes` array:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `action` | No | "add" (default) or "remove" |
-| `id` | Yes | Field ID (schema_id) |
+| `id` | Yes | Field ID |
 | `parent_section` | For add | Section ID to add field to |
 | `type` | For add | string, number, date, enum |
 | `label` | No | Defaults to id |
+| `table_id` | For table | Multivalue ID if adding column to table |
 
-## Field Types
+## Optional Field Properties
 
-| Type | Extra Fields |
-|------|--------------|
-| `string` | `default_value`, `constraints` |
-| `number` | `default_value` |
-| `date` | `format` |
-| `enum` | `options: [{"value": "v1", "label": "Label 1"}]` |
+| Property | Description |
+|----------|-------------|
+| `format` | Number format (e.g., "#" for integer) |
+| `options` | For enum: `[{"value": "v1", "label": "Label 1"}]` |
+| `rir_field_names` | AI extraction hints |
+| `hidden` | Hide field from UI |
+| `can_export` | Include in exports |
 
-Not supported: multiline fields. Ignore multiline requests - use regular `string` type instead.
+Not supported: multiline fields, default_value, constraints. Use regular `string` type for multiline.
 
 ## UI Configuration
 
