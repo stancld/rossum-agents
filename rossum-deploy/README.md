@@ -22,10 +22,7 @@
 > We aim to provide a simple, dependency-light solution for the [rossum-agent](../rossum-agent/) that covers core deployment workflows.
 
 > [!NOTE]
-> This is not an official Rossum project. It is a community-developed integration built on top of the Rossum API.
-
-> [!NOTE]
-> Follows semantic versioning from 1.0.0.
+> This is not an official Rossum project. It is a community-developed integration built on top of the Rossum API, not a product (yet).
 
 ## Comparison with deployment-manager
 
