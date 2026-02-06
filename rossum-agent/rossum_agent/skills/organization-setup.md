@@ -52,6 +52,16 @@ Use `prune_schema_fields(schema_id, fields_to_keep=[...])` to remove unwanted fi
 | Amounts, totals, tax | `amounts_section` |
 | Line item columns | `line_items_section` (multivalue) |
 
+## Task Tracking
+
+Organization setup is always a multi-step operation. Use `create_task` for each step upfront, then `update_task` as you progress, so the user has real-time visibility.
+
+| Phase | Action |
+|-------|--------|
+| After parsing the request | `create_task` for every distinct step (queue creation, schema update, hook setup, etc.) |
+| Starting a step | `update_task(status="in_progress")` |
+| Finishing a step | `update_task(status="completed")` |
+
 ## Constraints
 
 - Match region to template (EU/US/UK/CZ/CN defaults differ)
