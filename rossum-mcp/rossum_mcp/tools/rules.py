@@ -81,25 +81,29 @@ async def _list_rules(
 async def _create_rule(
     client: AsyncRossumAPIClient,
     name: str,
-    schema_id: int,
     trigger_condition: str,
     actions: list[RuleAction],
     enabled: bool = True,
+    schema_id: int | None = None,
     queue_ids: list[int] | None = None,
 ) -> Rule | dict:
     if not is_read_write_mode():
         return {"error": "create_rule is not available in read-only mode"}
 
-    schema_url = build_resource_url("schemas", schema_id)
+    if schema_id is None and not queue_ids:
+        return {"error": "Provide at least one of schema_id or queue_ids to scope the rule."}
+
     logger.info(f"Creating rule: name={name}, schema_id={schema_id}, enabled={enabled}")
 
     rule_data: dict = {
         "name": name,
-        "schema": schema_url,
         "trigger_condition": trigger_condition,
         "actions": actions,
         "enabled": enabled,
     }
+
+    if schema_id is not None:
+        rule_data["schema"] = build_resource_url("schemas", schema_id)
 
     if queue_ids is not None:
         rule_data["queues"] = [build_resource_url("queues", qid) for qid in queue_ids]
@@ -128,11 +132,13 @@ async def _update_rule(
 
     rule_data: dict = {
         "name": name,
-        "schema": existing_rule.schema,
         "trigger_condition": trigger_condition,
         "actions": actions,
         "enabled": enabled,
     }
+
+    if existing_rule.schema is not None:
+        rule_data["schema"] = existing_rule.schema
 
     if queue_ids is not None:
         rule_data["queues"] = [build_resource_url("queues", qid) for qid in queue_ids]
@@ -198,17 +204,17 @@ def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await _list_rules(client, schema_id, organization_id, enabled)
 
     @mcp.tool(
-        description="Create a new rule. Rules automate field operations based on trigger conditions (TxScript formulas like 'field.amount > 1000'). Actions require: id (unique str), type (show_message|hide_field|show_field|change_status|custom|etc), event (validation), payload (dict with type, content, schema_id for show_message). queue_ids limits rule to specific queues."
+        description="Create a new rule. Rules automate field operations based on trigger conditions (TxScript formulas like 'field.amount > 1000'). Actions require: id (unique str), type (show_message|hide_field|show_field|change_status|custom|etc), event (validation), payload (dict with type, content, schema_id for show_message). Provide at least one of schema_id or queue_ids to scope the rule."
     )
     async def create_rule(
         name: str,
-        schema_id: int,
         trigger_condition: str,
         actions: list[RuleAction],
         enabled: bool = True,
+        schema_id: int | None = None,
         queue_ids: list[int] | None = None,
     ) -> Rule | dict:
-        return await _create_rule(client, name, schema_id, trigger_condition, actions, enabled, queue_ids)
+        return await _create_rule(client, name, trigger_condition, actions, enabled, schema_id, queue_ids)
 
     @mcp.tool(
         description="Full update of a rule (PUT). All fields required. Use patch_rule for partial updates. queue_ids limits rule to specific queues."
