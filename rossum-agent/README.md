@@ -148,6 +148,11 @@ The agent provides internal tools and access to 50+ MCP tools via dynamic loadin
 **Skills:**
 - `load_skill` - Load domain-specific workflows (`rossum-deployment`, `hook-debugging`)
 
+**Task Tracking:**
+- `create_task` - Create a task to track progress on multi-step operations
+- `update_task` - Update a task's status (`pending`, `in_progress`, `completed`) or subject
+- `list_tasks` - List all tracked tasks with current status
+
 </details>
 
 <details>
@@ -214,6 +219,18 @@ flowchart TB
 | `GET /api/v1/chats/{id}/files/{name}` | Download file |
 
 API docs: `/api/docs` (Swagger) or `/api/redoc`
+
+**SSE Events:** The message endpoint streams these SSE event types:
+
+| SSE `event:` | Description |
+|--------------|-------------|
+| `step` | Agent steps (thinking, tool calls, final answer) |
+| `sub_agent_progress` | Sub-agent iteration updates |
+| `sub_agent_text` | Sub-agent text streaming |
+| `task_snapshot` | Task tracker state after each task mutation |
+| `file_created` | Output file notification |
+| `done` | Final event with token usage |
+| `error` | Agent execution error |
 
 **MCP Mode:** Chat sessions support mode switching via the `mcp_mode` parameter:
 - Set at chat creation: `POST /api/v1/chats` with `{"mcp_mode": "read-write"}`

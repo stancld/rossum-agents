@@ -208,6 +208,7 @@ When streaming messages, you'll receive these event types:
 | `file_created` | `event.filename`, `event.url` | Generated file |
 | `sub_agent_progress` | `event.tool_name`, `event.iteration` | Sub-agent status |
 | `sub_agent_text` | `event.text` | Sub-agent output |
+| `task_snapshot` | `event.tasks` | Task tracker state (list of tasks with id, subject, status, description) |
 | `done` | `event.input_tokens`, `event.output_tokens`, `event.token_usage_breakdown` | Token usage with optional breakdown by main agent vs sub-agents |
 
 **Note:** Text events (`thinking`, `intermediate`, `final_answer`) contain cumulative content - each event includes all previous text plus new tokens. To display live progress, print only the delta: `event.content[len(last_content):]`.
@@ -240,6 +241,7 @@ from rossum_agent_client.models import (
     FileCreatedEvent,
     SubAgentProgressEvent,
     SubAgentTextEvent,
+    TaskSnapshotEvent,
     Message,
     TextContent,
 
