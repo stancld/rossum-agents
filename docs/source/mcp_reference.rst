@@ -657,6 +657,45 @@ patch_schema
   entire content. Operations: "add" (requires parent_id, node_data), "update" (requires node_data),
   "remove" (only node_id needed).
 
+get_schema_tree_structure
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``get_schema_tree_structure(schema_id: int | None, queue_id: int | None)``
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.retrieve_schema(schema_id)``
+
+**API Endpoint:**
+  ``GET /v1/schemas/{schema_id}``
+
+**SDK Documentation:**
+  https://github.com/rossumai/rossum-sdk
+
+**Implementation:**
+  Returns a lightweight tree structure of the schema with only ids, labels, categories, and types.
+  Accepts either ``schema_id`` or ``queue_id`` (resolves to schema automatically). Exactly one
+  parameter must be provided.
+
+prune_schema_fields
+^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``prune_schema_fields(schema_id: int, fields_to_keep: list[str])``
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.update_schema(schema_id, data)``
+
+**API Endpoint:**
+  ``PUT /v1/schemas/{schema_id}``
+
+**SDK Documentation:**
+  https://github.com/rossumai/rossum-sdk
+
+**Implementation:**
+  Removes multiple fields from a schema at once, keeping only specified fields and their
+  ancestor sections/multivalues. Efficient for pruning unwanted fields during setup.
+
 get_user
 ^^^^^^^^
 
