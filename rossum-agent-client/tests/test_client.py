@@ -26,6 +26,7 @@ from rossum_agent_client.models import (
     StreamDoneEvent,
     SubAgentProgressEvent,
     SubAgentTextEvent,
+    TaskSnapshotEvent,
 )
 
 
@@ -350,6 +351,31 @@ class TestSendMessageStream:
         assert isinstance(events[1], SubAgentTextEvent)
         assert events[1].text == "Found results"
 
+    def test_send_message_stream_task_snapshot_event(
+        self, httpx_mock: HTTPXMock, client: RossumAgentClient, agent_api_url: str
+    ) -> None:
+        sse_response = (
+            "event: task_snapshot\n"
+            'data: {"type": "task_snapshot", "tasks": ['
+            '{"id": "1", "subject": "Deploy", "status": "completed"},'
+            '{"id": "2", "subject": "Verify", "status": "in_progress"}'
+            "]}\n\n"
+            "event: done\n"
+            'data: {"total_steps": 1, "input_tokens": 10, "output_tokens": 5}\n\n'
+        )
+        httpx_mock.add_response(
+            url=f"{agent_api_url}/api/v1/chats/chat-123/messages",
+            method="POST",
+            content=sse_response.encode(),
+        )
+
+        events = list(client.send_message_stream("chat-123", "Deploy"))
+
+        assert isinstance(events[0], TaskSnapshotEvent)
+        assert len(events[0].tasks) == 2
+        assert events[0].tasks[0]["subject"] == "Deploy"
+        assert events[0].tasks[1]["status"] == "in_progress"
+
     def test_send_message_stream_multiline_data(
         self, httpx_mock: HTTPXMock, client: RossumAgentClient, agent_api_url: str
     ) -> None:
@@ -510,6 +536,15 @@ class TestParseSSEEvent:
     def test_unknown_event_type_returns_none(self, client: RossumAgentClient) -> None:
         result = client._parse_sse_event("unknown_event", '{"type": "unknown"}')
         assert result is None
+
+    def test_task_snapshot_event_type(self, client: RossumAgentClient) -> None:
+        result = client._parse_sse_event(
+            "task_snapshot",
+            '{"type": "task_snapshot", "tasks": [{"id": "1", "subject": "Test", "status": "pending"}]}',
+        )
+        assert isinstance(result, TaskSnapshotEvent)
+        assert len(result.tasks) == 1
+        assert result.tasks[0]["subject"] == "Test"
 
     def test_error_event_type_returns_step_event(self, client: RossumAgentClient) -> None:
         result = client._parse_sse_event(

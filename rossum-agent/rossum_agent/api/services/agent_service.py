@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from rossum_agent.agent.core import RossumAgent, create_agent
 from rossum_agent.agent.memory import AgentMemory
-from rossum_agent.agent.models import AgentConfig, AgentStep, StepType
+from rossum_agent.agent.models import AgentConfig, AgentStep, StepType, ToolResult
 from rossum_agent.api.models.schemas import (
     DocumentContent,
     ImageContent,
@@ -18,23 +18,27 @@ from rossum_agent.api.models.schemas import (
     StreamDoneEvent,
     SubAgentProgressEvent,
     SubAgentTextEvent,
+    TaskSnapshotEvent,
 )
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.rossum_mcp_integration import connect_mcp_server
 from rossum_agent.tools import (
     SubAgentProgress,
     SubAgentText,
+    TaskTracker,
     set_mcp_connection,
     set_output_dir,
     set_progress_callback,
     set_rossum_credentials,
+    set_task_snapshot_callback,
+    set_task_tracker,
     set_text_callback,
 )
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
 from rossum_agent.utils import create_session_output_dir, get_display_tool_name, set_session_output_dir
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Callable
     from pathlib import Path
 
     from anthropic.types import ImageBlockParam, TextBlockParam
@@ -49,7 +53,8 @@ class _RequestContext:
     """Per-request context for agent execution."""
 
     output_dir: Path | None = None
-    sub_agent_queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent] | None = None
+    event_queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent] | None = None
+    event_loop: asyncio.AbstractEventLoop | None = None
     last_memory: AgentMemory | None = None
 
 
@@ -78,9 +83,11 @@ def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentP
 def _create_tool_start_event(step: AgentStep, current_tool: str) -> StepEvent:
     """Create a tool_start event from an AgentStep."""
     current_tool_args = None
+    current_tool_call_id = None
     for tc in step.tool_calls:
         if tc.name == current_tool:
             current_tool_args = tc.arguments
+            current_tool_call_id = tc.id
             break
     display_name = get_display_tool_name(current_tool, current_tool_args)
     return StepEvent(
@@ -89,23 +96,104 @@ def _create_tool_start_event(step: AgentStep, current_tool: str) -> StepEvent:
         tool_name=display_name,
         tool_arguments=current_tool_args,
         tool_progress=step.tool_progress,
+        tool_call_id=current_tool_call_id,
     )
 
 
-def _create_tool_result_event(step: AgentStep) -> StepEvent:
-    """Create a tool_result event from an AgentStep."""
-    last_result = step.tool_results[-1]
+def _create_tool_result_event(step_number: int, result: ToolResult) -> StepEvent:
+    """Create a tool_result event from a single ToolResult."""
     return StepEvent(
         type="tool_result",
-        step_number=step.step_number,
-        tool_name=last_result.name,
-        result=last_result.content,
-        is_error=last_result.is_error,
+        step_number=step_number,
+        tool_name=result.name,
+        result=result.content,
+        is_error=result.is_error,
+        tool_call_id=result.tool_call_id,
     )
 
 
-def convert_step_to_event(step: AgentStep) -> StepEvent:
-    """Convert an AgentStep to a StepEvent for SSE streaming.
+def _log_events(events: list[StepEvent]) -> None:
+    for e in events:
+        logger.info(
+            f"StepEvent: type={e.type}, step={e.step_number}, "
+            f"tool_call_id={e.tool_call_id}, is_streaming={e.is_streaming}"
+        )
+
+
+def _handle_error(step: AgentStep) -> list[StepEvent] | None:
+    if not step.error:
+        return None
+    return [StepEvent(type="error", step_number=step.step_number, content=step.error, is_final=True)]
+
+
+def _handle_final_answer(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.is_final and step.final_answer):
+        return None
+    return [StepEvent(type="final_answer", step_number=step.step_number, content=step.final_answer, is_final=True)]
+
+
+def _handle_intermediate_text(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.step_type == StepType.INTERMEDIATE and step.accumulated_text is not None):
+        return None
+    return [
+        StepEvent(type="intermediate", step_number=step.step_number, content=step.accumulated_text, is_streaming=True)
+    ]
+
+
+def _handle_streaming_final_answer(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.step_type == StepType.FINAL_ANSWER and step.accumulated_text is not None):
+        return None
+    return [
+        StepEvent(type="final_answer", step_number=step.step_number, content=step.accumulated_text, is_streaming=True)
+    ]
+
+
+def _handle_current_tool(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.current_tool and step.tool_progress):
+        return None
+    return [_create_tool_start_event(step, step.current_tool)]
+
+
+def _handle_streaming_tool_calls(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.tool_calls and step.is_streaming and step.tool_progress):
+        return None
+    total = len(step.tool_calls)
+    events: list[StepEvent] = []
+    for idx, tc in enumerate(step.tool_calls, 1):
+        ev = _create_tool_start_event(step, tc.name)
+        ev.tool_progress = (idx, total)
+        events.append(ev)
+    return events
+
+
+def _handle_tool_results(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.tool_results and not step.is_streaming):
+        return None
+    return [_create_tool_result_event(step.step_number, r) for r in step.tool_results]
+
+
+def _handle_thinking(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.step_type == StepType.THINKING or step.thinking is not None):
+        return None
+    return [
+        StepEvent(type="thinking", step_number=step.step_number, content=step.thinking, is_streaming=step.is_streaming)
+    ]
+
+
+_STEP_HANDLERS: tuple[Callable[[AgentStep], list[StepEvent] | None], ...] = (
+    _handle_error,
+    _handle_final_answer,
+    _handle_intermediate_text,
+    _handle_streaming_final_answer,
+    _handle_current_tool,
+    _handle_streaming_tool_calls,
+    _handle_tool_results,
+    _handle_thinking,
+)
+
+
+def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
+    """Convert an AgentStep to StepEvents for SSE streaming.
 
     Extended thinking mode produces three distinct content types:
     - "thinking": Model's chain-of-thought reasoning (from thinking blocks)
@@ -114,32 +202,18 @@ def convert_step_to_event(step: AgentStep) -> StepEvent:
 
     Per Claude's extended thinking API, thinking blocks contain internal reasoning
     while text blocks contain the actual response. Both are streamed separately.
-    """
-    if step.error:
-        event = StepEvent(type="error", step_number=step.step_number, content=step.error, is_final=True)
-    elif step.is_final and step.final_answer:
-        event = StepEvent(type="final_answer", step_number=step.step_number, content=step.final_answer, is_final=True)
-    elif step.step_type == StepType.INTERMEDIATE and step.accumulated_text is not None:
-        event = StepEvent(
-            type="intermediate", step_number=step.step_number, content=step.accumulated_text, is_streaming=True
-        )
-    elif step.step_type == StepType.FINAL_ANSWER and step.accumulated_text is not None:
-        event = StepEvent(
-            type="final_answer", step_number=step.step_number, content=step.accumulated_text, is_streaming=True
-        )
-    elif step.current_tool and step.tool_progress:
-        event = _create_tool_start_event(step, step.current_tool)
-    elif step.tool_results and not step.is_streaming:
-        event = _create_tool_result_event(step)
-    elif step.step_type == StepType.THINKING or step.thinking is not None:
-        event = StepEvent(
-            type="thinking", step_number=step.step_number, content=step.thinking, is_streaming=step.is_streaming
-        )
-    else:
-        event = StepEvent(type="thinking", step_number=step.step_number, content=None, is_streaming=step.is_streaming)
 
-    logger.info(f"StepEvent: type={event.type}, step={event.step_number}, is_streaming={event.is_streaming}")
-    return event
+    Returns a list because a single step may contain multiple tool results.
+    """
+    for handler in _STEP_HANDLERS:
+        events = handler(step)
+        if events is not None:
+            _log_events(events)
+            return events
+
+    events = [StepEvent(type="thinking", step_number=step.step_number, content=None, is_streaming=step.is_streaming)]
+    _log_events(events)
+    return events
 
 
 class AgentService:
@@ -166,31 +240,66 @@ class AgentService:
         """Get the output directory for the current run."""
         return self._get_context().output_dir
 
+    def _enqueue_event_threadsafe(
+        self,
+        event: SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent,
+        event_name: str,
+    ) -> None:
+        """Thread-safe event enqueueing via call_soon_threadsafe.
+
+        Callbacks may be invoked from thread pool executors, so we must marshal
+        the queue operation onto the event loop thread.
+        """
+        ctx = self._get_context()
+        if ctx.event_queue is None or ctx.event_loop is None:
+            return
+
+        def _put() -> None:
+            if ctx.event_queue is None:
+                return
+            try:
+                ctx.event_queue.put_nowait(event)
+            except asyncio.QueueFull:
+                logger.warning(f"{event_name} queue full, dropping event")
+
+        ctx.event_loop.call_soon_threadsafe(_put)
+
     def _on_sub_agent_progress(self, progress: SubAgentProgress) -> None:
         """Callback for sub-agent progress updates.
 
         Converts the progress to an event and puts it on the queue for streaming.
         """
-        ctx = self._get_context()
-        if ctx.sub_agent_queue is not None:
-            event = convert_sub_agent_progress_to_event(progress)
-            try:
-                ctx.sub_agent_queue.put_nowait(event)
-            except asyncio.QueueFull:
-                logger.warning("Sub-agent progress queue full, dropping event")
+        event = convert_sub_agent_progress_to_event(progress)
+        self._enqueue_event_threadsafe(event, "Sub-agent progress")
 
     def _on_sub_agent_text(self, text: SubAgentText) -> None:
         """Callback for sub-agent text streaming.
 
         Converts the text to an event and puts it on the queue for streaming.
         """
-        ctx = self._get_context()
-        if ctx.sub_agent_queue is not None:
-            event = SubAgentTextEvent(tool_name=text.tool_name, text=text.text, is_final=text.is_final)
+        event = SubAgentTextEvent(tool_name=text.tool_name, text=text.text, is_final=text.is_final)
+        self._enqueue_event_threadsafe(event, "Sub-agent text")
+
+    def _on_task_snapshot(self, snapshot: list[dict[str, object]]) -> None:
+        """Callback for task tracker state changes.
+
+        Puts a TaskSnapshotEvent on the queue for streaming.
+        """
+        event = TaskSnapshotEvent(tasks=snapshot)
+        self._enqueue_event_threadsafe(event, "Task snapshot")
+
+    @staticmethod
+    def _drain_queue(
+        queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent],
+    ) -> list[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent]:
+        """Drain all pending events from the queue."""
+        events: list[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent] = []
+        while not queue.empty():
             try:
-                ctx.sub_agent_queue.put_nowait(event)
-            except asyncio.QueueFull:
-                logger.warning("Sub-agent text queue full, dropping event")
+                events.append(queue.get_nowait())
+            except asyncio.QueueEmpty:
+                break
+        return events
 
     async def run_agent(
         self,
@@ -202,7 +311,7 @@ class AgentService:
         rossum_url: str | None = None,
         images: list[ImageContent] | None = None,
         documents: list[DocumentContent] | None = None,
-    ) -> AsyncIterator[StepEvent | StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent]:
+    ) -> AsyncIterator[StepEvent | StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent]:
         """Run the agent with a new prompt.
 
         Creates a fresh MCP connection, initializes the agent with conversation
@@ -230,9 +339,12 @@ class AgentService:
         if documents:
             self._save_documents_to_output_dir(documents)
 
-        ctx.sub_agent_queue = asyncio.Queue(maxsize=100)
+        ctx.event_queue = asyncio.Queue(maxsize=100)
+        ctx.event_loop = asyncio.get_running_loop()
         set_progress_callback(self._on_sub_agent_progress)
         set_text_callback(self._on_sub_agent_text)
+        set_task_tracker(TaskTracker())
+        set_task_snapshot_callback(self._on_task_snapshot)
 
         system_prompt = get_system_prompt()
         url_context = extract_url_context(rossum_url)
@@ -262,26 +374,19 @@ class AgentService:
 
                 try:
                     async for step in agent.run(user_content):
-                        while not ctx.sub_agent_queue.empty():
-                            try:
-                                sub_event = ctx.sub_agent_queue.get_nowait()
-                                yield sub_event
-                            except asyncio.QueueEmpty:
-                                break
+                        for sub_event in self._drain_queue(ctx.event_queue):
+                            yield sub_event
 
-                        yield convert_step_to_event(step)
+                        for event in convert_step_to_events(step):
+                            yield event
 
                         if not step.is_streaming:
                             total_steps = step.step_number
                             total_input_tokens = agent._total_input_tokens
                             total_output_tokens = agent._total_output_tokens
 
-                    while not ctx.sub_agent_queue.empty():
-                        try:
-                            sub_event = ctx.sub_agent_queue.get_nowait()
-                            yield sub_event
-                        except asyncio.QueueEmpty:
-                            break
+                    for sub_event in self._drain_queue(ctx.event_queue):
+                        yield sub_event
 
                     ctx.last_memory = agent.memory
 
@@ -304,6 +409,8 @@ class AgentService:
         finally:
             set_progress_callback(None)
             set_text_callback(None)
+            set_task_snapshot_callback(None)
+            set_task_tracker(None)
             set_output_dir(None)
             set_rossum_credentials(None, None)
 

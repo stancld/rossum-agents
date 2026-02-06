@@ -113,6 +113,13 @@ class SubAgentTextEvent(BaseModel):
     is_final: bool = False
 
 
+class TaskSnapshotEvent(BaseModel):
+    """Event emitted when task tracker state changes via SSE."""
+
+    type: Literal["task_snapshot"] = "task_snapshot"
+    tasks: list[dict[str, JsonValue]]
+
+
 class TokenUsageBySource(BaseModel):
     """Token usage for a specific source."""
 

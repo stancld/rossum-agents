@@ -22,6 +22,7 @@ from rossum_agent_client.models.responses import (
     SubAgentProgressEvent,
     SubAgentTextEvent,
     SubAgentTokenUsageDetail,
+    TaskSnapshotEvent,
     TextContent,
     TokenUsageBreakdown,
     TokenUsageBySource,
@@ -48,6 +49,7 @@ __all__ = [
     "FileCreatedEvent",
     "SubAgentProgressEvent",
     "SubAgentTextEvent",
+    "TaskSnapshotEvent",
     # Token usage
     "TokenUsageBySource",
     "SubAgentTokenUsageDetail",

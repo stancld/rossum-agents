@@ -19,7 +19,7 @@ class TestConcurrentAgentService:
         """Test that concurrent run_agent calls have isolated per-request contexts.
 
         This verifies the contextvar-based state management properly isolates
-        per-request state like output_dir and sub_agent_queue between concurrent requests.
+        per-request state like output_dir and event_queue between concurrent requests.
         """
         agent_service = AgentService()
 
@@ -41,8 +41,8 @@ class TestConcurrentAgentService:
                 ctx = _request_context.get()
                 observed_contexts[request_id] = {
                     "output_dir": str(ctx.output_dir) if ctx.output_dir else None,
-                    "has_queue": ctx.sub_agent_queue is not None,
-                    "queue_id": id(ctx.sub_agent_queue) if ctx.sub_agent_queue else None,
+                    "has_queue": ctx.event_queue is not None,
+                    "queue_id": id(ctx.event_queue) if ctx.event_queue else None,
                 }
                 await asyncio.sleep(delay)
                 yield AgentStep(step_number=1, final_answer=f"Response for {request_id}", is_final=True)
@@ -117,7 +117,7 @@ class TestConcurrentAgentService:
             async def mock_run(prompt):
                 await asyncio.sleep(delay)
                 ctx = _request_context.get()
-                if ctx.sub_agent_queue is None:
+                if ctx.event_queue is None:
                     errors.append(f"{request_id}: Queue was None!")
                     raise AttributeError("'NoneType' object has no attribute 'empty'")
                 yield AgentStep(step_number=1, final_answer=f"Done: {request_id}", is_final=True)
