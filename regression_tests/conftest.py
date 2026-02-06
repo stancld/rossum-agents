@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,7 +15,7 @@ from rossum_agent.agent.models import AgentConfig
 from rossum_agent.bedrock_client import create_bedrock_client
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.rossum_mcp_integration import connect_mcp_server
-from rossum_agent.tools.core import set_output_dir, set_rossum_credentials
+from rossum_agent.tools.core import set_mcp_connection, set_output_dir, set_rossum_credentials
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
 
 if TYPE_CHECKING:
@@ -172,6 +173,7 @@ def create_live_agent(
         ) as mcp_connection:
             set_output_dir(temp_output_dir)
             set_rossum_credentials(case.api_base_url, token)
+            set_mcp_connection(mcp_connection, asyncio.get_event_loop(), "read-write")
             client = create_bedrock_client()
             system_prompt = get_system_prompt()
 
@@ -190,5 +192,6 @@ def create_live_agent(
             finally:
                 set_output_dir(None)
                 set_rossum_credentials(None, None)
+                set_mcp_connection(None, None)  # type: ignore[arg-type]
 
     return _create_agent
