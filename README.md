@@ -200,26 +200,8 @@ EOF
 docker-compose up rossum-agent-api
 ```
 
-#### With Redis Logging
+Redis is included in the compose stack and used for logging. View logs with:
 
-For production-like monitoring locally:
-
-**All systems:**
-```bash
-# Start with logging stack
-docker-compose up rossum-agent redis
-```
-
-**ARM Mac (M1/M2/M3):**
-```bash
-# Start ARM-compatible services
-docker-compose up rossum-agent-mac redis
-```
-
-Access points:
-- **Redis**: localhost:6379
-
-View logs with:
 ```bash
 redis-cli LRANGE logs:$(date +%Y-%m-%d) 0 -1
 ```
@@ -279,9 +261,6 @@ Or run standalone: `rossum-mcp`
 ### AI Agent Interfaces
 
 ```bash
-# Docker (recommended for local)
-docker-compose up rossum-agent-api
-
 # REST API (from source)
 rossum-agent-api
 ```

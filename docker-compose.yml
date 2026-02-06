@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 5
 
-  rossum-agent-base:
+  rossum-agent-api:
     image: rossum-agent
     build:
       context: .
@@ -23,55 +23,16 @@ services:
     environment:
       - AWS_PROFILE=${AWS_PROFILE}
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
-      - LLM_API_BASE_URL=""
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    command: ["uv", "run", "rossum-agent-api", "--host", "0.0.0.0"]
     ports:
       - 127.0.0.1:8000:8000
     volumes:
       - ~/.aws:/root/.aws:ro
-    profiles:
-      - base
-
-  rossum-agent:
-    extends: rossum-agent-base
-    environment:
-      - AWS_PROFILE=${AWS_PROFILE}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
     depends_on:
       redis:
         condition: service_healthy
-
-  rossum-agent-mac:
-    extends: rossum-agent-base
-    environment:
-      - AWS_PROFILE=${AWS_PROFILE}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    networks:
-      - rossum-network
-    depends_on:
-      redis:
-        condition: service_healthy
-
-  rossum-agent-api:
-    extends: rossum-agent-base
-    command: ["uv", "run", "rossum-agent-api", "--host", "0.0.0.0"]
-    environment:
-      - AWS_PROFILE=${AWS_PROFILE}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    ports:
-      - 127.0.0.1:8000:8000
-    depends_on:
-      redis:
-        condition: service_healthy
-
-networks:
-  rossum-network:
-    driver: bridge
 
 volumes:
   redis-data:
