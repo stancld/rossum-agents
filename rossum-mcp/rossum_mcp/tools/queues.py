@@ -14,7 +14,13 @@ from rossum_api.models.engine import Engine
 from rossum_api.models.queue import Queue
 from rossum_api.models.schema import Schema
 
-from rossum_mcp.tools.base import build_resource_url, delete_resource, is_read_write_mode, truncate_dict_fields
+from rossum_mcp.tools.base import (
+    build_resource_url,
+    delete_resource,
+    graceful_list,
+    is_read_write_mode,
+    truncate_dict_fields,
+)
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -52,7 +58,7 @@ async def _list_queues(
     name: str | None = None,
 ) -> list[Queue]:
     logger.debug(f"Listing queues: id={id}, workspace_id={workspace_id}, name={name}")
-    filters: dict[str, int | str] = {}
+    filters: dict = {}
     if id is not None:
         filters["id"] = id
     if workspace_id is not None:
@@ -60,8 +66,8 @@ async def _list_queues(
     if name is not None:
         filters["name"] = name
 
-    queues = [queue async for queue in client.list_queues(**filters)]  # type: ignore[arg-type]
-    return [_truncate_queue_for_list(queue) for queue in queues]
+    result = await graceful_list(client, Resource.Queue, "queue", **filters)
+    return [_truncate_queue_for_list(queue) for queue in result.items]
 
 
 async def _get_queue_schema(client: AsyncRossumAPIClient, queue_id: int) -> Schema:

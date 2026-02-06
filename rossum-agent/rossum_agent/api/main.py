@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import uvicorn
 from fastapi import FastAPI, Request, status
-from gunicorn.app.base import BaseApplication  # ty: ignore[unresolved-import] - ty struggles
+from gunicorn.app.base import BaseApplication
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -158,8 +158,8 @@ def _run_gunicorn(args: argparse.Namespace) -> None:
 
         def load_config(self) -> None:
             for key, value in self.options.items():
-                if key in self.cfg.settings and value is not None:
-                    self.cfg.set(key.lower(), value)
+                if key in self.cfg.settings and value is not None:  # ty: ignore[possibly-missing-attribute]
+                    self.cfg.set(key.lower(), value)  # ty: ignore[possibly-missing-attribute]
 
         def load(self):
             return self.app_uri

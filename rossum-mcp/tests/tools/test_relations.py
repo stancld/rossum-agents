@@ -31,7 +31,7 @@ def mock_client() -> AsyncMock:
     """Create a mock AsyncRossumAPIClient."""
     client = AsyncMock()
     client._http_client = AsyncMock()
-    client._deserializer = Mock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
     return client
 
 
@@ -66,7 +66,7 @@ class TestGetRelation:
 
         mock_relation = create_mock_relation(id=100, type="duplicate", key="xyz789")
         mock_client._http_client.fetch_one.return_value = {"id": 100}
-        mock_client._deserializer.return_value = mock_relation
+        mock_client._deserializer = Mock(return_value=mock_relation)
 
         get_relation = mock_mcp._tools["get_relation"]
         result = await get_relation(relation_id=100)
@@ -85,7 +85,7 @@ class TestGetRelation:
 
         mock_relation = create_mock_relation(id=200, type="edit", key=None)
         mock_client._http_client.fetch_one.return_value = {"id": 200}
-        mock_client._deserializer.return_value = mock_relation
+        mock_client._deserializer = Mock(return_value=mock_relation)
 
         get_relation = mock_mcp._tools["get_relation"]
         result = await get_relation(relation_id=200)
@@ -109,11 +109,11 @@ class TestListRelations:
         mock_rel1 = create_mock_relation(id=1, type="duplicate")
         mock_rel2 = create_mock_relation(id=2, type="edit")
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             for item in [mock_rel1, mock_rel2]:
                 yield item
 
-        mock_client.list_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_relations = mock_mcp._tools["list_relations"]
         result = await list_relations()
@@ -128,17 +128,20 @@ class TestListRelations:
         register_relation_tools(mock_mcp, mock_client)
 
         mock_rel = create_mock_relation(id=1, type="duplicate")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_rel
 
-        mock_client.list_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_relations = mock_mcp._tools["list_relations"]
         result = await list_relations(type="duplicate")
 
         assert len(result) == 1
-        mock_client.list_relations.assert_called_once_with(type="duplicate")
+        assert received_filters["type"] == "duplicate"
 
     @pytest.mark.asyncio
     async def test_list_relations_with_parent_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -148,17 +151,20 @@ class TestListRelations:
         register_relation_tools(mock_mcp, mock_client)
 
         mock_rel = create_mock_relation(id=1)
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_rel
 
-        mock_client.list_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_relations = mock_mcp._tools["list_relations"]
         result = await list_relations(parent=500)
 
         assert len(result) == 1
-        mock_client.list_relations.assert_called_once_with(parent=500)
+        assert received_filters["parent"] == 500
 
     @pytest.mark.asyncio
     async def test_list_relations_with_annotation_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -168,17 +174,20 @@ class TestListRelations:
         register_relation_tools(mock_mcp, mock_client)
 
         mock_rel = create_mock_relation(id=1)
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_rel
 
-        mock_client.list_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_relations = mock_mcp._tools["list_relations"]
         result = await list_relations(annotation=600)
 
         assert len(result) == 1
-        mock_client.list_relations.assert_called_once_with(annotation=600)
+        assert received_filters["annotation"] == 600
 
     @pytest.mark.asyncio
     async def test_list_relations_with_key_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -188,17 +197,20 @@ class TestListRelations:
         register_relation_tools(mock_mcp, mock_client)
 
         mock_rel = create_mock_relation(id=1, key="specific_key")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_rel
 
-        mock_client.list_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_relations = mock_mcp._tools["list_relations"]
         result = await list_relations(key="specific_key")
 
         assert len(result) == 1
-        mock_client.list_relations.assert_called_once_with(key="specific_key")
+        assert received_filters["key"] == "specific_key"
 
     @pytest.mark.asyncio
     async def test_list_relations_empty(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -207,14 +219,42 @@ class TestListRelations:
 
         register_relation_tools(mock_mcp, mock_client)
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             return
             yield
 
-        mock_client.list_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_relations = mock_mcp._tools["list_relations"]
         result = await list_relations()
 
         assert len(result) == 0
         assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_relations_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test list_relations gracefully skips items that fail deserialization."""
+        from rossum_mcp.tools.relations import register_relation_tools
+
+        register_relation_tools(mock_mcp, mock_client)
+
+        mock_rel = create_mock_relation(id=1, type="duplicate")
+
+        def mock_deserializer(resource, raw):
+            if raw.get("id") == 2:
+                raise ValueError("broken relation")
+            return mock_rel
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1, "type": "duplicate"}
+            yield {"id": 2, "type": "broken"}
+            yield {"id": 3, "type": "edit"}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_relations = mock_mcp._tools["list_relations"]
+        result = await list_relations()
+
+        assert len(result) == 2

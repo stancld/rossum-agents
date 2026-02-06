@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Literal
 
+from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.email_template import EmailTemplate
 
-from rossum_mcp.tools.base import is_read_write_mode
+from rossum_mcp.tools.base import graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -38,13 +39,8 @@ async def _list_email_templates(
     if name is not None:
         filters["name"] = name
 
-    templates_list: list[EmailTemplate] = []
-    async for template in client.list_email_templates(**filters):
-        templates_list.append(template)
-        if first_n is not None and len(templates_list) >= first_n:
-            break
-
-    return templates_list
+    result = await graceful_list(client, Resource.EmailTemplate, "email_template", max_items=first_n, **filters)
+    return result.items
 
 
 async def _create_email_template(

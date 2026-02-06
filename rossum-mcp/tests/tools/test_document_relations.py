@@ -30,7 +30,7 @@ def mock_client() -> AsyncMock:
     """Create a mock AsyncRossumAPIClient."""
     client = AsyncMock()
     client._http_client = AsyncMock()
-    client._deserializer = Mock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
     return client
 
 
@@ -106,11 +106,11 @@ class TestListDocumentRelations:
         mock_dr1 = create_mock_document_relation(id=1, type="export")
         mock_dr2 = create_mock_document_relation(id=2, type="einvoice")
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             for item in [mock_dr1, mock_dr2]:
                 yield item
 
-        mock_client.list_document_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_document_relations = mock_mcp._tools["list_document_relations"]
         result = await list_document_relations()
@@ -125,17 +125,20 @@ class TestListDocumentRelations:
         register_document_relation_tools(mock_mcp, mock_client)
 
         mock_dr = create_mock_document_relation(id=1, type="export")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_dr
 
-        mock_client.list_document_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_document_relations = mock_mcp._tools["list_document_relations"]
         result = await list_document_relations(type="export")
 
         assert len(result) == 1
-        mock_client.list_document_relations.assert_called_once_with(type="export")
+        assert received_filters["type"] == "export"
 
     @pytest.mark.asyncio
     async def test_list_document_relations_with_annotation_filter(
@@ -147,17 +150,20 @@ class TestListDocumentRelations:
         register_document_relation_tools(mock_mcp, mock_client)
 
         mock_dr = create_mock_document_relation(id=1)
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_dr
 
-        mock_client.list_document_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_document_relations = mock_mcp._tools["list_document_relations"]
         result = await list_document_relations(annotation=500)
 
         assert len(result) == 1
-        mock_client.list_document_relations.assert_called_once_with(annotation=500)
+        assert received_filters["annotation"] == 500
 
     @pytest.mark.asyncio
     async def test_list_document_relations_with_documents_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -167,17 +173,20 @@ class TestListDocumentRelations:
         register_document_relation_tools(mock_mcp, mock_client)
 
         mock_dr = create_mock_document_relation(id=1)
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_dr
 
-        mock_client.list_document_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_document_relations = mock_mcp._tools["list_document_relations"]
         result = await list_document_relations(documents=700)
 
         assert len(result) == 1
-        mock_client.list_document_relations.assert_called_once_with(documents=700)
+        assert received_filters["documents"] == 700
 
     @pytest.mark.asyncio
     async def test_list_document_relations_with_key_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -187,17 +196,20 @@ class TestListDocumentRelations:
         register_document_relation_tools(mock_mcp, mock_client)
 
         mock_dr = create_mock_document_relation(id=1, key="specific_key")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_dr
 
-        mock_client.list_document_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_document_relations = mock_mcp._tools["list_document_relations"]
         result = await list_document_relations(key="specific_key")
 
         assert len(result) == 1
-        mock_client.list_document_relations.assert_called_once_with(key="specific_key")
+        assert received_filters["key"] == "specific_key"
 
     @pytest.mark.asyncio
     async def test_list_document_relations_empty(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -206,14 +218,42 @@ class TestListDocumentRelations:
 
         register_document_relation_tools(mock_mcp, mock_client)
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             return
             yield
 
-        mock_client.list_document_relations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_document_relations = mock_mcp._tools["list_document_relations"]
         result = await list_document_relations()
 
         assert len(result) == 0
         assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_document_relations_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test list_document_relations gracefully skips items that fail deserialization."""
+        from rossum_mcp.tools.document_relations import register_document_relation_tools
+
+        register_document_relation_tools(mock_mcp, mock_client)
+
+        mock_dr = create_mock_document_relation(id=1, type="export")
+
+        def mock_deserializer(resource, raw):
+            if raw.get("id") == 2:
+                raise ValueError("broken document relation")
+            return mock_dr
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1, "type": "export"}
+            yield {"id": 2, "type": "broken"}
+            yield {"id": 3, "type": "einvoice"}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_document_relations = mock_mcp._tools["list_document_relations"]
+        result = await list_document_relations()
+
+        assert len(result) == 2

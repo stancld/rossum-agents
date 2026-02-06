@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal, TypedDict
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.rule import Rule
 
-from rossum_mcp.tools.base import build_resource_url, delete_resource, is_read_write_mode
+from rossum_mcp.tools.base import build_resource_url, delete_resource, graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -74,8 +74,8 @@ async def _list_rules(
     if enabled is not None:
         filters["enabled"] = enabled
 
-    rules_list: list[Rule] = [rule async for rule in client.list_rules(**filters)]
-    return rules_list
+    result = await graceful_list(client, Resource.Rule, "rule", **filters)
+    return result.items
 
 
 async def _create_rule(
