@@ -29,6 +29,7 @@ def mock_client() -> AsyncMock:
     """Create a mock AsyncRossumAPIClient."""
     client = AsyncMock()
     client._http_client = AsyncMock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
     return client
 
 

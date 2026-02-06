@@ -31,7 +31,10 @@ def create_mock_workspace(**kwargs) -> Workspace:
 @pytest.fixture
 def mock_client() -> AsyncMock:
     """Create a mock AsyncRossumAPIClient."""
-    return AsyncMock()
+    client = AsyncMock()
+    client._http_client = AsyncMock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
+    return client
 
 
 @pytest.fixture
@@ -88,11 +91,11 @@ class TestListWorkspaces:
         mock_ws1 = create_mock_workspace(id=1, name="Workspace 1")
         mock_ws2 = create_mock_workspace(id=2, name="Workspace 2")
 
-        async def async_iter():
-            for item in [mock_ws1, mock_ws2]:
-                yield item
+        async def mock_fetch_all(resource, **filters):
+            yield mock_ws1
+            yield mock_ws2
 
-        mock_client.list_workspaces = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_workspaces = mock_mcp._tools["list_workspaces"]
         result = await list_workspaces()
@@ -107,17 +110,19 @@ class TestListWorkspaces:
         register_workspace_tools(mock_mcp, mock_client)
 
         mock_ws = create_mock_workspace(id=1, name="Org Workspace")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            received_filters.update(filters)
             yield mock_ws
 
-        mock_client.list_workspaces = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_workspaces = mock_mcp._tools["list_workspaces"]
         result = await list_workspaces(organization_id=50)
 
         assert len(result) == 1
-        mock_client.list_workspaces.assert_called_once_with(organization=50)
+        assert received_filters["organization"] == 50
 
     @pytest.mark.asyncio
     async def test_list_workspaces_with_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -127,17 +132,51 @@ class TestListWorkspaces:
         register_workspace_tools(mock_mcp, mock_client)
 
         mock_ws = create_mock_workspace(id=1, name="Production")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            received_filters.update(filters)
             yield mock_ws
 
-        mock_client.list_workspaces = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_workspaces = mock_mcp._tools["list_workspaces"]
         result = await list_workspaces(name="Production")
 
         assert len(result) == 1
-        mock_client.list_workspaces.assert_called_once_with(name="Production")
+        assert received_filters["name"] == "Production"
+
+    @pytest.mark.asyncio
+    async def test_list_workspaces_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test list_workspaces gracefully skips items that fail deserialization."""
+        from rossum_mcp.tools.workspaces import register_workspace_tools
+
+        register_workspace_tools(mock_mcp, mock_client)
+
+        mock_ws = create_mock_workspace(id=1, name="Good Workspace")
+
+        call_count = 0
+
+        def mock_deserializer(resource, raw):
+            nonlocal call_count
+            call_count += 1
+            if raw.get("id") == 2:
+                raise ValueError("broken workspace")
+            return mock_ws
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1}
+            yield {"id": 2}
+            yield {"id": 3}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_workspaces = mock_mcp._tools["list_workspaces"]
+        result = await list_workspaces()
+
+        assert len(result) == 2
 
 
 @pytest.mark.unit

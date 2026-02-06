@@ -40,7 +40,10 @@ def create_mock_email_template(**kwargs) -> EmailTemplate:
 @pytest.fixture
 def mock_client() -> AsyncMock:
     """Create a mock AsyncRossumAPIClient."""
-    return AsyncMock()
+    client = AsyncMock()
+    client._http_client = AsyncMock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
+    return client
 
 
 @pytest.fixture
@@ -94,11 +97,11 @@ class TestListEmailTemplates:
         mock_template1 = create_mock_email_template(id=1, name="Template 1")
         mock_template2 = create_mock_email_template(id=2, name="Template 2")
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             for item in [mock_template1, mock_template2]:
                 yield item
 
-        mock_client.list_email_templates = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_email_templates = mock_mcp._tools["list_email_templates"]
         result = await list_email_templates()
@@ -111,17 +114,20 @@ class TestListEmailTemplates:
         register_email_template_tools(mock_mcp, mock_client)
 
         mock_template = create_mock_email_template(id=1, name="Queue Template")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_template
 
-        mock_client.list_email_templates = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_email_templates = mock_mcp._tools["list_email_templates"]
         result = await list_email_templates(queue_id=100)
 
         assert len(result) == 1
-        mock_client.list_email_templates.assert_called_once_with(queue=100)
+        assert received_filters["queue"] == 100
 
     @pytest.mark.asyncio
     async def test_list_email_templates_with_type_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -129,17 +135,20 @@ class TestListEmailTemplates:
         register_email_template_tools(mock_mcp, mock_client)
 
         mock_template = create_mock_email_template(id=1, type="rejection")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_template
 
-        mock_client.list_email_templates = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_email_templates = mock_mcp._tools["list_email_templates"]
         result = await list_email_templates(type="rejection")
 
         assert len(result) == 1
-        mock_client.list_email_templates.assert_called_once_with(type="rejection")
+        assert received_filters["type"] == "rejection"
 
     @pytest.mark.asyncio
     async def test_list_email_templates_with_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -147,17 +156,20 @@ class TestListEmailTemplates:
         register_email_template_tools(mock_mcp, mock_client)
 
         mock_template = create_mock_email_template(id=1, name="Custom Notification")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_template
 
-        mock_client.list_email_templates = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_email_templates = mock_mcp._tools["list_email_templates"]
         result = await list_email_templates(name="Custom Notification")
 
         assert len(result) == 1
-        mock_client.list_email_templates.assert_called_once_with(name="Custom Notification")
+        assert received_filters["name"] == "Custom Notification"
 
     @pytest.mark.asyncio
     async def test_list_email_templates_with_first_n(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -168,11 +180,11 @@ class TestListEmailTemplates:
         mock_template2 = create_mock_email_template(id=2, name="Template 2")
         mock_template3 = create_mock_email_template(id=3, name="Template 3")
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             for item in [mock_template1, mock_template2, mock_template3]:
                 yield item
 
-        mock_client.list_email_templates = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_email_templates = mock_mcp._tools["list_email_templates"]
         result = await list_email_templates(first_n=2)
@@ -188,10 +200,10 @@ class TestListEmailTemplates:
 
         mock_template1 = create_mock_email_template(id=1, name="Template 1")
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             yield mock_template1
 
-        mock_client.list_email_templates = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_email_templates = mock_mcp._tools["list_email_templates"]
         result = await list_email_templates(first_n=10)
@@ -205,16 +217,42 @@ class TestListEmailTemplates:
         """Test email templates listing when no templates exist but first_n is specified."""
         register_email_template_tools(mock_mcp, mock_client)
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             return
             yield
 
-        mock_client.list_email_templates = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_email_templates = mock_mcp._tools["list_email_templates"]
         result = await list_email_templates(first_n=5)
 
         assert len(result) == 0
+
+    @pytest.mark.asyncio
+    async def test_list_email_templates_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test list_email_templates gracefully skips items that fail deserialization."""
+        register_email_template_tools(mock_mcp, mock_client)
+
+        mock_template = create_mock_email_template(id=1, name="Good Template")
+
+        def mock_deserializer(resource, raw):
+            if raw.get("id") == 2:
+                raise ValueError("broken email template")
+            return mock_template
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1, "name": "Good Template"}
+            yield {"id": 2, "name": "Broken Template"}
+            yield {"id": 3, "name": "Another Good Template"}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_email_templates = mock_mcp._tools["list_email_templates"]
+        result = await list_email_templates()
+
+        assert len(result) == 2
 
 
 @pytest.mark.unit

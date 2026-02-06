@@ -2,15 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+from rossum_api.domain_logic.resources import Resource
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
     from typing import Any
 
+    from rossum_api import AsyncRossumAPIClient
+
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GracefulListResult[T]:
+    items: list[T]
+    skipped_ids: list[int | str] = field(default_factory=list)
+
 
 BASE_URL = os.environ.get("ROSSUM_API_BASE_URL", "").rstrip("/")
 
@@ -57,10 +70,42 @@ def truncate_dict_fields(data: dict[str, Any], fields: tuple[str, ...]) -> dict[
         return data
 
     result = dict(data)
-    for field in fields:
-        if field in result:
-            result[field] = TRUNCATED_MARKER
+    for field_name in fields:
+        if field_name in result:
+            result[field_name] = TRUNCATED_MARKER
     return result
+
+
+async def graceful_list(
+    client: AsyncRossumAPIClient,
+    resource: Resource,
+    resource_label: str,
+    max_items: int | None = None,
+    **filters: Any,
+) -> GracefulListResult:
+    """List resources gracefully, skipping items that fail deserialization.
+
+    Uses _http_client.fetch_all directly so that a single broken item
+    does not terminate the entire iteration (the high-level client generators
+    die on the first deserialization error).
+    """
+    items: list[Any] = []
+    skipped_ids: list[int | str] = []
+    async for raw in client._http_client.fetch_all(resource, **filters):
+        try:
+            item = client._deserializer(resource, raw)
+            items.append(item)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            item_id = raw.get("id", "unknown")
+            skipped_ids.append(item_id)
+            logger.warning("Failed to deserialize %s (id=%s), skipping", resource_label, item_id)
+        if max_items is not None and len(items) >= max_items:
+            break
+    if skipped_ids:
+        logger.warning("Skipped %d %s item(s) that failed to deserialize", len(skipped_ids), resource_label)
+    return GracefulListResult(items=items, skipped_ids=skipped_ids)
 
 
 async def delete_resource(
