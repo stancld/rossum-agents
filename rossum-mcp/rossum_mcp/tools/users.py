@@ -5,8 +5,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.group import Group
 from rossum_api.models.user import User
+
+from rossum_mcp.tools.base import graceful_list
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -38,11 +41,13 @@ async def _list_users(
     }
     filters = {k: v for k, v in filter_mapping.items() if v is not None}
 
-    users_list: list[User] = [user async for user in client.list_users(**filters)]
+    result = await graceful_list(client, Resource.User, "user", **filters)
+    users_list = result.items
 
     if is_organization_group_admin is not None:
+        roles_result = await graceful_list(client, Resource.Group, "user_role")
         org_admin_role_urls: set[str] = {
-            group.url async for group in client.list_user_roles() if group.name == "organization_group_admin"
+            group.url for group in roles_result.items if group.name == "organization_group_admin"
         }
         if is_organization_group_admin:
             users_list = [user for user in users_list if set(user.groups) & org_admin_role_urls]
@@ -53,8 +58,8 @@ async def _list_users(
 
 
 async def _list_user_roles(client: AsyncRossumAPIClient) -> list[Group]:
-    groups_list: list[Group] = [group async for group in client.list_user_roles()]
-    return groups_list
+    result = await graceful_list(client, Resource.Group, "user_role")
+    return result.items
 
 
 def register_user_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:

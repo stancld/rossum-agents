@@ -83,11 +83,11 @@ class TestListSchemas:
             create_mock_schema(id=2, name="Schema 2"),
         ]
 
-        async def mock_list_schemas(**filters):
+        async def mock_fetch_all(resource, **filters):
             for schema in mock_schemas:
                 yield schema
 
-        mock_client.list_schemas = mock_list_schemas
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_schemas = mock_mcp._tools["list_schemas"]
         result = await list_schemas()
@@ -104,13 +104,13 @@ class TestListSchemas:
         mock_schemas = [create_mock_schema(id=1, name="Invoice Schema")]
         filters_received = {}
 
-        async def mock_list_schemas(**filters):
+        async def mock_fetch_all(resource, **filters):
             nonlocal filters_received
             filters_received = filters
             for schema in mock_schemas:
                 yield schema
 
-        mock_client.list_schemas = mock_list_schemas
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_schemas = mock_mcp._tools["list_schemas"]
         result = await list_schemas(name="Invoice Schema")
@@ -126,13 +126,13 @@ class TestListSchemas:
         mock_schemas = [create_mock_schema(id=1, name="Schema 1")]
         filters_received = {}
 
-        async def mock_list_schemas(**filters):
+        async def mock_fetch_all(resource, **filters):
             nonlocal filters_received
             filters_received = filters
             for schema in mock_schemas:
                 yield schema
 
-        mock_client.list_schemas = mock_list_schemas
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_schemas = mock_mcp._tools["list_schemas"]
         result = await list_schemas(queue_id=5)
@@ -148,13 +148,13 @@ class TestListSchemas:
         mock_schemas = [create_mock_schema(id=1, name="Test Schema")]
         filters_received = {}
 
-        async def mock_list_schemas(**filters):
+        async def mock_fetch_all(resource, **filters):
             nonlocal filters_received
             filters_received = filters
             for schema in mock_schemas:
                 yield schema
 
-        mock_client.list_schemas = mock_list_schemas
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_schemas = mock_mcp._tools["list_schemas"]
         result = await list_schemas(name="Test Schema", queue_id=3)
@@ -168,11 +168,11 @@ class TestListSchemas:
         """Test schema listing with no results."""
         register_schema_tools(mock_mcp, mock_client)
 
-        async def mock_list_schemas(**filters):
+        async def mock_fetch_all(resource, **filters):
             return
             yield
 
-        mock_client.list_schemas = mock_list_schemas
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_schemas = mock_mcp._tools["list_schemas"]
         result = await list_schemas()
@@ -196,10 +196,10 @@ class TestListSchemas:
             ],
         )
 
-        async def mock_list_schemas(**filters):
+        async def mock_fetch_all(resource, **filters):
             yield mock_schema
 
-        mock_client.list_schemas = mock_list_schemas
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_schemas = mock_mcp._tools["list_schemas"]
         result = await list_schemas()
@@ -208,6 +208,32 @@ class TestListSchemas:
         assert result[0].content == "<omitted>"
         assert result[0].name == "Schema 1"
         assert result[0].id == 1
+
+    @pytest.mark.asyncio
+    async def test_list_schemas_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test list_schemas gracefully skips items that fail deserialization."""
+        register_schema_tools(mock_mcp, mock_client)
+
+        good_schema = create_mock_schema(id=1, name="Good Schema")
+
+        def mock_deserializer(resource, raw):
+            if raw.get("id") == 2:
+                raise ValueError("broken schema")
+            return good_schema
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1, "name": "Good Schema"}
+            yield {"id": 2, "name": "Broken Schema"}
+            yield {"id": 3, "name": "Another Good Schema"}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_schemas = mock_mcp._tools["list_schemas"]
+        result = await list_schemas()
+
+        assert len(result) == 2
 
 
 @pytest.mark.unit

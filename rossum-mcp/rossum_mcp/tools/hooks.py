@@ -6,9 +6,10 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
+from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.hook import Hook, HookRunData, HookType
 
-from rossum_mcp.tools.base import TRUNCATED_MARKER, delete_resource, is_read_write_mode
+from rossum_mcp.tools.base import TRUNCATED_MARKER, delete_resource, graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -56,13 +57,8 @@ async def _list_hooks(
     if active is not None:
         filters["active"] = active
 
-    hooks_list: list[Hook] = []
-    async for hook in client.list_hooks(**filters):
-        hooks_list.append(hook)
-        if first_n is not None and len(hooks_list) >= first_n:
-            break
-
-    return hooks_list
+    result = await graceful_list(client, Resource.Hook, "hook", max_items=first_n, **filters)
+    return result.items
 
 
 async def _create_hook(
@@ -181,7 +177,8 @@ async def _list_hook_logs(
     }
     filters = {k: v for k, v in filter_mapping.items() if v is not None}
 
-    return [log async for log in client.list_hook_run_data(**filters)]
+    result = await graceful_list(client, Resource.HookRunData, "hook_log", **filters)
+    return result.items
 
 
 async def _list_hook_templates(client: AsyncRossumAPIClient) -> list[HookTemplate]:

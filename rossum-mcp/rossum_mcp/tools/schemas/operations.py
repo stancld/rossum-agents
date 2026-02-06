@@ -10,7 +10,7 @@ from rossum_api import APIClientError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.schema import Schema
 
-from rossum_mcp.tools.base import TRUNCATED_MARKER, delete_resource, is_read_write_mode
+from rossum_mcp.tools.base import TRUNCATED_MARKER, delete_resource, graceful_list, is_read_write_mode
 from rossum_mcp.tools.schemas.models import SchemaNode, SchemaNodeUpdate  # noqa: TC001 - needed at runtime for FastMCP
 from rossum_mcp.tools.schemas.patching import PatchOperation, apply_schema_patch
 from rossum_mcp.tools.schemas.pruning import (
@@ -48,14 +48,14 @@ async def list_schemas(
     client: AsyncRossumAPIClient, name: str | None = None, queue_id: int | None = None
 ) -> list[Schema]:
     logger.debug(f"Listing schemas: name={name}, queue_id={queue_id}")
-    filters: dict[str, int | str] = {}
+    filters: dict = {}
     if name is not None:
         filters["name"] = name
     if queue_id is not None:
         filters["queue"] = queue_id
 
-    schemas = [schema async for schema in client.list_schemas(**filters)]  # type: ignore[arg-type]
-    return [_truncate_schema_for_list(schema) for schema in schemas]
+    result = await graceful_list(client, Resource.Schema, "schema", **filters)
+    return [_truncate_schema_for_list(schema) for schema in result.items]
 
 
 async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_data: dict) -> Schema | dict:
