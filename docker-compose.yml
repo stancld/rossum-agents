@@ -63,6 +63,8 @@ services:
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+    ports:
+      - 127.0.0.1:8000:8000
     depends_on:
       redis:
         condition: service_healthy

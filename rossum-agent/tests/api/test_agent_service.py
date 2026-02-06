@@ -8,29 +8,36 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from rossum_agent.agent.memory import AgentMemory, MemoryStep, TaskStep
 from rossum_agent.agent.models import AgentStep, StepType, ThinkingBlockData, ToolCall, ToolResult
-from rossum_agent.api.models.schemas import ImageContent, StepEvent, SubAgentProgressEvent, SubAgentTextEvent
+from rossum_agent.api.models.schemas import (
+    ImageContent,
+    StepEvent,
+    SubAgentProgressEvent,
+    SubAgentTextEvent,
+    TaskSnapshotEvent,
+)
 from rossum_agent.api.services.agent_service import (
     AgentService,
     _create_tool_result_event,
     _create_tool_start_event,
-    convert_step_to_event,
+    convert_step_to_events,
     convert_sub_agent_progress_to_event,
 )
 from rossum_agent.tools import SubAgentProgress, SubAgentText
 
 
-class TestConvertStepToEvent:
-    """Tests for convert_step_to_event function."""
+class TestConvertStepToEvents:
+    """Tests for convert_step_to_events function."""
 
     def test_convert_error_step(self):
         """Test converting error step."""
         step = AgentStep(step_number=1, error="Something went wrong")
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "error"
-        assert event.step_number == 1
-        assert event.content == "Something went wrong"
-        assert event.is_final is True
+        assert len(events) == 1
+        assert events[0].type == "error"
+        assert events[0].step_number == 1
+        assert events[0].content == "Something went wrong"
+        assert events[0].is_final is True
 
     def test_convert_final_answer_step(self):
         """Test converting final answer step."""
@@ -39,26 +46,30 @@ class TestConvertStepToEvent:
             final_answer="Here is your answer",
             is_final=True,
         )
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "final_answer"
-        assert event.step_number == 2
-        assert event.content == "Here is your answer"
-        assert event.is_final is True
+        assert len(events) == 1
+        assert events[0].type == "final_answer"
+        assert events[0].step_number == 2
+        assert events[0].content == "Here is your answer"
+        assert events[0].is_final is True
 
     def test_convert_tool_start_step(self):
         """Test converting tool start step."""
         step = AgentStep(
             step_number=1,
             current_tool="list_annotations",
+            tool_calls=[ToolCall(id="tc_1", name="list_annotations", arguments={"queue_id": 123})],
             tool_progress=(1, 3),
         )
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "tool_start"
-        assert event.step_number == 1
-        assert event.tool_name == "list_annotations"
-        assert event.tool_progress == (1, 3)
+        assert len(events) == 1
+        assert events[0].type == "tool_start"
+        assert events[0].step_number == 1
+        assert events[0].tool_name == "list_annotations"
+        assert events[0].tool_progress == (1, 3)
+        assert events[0].tool_call_id == "tc_1"
 
     def test_convert_tool_result_step(self):
         """Test converting tool result step."""
@@ -71,13 +82,15 @@ class TestConvertStepToEvent:
             ],
             is_streaming=False,
         )
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "tool_result"
-        assert event.step_number == 1
-        assert event.tool_name == "list_annotations"
-        assert event.result == '{"annotations": []}'
-        assert event.is_error is False
+        assert len(events) == 1
+        assert events[0].type == "tool_result"
+        assert events[0].step_number == 1
+        assert events[0].tool_name == "list_annotations"
+        assert events[0].result == '{"annotations": []}'
+        assert events[0].is_error is False
+        assert events[0].tool_call_id == "call_123"
 
     def test_convert_tool_result_error_step(self):
         """Test converting tool result with error."""
@@ -90,28 +103,32 @@ class TestConvertStepToEvent:
             ],
             is_streaming=False,
         )
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "tool_result"
-        assert event.is_error is True
+        assert len(events) == 1
+        assert events[0].type == "tool_result"
+        assert events[0].is_error is True
+        assert events[0].tool_call_id == "call_456"
 
     def test_convert_thinking_step(self):
         """Test converting thinking step."""
         step = AgentStep(step_number=1, thinking="I'll help you with that...", is_streaming=True)
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "thinking"
-        assert event.step_number == 1
-        assert event.content == "I'll help you with that..."
-        assert event.is_streaming is True
+        assert len(events) == 1
+        assert events[0].type == "thinking"
+        assert events[0].step_number == 1
+        assert events[0].content == "I'll help you with that..."
+        assert events[0].is_streaming is True
 
     def test_convert_thinking_step_not_streaming(self):
         """Test converting thinking step when not streaming."""
         step = AgentStep(step_number=1, thinking="Complete thought", is_streaming=False)
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "thinking"
-        assert event.is_streaming is False
+        assert len(events) == 1
+        assert events[0].type == "thinking"
+        assert events[0].is_streaming is False
 
     def test_convert_intermediate_text_step(self):
         """Test converting intermediate text step with accumulated_text."""
@@ -121,12 +138,13 @@ class TestConvertStepToEvent:
             accumulated_text="Here is some intermediate text",
             is_streaming=True,
         )
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "intermediate"
-        assert event.step_number == 1
-        assert event.content == "Here is some intermediate text"
-        assert event.is_streaming is True
+        assert len(events) == 1
+        assert events[0].type == "intermediate"
+        assert events[0].step_number == 1
+        assert events[0].content == "Here is some intermediate text"
+        assert events[0].is_streaming is True
 
     def test_convert_final_answer_streaming_text_step(self):
         """Test converting final answer streaming text step with accumulated_text."""
@@ -136,12 +154,13 @@ class TestConvertStepToEvent:
             accumulated_text="Final response text",
             is_streaming=True,
         )
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "final_answer"
-        assert event.step_number == 2
-        assert event.content == "Final response text"
-        assert event.is_streaming is True
+        assert len(events) == 1
+        assert events[0].type == "final_answer"
+        assert events[0].step_number == 2
+        assert events[0].content == "Final response text"
+        assert events[0].is_streaming is True
 
     def test_convert_thinking_step_with_step_type(self):
         """Test converting step with StepType.THINKING."""
@@ -151,20 +170,52 @@ class TestConvertStepToEvent:
             thinking="Deep reasoning here",
             is_streaming=True,
         )
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "thinking"
-        assert event.content == "Deep reasoning here"
-        assert event.is_streaming is True
+        assert len(events) == 1
+        assert events[0].type == "thinking"
+        assert events[0].content == "Deep reasoning here"
+        assert events[0].is_streaming is True
 
     def test_convert_fallback_step(self):
         """Test converting step that falls through to fallback case."""
         step = AgentStep(step_number=1, is_streaming=True)
-        event = convert_step_to_event(step)
+        events = convert_step_to_events(step)
 
-        assert event.type == "thinking"
-        assert event.content is None
-        assert event.is_streaming is True
+        assert len(events) == 1
+        assert events[0].type == "thinking"
+        assert events[0].content is None
+        assert events[0].is_streaming is True
+
+    def test_convert_multi_tool_result_step(self):
+        """Test that multiple tool results produce one event per result."""
+        step = AgentStep(
+            step_number=3,
+            tool_results=[
+                ToolResult(tool_call_id="tc_1", name="list_annotations", content="result_1", is_error=False),
+                ToolResult(tool_call_id="tc_2", name="get_queue", content="result_2", is_error=False),
+                ToolResult(tool_call_id="tc_3", name="get_annotation", content="error_result", is_error=True),
+            ],
+            is_streaming=False,
+        )
+        events = convert_step_to_events(step)
+
+        assert len(events) == 3
+        assert events[0].tool_name == "list_annotations"
+        assert events[0].result == "result_1"
+        assert events[0].tool_call_id == "tc_1"
+        assert events[0].is_error is False
+        assert events[1].tool_name == "get_queue"
+        assert events[1].result == "result_2"
+        assert events[1].tool_call_id == "tc_2"
+        assert events[1].is_error is False
+        assert events[2].tool_name == "get_annotation"
+        assert events[2].result == "error_result"
+        assert events[2].tool_call_id == "tc_3"
+        assert events[2].is_error is True
+        for e in events:
+            assert e.type == "tool_result"
+            assert e.step_number == 3
 
 
 class TestCreateToolStartEvent:
@@ -187,6 +238,7 @@ class TestCreateToolStartEvent:
         assert event.tool_name == "list_annotations"
         assert event.tool_arguments == {"queue_id": 123}
         assert event.tool_progress == (1, 2)
+        assert event.tool_call_id == "tc_1"
 
     def test_create_tool_start_event_expands_call_on_connection(self):
         """Test that call_on_connection tool names are expanded."""
@@ -207,6 +259,7 @@ class TestCreateToolStartEvent:
         assert event.type == "tool_start"
         assert event.tool_name == "call_on_connection[sandbox.get_queues]"
         assert event.tool_arguments == {"connection_id": "sandbox", "tool_name": "get_queues", "arguments": "{}"}
+        assert event.tool_call_id == "tc_1"
 
     def test_create_tool_start_event_no_matching_tool_call(self):
         """Test creating tool start event when tool call is not found."""
@@ -223,6 +276,7 @@ class TestCreateToolStartEvent:
         assert event.type == "tool_start"
         assert event.tool_name == "get_annotation"
         assert event.tool_arguments is None
+        assert event.tool_call_id is None
 
 
 class TestCreateToolResultEvent:
@@ -230,59 +284,53 @@ class TestCreateToolResultEvent:
 
     def test_create_tool_result_event_success(self):
         """Test creating tool result event from successful result."""
-        step = AgentStep(
-            step_number=1,
-            tool_results=[
-                ToolResult(
-                    tool_call_id="tc_1",
-                    name="list_annotations",
-                    content='{"annotations": [1, 2, 3]}',
-                    is_error=False,
-                ),
-            ],
+        result = ToolResult(
+            tool_call_id="tc_1",
+            name="list_annotations",
+            content='{"annotations": [1, 2, 3]}',
+            is_error=False,
         )
-        event = _create_tool_result_event(step)
+        event = _create_tool_result_event(1, result)
 
         assert event.type == "tool_result"
         assert event.step_number == 1
         assert event.tool_name == "list_annotations"
         assert event.result == '{"annotations": [1, 2, 3]}'
         assert event.is_error is False
+        assert event.tool_call_id == "tc_1"
 
     def test_create_tool_result_event_error(self):
         """Test creating tool result event from error result."""
-        step = AgentStep(
-            step_number=2,
-            tool_results=[
-                ToolResult(
-                    tool_call_id="tc_2",
-                    name="get_annotation",
-                    content="Annotation not found",
-                    is_error=True,
-                ),
-            ],
+        result = ToolResult(
+            tool_call_id="tc_2",
+            name="get_annotation",
+            content="Annotation not found",
+            is_error=True,
         )
-        event = _create_tool_result_event(step)
+        event = _create_tool_result_event(2, result)
 
         assert event.type == "tool_result"
         assert event.step_number == 2
         assert event.tool_name == "get_annotation"
         assert event.result == "Annotation not found"
         assert event.is_error is True
+        assert event.tool_call_id == "tc_2"
 
-    def test_create_tool_result_event_uses_last_result(self):
-        """Test that only the last tool result is used."""
-        step = AgentStep(
-            step_number=1,
-            tool_results=[
-                ToolResult(tool_call_id="tc_1", name="first_tool", content="first", is_error=False),
-                ToolResult(tool_call_id="tc_2", name="second_tool", content="second", is_error=False),
-            ],
-        )
-        event = _create_tool_result_event(step)
+    def test_create_tool_result_event_emits_all_results(self):
+        """Test that all tool results are emitted, not just the last one."""
+        results = [
+            ToolResult(tool_call_id="tc_1", name="first_tool", content="first", is_error=False),
+            ToolResult(tool_call_id="tc_2", name="second_tool", content="second", is_error=False),
+        ]
+        events = [_create_tool_result_event(1, r) for r in results]
 
-        assert event.tool_name == "second_tool"
-        assert event.result == "second"
+        assert len(events) == 2
+        assert events[0].tool_name == "first_tool"
+        assert events[0].result == "first"
+        assert events[0].tool_call_id == "tc_1"
+        assert events[1].tool_name == "second_tool"
+        assert events[1].result == "second"
+        assert events[1].tool_call_id == "tc_2"
 
 
 class TestAgentServiceBuildUpdatedHistory:
@@ -1093,15 +1141,20 @@ class TestConvertSubAgentProgressToEvent:
 
 
 class TestAgentServiceSubAgentCallbacks:
-    """Tests for sub-agent callback handling."""
+    """Tests for sub-agent callback handling.
 
-    def test_on_sub_agent_progress_with_queue(self):
+    Callbacks use call_soon_threadsafe to marshal events onto the event loop,
+    so tests must be async and allow time for the scheduled callback to run.
+    """
+
+    async def test_on_sub_agent_progress_with_queue(self):
         """Test _on_sub_agent_progress puts event on queue."""
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = asyncio.Queue(maxsize=100)
+        ctx.event_queue = asyncio.Queue(maxsize=100)
+        ctx.event_loop = asyncio.get_running_loop()
         _request_context.set(ctx)
 
         progress = SubAgentProgress(
@@ -1114,9 +1167,10 @@ class TestAgentServiceSubAgentCallbacks:
         )
 
         service._on_sub_agent_progress(progress)
+        await asyncio.sleep(0)
 
-        assert ctx.sub_agent_queue.qsize() == 1
-        event = ctx.sub_agent_queue.get_nowait()
+        assert ctx.event_queue.qsize() == 1
+        event = ctx.event_queue.get_nowait()
         assert isinstance(event, SubAgentProgressEvent)
         assert event.tool_name == "test_tool"
 
@@ -1126,7 +1180,7 @@ class TestAgentServiceSubAgentCallbacks:
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = None
+        ctx.event_queue = None
         _request_context.set(ctx)
 
         progress = SubAgentProgress(
@@ -1140,16 +1194,19 @@ class TestAgentServiceSubAgentCallbacks:
 
         service._on_sub_agent_progress(progress)
 
-    def test_on_sub_agent_progress_queue_full(self, caplog):
+    async def test_on_sub_agent_progress_queue_full(self, caplog):
         """Test _on_sub_agent_progress logs warning when queue is full."""
+        import logging
+
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = asyncio.Queue(maxsize=1)
+        ctx.event_queue = asyncio.Queue(maxsize=1)
+        ctx.event_loop = asyncio.get_running_loop()
         _request_context.set(ctx)
 
-        ctx.sub_agent_queue.put_nowait(
+        ctx.event_queue.put_nowait(
             SubAgentProgressEvent(
                 tool_name="existing", iteration=1, max_iterations=1, tool_calls=["tool"], status="running"
             )
@@ -1164,28 +1221,29 @@ class TestAgentServiceSubAgentCallbacks:
             status="running",
         )
 
-        import logging
-
         with caplog.at_level(logging.WARNING):
             service._on_sub_agent_progress(progress)
+            await asyncio.sleep(0)
 
         assert "queue full" in caplog.text.lower()
 
-    def test_on_sub_agent_text_with_queue(self):
+    async def test_on_sub_agent_text_with_queue(self):
         """Test _on_sub_agent_text puts event on queue."""
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = asyncio.Queue(maxsize=100)
+        ctx.event_queue = asyncio.Queue(maxsize=100)
+        ctx.event_loop = asyncio.get_running_loop()
         _request_context.set(ctx)
 
         text = SubAgentText(tool_name="analyze_hook", text="Analyzing...", is_final=False)
 
         service._on_sub_agent_text(text)
+        await asyncio.sleep(0)
 
-        assert ctx.sub_agent_queue.qsize() == 1
-        event = ctx.sub_agent_queue.get_nowait()
+        assert ctx.event_queue.qsize() == 1
+        event = ctx.event_queue.get_nowait()
         assert isinstance(event, SubAgentTextEvent)
         assert event.tool_name == "analyze_hook"
         assert event.text == "Analyzing..."
@@ -1197,30 +1255,82 @@ class TestAgentServiceSubAgentCallbacks:
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = None
+        ctx.event_queue = None
         _request_context.set(ctx)
 
         text = SubAgentText(tool_name="test_tool", text="Hello", is_final=True)
 
         service._on_sub_agent_text(text)
 
-    def test_on_sub_agent_text_queue_full(self, caplog):
+    async def test_on_sub_agent_text_queue_full(self, caplog):
         """Test _on_sub_agent_text logs warning when queue is full."""
+        import logging
+
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = asyncio.Queue(maxsize=1)
+        ctx.event_queue = asyncio.Queue(maxsize=1)
+        ctx.event_loop = asyncio.get_running_loop()
         _request_context.set(ctx)
 
-        ctx.sub_agent_queue.put_nowait(SubAgentTextEvent(tool_name="existing", text="x", is_final=False))
+        ctx.event_queue.put_nowait(SubAgentTextEvent(tool_name="existing", text="x", is_final=False))
 
         text = SubAgentText(tool_name="new_tool", text="Hello", is_final=True)
 
-        import logging
-
         with caplog.at_level(logging.WARNING):
             service._on_sub_agent_text(text)
+            await asyncio.sleep(0)
+
+        assert "queue full" in caplog.text.lower()
+
+    async def test_on_task_snapshot_with_queue(self):
+        """Test _on_task_snapshot puts TaskSnapshotEvent on queue."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
+        service = AgentService()
+        ctx = _RequestContext()
+        ctx.event_queue = asyncio.Queue(maxsize=100)
+        ctx.event_loop = asyncio.get_running_loop()
+        _request_context.set(ctx)
+
+        snapshot = [{"id": "1", "subject": "Deploy", "status": "completed"}]
+        service._on_task_snapshot(snapshot)
+        await asyncio.sleep(0)
+
+        assert ctx.event_queue.qsize() == 1
+        event = ctx.event_queue.get_nowait()
+        assert isinstance(event, TaskSnapshotEvent)
+        assert event.tasks == snapshot
+
+    def test_on_task_snapshot_without_queue(self):
+        """Test _on_task_snapshot does nothing when queue is None."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
+        service = AgentService()
+        ctx = _RequestContext()
+        ctx.event_queue = None
+        _request_context.set(ctx)
+
+        service._on_task_snapshot([{"id": "1", "subject": "Task", "status": "pending"}])
+
+    async def test_on_task_snapshot_queue_full(self, caplog):
+        """Test _on_task_snapshot logs warning when queue is full."""
+        import logging
+
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
+        service = AgentService()
+        ctx = _RequestContext()
+        ctx.event_queue = asyncio.Queue(maxsize=1)
+        ctx.event_loop = asyncio.get_running_loop()
+        _request_context.set(ctx)
+
+        ctx.event_queue.put_nowait(TaskSnapshotEvent(tasks=[]))
+
+        with caplog.at_level(logging.WARNING):
+            service._on_task_snapshot([{"id": "1", "subject": "Task", "status": "pending"}])
+            await asyncio.sleep(0)
 
         assert "queue full" in caplog.text.lower()
 

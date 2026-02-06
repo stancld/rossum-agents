@@ -16,17 +16,22 @@ from rossum_agent.tools.core import (
     get_mcp_event_loop,
     get_mcp_mode,
     get_output_dir,
+    get_task_tracker,
     is_read_only_mode,
     report_progress,
+    report_task_snapshot,
     report_text,
     report_token_usage,
     set_mcp_connection,
     set_output_dir,
     set_progress_callback,
+    set_task_snapshot_callback,
+    set_task_tracker,
     set_text_callback,
     set_token_callback,
 )
 from rossum_agent.tools.spawn_mcp import SpawnedConnection, get_spawned_connections, get_spawned_connections_lock
+from rossum_agent.tools.task_tracker import TaskTracker
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -41,6 +46,8 @@ def _reset_core_state() -> Iterator[None]:
     set_progress_callback(None)
     set_text_callback(None)
     set_token_callback(None)
+    set_task_tracker(None)
+    set_task_snapshot_callback(None)
     set_mcp_connection(None, None)  # type: ignore[arg-type]
 
 
@@ -410,3 +417,45 @@ class TestSpawnedConnection:
         assert spawned.connection is mock_connection
         assert spawned.client is mock_client
         assert spawned.api_base_url == "https://api.example.com"
+
+
+class TestTaskTrackerContextVar:
+    """Tests for task tracker context variable functions."""
+
+    def test_set_and_get_task_tracker(self) -> None:
+        tracker = TaskTracker()
+        set_task_tracker(tracker)
+        assert get_task_tracker() is tracker
+
+    def test_get_task_tracker_default_none(self) -> None:
+        assert get_task_tracker() is None
+
+    def test_set_task_tracker_to_none(self) -> None:
+        tracker = TaskTracker()
+        set_task_tracker(tracker)
+        set_task_tracker(None)
+        assert get_task_tracker() is None
+
+
+class TestTaskSnapshotCallback:
+    """Tests for task snapshot callback functions."""
+
+    def test_set_snapshot_callback_and_report(self) -> None:
+        callback = MagicMock()
+        set_task_snapshot_callback(callback)
+
+        snapshot = [{"id": "1", "subject": "Test", "status": "pending"}]
+        report_task_snapshot(snapshot)
+        callback.assert_called_once_with(snapshot)
+
+    def test_report_task_snapshot_no_callback_no_error(self) -> None:
+        set_task_snapshot_callback(None)
+        report_task_snapshot([{"id": "1", "subject": "Test", "status": "pending"}])
+
+    def test_set_snapshot_callback_to_none_clears(self) -> None:
+        callback = MagicMock()
+        set_task_snapshot_callback(callback)
+        set_task_snapshot_callback(None)
+
+        report_task_snapshot([])
+        callback.assert_not_called()

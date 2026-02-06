@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
+- Added task tracking system (`create_task`, `update_task`, `list_tasks` tools) for real-time progress visibility on multi-step operations, streamed via SSE `task_snapshot` events [#157](https://github.com/stancld/rossum-agents/pull/157)
 - Added Gunicorn server support for production deployments via `--server gunicorn` CLI flag [#152](https://github.com/stancld/rossum-agents/pull/152)
   - Gunicorn is now bundled with the `api` extra
   - Uses UvicornWorker for ASGI compatibility
@@ -16,7 +17,7 @@ All notable changes to this project will be documented in this file.
 - Refactored API to use FastAPI's `app.state` for service instances instead of module-level globals [#153](https://github.com/stancld/rossum-agents/pull/153)
 
 ### Removed
-- Removed Teleport JWT user isolation (`user_detection.py`, `PyJWT`, `cryptography` dependencies)
+- Removed Teleport JWT user isolation (`user_detection.py`, `PyJWT`, `cryptography` dependencies) [#155](https://github.com/stancld/rossum-agents/pull/155)
 
 
 ## [1.0.0] - 2025-02-05

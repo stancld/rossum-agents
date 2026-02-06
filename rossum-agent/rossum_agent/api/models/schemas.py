@@ -158,6 +158,7 @@ class StepEvent(BaseModel):
     is_error: bool = False
     is_streaming: bool = False
     is_final: bool = False
+    tool_call_id: str | None = None
 
 
 class SubAgentProgressEvent(BaseModel):
@@ -179,6 +180,13 @@ class SubAgentTextEvent(BaseModel):
     tool_name: str
     text: str
     is_final: bool = False
+
+
+class TaskSnapshotEvent(BaseModel):
+    """Event emitted when task tracker state changes via SSE."""
+
+    type: Literal["task_snapshot"] = "task_snapshot"
+    tasks: list[dict[str, object]]
 
 
 class TokenUsageBySource(BaseModel):

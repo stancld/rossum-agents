@@ -30,6 +30,7 @@ from rossum_agent_client.models.responses import (
     StreamDoneEvent,
     SubAgentProgressEvent,
     SubAgentTextEvent,
+    TaskSnapshotEvent,
 )
 
 if TYPE_CHECKING:
@@ -37,7 +38,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-type SSEEvent = StepEvent | StreamDoneEvent | FileCreatedEvent | SubAgentProgressEvent | SubAgentTextEvent
+type SSEEvent = (
+    StepEvent | StreamDoneEvent | FileCreatedEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent
+)
 
 
 class BaseClient:
@@ -107,6 +110,8 @@ class BaseClient:
                 return SubAgentProgressEvent.model_validate(parsed)
             case "sub_agent_text":
                 return SubAgentTextEvent.model_validate(parsed)
+            case "task_snapshot":
+                return TaskSnapshotEvent.model_validate(parsed)
             case "error":
                 return StepEvent.model_validate(parsed)
             case _:
