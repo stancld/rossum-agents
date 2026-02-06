@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Fixed
-- Fixed `create_rule` and `update_rule` requiring `schema_id` — now optional to match the API. Rules can be scoped by `queue_ids` alone; at least one of `schema_id` or `queue_ids` is required.
+- Fixed `create_rule` and `update_rule` requiring `schema_id` — now optional to match the API. Rules can be scoped by `queue_ids` alone; at least one of `schema_id` or `queue_ids` is required [#156](https://github.com/stancld/rossum-agents/pull/156)
 
 
 ## [1.1.1] - 2026-02-05
