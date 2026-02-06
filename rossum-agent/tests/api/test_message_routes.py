@@ -12,6 +12,7 @@ from rossum_agent.api.models.schemas import (
     StreamDoneEvent,
     SubAgentProgressEvent,
     SubAgentTextEvent,
+    TaskSnapshotEvent,
 )
 from rossum_agent.api.routes.messages import (
     ProcessedEvent,
@@ -318,6 +319,17 @@ class TestProcessAgentEvent:
         result = _process_agent_event(event)
 
         assert result.sse_event is not None
+        assert result.final_response_update is None
+
+    def test_process_task_snapshot_event(self):
+        """Test processing TaskSnapshotEvent."""
+        event = TaskSnapshotEvent(tasks=[{"id": "1", "subject": "Deploy", "status": "completed"}])
+
+        result = _process_agent_event(event)
+
+        assert result.sse_event is not None
+        assert "task_snapshot" in result.sse_event
+        assert result.done_event is None
         assert result.final_response_update is None
 
     def test_process_step_event_error(self):

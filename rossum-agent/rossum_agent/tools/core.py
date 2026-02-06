@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     import asyncio
 
     from rossum_agent.rossum_mcp_integration import MCPConnection
+    from rossum_agent.tools.task_tracker import TaskTracker
 
 
 @dataclass
@@ -53,11 +54,14 @@ class SubAgentText:
 SubAgentProgressCallback = Callable[[SubAgentProgress], None]
 SubAgentTextCallback = Callable[[SubAgentText], None]
 SubAgentTokenCallback = Callable[[SubAgentTokenUsage], None]
+TaskSnapshotCallback = Callable[[list[dict[str, object]]], None]
 
 # Context variables for thread-safe state management
 _progress_callback: ContextVar[SubAgentProgressCallback | None] = ContextVar("progress_callback", default=None)
 _text_callback: ContextVar[SubAgentTextCallback | None] = ContextVar("text_callback", default=None)
 _token_callback: ContextVar[SubAgentTokenCallback | None] = ContextVar("token_callback", default=None)
+_task_snapshot_callback: ContextVar[TaskSnapshotCallback | None] = ContextVar("task_snapshot_callback", default=None)
+_task_tracker: ContextVar[TaskTracker | None] = ContextVar("task_tracker", default=None)
 _mcp_connection: ContextVar[MCPConnection | None] = ContextVar("mcp_connection", default=None)
 _mcp_event_loop: ContextVar[asyncio.AbstractEventLoop | None] = ContextVar("mcp_event_loop", default=None)
 _mcp_mode: ContextVar[str] = ContextVar("mcp_mode", default="read-only")
@@ -187,3 +191,24 @@ def require_rossum_credentials() -> tuple[str, str]:
     if (creds := get_rossum_credentials()) is not None:
         return creds
     raise ValueError("Rossum API credentials not available (neither in context nor environment variables)")
+
+
+def set_task_tracker(tracker: TaskTracker | None) -> None:
+    """Set the task tracker for the current request."""
+    _task_tracker.set(tracker)
+
+
+def get_task_tracker() -> TaskTracker | None:
+    """Get the current task tracker."""
+    return _task_tracker.get()
+
+
+def set_task_snapshot_callback(callback: TaskSnapshotCallback | None) -> None:
+    """Set the callback for task snapshot reporting."""
+    _task_snapshot_callback.set(callback)
+
+
+def report_task_snapshot(snapshot: list[dict[str, object]]) -> None:
+    """Report a task snapshot via the callback if set."""
+    if (callback := _task_snapshot_callback.get()) is not None:
+        callback(snapshot)

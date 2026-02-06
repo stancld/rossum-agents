@@ -19,6 +19,7 @@ from rossum_agent.tools.core import (
     get_mcp_mode,
     get_output_dir,
     get_rossum_credentials,
+    get_task_tracker,
     is_read_only_mode,
     report_progress,
     report_text,
@@ -28,6 +29,8 @@ from rossum_agent.tools.core import (
     set_output_dir,
     set_progress_callback,
     set_rossum_credentials,
+    set_task_snapshot_callback,
+    set_task_tracker,
     set_text_callback,
     set_token_callback,
 )
@@ -78,6 +81,12 @@ from rossum_agent.tools.subagents import (
     patch_schema_with_subagent,
     search_knowledge_base,
 )
+from rossum_agent.tools.task_tracker import (
+    TaskTracker,
+    create_task,
+    list_tasks,
+    update_task,
+)
 
 if TYPE_CHECKING:
     from anthropic._tools import BetaTool  # ty: ignore[unresolved-import] - private API
@@ -94,6 +103,9 @@ _BETA_TOOLS: list[BetaTool[..., str]] = [
     spawn_mcp_connection,
     call_on_connection,
     close_connection,
+    create_task,
+    update_task,
+    list_tasks,
 ]
 
 
@@ -162,11 +174,13 @@ __all__ = [
     "SubAgentTextCallback",
     "SubAgentTokenCallback",
     "SubAgentTokenUsage",
+    "TaskTracker",
     "WebSearchError",
     "call_on_connection",
     "cleanup_all_spawned_connections",
     "clear_spawned_connections",
     "close_connection",
+    "create_task",
     "create_workspace",
     "debug_hook",
     "deploy_compare_workspaces",
@@ -192,8 +206,10 @@ __all__ = [
     "get_mcp_mode",
     "get_output_dir",
     "get_rossum_credentials",
+    "get_task_tracker",
     "get_write_tools",
     "is_read_only_mode",
+    "list_tasks",
     "load_skill",
     "load_tool",
     "load_tool_category",
@@ -209,10 +225,13 @@ __all__ = [
     "set_output_dir",
     "set_progress_callback",
     "set_rossum_credentials",
+    "set_task_snapshot_callback",
+    "set_task_tracker",
     "set_text_callback",
     "set_token_callback",
     "spawn_mcp_connection",
     "suggest_categories_for_request",
     "suggest_formula_field",
+    "update_task",
     "write_file",
 ]

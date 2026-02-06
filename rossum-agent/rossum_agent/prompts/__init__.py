@@ -12,6 +12,7 @@ from rossum_agent.prompts.base_prompt import (
     DOCUMENTATION_WORKFLOWS,
     OUTPUT_FORMATTING,
     ROSSUM_EXPERT_INTRO,
+    TASK_TRACKING,
     get_shared_prompt_sections,
 )
 from rossum_agent.prompts.system_prompt import get_system_prompt
@@ -22,6 +23,7 @@ __all__ = [
     "DOCUMENTATION_WORKFLOWS",
     "OUTPUT_FORMATTING",
     "ROSSUM_EXPERT_INTRO",
+    "TASK_TRACKING",
     "get_shared_prompt_sections",
     "get_system_prompt",
 ]
