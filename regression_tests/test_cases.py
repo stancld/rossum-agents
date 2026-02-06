@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from regression_tests.custom_checks import (
     check_business_validation_hook_settings,
+    check_business_validation_rules,
     check_knowledge_base_hidden_multivalue_warning,
     check_net_terms_formula_field_added,
     check_no_misleading_training_suggestions,
@@ -44,6 +45,11 @@ NO_MISLEADING_TRAINING_SUGGESTIONS_CHECK = CustomCheck(
 NET_TERMS_FORMULA_FIELD_CHECK = CustomCheck(
     name="Net Terms formula field was added to schema",
     check_fn=check_net_terms_formula_field_added,
+)
+
+BUSINESS_VALIDATION_RULES_CHECK = CustomCheck(
+    name="Business validation rules have correct trigger conditions",
+    check_fn=check_business_validation_rules,
 )
 
 BUSINESS_VALIDATION_HOOK_CHECK = CustomCheck(
@@ -253,12 +259,12 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
     ),
     RegressionTestCase(
-        name="setup_invoice_queue_with_business_validation",
+        name="setup_invoice_queue_with_business_validation_hook",
         description="Create Invoice queue with business validation hook and return hook_id",
         api_base_url="https://api.elis.rossum.ai/v1",
         rossum_url=None,
         prompt=(
-            "# Set up Invoice queue with business validation\n\n"
+            "# Set up Invoice queue with business validation hook\n\n"
             "Workspace: 1680043\n"
             "Region: EU\n\n"
             "## Tasks:\n\n"
@@ -279,13 +285,45 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=70000, max_total_tokens=100000),
+        token_budget=TokenBudget(min_total_tokens=70000, max_total_tokens=160000),
         success_criteria=SuccessCriteria(
             require_subagent=True,
             required_keywords=[],
-            max_steps=6,
+            max_steps=8,
             file_expectation=FileExpectation(),
             custom_checks=[BUSINESS_VALIDATION_HOOK_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="setup_invoice_queue_with_business_validation_rules",
+        description="Create Invoice queue with business validation using rules (not hooks)",
+        api_base_url="https://api.elis.rossum.ai/v1",
+        rossum_url=None,
+        prompt=(
+            "# Set up Invoice queue with business validation rules\n\n"
+            "Workspace: 1680043\n"
+            "Region: EU\n\n"
+            "## Tasks:\n\n"
+            "1. Create a new queue: Invoices\n"
+            "2. Add business validation rules with these 3 checks:\n"
+            '    - Total amount is smaller than 400. Error message: "Total amount is larger than allowed 400."\n'
+            '    - Sum of all total amount line items equals total amount. Error message: "Sum of all total amount line items does not equal total amount."\n'
+            '    - All line items it holds: "quantity x unit price = total amount"\n\n'
+            "Return only the rule ID as a one-word answer."
+        ),
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "create_rule",
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=80000),
+        success_criteria=SuccessCriteria(
+            required_keywords=[],
+            max_steps=7,
+            file_expectation=FileExpectation(),
+            custom_checks=[BUSINESS_VALIDATION_RULES_CHECK],
         ),
     ),
     RegressionTestCase(

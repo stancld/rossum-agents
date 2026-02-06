@@ -8,6 +8,9 @@ from __future__ import annotations
 from regression_tests.custom_checks.business_validation_hook import (
     check_business_validation_hook_settings,
 )
+from regression_tests.custom_checks.business_validation_rules import (
+    check_business_validation_rules,
+)
 from regression_tests.custom_checks.hidden_multivalue_warning import (
     check_knowledge_base_hidden_multivalue_warning,
 )
@@ -26,6 +29,7 @@ from regression_tests.custom_checks.queue_ui_settings import (
 
 __all__ = [
     "check_business_validation_hook_settings",
+    "check_business_validation_rules",
     "check_knowledge_base_hidden_multivalue_warning",
     "check_net_terms_formula_field_added",
     "check_no_misleading_training_suggestions",
