@@ -90,7 +90,7 @@ def mock_client() -> AsyncMock:
     """Create a mock AsyncRossumAPIClient."""
     client = AsyncMock()
     client._http_client = AsyncMock()
-    client._deserializer = Mock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
     return client
 
 
@@ -148,11 +148,11 @@ class TestListQueues:
             create_mock_queue(id=2, name="Queue 2"),
         ]
 
-        async def mock_list_queues(**filters):
+        async def mock_fetch_all(resource, **filters):
             for queue in mock_queues:
                 yield queue
 
-        mock_client.list_queues = mock_list_queues
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_queues = mock_mcp._tools["list_queues"]
         result = await list_queues()
@@ -167,21 +167,21 @@ class TestListQueues:
         register_queue_tools(mock_mcp, mock_client)
 
         mock_queues = [create_mock_queue(id=1, name="Queue 1")]
-        filters_received = {}
+        received_filters: dict = {}
 
-        async def mock_list_queues(**filters):
-            nonlocal filters_received
-            filters_received = filters
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             for queue in mock_queues:
                 yield queue
 
-        mock_client.list_queues = mock_list_queues
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_queues = mock_mcp._tools["list_queues"]
         result = await list_queues(workspace_id=5)
 
         assert len(result) == 1
-        assert filters_received["workspace"] == 5
+        assert received_filters["workspace"] == 5
 
     @pytest.mark.asyncio
     async def test_list_queues_with_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -189,21 +189,21 @@ class TestListQueues:
         register_queue_tools(mock_mcp, mock_client)
 
         mock_queues = [create_mock_queue(id=1, name="Test Queue")]
-        filters_received = {}
+        received_filters: dict = {}
 
-        async def mock_list_queues(**filters):
-            nonlocal filters_received
-            filters_received = filters
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             for queue in mock_queues:
                 yield queue
 
-        mock_client.list_queues = mock_list_queues
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_queues = mock_mcp._tools["list_queues"]
         result = await list_queues(name="Test Queue")
 
         assert len(result) == 1
-        assert filters_received["name"] == "Test Queue"
+        assert received_filters["name"] == "Test Queue"
 
     @pytest.mark.asyncio
     async def test_list_queues_with_all_filters(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -211,33 +211,33 @@ class TestListQueues:
         register_queue_tools(mock_mcp, mock_client)
 
         mock_queues = [create_mock_queue(id=1, name="Test Queue")]
-        filters_received = {}
+        received_filters: dict = {}
 
-        async def mock_list_queues(**filters):
-            nonlocal filters_received
-            filters_received = filters
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             for queue in mock_queues:
                 yield queue
 
-        mock_client.list_queues = mock_list_queues
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_queues = mock_mcp._tools["list_queues"]
         result = await list_queues(workspace_id=3, name="Test Queue")
 
         assert len(result) == 1
-        assert filters_received["workspace"] == 3
-        assert filters_received["name"] == "Test Queue"
+        assert received_filters["workspace"] == 3
+        assert received_filters["name"] == "Test Queue"
 
     @pytest.mark.asyncio
     async def test_list_queues_empty_result(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test queue listing with no results."""
         register_queue_tools(mock_mcp, mock_client)
 
-        async def mock_list_queues(**filters):
+        async def mock_fetch_all(resource, **filters):
             return
             yield
 
-        mock_client.list_queues = mock_list_queues
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_queues = mock_mcp._tools["list_queues"]
         result = await list_queues()
@@ -260,10 +260,10 @@ class TestListQueues:
             },
         )
 
-        async def mock_list_queues(**filters):
+        async def mock_fetch_all(resource, **filters):
             yield mock_queue
 
-        mock_client.list_queues = mock_list_queues
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_queues = mock_mcp._tools["list_queues"]
         result = await list_queues()
@@ -281,16 +281,42 @@ class TestListQueues:
 
         mock_queue = create_mock_queue(id=1, name="Queue 1", settings={})
 
-        async def mock_list_queues(**filters):
+        async def mock_fetch_all(resource, **filters):
             yield mock_queue
 
-        mock_client.list_queues = mock_list_queues
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_queues = mock_mcp._tools["list_queues"]
         result = await list_queues()
 
         assert len(result) == 1
         assert result[0].settings == {}
+
+    @pytest.mark.asyncio
+    async def test_list_queues_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test list_queues gracefully skips items that fail deserialization."""
+        register_queue_tools(mock_mcp, mock_client)
+
+        mock_queue = create_mock_queue(id=1, name="Good Queue")
+
+        def mock_deserializer(resource, raw):
+            if raw.get("id") == 2:
+                raise ValueError("broken queue")
+            return mock_queue
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1, "name": "Good Queue"}
+            yield {"id": 2, "name": "Broken Queue"}
+            yield {"id": 3, "name": "Another Good Queue"}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_queues = mock_mcp._tools["list_queues"]
+        result = await list_queues()
+
+        assert len(result) == 2
 
 
 @pytest.mark.unit
@@ -626,7 +652,7 @@ class TestUpdateQueue:
 
         mock_queue = create_mock_queue(id=100, name="Updated Queue")
         mock_client._http_client.update.return_value = {"id": 100, "name": "Updated Queue"}
-        mock_client._deserializer.return_value = mock_queue
+        mock_client._deserializer = Mock(return_value=mock_queue)
 
         update_queue = mock_mcp._tools["update_queue"]
         result = await update_queue(queue_id=100, queue_data={"name": "Updated Queue"})
@@ -686,7 +712,7 @@ class TestCreateQueueFromTemplate:
 
         mock_queue = create_mock_queue(id=300, name="New Template Queue")
         mock_client._http_client.request_json.return_value = {"id": 300, "name": "New Template Queue"}
-        mock_client._deserializer.return_value = mock_queue
+        mock_client._deserializer = Mock(return_value=mock_queue)
 
         create_queue_from_template = mock_mcp._tools["create_queue_from_template"]
         result = await create_queue_from_template(
@@ -718,7 +744,7 @@ class TestCreateQueueFromTemplate:
 
         mock_queue = create_mock_queue(id=300, name="New Template Queue")
         mock_client._http_client.request_json.return_value = {"id": 300}
-        mock_client._deserializer.return_value = mock_queue
+        mock_client._deserializer = Mock(return_value=mock_queue)
 
         create_queue_from_template = mock_mcp._tools["create_queue_from_template"]
         await create_queue_from_template(

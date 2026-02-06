@@ -20,7 +20,10 @@ if TYPE_CHECKING:
 @pytest.fixture
 def mock_client() -> AsyncMock:
     """Create a mock AsyncRossumAPIClient."""
-    return AsyncMock()
+    client = AsyncMock()
+    client._http_client = AsyncMock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
+    return client
 
 
 @pytest.fixture
@@ -220,11 +223,11 @@ class TestListAnnotations:
         mock_ann1 = create_mock_annotation(id=1, status="confirmed")
         mock_ann2 = create_mock_annotation(id=2, status="to_review")
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             for item in [mock_ann1, mock_ann2]:
                 yield item
 
-        mock_client.list_annotations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_annotations = mock_mcp._tools["list_annotations"]
         result = await list_annotations(queue_id=100, status="confirmed,to_review")
@@ -238,17 +241,43 @@ class TestListAnnotations:
         """Test annotations listing without status filter."""
         register_annotation_tools(mock_mcp, mock_client)
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             return
             yield
 
-        mock_client.list_annotations = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_annotations = mock_mcp._tools["list_annotations"]
         result = await list_annotations(queue_id=100, status=None)
 
         assert len(result) == 0
         assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_annotations_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test list_annotations gracefully skips items that fail deserialization."""
+        register_annotation_tools(mock_mcp, mock_client)
+
+        mock_ann = create_mock_annotation(id=1, status="confirmed")
+
+        def mock_deserializer(resource, raw):
+            if raw.get("id") == 2:
+                raise ValueError("broken annotation")
+            return mock_ann
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1, "status": "confirmed"}
+            yield {"id": 2, "status": "broken"}
+            yield {"id": 3, "status": "to_review"}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_annotations = mock_mcp._tools["list_annotations"]
+        result = await list_annotations(queue_id=100, status="confirmed,to_review")
+
+        assert len(result) == 2
 
 
 @pytest.mark.unit

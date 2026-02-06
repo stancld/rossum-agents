@@ -18,7 +18,10 @@ if TYPE_CHECKING:
 @pytest.fixture
 def mock_client() -> AsyncMock:
     """Create a mock AsyncRossumAPIClient."""
-    return AsyncMock()
+    client = AsyncMock()
+    client._http_client = AsyncMock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
+    return client
 
 
 @pytest.fixture
@@ -72,11 +75,11 @@ class TestListHooks:
         mock_hook1 = create_mock_hook(id=1, name="Hook 1")
         mock_hook2 = create_mock_hook(id=2, name="Hook 2")
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             for item in [mock_hook1, mock_hook2]:
                 yield item
 
-        mock_client.list_hooks = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_hooks = mock_mcp._tools["list_hooks"]
         result = await list_hooks()
@@ -89,17 +92,20 @@ class TestListHooks:
         register_hook_tools(mock_mcp, mock_client)
 
         mock_hook = create_mock_hook(id=1, name="Queue Hook")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_hook
 
-        mock_client.list_hooks = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_hooks = mock_mcp._tools["list_hooks"]
         result = await list_hooks(queue_id=100)
 
         assert len(result) == 1
-        mock_client.list_hooks.assert_called_once_with(queue=100)
+        assert received_filters["queue"] == 100
 
     @pytest.mark.asyncio
     async def test_list_hooks_with_active_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -107,17 +113,20 @@ class TestListHooks:
         register_hook_tools(mock_mcp, mock_client)
 
         mock_hook = create_mock_hook(id=1, active=True)
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_hook
 
-        mock_client.list_hooks = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_hooks = mock_mcp._tools["list_hooks"]
         result = await list_hooks(active=True)
 
         assert len(result) == 1
-        mock_client.list_hooks.assert_called_once_with(active=True)
+        assert received_filters["active"] is True
 
     @pytest.mark.asyncio
     async def test_list_hooks_with_first_n(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -128,11 +137,11 @@ class TestListHooks:
         mock_hook2 = create_mock_hook(id=2, name="Hook 2")
         mock_hook3 = create_mock_hook(id=3, name="Hook 3")
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             for item in [mock_hook1, mock_hook2, mock_hook3]:
                 yield item
 
-        mock_client.list_hooks = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_hooks = mock_mcp._tools["list_hooks"]
         result = await list_hooks(first_n=2)
@@ -148,10 +157,10 @@ class TestListHooks:
 
         mock_hook1 = create_mock_hook(id=1, name="Hook 1")
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             yield mock_hook1
 
-        mock_client.list_hooks = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_hooks = mock_mcp._tools["list_hooks"]
         result = await list_hooks(first_n=10)
@@ -163,16 +172,42 @@ class TestListHooks:
         """Test hooks listing when no hooks exist but first_n is specified."""
         register_hook_tools(mock_mcp, mock_client)
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             return
             yield
 
-        mock_client.list_hooks = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_hooks = mock_mcp._tools["list_hooks"]
         result = await list_hooks(first_n=5)
 
         assert len(result) == 0
+
+    @pytest.mark.asyncio
+    async def test_list_hooks_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test list_hooks gracefully skips items that fail deserialization."""
+        register_hook_tools(mock_mcp, mock_client)
+
+        mock_hook = create_mock_hook(id=1, name="Good Hook")
+
+        def mock_deserializer(resource, raw):
+            if raw.get("id") == 2:
+                raise ValueError("broken hook")
+            return mock_hook
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1, "name": "Good Hook"}
+            yield {"id": 2, "name": "Broken Hook"}
+            yield {"id": 3, "name": "Another Good Hook"}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_hooks = mock_mcp._tools["list_hooks"]
+        result = await list_hooks()
+
+        assert len(result) == 2
 
 
 @pytest.mark.unit
@@ -518,28 +553,35 @@ class TestListHookLogs:
 
         mock_log = Mock()
         mock_log.id = 1
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_log
 
-        mock_client.list_hook_run_data = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_hook_logs = mock_mcp._tools["list_hook_logs"]
         result = await list_hook_logs(hook_id=123)
 
         assert len(result) == 1
-        mock_client.list_hook_run_data.assert_called_once_with(hook=123)
+        assert received_filters["hook"] == 123
 
     @pytest.mark.asyncio
     async def test_list_hook_logs_with_filters(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test hook logs listing with multiple filters."""
         register_hook_tools(mock_mcp, mock_client)
 
-        async def async_iter():
+        received_filters: dict = {}
+
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             return
             yield
 
-        mock_client.list_hook_run_data = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_hook_logs = mock_mcp._tools["list_hook_logs"]
         result = await list_hook_logs(
@@ -547,9 +589,13 @@ class TestListHookLogs:
         )
 
         assert result == []
-        mock_client.list_hook_run_data.assert_called_once_with(
-            hook=123, queue=456, log_level="ERROR", timestamp_after="2024-01-15T10:30:00Z", page_size=50
-        )
+        assert received_filters == {
+            "hook": 123,
+            "queue": 456,
+            "log_level": "ERROR",
+            "timestamp_after": "2024-01-15T10:30:00Z",
+            "page_size": 50,
+        }
 
 
 @pytest.mark.unit

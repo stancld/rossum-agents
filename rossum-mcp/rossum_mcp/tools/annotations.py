@@ -7,9 +7,10 @@ from collections.abc import Sequence  # noqa: TC003 - needed at runtime for Fast
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.annotation import Annotation
 
-from rossum_mcp.tools.base import delete_resource, is_read_write_mode
+from rossum_mcp.tools.base import delete_resource, graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -83,12 +84,8 @@ async def _list_annotations(
     if ordering:
         params["ordering"] = ordering
 
-    annotations_list: list[Annotation] = []
-    async for item in client.list_annotations(**params):
-        annotations_list.append(item)
-        if first_n is not None and len(annotations_list) >= first_n:
-            break
-    return annotations_list
+    result = await graceful_list(client, Resource.Annotation, "annotation", max_items=first_n, **params)
+    return result.items
 
 
 async def _start_annotation(client: AsyncRossumAPIClient, annotation_id: int) -> dict:

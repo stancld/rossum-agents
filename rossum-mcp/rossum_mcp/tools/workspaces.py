@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.workspace import Workspace
 
-from rossum_mcp.tools.base import build_resource_url, delete_resource, is_read_write_mode
+from rossum_mcp.tools.base import build_resource_url, delete_resource, graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -26,16 +27,14 @@ async def _list_workspaces(
     client: AsyncRossumAPIClient, organization_id: int | None = None, name: str | None = None
 ) -> list[Workspace]:
     logger.debug(f"Listing workspaces: organization_id={organization_id}, name={name}")
-    filters: dict[str, int | str] = {}
+    filters: dict[str, Any] = {}
     if organization_id is not None:
         filters["organization"] = organization_id
     if name is not None:
         filters["name"] = name
 
-    return [
-        workspace
-        async for workspace in client.list_workspaces(**filters)  # type: ignore[arg-type]
-    ]
+    result = await graceful_list(client, Resource.Workspace, "workspace", **filters)
+    return result.items
 
 
 async def _create_workspace(

@@ -21,7 +21,7 @@ def mock_client() -> AsyncMock:
     """Create a mock AsyncRossumAPIClient."""
     client = AsyncMock()
     client._http_client = AsyncMock()
-    client._deserializer = Mock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
     return client
 
 
@@ -76,11 +76,11 @@ class TestListEngines:
         mock_engine1 = create_mock_engine(id=1, name="Engine 1")
         mock_engine2 = create_mock_engine(id=2, name="Engine 2")
 
-        async def async_iter():
-            for item in [mock_engine1, mock_engine2]:
-                yield item
+        async def mock_fetch_all(resource, **filters):
+            yield mock_engine1
+            yield mock_engine2
 
-        mock_client.list_engines = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_engines = mock_mcp._tools["list_engines"]
         result = await list_engines()
@@ -93,17 +93,19 @@ class TestListEngines:
         register_engine_tools(mock_mcp, mock_client)
 
         mock_engine = create_mock_engine(id=1, type="extractor")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            received_filters.update(filters)
             yield mock_engine
 
-        mock_client.list_engines = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_engines = mock_mcp._tools["list_engines"]
         result = await list_engines(engine_type="extractor")
 
         assert len(result) == 1
-        mock_client.list_engines.assert_called_once_with(type="extractor")
+        assert received_filters["type"] == "extractor"
 
     @pytest.mark.asyncio
     async def test_list_engines_with_id_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -111,17 +113,19 @@ class TestListEngines:
         register_engine_tools(mock_mcp, mock_client)
 
         mock_engine = create_mock_engine(id=42, type="extractor")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            received_filters.update(filters)
             yield mock_engine
 
-        mock_client.list_engines = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_engines = mock_mcp._tools["list_engines"]
         result = await list_engines(id=42)
 
         assert len(result) == 1
-        mock_client.list_engines.assert_called_once_with(id=42)
+        assert received_filters["id"] == 42
 
     @pytest.mark.asyncio
     async def test_list_engines_with_agenda_id_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -129,17 +133,45 @@ class TestListEngines:
         register_engine_tools(mock_mcp, mock_client)
 
         mock_engine = create_mock_engine(id=1, agenda_id="my-agenda")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            received_filters.update(filters)
             yield mock_engine
 
-        mock_client.list_engines = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_engines = mock_mcp._tools["list_engines"]
         result = await list_engines(agenda_id="my-agenda")
 
         assert len(result) == 1
-        mock_client.list_engines.assert_called_once_with(agenda_id="my-agenda")
+        assert received_filters["agenda_id"] == "my-agenda"
+
+    @pytest.mark.asyncio
+    async def test_list_engines_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test list_engines gracefully skips items that fail deserialization."""
+        register_engine_tools(mock_mcp, mock_client)
+
+        mock_engine = create_mock_engine(id=1, name="Good Engine")
+
+        def mock_deserializer(resource, raw):
+            if raw.get("id") == 2:
+                raise ValueError("broken engine")
+            return mock_engine
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1}
+            yield {"id": 2}
+            yield {"id": 3}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_engines = mock_mcp._tools["list_engines"]
+        result = await list_engines()
+
+        assert len(result) == 2
 
 
 @pytest.mark.unit
@@ -157,7 +189,7 @@ class TestUpdateEngine:
 
         mock_engine = create_mock_engine(id=123, name="Updated Engine")
         mock_client._http_client.update.return_value = {"id": 123}
-        mock_client._deserializer.return_value = mock_engine
+        mock_client._deserializer = Mock(return_value=mock_engine)
 
         update_engine = mock_mcp._tools["update_engine"]
         result = await update_engine(engine_id=123, engine_data={"name": "Updated Engine"})
@@ -197,7 +229,7 @@ class TestCreateEngine:
 
         mock_engine = create_mock_engine(id=200, name="New Engine", type="extractor")
         mock_client._http_client.create.return_value = {"id": 200}
-        mock_client._deserializer.return_value = mock_engine
+        mock_client._deserializer = Mock(return_value=mock_engine)
 
         create_engine = mock_mcp._tools["create_engine"]
         result = await create_engine(name="New Engine", organization_id=1, engine_type="extractor")
@@ -252,7 +284,7 @@ class TestCreateEngineField:
 
         mock_field = create_mock_engine_field(id=500, label="Invoice Number")
         mock_client._http_client.create.return_value = {"id": 500}
-        mock_client._deserializer.return_value = mock_field
+        mock_client._deserializer = Mock(return_value=mock_field)
 
         create_engine_field = mock_mcp._tools["create_engine_field"]
         result = await create_engine_field(
@@ -342,7 +374,7 @@ class TestCreateEngineField:
 
         mock_field = create_mock_engine_field(id=500, subtype="iban", pre_trained_field_id="iban_field")
         mock_client._http_client.create.return_value = {"id": 500}
-        mock_client._deserializer.return_value = mock_field
+        mock_client._deserializer = Mock(return_value=mock_field)
 
         create_engine_field = mock_mcp._tools["create_engine_field"]
         result = await create_engine_field(

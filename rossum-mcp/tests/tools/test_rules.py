@@ -39,7 +39,10 @@ def create_mock_rule(**kwargs) -> Rule:
 @pytest.fixture
 def mock_client() -> AsyncMock:
     """Create a mock AsyncRossumAPIClient."""
-    return AsyncMock()
+    client = AsyncMock()
+    client._http_client = AsyncMock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
+    return client
 
 
 @pytest.fixture
@@ -97,11 +100,11 @@ class TestListRules:
         mock_rule1 = create_mock_rule(id=1, name="Rule 1")
         mock_rule2 = create_mock_rule(id=2, name="Rule 2")
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             for item in [mock_rule1, mock_rule2]:
                 yield item
 
-        mock_client.list_rules = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_rules = mock_mcp._tools["list_rules"]
         result = await list_rules()
@@ -116,17 +119,20 @@ class TestListRules:
         register_rule_tools(mock_mcp, mock_client)
 
         mock_rule = create_mock_rule(id=1, name="Schema Rule")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_rule
 
-        mock_client.list_rules = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_rules = mock_mcp._tools["list_rules"]
         result = await list_rules(schema_id=50)
 
         assert len(result) == 1
-        mock_client.list_rules.assert_called_once_with(schema=50)
+        assert received_filters["schema"] == 50
 
     @pytest.mark.asyncio
     async def test_list_rules_with_organization_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -136,17 +142,20 @@ class TestListRules:
         register_rule_tools(mock_mcp, mock_client)
 
         mock_rule = create_mock_rule(id=1, name="Org Rule")
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_rule
 
-        mock_client.list_rules = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_rules = mock_mcp._tools["list_rules"]
         result = await list_rules(organization_id=100)
 
         assert len(result) == 1
-        mock_client.list_rules.assert_called_once_with(organization=100)
+        assert received_filters["organization"] == 100
 
     @pytest.mark.asyncio
     async def test_list_rules_with_enabled_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -156,17 +165,20 @@ class TestListRules:
         register_rule_tools(mock_mcp, mock_client)
 
         mock_rule = create_mock_rule(id=1, enabled=True)
+        received_filters: dict = {}
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
             yield mock_rule
 
-        mock_client.list_rules = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_rules = mock_mcp._tools["list_rules"]
         result = await list_rules(enabled=True)
 
         assert len(result) == 1
-        mock_client.list_rules.assert_called_once_with(enabled=True)
+        assert received_filters["enabled"] is True
 
     @pytest.mark.asyncio
     async def test_list_rules_empty(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -175,17 +187,45 @@ class TestListRules:
 
         register_rule_tools(mock_mcp, mock_client)
 
-        async def async_iter():
+        async def mock_fetch_all(resource, **filters):
             return
             yield
 
-        mock_client.list_rules = Mock(side_effect=lambda **kwargs: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
 
         list_rules = mock_mcp._tools["list_rules"]
         result = await list_rules()
 
         assert len(result) == 0
         assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_rules_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test list_rules gracefully skips items that fail deserialization."""
+        from rossum_mcp.tools.rules import register_rule_tools
+
+        register_rule_tools(mock_mcp, mock_client)
+
+        good_rule = create_mock_rule(id=1, name="Good Rule")
+
+        def mock_deserializer(resource, raw):
+            if raw.get("id") == 2:
+                raise ValueError("broken rule")
+            return good_rule
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1, "name": "Good Rule"}
+            yield {"id": 2, "name": "Broken Rule"}
+            yield {"id": 3, "name": "Another Good Rule"}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_rules = mock_mcp._tools["list_rules"]
+        result = await list_rules()
+
+        assert len(result) == 2
 
 
 @pytest.mark.unit
