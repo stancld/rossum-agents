@@ -33,7 +33,7 @@
 | **Multi-Environment** | Spawn connections to different Rossum environments |
 | **Skills System** | Load domain-specific workflows on demand |
 
-**Interfaces:** Streamlit UI, REST API, Python SDK
+**Interfaces:** REST API, Python SDK
 
 ## Quick Start
 
@@ -43,16 +43,9 @@ export ROSSUM_API_TOKEN="your-api-token"
 export ROSSUM_API_BASE_URL="https://api.elis.rossum.ai/v1"
 export AWS_PROFILE="default"  # For Bedrock
 
-# Run the agent
-uv pip install rossum-agent[streamlit]
-uv cache clean rossum-agent  # Re-init if upgrading
-rossum-agent
-```
-
-Or with Docker:
-```bash
-docker-compose up rossum-agent
-# Open http://localhost:8501
+# Run the agent API
+uv pip install rossum-agent[api]
+rossum-agent-api
 ```
 
 ## Installation
@@ -65,9 +58,8 @@ uv sync
 
 **With extras:**
 ```bash
-uv sync --extra all        # All extras (api, streamlit, docs, tests)
+uv sync --extra all        # All extras (api, docs, tests)
 uv sync --extra api        # REST API (FastAPI, Redis)
-uv sync --extra streamlit  # Streamlit UI only
 ```
 
 ## Environment Variables
@@ -83,13 +75,6 @@ uv sync --extra streamlit  # Streamlit UI only
 | `ROSSUM_MCP_MODE` | No | MCP mode: `read-only` (default) or `read-write` |
 
 ## Usage
-
-### Streamlit UI
-
-```bash
-rossum-agent
-# Or: streamlit run rossum_agent/streamlit_app/app.py
-```
 
 ### REST API
 
@@ -193,7 +178,6 @@ Categories are auto-loaded based on keywords in the user's message.
 ```mermaid
 flowchart TB
     subgraph UI["User Interface"]
-        S[Streamlit UI]
         A[REST API]
     end
 

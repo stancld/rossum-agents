@@ -52,8 +52,7 @@ With extras:
 
 .. code-block:: bash
 
-   uv sync --extra all  # Install all extras (streamlit, docs, tests)
-   uv sync --extra streamlit  # Install Streamlit UI
+   uv sync --extra all  # Install all extras (api, docs, tests)
    uv sync --extra tests  # Install testing dependencies
 
 Installing Agent Client Only

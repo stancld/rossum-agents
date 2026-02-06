@@ -6,6 +6,10 @@ import tempfile
 import uuid
 from contextvars import ContextVar
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any
 
 # Context variable for session-specific output directory
 # This allows thread-safe per-session output directories
@@ -126,3 +130,17 @@ def is_valid_chat_id(chat_id: str) -> bool:
         return False
 
     return True
+
+
+def get_display_tool_name(tool_call_name: str, tool_arguments: dict[str, Any] | None = None) -> str:
+    """Get display name for a tool, expanding call_on_connection to show the actual MCP tool.
+
+    For call_on_connection, returns 'call_on_connection[connection_id.tool_name]' format.
+    For other tools, returns the original name.
+    """
+    if tool_call_name == "call_on_connection" and tool_arguments:
+        connection_id = tool_arguments.get("connection_id", "")
+        inner_tool = tool_arguments.get("tool_name", "")
+        if connection_id and inner_tool:
+            return f"call_on_connection[{connection_id}.{inner_tool}]"
+    return tool_call_name

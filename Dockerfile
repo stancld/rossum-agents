@@ -10,11 +10,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Install app dependencies
 COPY rossum-agent rossum-agent
-RUN cd rossum-agent && uv sync --extra streamlit --extra api
+RUN cd rossum-agent && uv sync --extra api
 
 # Expose the port the app runs on
-EXPOSE 8501
+EXPOSE 8000
 
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app/rossum-agent
-CMD ["uv", "run", "rossum-agent"]
+CMD ["uv", "run", "rossum-agent-api", "--host", "0.0.0.0"]

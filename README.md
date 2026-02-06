@@ -150,7 +150,7 @@ The agent automatically creates the queue, uploads documents, monitors processin
 This repository contains four standalone Python packages:
 
 - **[rossum-mcp/](rossum-mcp/)** - MCP server for Rossum API integration with AI assistants
-- **[rossum-agent/](rossum-agent/)** - Specialized AI agent toolkit with Streamlit UI
+- **[rossum-agent/](rossum-agent/)** - Specialized AI agent toolkit with REST API
 - **[rossum-agent-client/](rossum-agent-client/)** - Typed Python client for the Rossum Agent API
 - **[rossum-deploy/](rossum-deploy/)** - Minimalistic pull/diff/push deployment tool (lightweight alternative to [deployment-manager](https://github.com/rossumai/deployment-manager))
 
@@ -160,11 +160,10 @@ Each package can be installed and used independently or together for complete fu
 
 ```bash
 # Install and run (fastest)
-uv pip install rossum-agent[streamlit]
-uv cache clean rossum-agent  # Re-init if upgrading
+uv pip install rossum-agent[api]
 export ROSSUM_API_TOKEN="your-token"
 export ROSSUM_API_BASE_URL="https://api.elis.rossum.ai/v1"
-rossum-agent
+rossum-agent-api
 ```
 
 Or with Docker:
@@ -174,7 +173,6 @@ git clone https://github.com/stancld/rossum-agents.git && cd rossum-mcp
 echo "ROSSUM_API_TOKEN=your-token" > .env
 echo "ROSSUM_API_BASE_URL=https://api.elis.rossum.ai/v1" >> .env
 docker-compose up rossum-agent
-# Open http://localhost:8501
 ```
 
 ## Installation & Usage
@@ -198,11 +196,9 @@ AWS_PROFILE=default
 AWS_DEFAULT_REGION=us-east-1
 EOF
 
-# Run the agent with Streamlit UI
-docker-compose up rossum-agent
+# Run the agent API
+docker-compose up rossum-agent-api
 ```
-
-Access the application at **http://localhost:8501**
 
 #### With Redis Logging
 
@@ -221,7 +217,6 @@ docker-compose up rossum-agent-mac redis
 ```
 
 Access points:
-- **Application**: http://localhost:8501
 - **Redis**: localhost:6379
 
 View logs with:
@@ -248,8 +243,7 @@ export ROSSUM_API_BASE_URL="https://api.elis.rossum.ai/v1"
 export ROSSUM_MCP_MODE="read-write"
 
 # Run the agent
-rossum-agent                                    # CLI interface
-uv run streamlit run rossum_agent/app.py        # Web UI
+rossum-agent-api                                # REST API
 ```
 
 For individual package details, see [rossum-mcp/README.md](rossum-mcp/README.md), [rossum-agent/README.md](rossum-agent/README.md), and [rossum-deploy/README.md](rossum-deploy/README.md).
@@ -286,21 +280,11 @@ Or run standalone: `rossum-mcp`
 
 ```bash
 # Docker (recommended for local)
-docker-compose up rossum-agent
+docker-compose up rossum-agent-api
 
-# CLI interface (from source)
-rossum-agent
-
-# Streamlit web UI (from source)
-uv run streamlit run rossum_agent/app.py
+# REST API (from source)
+rossum-agent-api
 ```
-
-> **AWS Bedrock Note:** The Streamlit UI uses AWS Bedrock by default. Configure AWS credentials:
-> ```bash
-> export AWS_PROFILE=default
-> export AWS_DEFAULT_REGION=us-east-1
-> ```
-> Or mount credentials in Docker: `~/.aws:/root/.aws:ro`
 
 The agent includes file writing tools and Rossum integration via MCP. See [examples/](examples/) for complete workflows.
 
