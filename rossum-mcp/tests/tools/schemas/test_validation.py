@@ -214,6 +214,136 @@ class TestSanitizeSchemaContent:
         result = schemas.sanitize_schema_content(content)
         assert result[0]["children"][0]["ui_configuration"] == {"edit": "disabled"}
 
+    def test_strips_stretch_from_section_datapoint(self) -> None:
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "invoice_id",
+                        "label": "Invoice ID",
+                        "type": "string",
+                        "stretch": True,
+                        "width": 100,
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        dp = result[0]["children"][0]
+        assert "stretch" not in dp
+        assert "width" not in dp
+
+    def test_preserves_stretch_on_multivalue_tuple_children(self) -> None:
+        content = [
+            {
+                "category": "section",
+                "id": "items_section",
+                "label": "Items",
+                "children": [
+                    {
+                        "category": "multivalue",
+                        "id": "line_items",
+                        "label": "Line Items",
+                        "children": {
+                            "category": "tuple",
+                            "id": "line_item",
+                            "label": "Line Item",
+                            "children": [
+                                {
+                                    "category": "datapoint",
+                                    "id": "item_desc",
+                                    "label": "Description",
+                                    "type": "string",
+                                    "stretch": True,
+                                    "width": 200,
+                                },
+                                {
+                                    "category": "datapoint",
+                                    "id": "item_amount",
+                                    "label": "Amount",
+                                    "type": "number",
+                                    "width": 80,
+                                },
+                            ],
+                        },
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        tuple_children = result[0]["children"][0]["children"]["children"]
+        assert tuple_children[0]["stretch"] is True
+        assert tuple_children[0]["width"] == 200
+        assert tuple_children[1]["width"] == 80
+
+    def test_strips_stretch_from_multivalue_and_tuple_nodes(self) -> None:
+        """stretch/width should be stripped from the multivalue and tuple nodes themselves."""
+        content = [
+            {
+                "category": "section",
+                "id": "items_section",
+                "label": "Items",
+                "children": [
+                    {
+                        "category": "multivalue",
+                        "id": "line_items",
+                        "label": "Line Items",
+                        "stretch": True,
+                        "children": {
+                            "category": "tuple",
+                            "id": "line_item",
+                            "label": "Line Item",
+                            "width": 100,
+                            "children": [
+                                {
+                                    "category": "datapoint",
+                                    "id": "col",
+                                    "label": "Col",
+                                    "type": "string",
+                                    "stretch": True,
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        mv = result[0]["children"][0]
+        assert "stretch" not in mv
+        tuple_node = mv["children"]
+        assert "width" not in tuple_node
+        assert tuple_node["children"][0]["stretch"] is True
+
+    def test_strips_all_tuple_only_fields(self) -> None:
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "field",
+                        "label": "Field",
+                        "type": "string",
+                        "stretch": True,
+                        "width": 100,
+                        "can_collapse": True,
+                        "width_chars": 20,
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        dp = result[0]["children"][0]
+        for field in ("stretch", "width", "can_collapse", "width_chars"):
+            assert field not in dp
+
     def test_sanitizes_nested_multivalue_tuple_children(self) -> None:
         content = [
             {

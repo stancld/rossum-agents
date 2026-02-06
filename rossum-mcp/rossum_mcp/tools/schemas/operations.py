@@ -63,6 +63,8 @@ async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_dat
         return {"error": "update_schema is not available in read-only mode"}
 
     logger.debug(f"Updating schema: schema_id={schema_id}")
+    if "content" in schema_data and isinstance(schema_data["content"], list):
+        schema_data = {**schema_data, "content": sanitize_schema_content(schema_data["content"])}
     await client._http_client.update(Resource.Schema, schema_id, schema_data)
     updated_schema: Schema = await client.retrieve_schema(schema_id)
     return updated_schema
@@ -173,7 +175,8 @@ async def prune_schema_fields(
         return {"removed_fields": [], "remaining_fields": sorted(all_ids)}
 
     pruned_content, removed = _remove_fields_from_content(content, remove_set)
-    await client._http_client.update(Resource.Schema, schema_id, {"content": pruned_content})
+    sanitized_content = sanitize_schema_content(pruned_content)
+    await client._http_client.update(Resource.Schema, schema_id, {"content": sanitized_content})
 
     remaining_ids = _collect_all_field_ids(pruned_content)
     return {"removed_fields": sorted(removed), "remaining_fields": sorted(remaining_ids)}
