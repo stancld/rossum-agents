@@ -57,11 +57,6 @@ mcp = [
     "fastmcp>=2.0.0",
     "mcp>=1.0.0",
 ]
-# Streamlit UI
-streamlit = [
-    "streamlit>=1.37.0",
-    "redis>=7.0.0",
-]
 # Testing
 tests = [
     "coverage>=7.0.0",
@@ -70,7 +65,6 @@ tests = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "pytest-xdist>=3.0.0",
-    "streamlit>=1.37.0",
     "ty>=0.0.11",
 ]
 # All dependencies
@@ -102,7 +96,6 @@ all = [
     "sphinx-copybutton>=0.5.2",
     "sphinx-rtd-theme>=2.0.0",
     "sse-starlette>=2.0.0",
-    "streamlit>=1.37.0",
     "ty>=0.0.11",
     "uvicorn[standard]>=0.32.0",
 ]
@@ -113,7 +106,6 @@ include = ["rossum_mcp*", "rossum_deploy*", "rossum_agent*", "rossum_agent_clien
 
 [project.scripts]
 rossum-mcp = "rossum_mcp.server:main"
-rossum-agent = "rossum_agent.streamlit_app.cli:main"
 rossum-agent-api = "rossum_agent.api.main:main"
 
 [tool.pytest.ini_options]
@@ -142,7 +134,7 @@ exclude = ["**/tests/**", "**/outputs/**", "build/**"]
 
 # FastAPI/Starlette middleware and Anthropic TypedDict literals
 [[tool.ty.overrides]]
-include = ["**/api/**", "**/streamlit_app/**"]
+include = ["**/api/**"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
 deprecated = "ignore"

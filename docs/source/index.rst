@@ -146,7 +146,7 @@ The ``rossum_agent`` package provides additional capabilities:
 * Skills system for domain-specific workflows (deployment, hook debugging)
 * File output for saving reports, documentation, and analysis results
 * Integration with AI agent frameworks (Anthropic Claude via AWS Bedrock)
-* Streamlit web UI and REST API interfaces
+* REST API interface
 * See the :doc:`examples` section for complete workflows
 
 **Deployment Tools**
@@ -189,9 +189,6 @@ Run the AI agent:
 
    # CLI interface
    rossum-agent
-
-   # Streamlit web UI
-   streamlit run rossum-agent/rossum_agent/app.py
 
    # Or run with Docker Compose
    docker-compose up rossum-agent
