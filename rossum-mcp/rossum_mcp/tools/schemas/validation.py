@@ -6,6 +6,8 @@ MAX_ID_LENGTH = 50
 VALID_DATAPOINT_TYPES = {"string", "number", "date", "enum", "button"}
 VALID_UI_CONFIGURATION_TYPES = {"captured", "data", "manual", "formula", "reasoning", None}
 VALID_UI_CONFIGURATION_EDIT = {"enabled", "enabled_without_warning", "disabled"}
+# These attributes are only valid on datapoints inside a multivalue's tuple (table columns)
+MULTIVALUE_TUPLE_ONLY_FIELDS = {"width", "stretch", "can_collapse", "width_chars"}
 
 
 class SchemaValidationError(ValueError):
@@ -25,22 +27,35 @@ def _sanitize_ui_configuration(node: dict) -> None:
         del node["ui_configuration"]
 
 
-def sanitize_schema_content(content: list[dict]) -> list[dict]:
-    """Sanitize schema content by removing invalid ui_configuration values.
+def _strip_tuple_only_fields(node: dict) -> None:
+    """Remove multivalue-tuple-only attributes (stretch, width, etc.) from a node."""
+    for field in MULTIVALUE_TUPLE_ONLY_FIELDS:
+        node.pop(field, None)
 
-    Recursively traverses all nodes and removes invalid ui_configuration.type
-    values that would cause API errors (e.g., 'area', 'textarea').
+
+def sanitize_schema_content(content: list[dict]) -> list[dict]:
+    """Sanitize schema content to prevent API errors.
+
+    Strips invalid ui_configuration values and removes stretch/width/can_collapse/width_chars
+    from fields not inside a multivalue-tuple (the API only allows them on table columns).
     """
 
-    def _traverse(node: dict) -> None:
+    def _traverse(node: dict, *, in_multivalue_tuple: bool = False, parent_is_multivalue: bool = False) -> None:
         _sanitize_ui_configuration(node)
+        if not in_multivalue_tuple:
+            _strip_tuple_only_fields(node)
+
+        is_multivalue = node.get("category") == "multivalue"
         children = node.get("children")
         if children is not None:
-            if isinstance(children, list):
+            if isinstance(children, dict):
+                # Multivalue's children is a dict (the tuple container)
+                _traverse(children, parent_is_multivalue=is_multivalue)
+            elif isinstance(children, list):
+                # If parent was multivalue, we're in the tuple → list children can have stretch
+                child_in_tuple = parent_is_multivalue or in_multivalue_tuple
                 for child in children:
-                    _traverse(child)
-            elif isinstance(children, dict):
-                _traverse(children)
+                    _traverse(child, in_multivalue_tuple=child_in_tuple)
 
     for section in content:
         _traverse(section)
