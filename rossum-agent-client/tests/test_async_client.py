@@ -16,6 +16,7 @@ from rossum_agent_client.models import (
     HealthResponse,
     StepEvent,
     StreamDoneEvent,
+    TaskSnapshotEvent,
 )
 
 
@@ -215,6 +216,31 @@ class TestAsyncSendMessageStream:
         assert events[0].type == "thinking"
         assert events[1].type == "final_answer"
         assert isinstance(events[2], StreamDoneEvent)
+
+    @pytest.mark.asyncio
+    async def test_send_message_stream_task_snapshot_event(
+        self, httpx_mock: HTTPXMock, async_client: AsyncRossumAgentClient, agent_api_url: str
+    ) -> None:
+        sse_response = (
+            "event: task_snapshot\n"
+            'data: {"type": "task_snapshot", "tasks": ['
+            '{"id": "1", "subject": "Step A", "status": "completed"}'
+            "]}\n\n"
+            "event: done\n"
+            'data: {"total_steps": 1, "input_tokens": 10, "output_tokens": 5}\n\n'
+        )
+        httpx_mock.add_response(
+            url=f"{agent_api_url}/api/v1/chats/chat-123/messages",
+            method="POST",
+            content=sse_response.encode(),
+        )
+
+        events = []
+        async for event in async_client.send_message_stream("chat-123", "Do task"):
+            events.append(event)
+
+        assert isinstance(events[0], TaskSnapshotEvent)
+        assert events[0].tasks[0]["subject"] == "Step A"
 
     @pytest.mark.asyncio
     async def test_send_message_stream_with_rossum_url(

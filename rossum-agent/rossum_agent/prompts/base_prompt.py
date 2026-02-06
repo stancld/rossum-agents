@@ -75,9 +75,22 @@ Match response length to question complexity. Be concise for simple questions.
 
 For documentation: use Mermaid diagrams, cross-reference with anchors, explain business logic in prose (not JSON dumps), flag issues with `⚠️ SUSPICIOUS:`."""
 
+TASK_TRACKING = """
+# Task Tracking
+
+Use `create_task`, `update_task`, and `list_tasks` for complex multi-step operations (3+ steps). This gives users real-time progress visibility.
+
+| When | Action |
+|------|--------|
+| Starting multi-step work | `create_task` for each step |
+| Beginning a step | `update_task(status="in_progress")` |
+| Finishing a step | `update_task(status="completed")` |
+
+Skip task tracking for simple single-step requests."""
+
 
 def get_shared_prompt_sections() -> str:
     """Get all shared prompt sections combined."""
     return "\n\n---\n".join(
-        [CRITICAL_REQUIREMENTS, DOCUMENTATION_WORKFLOWS, CONFIGURATION_WORKFLOWS, OUTPUT_FORMATTING]
+        [CRITICAL_REQUIREMENTS, DOCUMENTATION_WORKFLOWS, CONFIGURATION_WORKFLOWS, OUTPUT_FORMATTING, TASK_TRACKING]
     )

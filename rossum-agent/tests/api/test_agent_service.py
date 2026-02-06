@@ -8,7 +8,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from rossum_agent.agent.memory import AgentMemory, MemoryStep, TaskStep
 from rossum_agent.agent.models import AgentStep, StepType, ThinkingBlockData, ToolCall, ToolResult
-from rossum_agent.api.models.schemas import ImageContent, StepEvent, SubAgentProgressEvent, SubAgentTextEvent
+from rossum_agent.api.models.schemas import (
+    ImageContent,
+    StepEvent,
+    SubAgentProgressEvent,
+    SubAgentTextEvent,
+    TaskSnapshotEvent,
+)
 from rossum_agent.api.services.agent_service import (
     AgentService,
     _create_tool_result_event,
@@ -1093,15 +1099,20 @@ class TestConvertSubAgentProgressToEvent:
 
 
 class TestAgentServiceSubAgentCallbacks:
-    """Tests for sub-agent callback handling."""
+    """Tests for sub-agent callback handling.
 
-    def test_on_sub_agent_progress_with_queue(self):
+    Callbacks use call_soon_threadsafe to marshal events onto the event loop,
+    so tests must be async and allow time for the scheduled callback to run.
+    """
+
+    async def test_on_sub_agent_progress_with_queue(self):
         """Test _on_sub_agent_progress puts event on queue."""
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = asyncio.Queue(maxsize=100)
+        ctx.event_queue = asyncio.Queue(maxsize=100)
+        ctx.event_loop = asyncio.get_running_loop()
         _request_context.set(ctx)
 
         progress = SubAgentProgress(
@@ -1114,9 +1125,10 @@ class TestAgentServiceSubAgentCallbacks:
         )
 
         service._on_sub_agent_progress(progress)
+        await asyncio.sleep(0)
 
-        assert ctx.sub_agent_queue.qsize() == 1
-        event = ctx.sub_agent_queue.get_nowait()
+        assert ctx.event_queue.qsize() == 1
+        event = ctx.event_queue.get_nowait()
         assert isinstance(event, SubAgentProgressEvent)
         assert event.tool_name == "test_tool"
 
@@ -1126,7 +1138,7 @@ class TestAgentServiceSubAgentCallbacks:
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = None
+        ctx.event_queue = None
         _request_context.set(ctx)
 
         progress = SubAgentProgress(
@@ -1140,16 +1152,19 @@ class TestAgentServiceSubAgentCallbacks:
 
         service._on_sub_agent_progress(progress)
 
-    def test_on_sub_agent_progress_queue_full(self, caplog):
+    async def test_on_sub_agent_progress_queue_full(self, caplog):
         """Test _on_sub_agent_progress logs warning when queue is full."""
+        import logging
+
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = asyncio.Queue(maxsize=1)
+        ctx.event_queue = asyncio.Queue(maxsize=1)
+        ctx.event_loop = asyncio.get_running_loop()
         _request_context.set(ctx)
 
-        ctx.sub_agent_queue.put_nowait(
+        ctx.event_queue.put_nowait(
             SubAgentProgressEvent(
                 tool_name="existing", iteration=1, max_iterations=1, tool_calls=["tool"], status="running"
             )
@@ -1164,28 +1179,29 @@ class TestAgentServiceSubAgentCallbacks:
             status="running",
         )
 
-        import logging
-
         with caplog.at_level(logging.WARNING):
             service._on_sub_agent_progress(progress)
+            await asyncio.sleep(0)
 
         assert "queue full" in caplog.text.lower()
 
-    def test_on_sub_agent_text_with_queue(self):
+    async def test_on_sub_agent_text_with_queue(self):
         """Test _on_sub_agent_text puts event on queue."""
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = asyncio.Queue(maxsize=100)
+        ctx.event_queue = asyncio.Queue(maxsize=100)
+        ctx.event_loop = asyncio.get_running_loop()
         _request_context.set(ctx)
 
         text = SubAgentText(tool_name="analyze_hook", text="Analyzing...", is_final=False)
 
         service._on_sub_agent_text(text)
+        await asyncio.sleep(0)
 
-        assert ctx.sub_agent_queue.qsize() == 1
-        event = ctx.sub_agent_queue.get_nowait()
+        assert ctx.event_queue.qsize() == 1
+        event = ctx.event_queue.get_nowait()
         assert isinstance(event, SubAgentTextEvent)
         assert event.tool_name == "analyze_hook"
         assert event.text == "Analyzing..."
@@ -1197,30 +1213,82 @@ class TestAgentServiceSubAgentCallbacks:
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = None
+        ctx.event_queue = None
         _request_context.set(ctx)
 
         text = SubAgentText(tool_name="test_tool", text="Hello", is_final=True)
 
         service._on_sub_agent_text(text)
 
-    def test_on_sub_agent_text_queue_full(self, caplog):
+    async def test_on_sub_agent_text_queue_full(self, caplog):
         """Test _on_sub_agent_text logs warning when queue is full."""
+        import logging
+
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
         service = AgentService()
         ctx = _RequestContext()
-        ctx.sub_agent_queue = asyncio.Queue(maxsize=1)
+        ctx.event_queue = asyncio.Queue(maxsize=1)
+        ctx.event_loop = asyncio.get_running_loop()
         _request_context.set(ctx)
 
-        ctx.sub_agent_queue.put_nowait(SubAgentTextEvent(tool_name="existing", text="x", is_final=False))
+        ctx.event_queue.put_nowait(SubAgentTextEvent(tool_name="existing", text="x", is_final=False))
 
         text = SubAgentText(tool_name="new_tool", text="Hello", is_final=True)
 
-        import logging
-
         with caplog.at_level(logging.WARNING):
             service._on_sub_agent_text(text)
+            await asyncio.sleep(0)
+
+        assert "queue full" in caplog.text.lower()
+
+    async def test_on_task_snapshot_with_queue(self):
+        """Test _on_task_snapshot puts TaskSnapshotEvent on queue."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
+        service = AgentService()
+        ctx = _RequestContext()
+        ctx.event_queue = asyncio.Queue(maxsize=100)
+        ctx.event_loop = asyncio.get_running_loop()
+        _request_context.set(ctx)
+
+        snapshot = [{"id": "1", "subject": "Deploy", "status": "completed"}]
+        service._on_task_snapshot(snapshot)
+        await asyncio.sleep(0)
+
+        assert ctx.event_queue.qsize() == 1
+        event = ctx.event_queue.get_nowait()
+        assert isinstance(event, TaskSnapshotEvent)
+        assert event.tasks == snapshot
+
+    def test_on_task_snapshot_without_queue(self):
+        """Test _on_task_snapshot does nothing when queue is None."""
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
+        service = AgentService()
+        ctx = _RequestContext()
+        ctx.event_queue = None
+        _request_context.set(ctx)
+
+        service._on_task_snapshot([{"id": "1", "subject": "Task", "status": "pending"}])
+
+    async def test_on_task_snapshot_queue_full(self, caplog):
+        """Test _on_task_snapshot logs warning when queue is full."""
+        import logging
+
+        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
+
+        service = AgentService()
+        ctx = _RequestContext()
+        ctx.event_queue = asyncio.Queue(maxsize=1)
+        ctx.event_loop = asyncio.get_running_loop()
+        _request_context.set(ctx)
+
+        ctx.event_queue.put_nowait(TaskSnapshotEvent(tasks=[]))
+
+        with caplog.at_level(logging.WARNING):
+            service._on_task_snapshot([{"id": "1", "subject": "Task", "status": "pending"}])
+            await asyncio.sleep(0)
 
         assert "queue full" in caplog.text.lower()
 

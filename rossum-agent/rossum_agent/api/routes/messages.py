@@ -28,6 +28,7 @@ from rossum_agent.api.models.schemas import (
     StreamDoneEvent,
     SubAgentProgressEvent,
     SubAgentTextEvent,
+    TaskSnapshotEvent,
 )
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
@@ -44,7 +45,7 @@ def _format_sse_event(event_type: str, data: str) -> str:
     return f"event: {event_type}\ndata: {data}\n\n"
 
 
-type AgentEvent = StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | StepEvent
+type AgentEvent = StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | StepEvent
 
 
 @dataclass
@@ -64,8 +65,10 @@ def _process_agent_event(event: AgentEvent) -> ProcessedEvent:
         return ProcessedEvent(sse_event=_format_sse_event("sub_agent_progress", event.model_dump_json()))
     if isinstance(event, SubAgentTextEvent):
         return ProcessedEvent(sse_event=_format_sse_event("sub_agent_text", event.model_dump_json()))
+    if isinstance(event, TaskSnapshotEvent):
+        return ProcessedEvent(sse_event=_format_sse_event("task_snapshot", event.model_dump_json()))
     sse = _format_sse_event("step", event.model_dump_json())
-    if event.type == "text" and event.is_streaming:
+    if event.type == "final_answer" and event.is_streaming:
         return ProcessedEvent(sse_event=sse, final_response_update=event.content)
     final_response = event.content if event.type == "final_answer" and event.content else None
     return ProcessedEvent(sse_event=sse, final_response_update=final_response)
@@ -163,7 +166,7 @@ async def send_message(
         except Exception as e:
             logger.error(f"Error during agent execution: {e}", exc_info=True)
             error_event = StepEvent(type="error", step_number=0, content=str(e), is_final=True)
-            yield _format_sse_event("error", error_event.model_dump_json())
+            yield _format_sse_event("step", error_event.model_dump_json())
             return
 
         updated_history = agent_service.build_updated_history(
