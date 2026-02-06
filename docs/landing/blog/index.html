@@ -638,8 +638,8 @@
 
       <p>I chose sub-agents for tasks that either required many retries (like debugging webhooks) or produced verbose intermediate outputs (like knowledge base searches). The primary conversation stays clean:</p>
 
-      <figure class="arch-diagram" role="img" aria-label="Architecture diagram showing Main Agent (Opus 4.5) delegating to three sub-agents: HookDebugSubAgent for serverless function failures, SchemaPatchingSubAgent for JSON schema modifications, and KnowledgeBaseSubAgent for documentation retrieval">
-        <div class="level-1">Main Agent (Opus 4.5)</div>
+      <figure class="arch-diagram" role="img" aria-label="Architecture diagram showing Main Agent (Opus 4.6) delegating to three sub-agents: HookDebugSubAgent for serverless function failures, SchemaPatchingSubAgent for JSON schema modifications, and KnowledgeBaseSubAgent for documentation retrieval">
+        <div class="level-1">Main Agent (Opus 4.6)</div>
         <div class="level-2">├── HookDebugSubAgent (serverless function failures)</div>
         <div class="level-2">├── SchemaPatchingSubAgent (JSON schema modifications)</div>
         <div class="level-2">└── KnowledgeBaseSubAgent (documentation retrieval)</div>
@@ -712,9 +712,9 @@
       <a href="https://github.com/stancld/rossum-agents/pull/99" class="pr-link" target="_blank" rel="noopener">PR #99</a>
       <a href="https://github.com/anthropics/claude-code/tree/main/plugins/claude-opus-4-5-migration" class="pr-link" target="_blank" rel="noopener">Opus 4.5 Migration Plugin</a>
 
-      <p>Switching models usually feels like a simple configuration change. But moving from Sonnet to <strong>Claude Opus 4.5</strong> taught me that better models require better, and often <em>shorter</em>, instructions. My prompt had become an over-engineered legal document, and I had to admit it.</p>
+      <p>Switching models usually feels like a simple configuration change. But moving from Sonnet to <strong>Claude Opus 4.6</strong> taught me that better models require better, and often <em>shorter</em>, instructions. My prompt had become an over-engineered legal document, and I had to admit it.</p>
 
-      <p>The initial migration was rough. Opus fell into the "tool-calling inferno": redundant loops where the model over-analyzed simple tasks, burning tokens without progress. I realized the problem wasn't the model; it was my "legacy" prompts. Building with less capable models had trained me to write exhaustive, hand-holding instructions. Because Opus 4.5 is more literal and responsive, my <code>CRITICAL:</code> and <code>MUST:</code> blocks were being treated as absolute commands to act, even when unnecessary.</p>
+      <p>The initial migration was rough. Opus fell into the "tool-calling inferno": redundant loops where the model over-analyzed simple tasks, burning tokens without progress. I realized the problem wasn't the model; it was my "legacy" prompts. Building with less capable models had trained me to write exhaustive, hand-holding instructions. Because Opus 4.6 is more literal and responsive, my <code>CRITICAL:</code> and <code>MUST:</code> blocks were being treated as absolute commands to act, even when unnecessary.</p>
 
       <p>The fix: stop writing procedures, start writing goals.</p>
 

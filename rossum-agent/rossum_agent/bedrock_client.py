@@ -7,7 +7,7 @@ import os
 import boto3
 from anthropic import AnthropicBedrock
 
-OPUS_MODEL_ID = "eu.anthropic.claude-opus-4-5-20251101-v1:0"
+OPUS_MODEL_ID = "eu.anthropic.claude-opus-4-6-v1"
 HAIKU_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
