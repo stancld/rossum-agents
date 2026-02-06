@@ -1442,10 +1442,10 @@ Creates a new business rule. Rules automate field operations based on trigger co
 **Parameters:**
 
 - ``name`` (string, required): Rule name
-- ``schema_id`` (integer, required): Schema ID to associate the rule with
 - ``trigger_condition`` (string, required): TxScript formula (e.g., ``"field.amount > 10000"``)
 - ``actions`` (array, required): List of actions with required fields: ``id`` (unique string), ``type``, ``event``, ``payload``
 - ``enabled`` (boolean, optional): Whether the rule is enabled (default: true)
+- ``schema_id`` (integer, optional): Schema ID to associate the rule with (at least one of ``schema_id`` or ``queue_ids`` required)
 - ``queue_ids`` (array of integers, optional): List of queue IDs to limit the rule to specific queues
 
 **Action types:** ``show_message``, ``add_automation_blocker``, ``add_validation_source``, ``change_queue``, ``send_email``, ``hide_field``, ``show_field``, ``show_hide_field``, ``change_status``, ``add_label``, ``remove_label``, ``custom``
@@ -1473,9 +1473,9 @@ Creates a new business rule. Rules automate field operations based on trigger co
    # Create a simple validation rule
    rule = create_rule(
        name="High Value Alert",
-       schema_id=12345,
        trigger_condition="field.amount > 10000",
-       actions=[{"id": "alert1", "type": "show_message", "event": "validation", "payload": {"type": "error", "content": "High value invoice", "schema_id": "amount"}}]
+       actions=[{"id": "alert1", "type": "show_message", "event": "validation", "payload": {"type": "error", "content": "High value invoice", "schema_id": "amount"}}],
+       schema_id=12345
    )
 
 **Note:** This operation is only available in read-write mode.

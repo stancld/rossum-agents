@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
   - Uses UvicornWorker for ASGI compatibility
 
 ### Changed
+- Migrated default model from Opus 4.5 to Opus 4.6 [#156](https://github.com/stancld/rossum-agents/pull/156)
 - Refactored API to use FastAPI's `app.state` for service instances instead of module-level globals [#153](https://github.com/stancld/rossum-agents/pull/153)
 
 ### Removed
