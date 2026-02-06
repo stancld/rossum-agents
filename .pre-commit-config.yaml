@@ -37,3 +37,17 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+
+      - id: tui-prettier
+        name: tui-prettier
+        entry: npx --prefix rossum-agent-tui prettier --check
+        language: system
+        files: ^rossum-agent-tui/src/.*\.(ts|tsx)$
+        pass_filenames: true
+
+      - id: tui-typecheck
+        name: tui-typecheck
+        entry: bash -c 'cd rossum-agent-tui && npx tsc --noEmit'
+        language: system
+        files: ^rossum-agent-tui/src/.*\.(ts|tsx)$
+        pass_filenames: false
