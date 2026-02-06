@@ -240,6 +240,57 @@ class TestCreateRule:
         assert call_args["enabled"] is True
 
     @pytest.mark.asyncio
+    async def test_create_rule_without_schema_id(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test creating a rule with only queue_ids (no schema_id)."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
+        importlib.reload(base)
+
+        from rossum_mcp.tools.rules import register_rule_tools
+
+        register_rule_tools(mock_mcp, mock_client)
+
+        mock_rule = create_mock_rule(id=457, name="Queue-only Rule", enabled=True)
+        mock_client.create_new_rule.return_value = mock_rule
+
+        create_rule = mock_mcp._tools["create_rule"]
+        result = await create_rule(
+            name="Queue-only Rule",
+            trigger_condition="field.amount > 500",
+            actions=[],
+            queue_ids=[101],
+        )
+
+        assert result.id == 457
+        call_args = mock_client.create_new_rule.call_args[0][0]
+        assert "schema" not in call_args
+        assert call_args["queues"] == ["https://api.test.rossum.ai/v1/queues/101"]
+
+    @pytest.mark.asyncio
+    async def test_create_rule_requires_scope(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test create_rule fails when neither schema_id nor queue_ids provided."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+
+        from rossum_mcp.tools.rules import register_rule_tools
+
+        register_rule_tools(mock_mcp, mock_client)
+
+        create_rule = mock_mcp._tools["create_rule"]
+        result = await create_rule(
+            name="Unscoped Rule",
+            trigger_condition="True",
+            actions=[],
+        )
+
+        assert result["error"] == "Provide at least one of schema_id or queue_ids to scope the rule."
+        mock_client.create_new_rule.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_create_rule_read_only_mode(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
@@ -254,9 +305,9 @@ class TestCreateRule:
         create_rule = mock_mcp._tools["create_rule"]
         result = await create_rule(
             name="Test Rule",
-            schema_id=100,
             trigger_condition="True",
             actions=[],
+            queue_ids=[1],
         )
 
         assert result["error"] == "create_rule is not available in read-only mode"

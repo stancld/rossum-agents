@@ -120,15 +120,7 @@ Extract actionable technical information a developer can use immediately.
 | Code examples | JSON configs, API payloads |
 | Implementation steps | When present |
 
-## AI Feature Topics (document splitting, AI predictions, field automation)
-
-When the topic involves document splitting, beware of the bug in knowledge base, emphasize below:
-
-⛔ CRITICAL SCHEMA REQUIREMENTS
-| Property | Constraint |
-|----------|------------|
-| hidden | false |
-| Multivalue parent | Required for splitting (one value per split document)."""
+For document splitting topics, beware of the bug in knowledge base — emphasize `hidden: false` and multivalue parent requirements from system prompt."""
 
         response = client.messages.create(
             model=get_model_id(),

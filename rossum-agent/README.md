@@ -12,7 +12,7 @@
 
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
-[![Claude Opus 4.5](https://img.shields.io/badge/Claude-Opus_4.5-blueviolet.svg)](https://www.anthropic.com/claude/opus)
+[![Claude Opus 4.6](https://img.shields.io/badge/Claude-Opus_4.6-blueviolet.svg)](https://www.anthropic.com/claude/opus)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![ty](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json)](https://github.com/astral-sh/ty)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
