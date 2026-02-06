@@ -14,17 +14,16 @@
 | Task | Command |
 |------|---------|
 | Setup | `uv sync` or `uv pip install -e .` |
-| Server | `python server.py` |
+| Server | `rossum-mcp` (installed) or `python -m rossum_mcp.server` (dev) |
 | Tests | `pytest` or `pytest path/to/test.py` |
 | rossum-deploy tests | `cd rossum-deploy && pytest tests/` (required when modifying `workspace.py`) |
 | Lint | `pre-commit run --all-files` |
 
 ## Architecture
 
-- **rossum-mcp**: Single-file MCP server (`server.py`), `RossumMCPServer` class, 56 tools
+- **rossum-mcp**: FastMCP server in `rossum_mcp/server.py`; tools registered from `rossum_mcp/tools/` modules, 61 tools
 - **rossum-agent**: AI agent with prompts in `rossum_agent/prompts/`, skills in `rossum_agent/skills/`
 - **rossum-agent-tui**: Development test-bed TUI for rossum-agent. Not production code — no tests required.
-- Sync API client wrapped in async executors for MCP compatibility
 - **New skills**: Add to `rossum_agent/prompts/base_prompt.py` ROSSUM_EXPERT_INTRO section
 
 ## Prompt Engineering (rossum-agent)
@@ -48,7 +47,7 @@
 | No `Any` | Use specific types |
 | Imports | Standard library first, `from pathlib import Path` |
 | Comments | Explain why, not what |
-| No trailing commas | `[1, 2, 3]` not `[1, 2, 3,]` |
+| No trailing commas | Follow ruff-format output |
 | Noqa comments | Always explain: `# noqa: TC003 - reason` |
 
 ## FastMCP Tools (rossum-mcp)
@@ -75,8 +74,8 @@ When adding/modifying tools, update:
 
 | Tool Type | Files to Update |
 |-----------|-----------------|
-| MCP tools | `rossum-mcp/README.md`, `docs/source/index.rst`, `docs/source/usage.rst` |
-| Agent tools | `rossum-agent/README.md`, `docs/source/index.rst`, `docs/source/usage.rst` |
+| MCP tools | `rossum-mcp/README.md`, `docs/source/index.rst`, `docs/source/usage.rst`, `docs/source/mcp_reference.rst` |
+| Agent tools | `rossum-agent/README.md`, `docs/source/index.rst`, `docs/source/usage.rst`, `docs/source/skills_and_subagents.rst` |
 
 Include: tool name, description, parameters with types, return format with JSON examples.
 
@@ -85,7 +84,7 @@ Include: tool name, description, parameters with types, return format with JSON 
 | Scenario | Action |
 |----------|--------|
 | New functions | Unit tests |
-| New MCP tools | Integration tests in `rossum-mcp/tests/test_server.py` |
+| New MCP tools | Integration tests in `rossum-mcp/tests/tools/` and catalog tests in `rossum-mcp/tests/test_catalog.py` |
 | New agent tools | Tests in `rossum-agent/tests/` |
 | Bug fixes | Regression tests |
 | Modified logic | Update + add tests |
@@ -108,7 +107,6 @@ Backend (`messages.py`) emits these SSE event names with corresponding payloads:
 | `task_snapshot` | `TaskSnapshotEvent` | `TaskSnapshotEvent` | Task tracker state |
 | `file_created` | `FileCreatedEvent` | `FileCreatedEvent` | Output file notification |
 | `done` | `StreamDoneEvent` | `StreamDoneEvent` | Final event with token usage |
-| `error` | `StepEvent` (exception path) | `{ message: string }` | **Mismatch — see Known Issues** |
 
 ### StepEvent.type Values
 
@@ -156,25 +154,15 @@ The agent signals tool usage through two paired `StepEvent` types sharing the sa
 
 ### Known Issues & Contract Mismatches
 
-#### 1. Error event payload mismatch (bug)
-Backend exception handler (`messages.py:168`) emits `event: error` with a `StepEvent` JSON payload, but TUI expects `{ message: string }`. Result: `state.error` is set to `undefined`, losing the error message.
-**Fix**: Change exception handler to emit `event: step` (not `event: error`) so it's handled by the existing `StepEvent` logic, or change payload to `{ message: str(e) }`.
-
-#### 2. Dead `"text"` type check (bug)
-`_process_agent_event` in `messages.py:71` checks `event.type == "text"`, but `StepEvent.type` never includes `"text"`. This branch is dead code.
-**Fix**: Remove or change to the intended type (likely `"final_answer"` for streaming final answers).
-
-#### 3. `StreamDoneEvent` missing `type` field (minor mismatch)
+#### 1. `StreamDoneEvent` missing `type` field (minor mismatch)
 Python `StreamDoneEvent` has no `type` field; TUI type declares `type: "done"`. Not a runtime bug (TUI dispatches on the SSE event name, not `data.type`), but makes TS types inaccurate.
 **Fix**: Add `type: Literal["done"] = "done"` to Python `StreamDoneEvent`, or remove `type` from TS `StreamDoneEvent`.
 
-#### 4. `sub_agent_text` events silently dropped (missing feature)
-Backend emits `sub_agent_text` events, TUI `SSEEvent` union includes them, but `useChat.ts` dispatch has no handler → events hit the default branch and are ignored.
-**Fix**: Add `case "sub_agent_text":` handler to `useChat.ts` dispatch.
+#### 2. `sub_agent_text` events not rendered (minor)
+Backend emits `sub_agent_text` events; TUI handles them in dispatch but currently ignores them (`return prev`). Not a crash, but sub-agent text is not surfaced to the user.
 
-#### 5. Tool call pairing fragility (design risk)
-Pairing by `step_number` alone assumes exactly one tool call per step. The internal `ToolCall` model already has an `id` field and `ToolResult` has `tool_call_id`, but these are **not exposed** in the SSE `StepEvent`. If multiple tools execute within one step or tool_start is emitted multiple times (progress updates), pairing can silently mis-pair or lose results.
-**Fix (future)**: Expose `tool_call_id` in `StepEvent` and pair by that instead of `step_number`. Currently safe because `agent/core.py` emits one `tool_start` per tool per step and `tool_result` uses `step.tool_results[-1]` (last result only).
+#### 3. TUI `SSEEvent` union includes legacy `event: "error"` variant
+TUI types still declare `{ event: "error"; data: { message: string } }` in `SSEEvent`, but the backend no longer emits `event: error` — errors are emitted as `event: step` with `StepEvent(type="error")`. The TUI type is dead code.
 
 ## Environment Variables
 
@@ -184,7 +172,6 @@ Pairing by `step_number` alone assumes exactly one tool call per step. The inter
 | `ROSSUM_API_BASE_URL` | Required - API endpoint |
 | `REDIS_HOST`, `REDIS_PORT` | Optional - Redis connection (default port: 6379) |
 | `ROSSUM_MCP_MODE` | Optional - read-only or read-write |
-| `PUBLIC_URL` | Optional - shareable links on remote servers |
 
 ## Planning Files
 
