@@ -25,7 +25,7 @@ services:
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
       - LLM_API_BASE_URL=""
     ports:
-      - 127.0.0.1:8501:8501
+      - 127.0.0.1:8000:8000
     volumes:
       - ~/.aws:/root/.aws:ro
     profiles:

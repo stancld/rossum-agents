@@ -52,19 +52,11 @@ cp ~/my-invoices/*.pdf examples/data/
 
 ### Usage
 
-Run the agent CLI:
+Run the agent API:
 
 ```bash
 # From anywhere after installation
-rossum-agent
-```
-
-Or run the Streamlit UI:
-
-```bash
-# From the rossum_agent directory
-cd rossum-agent
-streamlit run app.py
+rossum-agent-api
 ```
 
 ### Example Commands
