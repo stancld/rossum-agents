@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Refactored API to use FastAPI's `app.state` for service instances instead of module-level globals [#153](https://github.com/stancld/rossum-agents/pull/153)
 
+### Removed
+- Removed Teleport JWT user isolation (`user_detection.py`, `PyJWT`, `cryptography` dependencies)
+
 
 ## [1.0.0] - 2025-02-05
 

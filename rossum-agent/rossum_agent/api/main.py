@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import uvicorn
 from fastapi import FastAPI, Request, status
-from gunicorn.app.base import BaseApplication
+from gunicorn.app.base import BaseApplication  # ty: ignore[unresolved-import] - ty struggles
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator

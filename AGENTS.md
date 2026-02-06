@@ -99,7 +99,6 @@ Structure: `tests/` mirrors source, pytest fixtures in `conftest.py`, imports at
 | `ROSSUM_API_BASE_URL` | Required - API endpoint |
 | `REDIS_HOST`, `REDIS_PORT` | Optional - Redis connection (default port: 6379) |
 | `ROSSUM_MCP_MODE` | Optional - read-only or read-write |
-| `TELEPORT_JWT_JWKS_URL` | Optional - enables user isolation via JWT |
 | `PUBLIC_URL` | Optional - shareable links on remote servers |
 
 ## Planning Files
