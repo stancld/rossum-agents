@@ -37,7 +37,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 CRITICAL_REQUIREMENTS = """
 # Domain Knowledge
 
-**Schema**: sections → datapoints | multivalues → tuples (tables). Datapoint fields: `id`, `label`, `type`, `is_formula`, `formula`, `is_reasoning`, `prompt`, `score_threshold`.
+**Schema**: sections → datapoints | multivalues → tuples (tables). Datapoint fields: `id`, `label`, `type`, `ui_configuration` (with `type`: `captured`/`data`/`manual`/`formula`/`reasoning`), `formula`, `prompt`, `context`, `score_threshold`.
 
 **API constraints**:
 - IDs are integers: `queue_id=12345` not `"12345"`
