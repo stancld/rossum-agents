@@ -1,11 +1,4 @@
-"""Shared base module for sub-agents.
-
-Provides common infrastructure for sub-agents that use iterative LLM calls with tool use:
-- Unified iteration loop with token tracking
-- Context saving for debugging
-- Consistent logging patterns
-- Progress and token usage reporting
-"""
+"""Shared base for sub-agents with iterative LLM tool-use loops."""
 
 from __future__ import annotations
 
@@ -50,6 +43,7 @@ class SubAgentResult:
     input_tokens: int
     output_tokens: int
     iterations_used: int
+    tool_calls: list[dict[str, Any]] | None = None
 
 
 def save_iteration_context(
@@ -61,17 +55,7 @@ def save_iteration_context(
     tools: list[dict[str, Any]],
     max_tokens: int,
 ) -> None:
-    """Save agent input context to file for debugging.
-
-    Args:
-        tool_name: Name of the sub-agent tool (e.g., "debug_hook", "patch_schema").
-        iteration: Current iteration number (1-indexed).
-        max_iterations: Maximum number of iterations.
-        messages: Current conversation messages.
-        system_prompt: System prompt used.
-        tools: Tool definitions.
-        max_tokens: Max tokens setting.
-    """
+    """Save agent input context to file for debugging."""
     try:
         output_dir = get_output_dir()
         context_file = output_dir / f"{tool_name}_context_iter_{iteration}.json"
@@ -101,11 +85,6 @@ class SubAgent(ABC):
     """
 
     def __init__(self, config: SubAgentConfig) -> None:
-        """Initialize the sub-agent.
-
-        Args:
-            config: Configuration for the sub-agent.
-        """
         self.config = config
         self._client = None
 
@@ -121,27 +100,13 @@ class SubAgent(ABC):
 
     @abstractmethod
     def execute_tool(self, tool_name: str, tool_input: dict[str, Any]) -> str:
-        """Execute a tool call from the LLM.
-
-        Args:
-            tool_name: Name of the tool to execute.
-            tool_input: Input arguments for the tool.
-
-        Returns:
-            Tool result as a string.
-        """
+        """Execute a tool call from the LLM and return the result as a string."""
 
     @abstractmethod
     def process_response_block(self, block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
         """Process a response block for special handling (e.g., web search).
 
-        Args:
-            block: Response content block.
-            iteration: Current iteration number (1-indexed).
-            max_iterations: Maximum iterations.
-
-        Returns:
-            Tool result dict if the block was processed, None otherwise.
+        Returns tool result dict if the block was processed, None otherwise.
         """
 
     def run(self, initial_message: str) -> SubAgentResult:
@@ -150,6 +115,7 @@ class SubAgent(ABC):
         total_input_tokens = 0
         total_output_tokens = 0
         current_iteration = 0
+        all_tool_calls: list[dict[str, Any]] = []
 
         response = None
         try:
@@ -231,6 +197,7 @@ class SubAgent(ABC):
                         input_tokens=total_input_tokens,
                         output_tokens=total_output_tokens,
                         iterations_used=current_iteration,
+                        tool_calls=all_tool_calls or None,
                     )
 
                 messages.append({"role": "assistant", "content": response.content})
@@ -248,6 +215,7 @@ class SubAgent(ABC):
                         tool_name = block.name
                         tool_input = block.input
                         iteration_tool_calls.append(tool_name)
+                        all_tool_calls.append({"tool": tool_name, "input": tool_input})
 
                         logger.info(f"{self.config.tool_name} [iter {current_iteration}]: calling tool '{tool_name}'")
 
@@ -291,6 +259,7 @@ class SubAgent(ABC):
                 input_tokens=total_input_tokens,
                 output_tokens=total_output_tokens,
                 iterations_used=self.config.max_iterations,
+                tool_calls=all_tool_calls or None,
             )
 
         except Exception as e:
