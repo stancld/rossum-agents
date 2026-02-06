@@ -133,9 +133,9 @@ async def patch_schema(
 async def get_schema_tree_structure(
     client: AsyncRossumAPIClient, schema_id: int | None = None, queue_id: int | None = None
 ) -> list[dict] | dict:
-    if not schema_id and not queue_id:
+    if schema_id is None and queue_id is None:
         return {"error": "Provide schema_id or queue_id"}
-    if schema_id and queue_id:
+    if schema_id is not None and queue_id is not None:
         return {"error": "Provide schema_id or queue_id, not both"}
     if queue_id:
         queue = await client.retrieve_queue(queue_id)
