@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Refactored API to use FastAPI's `app.state` for service instances instead of module-level globals [#153](https://github.com/stancld/rossum-agents/pull/153)
 
 ### Removed
+- Removed Streamlit UI (`streamlit_app` submodule and all Streamlit dependencies) [#160](https://github.com/stancld/rossum-agents/pull/160)
 - Removed Teleport JWT user isolation (`user_detection.py`, `PyJWT`, `cryptography` dependencies) [#155](https://github.com/stancld/rossum-agents/pull/155)
 
 
