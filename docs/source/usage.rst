@@ -45,14 +45,9 @@ For read-only access , use ``"ROSSUM_MCP_MODE": "read-only"`` to restrict access
 Running the AI Agent
 --------------------
 
-The ``rossum_agent`` package provides Streamlit web UI and REST API interfaces:
+The ``rossum_agent`` package provides a REST API interface:
 
 .. code-block:: bash
-
-   # Streamlit web UI
-   rossum-agent
-   # or directly:
-   streamlit run rossum-agent/rossum_agent/streamlit_app/app.py
 
    # REST API
    rossum-agent-api
