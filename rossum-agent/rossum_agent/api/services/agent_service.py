@@ -38,7 +38,7 @@ from rossum_agent.url_context import extract_url_context, format_context_for_pro
 from rossum_agent.utils import create_session_output_dir, get_display_tool_name, set_session_output_dir
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Callable
     from pathlib import Path
 
     from anthropic.types import ImageBlockParam, TextBlockParam
@@ -120,6 +120,78 @@ def _log_events(events: list[StepEvent]) -> None:
         )
 
 
+def _handle_error(step: AgentStep) -> list[StepEvent] | None:
+    if not step.error:
+        return None
+    return [StepEvent(type="error", step_number=step.step_number, content=step.error, is_final=True)]
+
+
+def _handle_final_answer(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.is_final and step.final_answer):
+        return None
+    return [StepEvent(type="final_answer", step_number=step.step_number, content=step.final_answer, is_final=True)]
+
+
+def _handle_intermediate_text(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.step_type == StepType.INTERMEDIATE and step.accumulated_text is not None):
+        return None
+    return [
+        StepEvent(type="intermediate", step_number=step.step_number, content=step.accumulated_text, is_streaming=True)
+    ]
+
+
+def _handle_streaming_final_answer(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.step_type == StepType.FINAL_ANSWER and step.accumulated_text is not None):
+        return None
+    return [
+        StepEvent(type="final_answer", step_number=step.step_number, content=step.accumulated_text, is_streaming=True)
+    ]
+
+
+def _handle_current_tool(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.current_tool and step.tool_progress):
+        return None
+    return [_create_tool_start_event(step, step.current_tool)]
+
+
+def _handle_streaming_tool_calls(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.tool_calls and step.is_streaming and step.tool_progress):
+        return None
+    total = len(step.tool_calls)
+    events: list[StepEvent] = []
+    for idx, tc in enumerate(step.tool_calls, 1):
+        ev = _create_tool_start_event(step, tc.name)
+        ev.tool_progress = (idx, total)
+        events.append(ev)
+    return events
+
+
+def _handle_tool_results(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.tool_results and not step.is_streaming):
+        return None
+    return [_create_tool_result_event(step.step_number, r) for r in step.tool_results]
+
+
+def _handle_thinking(step: AgentStep) -> list[StepEvent] | None:
+    if not (step.step_type == StepType.THINKING or step.thinking is not None):
+        return None
+    return [
+        StepEvent(type="thinking", step_number=step.step_number, content=step.thinking, is_streaming=step.is_streaming)
+    ]
+
+
+_STEP_HANDLERS: tuple[Callable[[AgentStep], list[StepEvent] | None], ...] = (
+    _handle_error,
+    _handle_final_answer,
+    _handle_intermediate_text,
+    _handle_streaming_final_answer,
+    _handle_current_tool,
+    _handle_streaming_tool_calls,
+    _handle_tool_results,
+    _handle_thinking,
+)
+
+
 def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
     """Convert an AgentStep to StepEvents for SSE streaming.
 
@@ -133,42 +205,15 @@ def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
 
     Returns a list because a single step may contain multiple tool results.
     """
-    if step.error:
-        event = StepEvent(type="error", step_number=step.step_number, content=step.error, is_final=True)
-    elif step.is_final and step.final_answer:
-        event = StepEvent(type="final_answer", step_number=step.step_number, content=step.final_answer, is_final=True)
-    elif step.step_type == StepType.INTERMEDIATE and step.accumulated_text is not None:
-        event = StepEvent(
-            type="intermediate", step_number=step.step_number, content=step.accumulated_text, is_streaming=True
-        )
-    elif step.step_type == StepType.FINAL_ANSWER and step.accumulated_text is not None:
-        event = StepEvent(
-            type="final_answer", step_number=step.step_number, content=step.accumulated_text, is_streaming=True
-        )
-    elif step.current_tool and step.tool_progress:
-        event = _create_tool_start_event(step, step.current_tool)
-    elif step.tool_calls and step.is_streaming and step.tool_progress:
-        total = len(step.tool_calls)
-        events = []
-        for idx, tc in enumerate(step.tool_calls, 1):
-            ev = _create_tool_start_event(step, tc.name)
-            ev.tool_progress = (idx, total)
-            events.append(ev)
-        _log_events(events)
-        return events
-    elif step.tool_results and not step.is_streaming:
-        events = [_create_tool_result_event(step.step_number, r) for r in step.tool_results]
-        _log_events(events)
-        return events
-    elif step.step_type == StepType.THINKING or step.thinking is not None:
-        event = StepEvent(
-            type="thinking", step_number=step.step_number, content=step.thinking, is_streaming=step.is_streaming
-        )
-    else:
-        event = StepEvent(type="thinking", step_number=step.step_number, content=None, is_streaming=step.is_streaming)
+    for handler in _STEP_HANDLERS:
+        events = handler(step)
+        if events is not None:
+            _log_events(events)
+            return events
 
-    _log_events([event])
-    return [event]
+    events = [StepEvent(type="thinking", step_number=step.step_number, content=None, is_streaming=step.is_streaming)]
+    _log_events(events)
+    return events
 
 
 class AgentService:
