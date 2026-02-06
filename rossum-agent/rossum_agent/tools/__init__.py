@@ -62,6 +62,7 @@ from rossum_agent.tools.dynamic_tools import (
     reset_dynamic_tools,
     suggest_categories_for_request,
 )
+from rossum_agent.tools.elis_backend_openapi_search import elis_openapi_grep, elis_openapi_jq, refresh_openapi_spec
 from rossum_agent.tools.file_tools import write_file
 from rossum_agent.tools.formula import suggest_formula_field
 from rossum_agent.tools.skills import load_skill
@@ -79,6 +80,7 @@ from rossum_agent.tools.subagents import (
     debug_hook,
     evaluate_python_hook,
     patch_schema_with_subagent,
+    search_elis_docs,
     search_knowledge_base,
 )
 from rossum_agent.tools.task_tracker import (
@@ -95,6 +97,7 @@ if TYPE_CHECKING:
 _BETA_TOOLS: list[BetaTool[..., str]] = [
     write_file,
     search_knowledge_base,
+    search_elis_docs,
     evaluate_python_hook,
     debug_hook,
     patch_schema_with_subagent,
@@ -106,6 +109,8 @@ _BETA_TOOLS: list[BetaTool[..., str]] = [
     create_task,
     update_task,
     list_tasks,
+    elis_openapi_jq,
+    elis_openapi_grep,
 ]
 
 
@@ -190,6 +195,8 @@ __all__ = [
     "deploy_pull",
     "deploy_push",
     "deploy_to_org",
+    "elis_openapi_grep",
+    "elis_openapi_jq",
     "evaluate_python_hook",
     "execute_internal_tool",
     "execute_tool",
@@ -215,11 +222,13 @@ __all__ = [
     "load_tool_category",
     "patch_schema_with_subagent",
     "preload_categories_for_request",
+    "refresh_openapi_spec",
     "report_progress",
     "report_text",
     "report_token_usage",
     "require_rossum_credentials",
     "reset_dynamic_tools",
+    "search_elis_docs",
     "search_knowledge_base",
     "set_mcp_connection",
     "set_output_dir",

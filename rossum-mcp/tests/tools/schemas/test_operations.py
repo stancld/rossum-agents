@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, Mock  # noqa: TC003 - needed at runtime for fixtures
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from rossum_mcp.tools import base, schemas
@@ -649,6 +649,58 @@ class TestGetSchemaTreeStructure:
         assert "error" in result
         assert "999" in result["error"]
         assert "not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_schema_tree_structure_by_queue_id(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test tree structure via queue_id resolves schema automatically."""
+        register_schema_tools(mock_mcp, mock_client)
+
+        mock_queue = Mock()
+        mock_queue.schema = "https://api.test/v1/schemas/50"
+        mock_client.retrieve_queue.return_value = mock_queue
+
+        mock_schema = create_mock_schema(
+            id=50,
+            content=[
+                {
+                    "id": "section",
+                    "label": "Section",
+                    "category": "section",
+                    "children": [{"id": "field1", "label": "Field 1", "category": "datapoint", "type": "string"}],
+                }
+            ],
+        )
+        mock_client.retrieve_schema.return_value = mock_schema
+
+        get_schema_tree_structure = mock_mcp._tools["get_schema_tree_structure"]
+        result = await get_schema_tree_structure(queue_id=100)
+
+        mock_client.retrieve_queue.assert_called_once_with(100)
+        mock_client.retrieve_schema.assert_called_once_with(50)
+        assert len(result) == 1
+        assert result[0]["id"] == "section"
+
+    @pytest.mark.asyncio
+    async def test_get_schema_tree_structure_no_args(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test tree structure returns error when neither schema_id nor queue_id provided."""
+        register_schema_tools(mock_mcp, mock_client)
+
+        get_schema_tree_structure = mock_mcp._tools["get_schema_tree_structure"]
+        result = await get_schema_tree_structure()
+
+        assert isinstance(result, dict)
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_get_schema_tree_structure_both_args(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test tree structure returns error when both schema_id and queue_id provided."""
+        register_schema_tools(mock_mcp, mock_client)
+
+        get_schema_tree_structure = mock_mcp._tools["get_schema_tree_structure"]
+        result = await get_schema_tree_structure(schema_id=50, queue_id=100)
+
+        assert isinstance(result, dict)
+        assert "error" in result
 
 
 @pytest.mark.unit

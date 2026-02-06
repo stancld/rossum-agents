@@ -26,7 +26,7 @@
 
 | Capability | Description |
 |------------|-------------|
-| **Rossum MCP Integration** | Full access to 50 MCP tools for document processing |
+| **Rossum MCP Integration** | Full access to 61 MCP tools for document processing |
 | **Hook Debugging** | Sandboxed execution with Opus sub-agent analysis |
 | **Deployment Tools** | Pull, push, diff, copy configs across environments |
 | **Knowledge Base Search** | AI-powered Rossum documentation search |
@@ -114,7 +114,7 @@ asyncio.run(main())
 
 ## Available Tools
 
-The agent provides internal tools and access to 50+ MCP tools via dynamic loading.
+The agent provides internal tools and access to 61 MCP tools via dynamic loading.
 
 <details>
 <summary><strong>Internal Tools</strong></summary>
@@ -122,6 +122,14 @@ The agent provides internal tools and access to 50+ MCP tools via dynamic loadin
 **File & Knowledge:**
 - `write_file` - Save reports, documentation, analysis results
 - `search_knowledge_base` - Search Rossum docs with AI analysis
+
+**API Reference:**
+- `elis_openapi_jq` - Query Rossum API OpenAPI spec with jq
+- `elis_openapi_grep` - Free-text search in API spec
+- `search_elis_docs` - AI-powered search of API documentation
+
+**Formula:**
+- `suggest_formula_field` - Suggest formula field expressions via Rossum Local Copilot
 
 **Hook Analysis:**
 - `evaluate_python_hook` - Execute hooks in sandboxed environment
@@ -194,7 +202,7 @@ flowchart TB
     end
 
     subgraph MCP["Rossum MCP Server"]
-        Tools[50 MCP Tools]
+        Tools[61 MCP Tools]
     end
 
     API[Rossum API]

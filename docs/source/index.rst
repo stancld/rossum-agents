@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **59 tools** organized into ten categories:
+The MCP server provides **61 tools** organized into ten categories:
 
 **Document Processing**
 
@@ -139,6 +139,8 @@ The ``rossum_deploy`` package provides configuration deployment:
 
 The ``rossum_agent`` package provides additional capabilities:
 
+* Formula field suggestions via Rossum Local Copilot integration
+* Elis API OpenAPI search via jq queries and free-text grep with sub-agent analysis
 * Knowledge Base search for Rossum documentation with Opus-powered analysis
 * Hook debugging tools with sandboxed code execution and Opus sub-agent analysis
 * Deployment tools for pull/push/diff of Rossum configurations across environments

@@ -146,3 +146,9 @@ include = ["**/redis_storage.py"]
 not-iterable = "ignore"
 invalid-argument-type = "ignore"
 possibly-missing-attribute = "ignore"
+
+# jq is a C extension without type stubs
+[[tool.ty.overrides]]
+include = ["**/elis_backend_openapi_search.py"]
+[tool.ty.overrides.rules]
+unresolved-import = "ignore"

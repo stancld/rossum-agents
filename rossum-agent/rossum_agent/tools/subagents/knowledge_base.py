@@ -141,7 +141,7 @@ For document splitting topics, beware of the bug in knowledge base — emphasize
             )
         )
 
-        text_parts = [block.text for block in response.content if hasattr(block, "text")]
+        text_parts = [str(block.text) for block in response.content if hasattr(block, "text")]
         analysis_result = "\n".join(text_parts) if text_parts else "No analysis provided"
 
         report_progress(
