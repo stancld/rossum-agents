@@ -23,6 +23,7 @@
 
 - **rossum-mcp**: Single-file MCP server (`server.py`), `RossumMCPServer` class, 56 tools
 - **rossum-agent**: AI agent with prompts in `rossum_agent/prompts/`, skills in `rossum_agent/skills/`
+- **rossum-agent-tui**: Development test-bed TUI for rossum-agent. Not production code — no tests required.
 - Sync API client wrapped in async executors for MCP compatibility
 - **New skills**: Add to `rossum_agent/prompts/base_prompt.py` ROSSUM_EXPERT_INTRO section
 
@@ -90,6 +91,8 @@ Include: tool name, description, parameters with types, return format with JSON 
 | Modified logic | Update + add tests |
 
 Structure: `tests/` mirrors source, pytest fixtures in `conftest.py`, imports at file top.
+
+**Exception**: `rossum-agent-tui` — dev-only test-bed, tests not required.
 
 ## SSE Streaming Contract (rossum-agent → rossum-agent-tui)
 

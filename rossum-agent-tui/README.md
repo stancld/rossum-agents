@@ -47,6 +47,18 @@ fabry --mcp-mode read-write
 
 Expandable items: thinking steps, tool calls, and intermediate content (instructions).
 
+## Task Tracking
+
+When the agent uses task tracking for multi-step operations, a task list appears inline showing progress:
+
+| Badge | Status |
+|-------|--------|
+| `✓` (green) | Completed |
+| Spinner | In progress |
+| `○` (dimmed) | Pending |
+
+Tasks update in real-time as the agent works through each step.
+
 ## Session Persistence
 
 Chat state is persisted to `~/.rossum-agent-tui/history.json`. On restart, the TUI restores the previous session (chat history, completed steps, tasks).
