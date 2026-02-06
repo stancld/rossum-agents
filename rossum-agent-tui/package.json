@@ -1,0 +1,30 @@
+{
+  "name": "rossum-agent-tui",
+  "version": "0.1.0",
+  "description": "Terminal UI for Rossum Agent API",
+  "type": "module",
+  "bin": {
+    "fabry": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write 'src/**/*.{ts,tsx}'",
+    "format:check": "prettier --check 'src/**/*.{ts,tsx}'"
+  },
+  "dependencies": {
+    "@inkjs/ui": "^2.0.0",
+    "eventsource-parser": "^3.0.0",
+    "ink": "^5.1.0",
+    "meow": "^13.0.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.1",
+    "@types/react": "^18.3.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.7.0"
+  }
+}

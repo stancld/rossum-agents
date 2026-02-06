@@ -158,6 +158,7 @@ class StepEvent(BaseModel):
     is_error: bool = False
     is_streaming: bool = False
     is_final: bool = False
+    tool_call_id: str | None = None
 
 
 class SubAgentProgressEvent(BaseModel):
