@@ -70,7 +70,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url=None,
         prompt="Hey, what can you do?",
         tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=5500, max_total_tokens=7000),
+        token_budget=TokenBudget(min_total_tokens=6000, max_total_tokens=7000),
         success_criteria=SuccessCriteria(
             required_keywords=["hook", "queue", "debug"],  # Simplified keywords for streamlined prompt
             max_steps=1,
@@ -118,11 +118,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=65000, max_total_tokens=95000),
+        token_budget=TokenBudget(min_total_tokens=80000, max_total_tokens=110000),
         success_criteria=SuccessCriteria(
             require_subagent=True,
             required_keywords=[],
-            max_steps=4,
+            max_steps=5,
             file_expectation=FileExpectation(expected_files=["roast.md"]),
             custom_checks=[HIDDEN_MULTIVALUE_CHECK],
         ),

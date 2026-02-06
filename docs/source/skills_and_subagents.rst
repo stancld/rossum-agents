@@ -322,7 +322,7 @@ Sub-Agent Architecture
 
 All sub-agents share common patterns:
 
-- **Model**: Claude Opus 4.5 via AWS Bedrock
+- **Model**: Claude Opus 4.6 via AWS Bedrock
 - **Iteration limit**: 5-10 iterations depending on task complexity
 - **Tool access**: MCP tools via helper functions
 - **Progress reporting**: Real-time progress updates via callback system

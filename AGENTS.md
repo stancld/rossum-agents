@@ -28,7 +28,7 @@
 
 ## Prompt Engineering (rossum-agent)
 
-**rossum-agent uses Opus 4.5** - optimize prompts in `rossum_agent/prompts/` and `rossum_agent/skills/` accordingly:
+**rossum-agent uses Opus 4.6** - optimize prompts in `rossum_agent/prompts/` and `rossum_agent/skills/` accordingly:
 
 | Principle | Implementation |
 |-----------|----------------|

@@ -1,6 +1,6 @@
 """Shared prompt content for the Rossum Agent.
 
-Optimized for Opus 4.5: Goals + constraints, not procedures.
+Optimized for Opus 4.6: Goals + constraints, not procedures.
 """
 
 from __future__ import annotations
