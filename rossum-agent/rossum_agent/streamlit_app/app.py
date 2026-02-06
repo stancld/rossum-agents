@@ -33,7 +33,6 @@ from rossum_agent.streamlit_app.render_modules import (
 from rossum_agent.streamlit_app.response_formatting import ChatResponse, parse_and_format_final_answer
 from rossum_agent.tools import set_mcp_connection, set_output_dir
 from rossum_agent.url_context import RossumUrlContext, extract_url_context, format_context_for_prompt
-from rossum_agent.user_detection import get_user_from_jwt, normalize_user_id
 from rossum_agent.utils import (
     cleanup_session_output_dir,
     create_session_output_dir,
@@ -118,14 +117,8 @@ async def run_agent_turn(
 
 def _initialize_user_and_storage() -> None:
     """Initialize user ID and Redis storage in session state."""
-    jwt_enabled = bool(os.getenv("TELEPORT_JWT_JWKS_URL"))
-    st.session_state.user_isolation_enabled = jwt_enabled
-
     if "user_id" not in st.session_state:
-        headers = dict(st.context.headers) if hasattr(st.context, "headers") else None
-        jwt_token = headers.get("Teleport-Jwt-Assertion") if headers else None
-        user_id = get_user_from_jwt(jwt_token)
-        st.session_state.user_id = normalize_user_id(user_id)
+        st.session_state.user_id = "default"
 
     if "redis_storage" not in st.session_state:
         st.session_state.redis_storage = RedisStorage()
@@ -205,14 +198,9 @@ def _load_messages_from_redis() -> None:
 
     shared_user_id = st.session_state.get("shared_user_id")
     if shared_user_id:
-        user_id = shared_user_id if st.session_state.user_isolation_enabled else None
         logger.info(f"Loading shared conversation from user: {shared_user_id}")
-    else:
-        user_id = st.session_state.user_id if st.session_state.user_isolation_enabled else None
 
-    chat_data = st.session_state.redis_storage.load_chat(
-        user_id, st.session_state.chat_id, st.session_state.output_dir
-    )
+    chat_data = st.session_state.redis_storage.load_chat(None, st.session_state.chat_id, st.session_state.output_dir)
     if chat_data:
         st.session_state.messages = chat_data.messages
         logger.info(f"Loaded {len(chat_data.messages)} messages from Redis for chat {st.session_state.chat_id}")
@@ -368,8 +356,7 @@ def _render_sidebar() -> dict[str, float]:
         _render_quick_actions()
         generated_files_metadata = _render_generated_files()
 
-        user_id = st.session_state.user_id if st.session_state.user_isolation_enabled else None
-        render_chat_history(st.session_state.redis_storage, st.session_state.chat_id, user_id)
+        render_chat_history(st.session_state.redis_storage, st.session_state.chat_id, None)
 
         st.sidebar.divider()
         st.sidebar.caption(f"User ID: {st.session_state.user_id}")
@@ -502,9 +489,8 @@ def _process_user_input(generated_files_metadata: dict[str, float]) -> None:
     st.session_state.messages.append({"role": "user", "content": display_content})
 
     if st.session_state.redis_storage.is_connected():
-        user_id = st.session_state.user_id if st.session_state.user_isolation_enabled else None
         st.session_state.redis_storage.save_chat(
-            user_id, st.session_state.chat_id, st.session_state.messages, str(st.session_state.output_dir)
+            None, st.session_state.chat_id, st.session_state.messages, str(st.session_state.output_dir)
         )
 
     with st.chat_message("user"):
@@ -601,7 +587,6 @@ def _save_response_to_redis(chat_response: ChatResponse) -> None:
     if not st.session_state.redis_storage.is_connected():
         return
 
-    user_id = st.session_state.get("user_id") if st.session_state.get("user_isolation_enabled", False) else None
     metadata = ChatMetadata(
         commit_sha=get_commit_sha(),
         total_input_tokens=chat_response.total_input_tokens,
@@ -610,7 +595,7 @@ def _save_response_to_redis(chat_response: ChatResponse) -> None:
         total_steps=chat_response.total_steps,
     )
     st.session_state.redis_storage.save_chat(
-        user_id,
+        None,
         st.session_state.chat_id,
         st.session_state.messages,
         str(st.session_state.output_dir),

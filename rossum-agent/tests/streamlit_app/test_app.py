@@ -262,34 +262,23 @@ class TestInitializeUserAndStorage:
         """Set up mock dependencies."""
         with (
             patch("rossum_agent.streamlit_app.app.RedisStorage") as mock_redis,
-            patch("rossum_agent.streamlit_app.app.get_user_from_jwt") as mock_detect,
-            patch("rossum_agent.streamlit_app.app.normalize_user_id") as mock_norm,
             patch.dict("os.environ", {}, clear=True),
         ):
             mock_redis_instance = MagicMock()
             mock_redis.return_value = mock_redis_instance
-            mock_detect.return_value = "test-user"
-            mock_norm.return_value = "test-user"
-            yield {"st": mock_streamlit, "redis": mock_redis, "detect": mock_detect, "norm": mock_norm}
+            yield {"st": mock_streamlit, "redis": mock_redis}
 
     def test_initializes_user_id(self, mock_deps):
         """Test user ID is initialized."""
         _initialize_user_and_storage()
 
-        assert mock_deps["st"].session_state["user_id"] == "test-user"
+        assert mock_deps["st"].session_state["user_id"] == "default"
 
     def test_initializes_redis_storage(self, mock_deps):
         """Test Redis storage is initialized."""
         _initialize_user_and_storage()
 
         assert "redis_storage" in mock_deps["st"].session_state
-
-    def test_enables_user_isolation_with_jwt_url(self, mock_deps):
-        """Test user isolation is enabled when JWT URL is set."""
-        with patch.dict("os.environ", {"TELEPORT_JWT_JWKS_URL": "https://example.com"}):
-            _initialize_user_and_storage()
-
-        assert mock_deps["st"].session_state["user_isolation_enabled"] is True
 
 
 class TestInitializeChatId:
@@ -493,28 +482,6 @@ class TestSaveResponseToRedis:
         mock_deps["st"].session_state["chat_id"] = "test-chat"
         mock_deps["st"].session_state["messages"] = []
         mock_deps["st"].session_state["output_dir"] = tempfile.gettempdir()
-        mock_deps["st"].session_state["user_isolation_enabled"] = False
-
-        chat_response = MagicMock()
-        chat_response.total_input_tokens = 100
-        chat_response.total_output_tokens = 50
-        chat_response.total_tool_calls = 2
-        chat_response.total_steps = 3
-
-        _save_response_to_redis(chat_response)
-
-        mock_redis.save_chat.assert_called_once()
-
-    def test_saves_with_user_isolation_enabled(self, mock_deps):
-        """Test response is saved with user ID when isolation is enabled."""
-        mock_redis = MagicMock()
-        mock_redis.is_connected.return_value = True
-        mock_deps["st"].session_state["redis_storage"] = mock_redis
-        mock_deps["st"].session_state["chat_id"] = "test-chat"
-        mock_deps["st"].session_state["messages"] = []
-        mock_deps["st"].session_state["output_dir"] = tempfile.gettempdir()
-        mock_deps["st"].session_state["user_isolation_enabled"] = True
-        mock_deps["st"].session_state["user_id"] = "test-user"
 
         chat_response = MagicMock()
         chat_response.total_input_tokens = 100
@@ -537,8 +504,8 @@ class TestLoadMessagesFromRedisWithSharedUser:
             mock_st.session_state = MockSessionState()
             yield mock_st
 
-    def test_loads_from_shared_user_when_isolation_enabled(self, mock_streamlit):
-        """Test loading messages from shared user when isolation is enabled."""
+    def test_loads_from_shared_user(self, mock_streamlit):
+        """Test loading messages from shared user."""
         mock_redis = MagicMock()
         mock_redis.is_connected.return_value = True
         chat_data = MagicMock()
@@ -548,7 +515,6 @@ class TestLoadMessagesFromRedisWithSharedUser:
         mock_streamlit.session_state["redis_storage"] = mock_redis
         mock_streamlit.session_state["chat_id"] = "shared-chat"
         mock_streamlit.session_state["output_dir"] = Path(tempfile.gettempdir())
-        mock_streamlit.session_state["user_isolation_enabled"] = True
         mock_streamlit.session_state["user_id"] = "current-user"
         mock_streamlit.session_state["shared_user_id"] = "original-owner"
 
@@ -566,7 +532,6 @@ class TestLoadMessagesFromRedisWithSharedUser:
         mock_streamlit.session_state["redis_storage"] = mock_redis
         mock_streamlit.session_state["chat_id"] = "own-chat"
         mock_streamlit.session_state["output_dir"] = Path(tempfile.gettempdir())
-        mock_streamlit.session_state["user_isolation_enabled"] = True
         mock_streamlit.session_state["user_id"] = "current-user"
 
         _load_messages_from_redis()
@@ -674,8 +639,6 @@ class TestMainFunction:
             patch("rossum_agent.streamlit_app.app.get_generated_files") as mock_get_files,
             patch("rossum_agent.streamlit_app.app.get_generated_files_with_metadata") as mock_get_meta,
             patch("rossum_agent.streamlit_app.app.render_chat_history"),
-            patch("rossum_agent.streamlit_app.app.get_user_from_jwt") as mock_detect_user,
-            patch("rossum_agent.streamlit_app.app.normalize_user_id") as mock_norm_user,
             patch.dict("os.environ", {}, clear=True),
         ):
             mock_redis_instance = MagicMock()
@@ -687,8 +650,6 @@ class TestMainFunction:
             mock_create_dir.return_value = str(Path(tempfile.gettempdir()) / "test_output")
             mock_get_files.return_value = []
             mock_get_meta.return_value = {}
-            mock_detect_user.return_value = "test-user"
-            mock_norm_user.return_value = "test-user"
 
             yield {
                 "redis": mock_redis,
@@ -696,8 +657,6 @@ class TestMainFunction:
                 "generate_chat_id": mock_gen_chat,
                 "create_session_output_dir": mock_create_dir,
                 "st": mock_streamlit,
-                "get_user_from_jwt": mock_detect_user,
-                "normalize_user_id": mock_norm_user,
             }
 
     def test_main_initializes_session_state(self, mock_dependencies):
@@ -721,30 +680,6 @@ class TestMainFunction:
 
         assert st.session_state["chat_id"] == "chat-test-123"
         assert st.query_params["chat_id"] == "chat-test-123"
-
-    def test_main_detects_user_from_jwt(self, mock_dependencies):
-        """Test that main detects user ID from JWT headers."""
-        st = mock_dependencies["st"]
-        st.context.headers = {"Teleport-Jwt-Assertion": "jwt-token-here"}
-
-        main()
-
-        mock_dependencies["get_user_from_jwt"].assert_called_once_with("jwt-token-here")
-
-    def test_main_enables_user_isolation_with_jwt_config(self, mock_dependencies):
-        """Test that user isolation is enabled when JWT config is present."""
-        with patch.dict("os.environ", {"TELEPORT_JWT_JWKS_URL": "https://example.com/jwks"}):
-            st = mock_dependencies["st"]
-            main()
-
-            assert st.session_state["user_isolation_enabled"] is True
-
-    def test_main_disables_user_isolation_without_jwt_config(self, mock_dependencies):
-        """Test that user isolation is disabled when JWT config is absent."""
-        st = mock_dependencies["st"]
-        main()
-
-        assert st.session_state["user_isolation_enabled"] is False
 
     def test_main_shows_credentials_warning_when_not_saved(self, mock_dependencies):
         """Test that credentials warning is shown when not saved."""
