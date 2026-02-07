@@ -40,6 +40,8 @@ class SubAgentTokenUsage:
     input_tokens: int
     output_tokens: int
     iteration: int | None = None
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
 
 
 @dataclass

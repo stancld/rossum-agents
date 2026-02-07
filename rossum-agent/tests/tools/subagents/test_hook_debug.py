@@ -6,7 +6,6 @@ import json
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
 from rossum_agent.tools.subagents.base import SubAgentResult
 from rossum_agent.tools.subagents.hook_debug import (
     _ALLOWED_BUILTIN_NAMES,
@@ -17,17 +16,13 @@ from rossum_agent.tools.subagents.hook_debug import (
     _HOOK_DEBUG_SYSTEM_PROMPT,
     _OPUS_TOOLS,
     _SEARCH_KNOWLEDGE_BASE_TOOL,
-    _WEB_SEARCH_NO_RESULTS,
     _call_opus_for_debug,
     _execute_opus_tool,
-    _extract_and_analyze_web_search_results,
-    _extract_web_search_text_from_block,
     _make_evaluate_response,
     _strip_imports,
     debug_hook,
     evaluate_python_hook,
 )
-from rossum_agent.tools.subagents.knowledge_base import WebSearchError
 
 
 class TestConstants:
@@ -364,7 +359,6 @@ class TestCallOpusForDebug:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = _call_opus_for_debug("hook123", "ann456", None)
 
@@ -390,7 +384,6 @@ class TestCallOpusForDebug:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = _call_opus_for_debug("h1", "a1", None)
 
@@ -427,11 +420,7 @@ class TestCallOpusForDebug:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
             patch("rossum_agent.tools.subagents.hook_debug._execute_opus_tool", return_value='{"id": "123"}'),
-            patch(
-                "rossum_agent.tools.subagents.hook_debug._extract_and_analyze_web_search_results", return_value=None
-            ),
         ):
             result = _call_opus_for_debug("h1", "a1", None)
 
@@ -471,12 +460,8 @@ class TestCallOpusForDebug:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
             patch(
                 "rossum_agent.tools.subagents.hook_debug._execute_opus_tool", side_effect=RuntimeError("Tool failed")
-            ),
-            patch(
-                "rossum_agent.tools.subagents.hook_debug._extract_and_analyze_web_search_results", return_value=None
             ),
         ):
             result = _call_opus_for_debug("h1", "a1", None)
@@ -510,7 +495,6 @@ class TestCallOpusForDebug:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = _call_opus_for_debug("h1", "a1", None)
 
@@ -533,14 +517,18 @@ class TestCallOpusForDebug:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             _call_opus_for_debug("h1", "a1", "schema999")
 
             call_args = mock_client.messages.create.call_args
             messages = call_args.kwargs["messages"]
             user_content = messages[0]["content"]
-            assert "schema999" in user_content
+            # Content may be a string or list of dicts (after cache breakpoint conversion)
+            if isinstance(user_content, list):
+                user_text = " ".join(block["text"] for block in user_content if "text" in block)
+            else:
+                user_text = user_content
+            assert "schema999" in user_text
 
     def test_handles_evaluate_python_hook_result_logging(self):
         """Test logs evaluate_python_hook results properly."""
@@ -575,11 +563,7 @@ class TestCallOpusForDebug:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
             patch("rossum_agent.tools.subagents.hook_debug._execute_opus_tool", return_value=eval_result),
-            patch(
-                "rossum_agent.tools.subagents.hook_debug._extract_and_analyze_web_search_results", return_value=None
-            ),
         ):
             result = _call_opus_for_debug("h1", "a1", None)
 
@@ -885,167 +869,3 @@ class TestDebugHook:
 
         assert "error" in parsed
         assert "annotation_id" in parsed["error"]
-
-
-class TestExtractWebSearchTextFromBlock:
-    """Test _extract_web_search_text_from_block function."""
-
-    def test_non_web_search_block_returns_none(self):
-        """Test that non-web_search_tool_result block returns None."""
-        block = MagicMock()
-        block.type = "text"
-
-        result = _extract_web_search_text_from_block(block)
-
-        assert result is None
-
-    def test_block_without_type_returns_none(self):
-        """Test that block without type attribute returns None."""
-        block = MagicMock(spec=[])
-
-        result = _extract_web_search_text_from_block(block)
-
-        assert result is None
-
-    def test_web_search_result_error_raises_web_search_error(self):
-        """Test that web_search_result_error raises WebSearchError."""
-        error_result = MagicMock()
-        error_result.type = "web_search_result_error"
-        error_result.error_code = "rate_limited"
-        error_result.message = "Too many requests"
-
-        block = MagicMock()
-        block.type = "web_search_tool_result"
-        block.content = [error_result]
-
-        with pytest.raises(WebSearchError, match="rate_limited - Too many requests"):
-            _extract_web_search_text_from_block(block)
-
-    def test_empty_results_returns_no_results_marker(self):
-        """Test that empty results returns _WEB_SEARCH_NO_RESULTS."""
-        block = MagicMock()
-        block.type = "web_search_tool_result"
-        block.content = []
-
-        result = _extract_web_search_text_from_block(block)
-
-        assert result == _WEB_SEARCH_NO_RESULTS
-
-    def test_valid_results_returns_formatted_text(self):
-        """Test that valid results return formatted text."""
-        search_result = MagicMock()
-        search_result.type = "web_search_result"
-        search_result.title = "Rossum Hooks Guide"
-        search_result.url = "https://knowledge-base.rossum.ai/docs/hooks"
-        search_result.page_content = "This is the hook documentation content."
-
-        block = MagicMock()
-        block.type = "web_search_tool_result"
-        block.content = [search_result]
-
-        result = _extract_web_search_text_from_block(block)
-
-        assert "## Rossum Hooks Guide" in result
-        assert "URL: https://knowledge-base.rossum.ai/docs/hooks" in result
-        assert "This is the hook documentation content." in result
-
-    def test_multiple_results_are_joined(self):
-        """Test that multiple results are joined with separator."""
-        result1 = MagicMock()
-        result1.type = "web_search_result"
-        result1.title = "Page 1"
-        result1.url = "https://example.com/1"
-        result1.page_content = "Content 1"
-
-        result2 = MagicMock()
-        result2.type = "web_search_result"
-        result2.title = "Page 2"
-        result2.url = "https://example.com/2"
-        result2.page_content = "Content 2"
-
-        block = MagicMock()
-        block.type = "web_search_tool_result"
-        block.content = [result1, result2]
-
-        result = _extract_web_search_text_from_block(block)
-
-        assert "## Page 1" in result
-        assert "## Page 2" in result
-        assert "\n---\n" in result
-
-
-class TestExtractAndAnalyzeWebSearchResults:
-    """Test _extract_and_analyze_web_search_results function."""
-
-    def test_non_web_search_block_returns_none(self):
-        """Test that non-web_search block returns None."""
-        block = MagicMock()
-        block.type = "text"
-
-        result = _extract_and_analyze_web_search_results(block, iteration=1, max_iterations=5)
-
-        assert result is None
-
-    def test_no_results_returns_appropriate_dict(self):
-        """Test that no results returns appropriate tool_result dict."""
-        block = MagicMock()
-        block.type = "web_search_tool_result"
-        block.id = "tool_use_123"
-        block.content = []
-
-        result = _extract_and_analyze_web_search_results(block, iteration=1, max_iterations=5)
-
-        assert result is not None
-        assert result["type"] == "tool_result"
-        assert result["tool_use_id"] == "tool_use_123"
-        assert "no results" in result["content"]
-
-    def test_results_with_opus_analysis(self):
-        """Test results are analyzed with Opus."""
-        search_result = MagicMock()
-        search_result.type = "web_search_result"
-        search_result.title = "Test Page"
-        search_result.url = "https://example.com"
-        search_result.page_content = "Test content"
-
-        block = MagicMock()
-        block.type = "web_search_tool_result"
-        block.id = "tool_use_456"
-        block.search_query = "test query"
-        block.content = [search_result]
-
-        with patch(
-            "rossum_agent.tools.subagents.hook_debug._call_opus_for_web_search_analysis",
-            return_value="Opus analyzed this content",
-        ) as mock_opus:
-            result = _extract_and_analyze_web_search_results(block, iteration=2, max_iterations=10)
-
-            assert result is not None
-            assert result["type"] == "tool_result"
-            assert result["tool_use_id"] == "tool_use_456"
-            assert "Analyzed Rossum Knowledge Base" in result["content"]
-            assert "Opus analyzed this content" in result["content"]
-            mock_opus.assert_called_once_with("test query", "## Test Page\nURL: https://example.com\n\nTest content\n")
-
-    def test_uses_default_query_when_search_query_missing(self):
-        """Test that default query is used when block.search_query is missing."""
-        search_result = MagicMock()
-        search_result.type = "web_search_result"
-        search_result.title = "Page"
-        search_result.url = "https://example.com"
-        search_result.page_content = "Content"
-
-        block = MagicMock()
-        block.type = "web_search_tool_result"
-        block.id = "tool_id"
-        block.content = [search_result]
-        del block.search_query
-
-        with patch(
-            "rossum_agent.tools.subagents.hook_debug._call_opus_for_web_search_analysis",
-            return_value="Analysis",
-        ) as mock_opus:
-            _extract_and_analyze_web_search_results(block, iteration=1, max_iterations=5)
-
-            mock_opus.assert_called_once()
-            assert mock_opus.call_args[0][0] == "Rossum documentation"

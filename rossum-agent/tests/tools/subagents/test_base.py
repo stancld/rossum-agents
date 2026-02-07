@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock, patch
 
 from rossum_agent.tools.subagents.base import (
     SubAgent,
     SubAgentConfig,
     SubAgentResult,
-    save_iteration_context,
 )
 
 
@@ -89,59 +87,6 @@ class TestSubAgentResult:
         assert result.tool_calls == calls
 
 
-class TestSaveIterationContext:
-    """Test save_iteration_context function."""
-
-    def test_saves_context_file(self, tmp_path):
-        """Test that context file is saved with expected structure."""
-        messages = [{"role": "user", "content": "test"}]
-        tools = [{"name": "tool1"}]
-
-        with patch("rossum_agent.tools.subagents.base.get_output_dir", return_value=tmp_path):
-            save_iteration_context(
-                tool_name="test_tool",
-                iteration=1,
-                max_iterations=5,
-                messages=messages,
-                system_prompt="Test prompt",
-                tools=tools,
-                max_tokens=4096,
-            )
-
-        context_file = tmp_path / "test_tool_context_iter_1.json"
-        assert context_file.exists()
-
-        context_data = json.loads(context_file.read_text())
-        assert context_data["iteration"] == 1
-        assert context_data["max_iterations"] == 5
-        assert context_data["messages"] == messages
-        assert context_data["system_prompt"] == "Test prompt"
-        assert context_data["tools"] == tools
-        assert context_data["max_tokens"] == 4096
-
-    def test_logs_warning_on_failure(self):
-        """Test that warning is logged when save fails."""
-        with (
-            patch(
-                "rossum_agent.tools.subagents.base.get_output_dir",
-                side_effect=Exception("Test error"),
-            ),
-            patch("rossum_agent.tools.subagents.base.logger") as mock_logger,
-        ):
-            save_iteration_context(
-                tool_name="test",
-                iteration=1,
-                max_iterations=5,
-                messages=[],
-                system_prompt="",
-                tools=[],
-                max_tokens=4096,
-            )
-
-            mock_logger.warning.assert_called_once()
-            assert "Failed to save test context" in mock_logger.warning.call_args[0][0]
-
-
 class ConcreteSubAgent(SubAgent):
     """Concrete implementation for testing."""
 
@@ -207,6 +152,8 @@ class TestSubAgent:
         mock_response.stop_reason = "end_of_turn"
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 0
+        mock_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
@@ -218,7 +165,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = agent.run("Test message")
 
@@ -269,7 +215,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = agent.run("Test message")
 
@@ -299,6 +244,8 @@ class TestSubAgent:
         mock_response.stop_reason = "end_of_turn"
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 0
+        mock_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
@@ -310,7 +257,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = agent.run("Test message")
 
@@ -335,6 +281,8 @@ class TestSubAgent:
         mock_response.stop_reason = "end_of_turn"
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 0
+        mock_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
@@ -349,7 +297,6 @@ class TestSubAgent:
                 "rossum_agent.tools.subagents.base.report_token_usage",
                 side_effect=capture_tokens,
             ),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             agent.run("Test")
 
@@ -408,7 +355,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = agent.run("Test")
 
@@ -455,6 +401,8 @@ class TestSubAgent:
         mock_response.stop_reason = "tool_use"
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 0
+        mock_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
@@ -466,7 +414,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
             patch("rossum_agent.tools.subagents.base.logger") as mock_logger,
         ):
             result = agent.run("Test")
@@ -498,6 +445,8 @@ class TestSubAgent:
         mock_response.stop_reason = "tool_use"
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 0
+        mock_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
@@ -509,7 +458,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
             patch("rossum_agent.tools.subagents.base.logger"),
         ):
             result = agent.run("Test")
@@ -532,3 +480,82 @@ class TestSubAgent:
         result = agent.process_response_block(block, 1, 5)
 
         assert result is None
+
+    def test_run_sends_system_with_cache_control(self):
+        """Test that run sends system prompt as list with cache_control."""
+        config = SubAgentConfig(
+            tool_name="test",
+            system_prompt="Test system prompt",
+            tools=[{"name": "tool1", "description": "t1", "input_schema": {}}],
+        )
+        agent = ConcreteSubAgent(config)
+
+        mock_text_block = MagicMock()
+        mock_text_block.text = "Done"
+        mock_text_block.type = "text"
+
+        mock_response = MagicMock()
+        mock_response.content = [mock_text_block]
+        mock_response.stop_reason = "end_of_turn"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 80
+        mock_response.usage.cache_read_input_tokens = 0
+
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_response
+
+        with (
+            patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage"),
+        ):
+            agent.run("Test message")
+
+            call_kwargs = mock_client.messages.create.call_args[1]
+
+            # System should be a list with cache_control
+            assert isinstance(call_kwargs["system"], list)
+            assert call_kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}
+
+            # Last tool should have cache_control
+            tools = call_kwargs["tools"]
+            assert tools[-1]["cache_control"] == {"type": "ephemeral"}
+
+    def test_run_reports_cache_tokens(self):
+        """Test that cache token metrics are reported via callback."""
+        config = SubAgentConfig(
+            tool_name="test",
+            system_prompt="prompt",
+            tools=[],
+        )
+        agent = ConcreteSubAgent(config)
+
+        token_reports = []
+
+        def capture_tokens(usage):
+            token_reports.append(usage)
+
+        mock_response = MagicMock()
+        mock_response.content = []
+        mock_response.stop_reason = "end_of_turn"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 30
+        mock_response.usage.cache_read_input_tokens = 60
+
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_response
+
+        with (
+            patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage", side_effect=capture_tokens),
+        ):
+            agent.run("Test")
+
+            assert len(token_reports) == 1
+            assert token_reports[0].cache_creation_input_tokens == 30
+            assert token_reports[0].cache_read_input_tokens == 60
+
+    # Unit tests for add_message_cache_breakpoint are in tests/agent/test_core.py::TestCacheBreakpoints

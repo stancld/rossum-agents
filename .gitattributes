@@ -1,0 +1,1 @@
+rossum-agent/data/*.json filter=lfs diff=lfs merge=lfs -text

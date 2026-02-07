@@ -132,6 +132,33 @@ def is_valid_chat_id(chat_id: str) -> bool:
     return True
 
 
+def add_message_cache_breakpoint(messages: list[dict[str, Any]]) -> None:
+    """Add cache_control to the last content block of the last message.
+
+    Mutates messages in-place. Removes any previous message-level
+    cache_control breakpoints first to stay within Anthropic's
+    4-breakpoint limit.
+    """
+    if not messages:
+        return
+    # Remove previous message-level cache_control breakpoints
+    for msg in messages:
+        content = msg.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict):
+                    block.pop("cache_control", None)
+    # Add breakpoint to last message
+    last_msg = messages[-1]
+    content = last_msg.get("content")
+    if isinstance(content, list) and content:
+        last_block = content[-1]
+        if isinstance(last_block, dict):
+            last_block["cache_control"] = {"type": "ephemeral"}
+    elif isinstance(content, str) and content:
+        last_msg["content"] = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
+
+
 def get_display_tool_name(tool_call_name: str, tool_arguments: dict[str, Any] | None = None) -> str:
     """Get display name for a tool, expanding call_on_connection to show the actual MCP tool.
 

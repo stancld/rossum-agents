@@ -97,6 +97,7 @@ from rossum_agent.tools import (
     set_progress_callback,
     set_token_callback,
 )
+from rossum_agent.utils import add_message_cache_breakpoint
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator
@@ -241,6 +242,14 @@ class RossumAgent:
         self._sub_agent_input_tokens: int = 0
         self._sub_agent_output_tokens: int = 0
         self._sub_agent_usage: dict[str, tuple[int, int]] = {}  # tool_name -> (input, output)
+        # Cache token tracking
+        self._total_cache_creation_tokens: int = 0
+        self._total_cache_read_tokens: int = 0
+        self._main_agent_cache_creation_tokens: int = 0
+        self._main_agent_cache_read_tokens: int = 0
+        self._sub_agent_cache_creation_tokens: int = 0
+        self._sub_agent_cache_read_tokens: int = 0
+        self._sub_agent_cache_usage: dict[str, tuple[int, int]] = {}  # tool_name -> (creation, read)
 
     @property
     def messages(self) -> list[MessageParam]:
@@ -257,6 +266,13 @@ class RossumAgent:
         self._sub_agent_input_tokens = 0
         self._sub_agent_output_tokens = 0
         self._sub_agent_usage = {}
+        self._total_cache_creation_tokens = 0
+        self._total_cache_read_tokens = 0
+        self._main_agent_cache_creation_tokens = 0
+        self._main_agent_cache_read_tokens = 0
+        self._sub_agent_cache_creation_tokens = 0
+        self._sub_agent_cache_read_tokens = 0
+        self._sub_agent_cache_usage = {}
         reset_dynamic_tools()
 
     def _accumulate_sub_agent_tokens(self, usage: SubAgentTokenUsage) -> None:
@@ -268,6 +284,16 @@ class RossumAgent:
         # Track per sub-agent
         prev_in, prev_out = self._sub_agent_usage.get(usage.tool_name, (0, 0))
         self._sub_agent_usage[usage.tool_name] = (prev_in + usage.input_tokens, prev_out + usage.output_tokens)
+        # Cache tokens
+        self._total_cache_creation_tokens += usage.cache_creation_input_tokens
+        self._total_cache_read_tokens += usage.cache_read_input_tokens
+        self._sub_agent_cache_creation_tokens += usage.cache_creation_input_tokens
+        self._sub_agent_cache_read_tokens += usage.cache_read_input_tokens
+        prev_cc, prev_cr = self._sub_agent_cache_usage.get(usage.tool_name, (0, 0))
+        self._sub_agent_cache_usage[usage.tool_name] = (
+            prev_cc + usage.cache_creation_input_tokens,
+            prev_cr + usage.cache_read_input_tokens,
+        )
         logger.info(
             f"Sub-agent '{usage.tool_name}' token usage (iter {usage.iteration}): "
             f"in={usage.input_tokens}, out={usage.output_tokens}, "
@@ -284,6 +310,11 @@ class RossumAgent:
             sub_input=self._sub_agent_input_tokens,
             sub_output=self._sub_agent_output_tokens,
             sub_by_tool=self._sub_agent_usage,
+            main_cache_creation=self._main_agent_cache_creation_tokens,
+            main_cache_read=self._main_agent_cache_read_tokens,
+            sub_cache_creation=self._sub_agent_cache_creation_tokens,
+            sub_cache_read=self._sub_agent_cache_read_tokens,
+            sub_cache_by_tool=self._sub_agent_cache_usage,
         )
 
     def log_token_usage_summary(self) -> None:
@@ -383,10 +414,24 @@ class RossumAgent:
             "type": "enabled",
             "budget_tokens": self.config.thinking_budget_tokens,
         }
+
+        # Cache breakpoints: system prompt
+        system: list[TextBlockParam] = [
+            {"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}
+        ]
+
+        # Cache breakpoints: last tool definition
+        if tools:
+            tools = [*tools]  # shallow copy
+            tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}  # type: ignore[assignment]  # runtime addition of cache_control
+
+        # Cache breakpoints: last message content block
+        add_message_cache_breakpoint(messages)  # type: ignore[arg-type]  # MessageParam is dict at runtime
+
         with self.client.messages.stream(
             model=model_id,
             max_tokens=self.config.max_output_tokens,
-            system=self.system_prompt,
+            system=system,
             messages=messages,
             tools=tools if tools else Omit(),
             thinking=thinking_config,
@@ -564,14 +609,22 @@ class RossumAgent:
             raise RuntimeError("Stream ended without final message")
 
         thinking_blocks = self._extract_thinking_blocks(state.final_message)
-        input_tokens = state.final_message.usage.input_tokens
+        raw_input_tokens = state.final_message.usage.input_tokens
         output_tokens = state.final_message.usage.output_tokens
+        cache_creation = getattr(state.final_message.usage, "cache_creation_input_tokens", 0) or 0
+        cache_read = getattr(state.final_message.usage, "cache_read_input_tokens", 0) or 0
+        input_tokens = raw_input_tokens + cache_creation + cache_read
         self._total_input_tokens += input_tokens
         self._total_output_tokens += output_tokens
         self._main_agent_input_tokens += input_tokens
         self._main_agent_output_tokens += output_tokens
+        self._total_cache_creation_tokens += cache_creation
+        self._total_cache_read_tokens += cache_read
+        self._main_agent_cache_creation_tokens += cache_creation
+        self._main_agent_cache_read_tokens += cache_read
         logger.info(
             f"Step {step_num}: input_tokens={input_tokens}, output_tokens={output_tokens}, "
+            f"cache_creation={cache_creation}, cache_read={cache_read}, "
             f"total_input={self._total_input_tokens}, total_output={self._total_output_tokens}"
         )
 
