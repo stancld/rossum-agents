@@ -45,7 +45,7 @@ def check_knowledge_base_hidden_multivalue_warning(
             except json.JSONDecodeError:
                 continue
 
-            analysis = result.get("analysis", "")
+            analysis = result.get("answer", "")
             if not analysis:
                 continue
 

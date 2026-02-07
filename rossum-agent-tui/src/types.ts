@@ -52,6 +52,7 @@ export type SubAgentStatus =
   | "thinking"
   | "searching"
   | "analyzing"
+  | "reasoning"
   | "running_tool"
   | "completed"
   | "running";

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -16,10 +15,10 @@ from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
 from rossum_agent.tools.core import (
     SubAgentProgress,
     SubAgentTokenUsage,
-    get_output_dir,
     report_progress,
     report_token_usage,
 )
+from rossum_agent.utils import add_message_cache_breakpoint
 
 logger = logging.getLogger(__name__)
 
@@ -46,32 +45,16 @@ class SubAgentResult:
     tool_calls: list[dict[str, Any]] | None = None
 
 
-def save_iteration_context(
-    tool_name: str,
-    iteration: int,
-    max_iterations: int,
-    messages: list[dict[str, Any]],
-    system_prompt: str,
-    tools: list[dict[str, Any]],
-    max_tokens: int,
-) -> None:
-    """Save agent input context to file for debugging."""
-    try:
-        output_dir = get_output_dir()
-        context_file = output_dir / f"{tool_name}_context_iter_{iteration}.json"
-        context_data = {
-            "iteration": iteration,
-            "max_iterations": max_iterations,
-            "model": get_model_id(),
-            "max_tokens": max_tokens,
-            "system_prompt": system_prompt,
-            "messages": messages,
-            "tools": tools,
-        }
-        context_file.write_text(json.dumps(context_data, indent=2, default=str))
-        logger.info(f"{tool_name} sub-agent: saved context to {context_file}")
-    except Exception as e:
-        logger.warning(f"Failed to save {tool_name} context: {e}")
+def _fmt_tool_call(name: str, inp: dict[str, Any]) -> str:
+    """Format a tool call as 'name(preview)' for progress display."""
+    if not isinstance(inp, dict):
+        return name
+    for key in ("pattern", "query", "slug", "text", "objective", "url", "path"):
+        val = inp.get(key)
+        if isinstance(val, str) and val.strip():
+            s = " ".join(val.strip().split())
+            return f"{name}({s[:50]}{'...' if len(s) > 50 else ''})"
+    return name
 
 
 class SubAgent(ABC):
@@ -117,6 +100,12 @@ class SubAgent(ABC):
         current_iteration = 0
         all_tool_calls: list[dict[str, Any]] = []
 
+        # Cache breakpoints: system prompt and tools (static per sub-agent)
+        system = [{"type": "text", "text": self.config.system_prompt, "cache_control": {"type": "ephemeral"}}]
+        tools = [*self.config.tools] if self.config.tools else []
+        if tools:
+            tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}
+
         response = None
         try:
             for iteration in range(self.config.max_iterations):
@@ -136,28 +125,23 @@ class SubAgent(ABC):
                     )
                 )
 
-                save_iteration_context(
-                    tool_name=self.config.tool_name,
-                    iteration=current_iteration,
-                    max_iterations=self.config.max_iterations,
-                    messages=messages,
-                    system_prompt=self.config.system_prompt,
-                    tools=self.config.tools,
-                    max_tokens=self.config.max_tokens,
-                )
+                # Cache breakpoint: last message
+                add_message_cache_breakpoint(messages)
 
                 llm_start = time.perf_counter()
                 response = self.client.messages.create(
                     model=get_model_id(),
                     max_tokens=self.config.max_tokens,
-                    system=self.config.system_prompt,
+                    system=system,
                     messages=messages,
-                    tools=self.config.tools,
+                    tools=tools,
                 )
                 llm_elapsed_ms = (time.perf_counter() - llm_start) * 1000
 
                 input_tokens = response.usage.input_tokens
                 output_tokens = response.usage.output_tokens
+                cache_creation = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
+                cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
                 total_input_tokens += input_tokens
                 total_output_tokens += output_tokens
 
@@ -169,9 +153,11 @@ class SubAgent(ABC):
                 report_token_usage(
                     SubAgentTokenUsage(
                         tool_name=self.config.tool_name,
-                        input_tokens=input_tokens,
+                        input_tokens=input_tokens + cache_creation + cache_read,
                         output_tokens=output_tokens,
                         iteration=current_iteration,
+                        cache_creation_input_tokens=cache_creation,
+                        cache_read_input_tokens=cache_read,
                     )
                 )
 
@@ -214,7 +200,8 @@ class SubAgent(ABC):
                     if hasattr(block, "type") and block.type == "tool_use":
                         tool_name = block.name
                         tool_input = block.input
-                        iteration_tool_calls.append(tool_name)
+                        display_call = _fmt_tool_call(tool_name, tool_input)
+                        iteration_tool_calls.append(display_call)
                         all_tool_calls.append({"tool": tool_name, "input": tool_input})
 
                         logger.info(f"{self.config.tool_name} [iter {current_iteration}]: calling tool '{tool_name}'")
@@ -224,7 +211,7 @@ class SubAgent(ABC):
                                 tool_name=self.config.tool_name,
                                 iteration=current_iteration,
                                 max_iterations=self.config.max_iterations,
-                                current_tool=tool_name,
+                                current_tool=display_call,
                                 tool_calls=iteration_tool_calls.copy(),
                                 status="running_tool",
                             )
@@ -234,8 +221,10 @@ class SubAgent(ABC):
                             tool_start = time.perf_counter()
                             result = self.execute_tool(tool_name, tool_input)
                             tool_elapsed_ms = (time.perf_counter() - tool_start) * 1000
+                            result_preview = result[:200] + "..." if len(result) > 200 else result
                             logger.info(
                                 f"{self.config.tool_name}: tool '{tool_name}' executed in {tool_elapsed_ms:.1f}ms"
+                                f" | result: {result_preview}"
                             )
                             tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
                         except Exception as e:
@@ -251,6 +240,16 @@ class SubAgent(ABC):
 
                 if tool_results:
                     messages.append({"role": "user", "content": tool_results})
+
+                    report_progress(
+                        SubAgentProgress(
+                            tool_name=self.config.tool_name,
+                            iteration=current_iteration,
+                            max_iterations=self.config.max_iterations,
+                            tool_calls=iteration_tool_calls.copy(),
+                            status="reasoning",
+                        )
+                    )
 
             logger.warning(f"{self.config.tool_name}: max iterations ({self.config.max_iterations}) reached")
             text_parts = [block.text for block in response.content if hasattr(block, "text")] if response else []

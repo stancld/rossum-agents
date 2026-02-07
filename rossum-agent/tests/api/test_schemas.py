@@ -347,6 +347,24 @@ class TestStreamDoneEvent:
         assert event.input_tokens == 1500
         assert event.output_tokens == 350
 
+    def test_cache_token_defaults_to_zero(self):
+        """Test cache token fields default to zero."""
+        event = StreamDoneEvent(total_steps=1, input_tokens=100, output_tokens=50)
+        assert event.cache_creation_input_tokens == 0
+        assert event.cache_read_input_tokens == 0
+
+    def test_cache_token_fields(self):
+        """Test cache token fields can be set."""
+        event = StreamDoneEvent(
+            total_steps=3,
+            input_tokens=1500,
+            output_tokens=350,
+            cache_creation_input_tokens=200,
+            cache_read_input_tokens=800,
+        )
+        assert event.cache_creation_input_tokens == 200
+        assert event.cache_read_input_tokens == 800
+
 
 class TestHealthResponse:
     """Tests for HealthResponse schema."""
@@ -377,3 +395,95 @@ class TestErrorResponse:
         """Test error without code."""
         error = ErrorResponse(detail="Something went wrong")
         assert error.error_code is None
+
+
+class TestTokenUsageCacheFields:
+    """Tests for cache token fields on token usage models."""
+
+    def test_token_usage_by_source_cache_defaults(self):
+        """Test cache fields default to zero."""
+        from rossum_agent.api.models.schemas import TokenUsageBySource
+
+        usage = TokenUsageBySource.from_counts(100, 50)
+        assert usage.cache_creation_input_tokens == 0
+        assert usage.cache_read_input_tokens == 0
+
+    def test_token_usage_by_source_cache_values(self):
+        """Test cache fields can be set via from_counts."""
+        from rossum_agent.api.models.schemas import TokenUsageBySource
+
+        usage = TokenUsageBySource.from_counts(100, 50, cache_creation_input_tokens=20, cache_read_input_tokens=70)
+        assert usage.cache_creation_input_tokens == 20
+        assert usage.cache_read_input_tokens == 70
+
+    def test_token_usage_breakdown_cache_fields(self):
+        """Test TokenUsageBreakdown includes cache metrics."""
+        from rossum_agent.api.models.schemas import TokenUsageBreakdown
+
+        breakdown = TokenUsageBreakdown.from_raw_counts(
+            total_input=1000,
+            total_output=500,
+            main_input=600,
+            main_output=300,
+            sub_input=400,
+            sub_output=200,
+            sub_by_tool={"debug_hook": (400, 200)},
+            main_cache_creation=50,
+            main_cache_read=400,
+            sub_cache_creation=30,
+            sub_cache_read=300,
+            sub_cache_by_tool={"debug_hook": (30, 300)},
+        )
+
+        assert breakdown.total.cache_creation_input_tokens == 80
+        assert breakdown.total.cache_read_input_tokens == 700
+        assert breakdown.main_agent.cache_creation_input_tokens == 50
+        assert breakdown.main_agent.cache_read_input_tokens == 400
+        assert breakdown.sub_agents.cache_creation_input_tokens == 30
+        assert breakdown.sub_agents.cache_read_input_tokens == 300
+        assert breakdown.sub_agents.by_tool["debug_hook"].cache_creation_input_tokens == 30
+        assert breakdown.sub_agents.by_tool["debug_hook"].cache_read_input_tokens == 300
+
+    def test_format_summary_lines_includes_cache_rows(self):
+        """Test format_summary_lines shows cache metrics when present."""
+        from rossum_agent.api.models.schemas import TokenUsageBreakdown
+
+        breakdown = TokenUsageBreakdown.from_raw_counts(
+            total_input=1000,
+            total_output=500,
+            main_input=1000,
+            main_output=500,
+            sub_input=0,
+            sub_output=0,
+            sub_by_tool={},
+            main_cache_creation=100,
+            main_cache_read=800,
+        )
+
+        lines = breakdown.format_summary_lines()
+        text = "\n".join(lines)
+
+        assert "Input token breakdown:" in text
+        assert "Cache read" in text
+        assert "Cache write (creation)" in text
+        assert "1,000" in text
+
+    def test_format_summary_lines_omits_cache_when_zero(self):
+        """Test format_summary_lines uses simple format when no caching."""
+        from rossum_agent.api.models.schemas import TokenUsageBreakdown
+
+        breakdown = TokenUsageBreakdown.from_raw_counts(
+            total_input=1000,
+            total_output=500,
+            main_input=1000,
+            main_output=500,
+            sub_input=0,
+            sub_output=0,
+            sub_by_tool={},
+        )
+
+        lines = breakdown.format_summary_lines()
+        text = "\n".join(lines)
+
+        assert "Input token breakdown:" not in text
+        assert "Cache write (creation)" not in text

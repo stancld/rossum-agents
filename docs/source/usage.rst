@@ -2168,14 +2168,67 @@ Files are saved to a session-specific directory that can be shared with the user
 Knowledge Base Tools
 ^^^^^^^^^^^^^^^^^^^^
 
+The Knowledge Base tools provide access to pre-scraped Rossum documentation articles. Articles are cached locally (24-hour TTL) from an S3-hosted JSON file.
+
+kb_grep
+"""""""
+
+Search Knowledge Base article titles and content by keyword or regex.
+
+Use to discover relevant articles when you don't know the exact slug.
+
+**Parameters:**
+
+- ``pattern`` (string, required): Text pattern to search for (supports regex).
+  Examples: ``"document splitting"``, ``"webhook"``, ``"email_template"``, ``"formula"``.
+- ``case_insensitive`` (bool, optional): Whether to ignore case (default: ``true``).
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "status": "success",
+     "matches": 3,
+     "result": [
+       {
+         "slug": "document-splitting-extension",
+         "title": "Document Splitting Extension",
+         "url": "https://knowledge-base.rossum.ai/docs/document-splitting-extension",
+         "snippet": "[title] Document Splitting Extension\n[content] ...split documents into multiple pages..."
+       }
+     ]
+   }
+
+kb_get_article
+""""""""""""""
+
+Retrieve a full Knowledge Base article by its slug.
+
+Use after ``kb_grep`` to read the complete content of a specific article.
+
+**Parameters:**
+
+- ``slug`` (string, required): Article slug (e.g. ``"document-splitting-extension"``). Partial match supported.
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "status": "success",
+     "slug": "document-splitting-extension",
+     "title": "Document Splitting Extension",
+     "url": "https://knowledge-base.rossum.ai/docs/document-splitting-extension",
+     "content": "# Document Splitting Extension\n\nSplit documents into multiple pages..."
+   }
+
 search_knowledge_base
 """""""""""""""""""""
 
-Search the Rossum Knowledge Base for documentation about extensions, hooks, and configurations.
+Search the Rossum Knowledge Base using an Opus sub-agent for complex questions requiring multiple lookups.
 
-Use this tool to find information about Rossum features, troubleshoot errors,
-and understand extension configurations. The search is performed against
-https://knowledge-base.rossum.ai/docs and results are analyzed by Claude Opus.
+The sub-agent iterates through pre-scraped KB articles using ``kb_grep`` and ``kb_get_article`` to find comprehensive answers. Use for complex questions; for quick lookups, use ``kb_grep`` and ``kb_get_article`` directly.
 
 **Parameters:**
 
@@ -2183,19 +2236,19 @@ https://knowledge-base.rossum.ai/docs and results are analyzed by Claude Opus.
   or feature names. Examples: 'document splitting extension', 'duplicate handling configuration',
   'webhook timeout error'.
 - ``user_query`` (string, optional): The original user question for context. Pass the user's full
-  question here so Opus can tailor the analysis to address their specific needs.
+  question here so the sub-agent can tailor the analysis to address their specific needs.
 
 **Returns:**
-
-JSON string with structure:
 
 .. code-block:: json
 
    {
      "status": "success",
-     "query": "document splitting",
-     "analysis": "## Document Splitting Extension\n\nThe document splitting extension...",
-     "source_urls": ["https://knowledge-base.rossum.ai/docs/..."]
+     "answer": "## Document Splitting Extension\n\nThe document splitting extension...",
+     "iterations": 2,
+     "input_tokens": 1500,
+     "output_tokens": 800,
+     "searches": [{"tool": "kb_grep", "input": {"pattern": "splitting"}}]
    }
 
 Hook Debugging Tools

@@ -32,6 +32,7 @@
 | **Knowledge Base Search** | AI-powered Rossum documentation search |
 | **Multi-Environment** | Spawn connections to different Rossum environments |
 | **Skills System** | Load domain-specific workflows on demand |
+| **Prompt Caching** | Automatic `cache_control` on system prompt, tools, and conversation history for up to 90% input token cost reduction |
 
 **Interfaces:** REST API, Python SDK
 
@@ -121,7 +122,9 @@ The agent provides internal tools and access to 61 MCP tools via dynamic loading
 
 **File & Knowledge:**
 - `write_file` - Save reports, documentation, analysis results
-- `search_knowledge_base` - Search Rossum docs with AI analysis
+- `search_knowledge_base` - Search Rossum docs with AI analysis (sub-agent)
+- `kb_grep` - Regex search across Knowledge Base article titles and content
+- `kb_get_article` - Retrieve full Knowledge Base article by slug
 
 **API Reference:**
 - `elis_openapi_jq` - Query Rossum API OpenAPI spec with jq
