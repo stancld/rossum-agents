@@ -463,9 +463,10 @@ class TestTokenUsageCacheFields:
         lines = breakdown.format_summary_lines()
         text = "\n".join(lines)
 
-        assert "Input (new + cached)" in text
-        assert "Cache new (creation)" in text
-        assert "1,000 + 800" in text
+        assert "Input token breakdown:" in text
+        assert "Cache read" in text
+        assert "Cache write (creation)" in text
+        assert "1,000" in text
 
     def test_format_summary_lines_omits_cache_when_zero(self):
         """Test format_summary_lines uses simple format when no caching."""
@@ -484,5 +485,5 @@ class TestTokenUsageCacheFields:
         lines = breakdown.format_summary_lines()
         text = "\n".join(lines)
 
-        assert "Input (new + cached)" not in text
-        assert "Cache new (creation)" not in text
+        assert "Input token breakdown:" not in text
+        assert "Cache write (creation)" not in text
