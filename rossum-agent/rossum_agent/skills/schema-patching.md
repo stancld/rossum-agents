@@ -32,6 +32,8 @@ Each change object in the `changes` array:
 | `rir_field_names` | AI extraction hints |
 | `hidden` | Hide field from UI |
 | `can_export` | Include in exports |
+| `prompt` | LLM prompt for reasoning fields (max 2000 chars) |
+| `context` | Context field IDs for reasoning (TxScript format, e.g. `field.invoice_id`) |
 
 Not supported: multiline fields, default_value, constraints. Use regular `string` type for multiline.
 
