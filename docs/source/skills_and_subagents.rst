@@ -308,16 +308,34 @@ Returns JSON with:
 Knowledge Base Sub-Agent
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-Invoked via the ``search_knowledge_base`` tool. Searches Rossum documentation and analyzes results with Opus.
+Invoked via the ``search_knowledge_base`` tool. Iterates through pre-scraped Knowledge Base articles using ``kb_grep`` and ``kb_get_article`` tools.
 
 **Capabilities:**
 
-- Searches ``knowledge-base.rossum.ai`` for documentation
-- Fetches full page content via Jina Reader
-- Analyzes results with Opus to extract relevant information
-- Provides synthesized, actionable responses
+- Searches pre-scraped KB articles by keyword/regex (``kb_grep``)
+- Retrieves full article content by slug (``kb_get_article``)
+- Opus synthesizes actionable answers from multiple articles
+- Articles cached locally with 24-hour TTL from S3-hosted JSON
 
-**Usage:**
+**Direct search tools** (available without sub-agent overhead):
+
+``kb_grep(pattern, case_insensitive=True)``
+   Regex search across article titles and content. Returns matching articles with snippets.
+
+   .. code-block:: python
+
+      kb_grep(pattern="document splitting")
+      kb_grep(pattern="webhook|email_template")
+
+``kb_get_article(slug)``
+   Retrieve full article content by slug. Supports partial match.
+
+   .. code-block:: python
+
+      kb_get_article(slug="document-splitting-extension")
+      kb_get_article(slug="webhook")
+
+**Sub-agent usage** (for complex questions requiring multiple lookups):
 
 .. code-block:: python
 
@@ -328,10 +346,10 @@ Invoked via the ``search_knowledge_base`` tool. Searches Rossum documentation an
 
 Returns JSON with:
 
-- Search status
-- Query used
-- Analyzed results from Opus
-- Source URLs
+- Synthesized answer from Opus
+- Number of iterations used
+- Token usage (input/output)
+- List of searches performed
 
 Schema Patching Sub-Agent
 ^^^^^^^^^^^^^^^^^^^^^^^^^

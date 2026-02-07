@@ -566,7 +566,6 @@ class TestCallOpusForPatching:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
             patch("rossum_agent.tools.subagents.base.report_progress", side_effect=capture_progress),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             mock_client.return_value.messages.create.return_value = mock_response
 
@@ -604,7 +603,6 @@ class TestCallOpusForPatching:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
             patch(
                 "rossum_agent.tools.subagents.schema_patching._execute_opus_tool",
                 return_value='[{"id": "section1"}]',
@@ -622,10 +620,15 @@ class TestCallOpusForPatching:
 
     def test_max_iterations_is_5(self):
         """Test that max iterations is reduced to 5 for deterministic workflow."""
+        mock_tool_block = MagicMock()
+        mock_tool_block.type = "tool_use"
+        mock_tool_block.name = "get_schema_tree_structure"
+        mock_tool_block.input = {"schema_id": 123}
+        mock_tool_block.id = "tool_1"
+
         mock_response = MagicMock()
-        mock_response.stop_reason = "end_of_turn"
-        mock_response.content = [MagicMock(text="Done", type="text")]
-        mock_response.content[0].text = "Done"
+        mock_response.stop_reason = "tool_use"
+        mock_response.content = [mock_tool_block]
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
 
@@ -633,15 +636,19 @@ class TestCallOpusForPatching:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context") as mock_save,
+            patch(
+                "rossum_agent.tools.subagents.schema_patching._execute_opus_tool",
+                return_value='[{"id": "section1"}]',
+            ),
+            patch("rossum_agent.tools.subagents.base.logger"),
         ):
             mock_client.return_value.messages.create.return_value = mock_response
 
             changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
-            _call_opus_for_patching("123", changes)
+            result = _call_opus_for_patching("123", changes)
 
-            saved_context = mock_save.call_args.kwargs
-            assert saved_context["max_iterations"] == 5
+            assert result.iterations_used == 5
+            assert mock_client.return_value.messages.create.call_count == 5
 
     def test_bedrock_client_exception_returns_error(self):
         """Test that create_bedrock_client exception returns error message."""

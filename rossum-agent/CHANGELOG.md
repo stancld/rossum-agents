@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
+- Added `kb_grep` and `kb_get_article` tools for direct regex search and article retrieval from pre-scraped Knowledge Base articles
+- Added `scrape_knowledge_base.py` script to scrape Rossum Knowledge Base via sitemap + Jina Reader and produce S3-hosted JSON
 - Added task tracking system (`create_task`, `update_task`, `list_tasks` tools) for real-time progress visibility on multi-step operations, streamed via SSE `task_snapshot` events [#157](https://github.com/stancld/rossum-agents/pull/157)
 - Added `search_elis_docs` sub-agent tool with `elis_openapi_jq` and `elis_openapi_grep` for querying the Rossum API OpenAPI specification directly [#154](https://github.com/stancld/rossum-agents/pull/154)
 - Added Gunicorn server support for production deployments via `--server gunicorn` CLI flag [#152](https://github.com/stancld/rossum-agents/pull/152)
@@ -14,10 +16,12 @@ All notable changes to this project will be documented in this file.
   - Uses UvicornWorker for ASGI compatibility
 
 ### Changed
+- Refactored `search_knowledge_base` sub-agent from live DuckDuckGo web search (`ddgs`) to pre-scraped JSON file approach with local `kb_grep`/`kb_get_article` tools — faster, more reliable, no external search dependency at runtime
 - Migrated default model from Opus 4.5 to Opus 4.6 [#156](https://github.com/stancld/rossum-agents/pull/156)
 - Refactored API to use FastAPI's `app.state` for service instances instead of module-level globals [#153](https://github.com/stancld/rossum-agents/pull/153)
 
 ### Removed
+- Removed `ddgs` dependency (replaced by pre-scraped KB article search)
 - Removed Streamlit UI (`streamlit_app` submodule and all Streamlit dependencies) [#160](https://github.com/stancld/rossum-agents/pull/160)
 - Removed Teleport JWT user isolation (`user_detection.py`, `PyJWT`, `cryptography` dependencies) [#155](https://github.com/stancld/rossum-agents/pull/155)
 

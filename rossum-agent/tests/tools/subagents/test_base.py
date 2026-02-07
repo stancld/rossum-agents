@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock, patch
 
 from rossum_agent.tools.subagents.base import (
     SubAgent,
     SubAgentConfig,
     SubAgentResult,
-    save_iteration_context,
 )
 
 
@@ -89,59 +87,6 @@ class TestSubAgentResult:
         assert result.tool_calls == calls
 
 
-class TestSaveIterationContext:
-    """Test save_iteration_context function."""
-
-    def test_saves_context_file(self, tmp_path):
-        """Test that context file is saved with expected structure."""
-        messages = [{"role": "user", "content": "test"}]
-        tools = [{"name": "tool1"}]
-
-        with patch("rossum_agent.tools.subagents.base.get_output_dir", return_value=tmp_path):
-            save_iteration_context(
-                tool_name="test_tool",
-                iteration=1,
-                max_iterations=5,
-                messages=messages,
-                system_prompt="Test prompt",
-                tools=tools,
-                max_tokens=4096,
-            )
-
-        context_file = tmp_path / "test_tool_context_iter_1.json"
-        assert context_file.exists()
-
-        context_data = json.loads(context_file.read_text())
-        assert context_data["iteration"] == 1
-        assert context_data["max_iterations"] == 5
-        assert context_data["messages"] == messages
-        assert context_data["system_prompt"] == "Test prompt"
-        assert context_data["tools"] == tools
-        assert context_data["max_tokens"] == 4096
-
-    def test_logs_warning_on_failure(self):
-        """Test that warning is logged when save fails."""
-        with (
-            patch(
-                "rossum_agent.tools.subagents.base.get_output_dir",
-                side_effect=Exception("Test error"),
-            ),
-            patch("rossum_agent.tools.subagents.base.logger") as mock_logger,
-        ):
-            save_iteration_context(
-                tool_name="test",
-                iteration=1,
-                max_iterations=5,
-                messages=[],
-                system_prompt="",
-                tools=[],
-                max_tokens=4096,
-            )
-
-            mock_logger.warning.assert_called_once()
-            assert "Failed to save test context" in mock_logger.warning.call_args[0][0]
-
-
 class ConcreteSubAgent(SubAgent):
     """Concrete implementation for testing."""
 
@@ -218,7 +163,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = agent.run("Test message")
 
@@ -269,7 +213,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = agent.run("Test message")
 
@@ -310,7 +253,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = agent.run("Test message")
 
@@ -349,7 +291,6 @@ class TestSubAgent:
                 "rossum_agent.tools.subagents.base.report_token_usage",
                 side_effect=capture_tokens,
             ),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             agent.run("Test")
 
@@ -408,7 +349,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
         ):
             result = agent.run("Test")
 
@@ -466,7 +406,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
             patch("rossum_agent.tools.subagents.base.logger") as mock_logger,
         ):
             result = agent.run("Test")
@@ -509,7 +448,6 @@ class TestSubAgent:
             ),
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.save_iteration_context"),
             patch("rossum_agent.tools.subagents.base.logger"),
         ):
             result = agent.run("Test")
