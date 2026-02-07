@@ -148,10 +148,12 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
     ),
     "users": ToolCategory(
         name="users",
-        description="User management: list users and roles",
+        description="User management: create, update, list users and roles",
         tools=[
             ToolInfo("get_user", "Retrieve user details"),
             ToolInfo("list_users", "List users with filters"),
+            ToolInfo("create_user", "Create a new user", read_only=False),
+            ToolInfo("update_user", "Update user (PATCH)", read_only=False),
             ToolInfo("list_user_roles", "List available user roles"),
         ],
         keywords=["user", "role", "permission", "token_owner"],
