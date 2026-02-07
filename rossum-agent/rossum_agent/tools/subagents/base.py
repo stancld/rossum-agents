@@ -18,6 +18,7 @@ from rossum_agent.tools.core import (
     report_progress,
     report_token_usage,
 )
+from rossum_agent.utils import add_message_cache_breakpoint
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,12 @@ class SubAgent(ABC):
         current_iteration = 0
         all_tool_calls: list[dict[str, Any]] = []
 
+        # Cache breakpoints: system prompt and tools (static per sub-agent)
+        system = [{"type": "text", "text": self.config.system_prompt, "cache_control": {"type": "ephemeral"}}]
+        tools = [*self.config.tools] if self.config.tools else []
+        if tools:
+            tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}
+
         response = None
         try:
             for iteration in range(self.config.max_iterations):
@@ -106,18 +113,23 @@ class SubAgent(ABC):
                     )
                 )
 
+                # Cache breakpoint: last message
+                add_message_cache_breakpoint(messages)
+
                 llm_start = time.perf_counter()
                 response = self.client.messages.create(
                     model=get_model_id(),
                     max_tokens=self.config.max_tokens,
-                    system=self.config.system_prompt,
+                    system=system,
                     messages=messages,
-                    tools=self.config.tools,
+                    tools=tools,
                 )
                 llm_elapsed_ms = (time.perf_counter() - llm_start) * 1000
 
                 input_tokens = response.usage.input_tokens
                 output_tokens = response.usage.output_tokens
+                cache_creation = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
+                cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
                 total_input_tokens += input_tokens
                 total_output_tokens += output_tokens
 
@@ -132,6 +144,8 @@ class SubAgent(ABC):
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                         iteration=current_iteration,
+                        cache_creation_input_tokens=cache_creation,
+                        cache_read_input_tokens=cache_read,
                     )
                 )
 

@@ -523,7 +523,12 @@ class TestCallOpusForDebug:
             call_args = mock_client.messages.create.call_args
             messages = call_args.kwargs["messages"]
             user_content = messages[0]["content"]
-            assert "schema999" in user_content
+            # Content may be a string or list of dicts (after cache breakpoint conversion)
+            if isinstance(user_content, list):
+                user_text = " ".join(block["text"] for block in user_content if "text" in block)
+            else:
+                user_text = user_content
+            assert "schema999" in user_text
 
     def test_handles_evaluate_python_hook_result_logging(self):
         """Test logs evaluate_python_hook results properly."""

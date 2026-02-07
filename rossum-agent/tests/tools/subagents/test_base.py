@@ -470,3 +470,82 @@ class TestSubAgent:
         result = agent.process_response_block(block, 1, 5)
 
         assert result is None
+
+    def test_run_sends_system_with_cache_control(self):
+        """Test that run sends system prompt as list with cache_control."""
+        config = SubAgentConfig(
+            tool_name="test",
+            system_prompt="Test system prompt",
+            tools=[{"name": "tool1", "description": "t1", "input_schema": {}}],
+        )
+        agent = ConcreteSubAgent(config)
+
+        mock_text_block = MagicMock()
+        mock_text_block.text = "Done"
+        mock_text_block.type = "text"
+
+        mock_response = MagicMock()
+        mock_response.content = [mock_text_block]
+        mock_response.stop_reason = "end_of_turn"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 80
+        mock_response.usage.cache_read_input_tokens = 0
+
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_response
+
+        with (
+            patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage"),
+        ):
+            agent.run("Test message")
+
+            call_kwargs = mock_client.messages.create.call_args[1]
+
+            # System should be a list with cache_control
+            assert isinstance(call_kwargs["system"], list)
+            assert call_kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}
+
+            # Last tool should have cache_control
+            tools = call_kwargs["tools"]
+            assert tools[-1]["cache_control"] == {"type": "ephemeral"}
+
+    def test_run_reports_cache_tokens(self):
+        """Test that cache token metrics are reported via callback."""
+        config = SubAgentConfig(
+            tool_name="test",
+            system_prompt="prompt",
+            tools=[],
+        )
+        agent = ConcreteSubAgent(config)
+
+        token_reports = []
+
+        def capture_tokens(usage):
+            token_reports.append(usage)
+
+        mock_response = MagicMock()
+        mock_response.content = []
+        mock_response.stop_reason = "end_of_turn"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 30
+        mock_response.usage.cache_read_input_tokens = 60
+
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_response
+
+        with (
+            patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage", side_effect=capture_tokens),
+        ):
+            agent.run("Test")
+
+            assert len(token_reports) == 1
+            assert token_reports[0].cache_creation_input_tokens == 30
+            assert token_reports[0].cache_read_input_tokens == 60
+
+    # Unit tests for add_message_cache_breakpoint are in tests/agent/test_core.py::TestCacheBreakpoints

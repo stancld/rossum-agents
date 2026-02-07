@@ -197,11 +197,25 @@ class TokenUsageBySource(BaseModel):
     input_tokens: int
     output_tokens: int
     total_tokens: int
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
 
     @classmethod
-    def from_counts(cls, input_tokens: int, output_tokens: int) -> TokenUsageBySource:
+    def from_counts(
+        cls,
+        input_tokens: int,
+        output_tokens: int,
+        cache_creation_input_tokens: int = 0,
+        cache_read_input_tokens: int = 0,
+    ) -> TokenUsageBySource:
         """Create from input/output counts, computing total."""
-        return cls(input_tokens=input_tokens, output_tokens=output_tokens, total_tokens=input_tokens + output_tokens)
+        return cls(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=input_tokens + output_tokens,
+            cache_creation_input_tokens=cache_creation_input_tokens,
+            cache_read_input_tokens=cache_read_input_tokens,
+        )
 
 
 class SubAgentTokenUsageDetail(BaseModel):
@@ -210,18 +224,37 @@ class SubAgentTokenUsageDetail(BaseModel):
     input_tokens: int
     output_tokens: int
     total_tokens: int
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
     by_tool: dict[str, TokenUsageBySource]
 
     @classmethod
     def from_counts(
-        cls, input_tokens: int, output_tokens: int, by_tool: dict[str, tuple[int, int]]
+        cls,
+        input_tokens: int,
+        output_tokens: int,
+        by_tool: dict[str, tuple[int, int]],
+        cache_creation_input_tokens: int = 0,
+        cache_read_input_tokens: int = 0,
+        cache_by_tool: dict[str, tuple[int, int]] | None = None,
     ) -> SubAgentTokenUsageDetail:
         """Create from input/output counts, computing total."""
+        _cache_by_tool = cache_by_tool or {}
         return cls(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=input_tokens + output_tokens,
-            by_tool={name: TokenUsageBySource.from_counts(inp, out) for name, (inp, out) in by_tool.items()},
+            cache_creation_input_tokens=cache_creation_input_tokens,
+            cache_read_input_tokens=cache_read_input_tokens,
+            by_tool={
+                name: TokenUsageBySource.from_counts(
+                    inp,
+                    out,
+                    cache_creation_input_tokens=_cache_by_tool.get(name, (0, 0))[0],
+                    cache_read_input_tokens=_cache_by_tool.get(name, (0, 0))[1],
+                )
+                for name, (inp, out) in by_tool.items()
+            },
         )
 
 
@@ -242,23 +275,56 @@ class TokenUsageBreakdown(BaseModel):
         sub_input: int,
         sub_output: int,
         sub_by_tool: dict[str, tuple[int, int]],
+        main_cache_creation: int = 0,
+        main_cache_read: int = 0,
+        sub_cache_creation: int = 0,
+        sub_cache_read: int = 0,
+        sub_cache_by_tool: dict[str, tuple[int, int]] | None = None,
     ) -> TokenUsageBreakdown:
         """Create breakdown from raw token counts."""
+        total_cache_creation = main_cache_creation + sub_cache_creation
+        total_cache_read = main_cache_read + sub_cache_read
         return cls(
-            total=TokenUsageBySource.from_counts(total_input, total_output),
-            main_agent=TokenUsageBySource.from_counts(main_input, main_output),
-            sub_agents=SubAgentTokenUsageDetail.from_counts(sub_input, sub_output, sub_by_tool),
+            total=TokenUsageBySource.from_counts(
+                total_input,
+                total_output,
+                cache_creation_input_tokens=total_cache_creation,
+                cache_read_input_tokens=total_cache_read,
+            ),
+            main_agent=TokenUsageBySource.from_counts(
+                main_input,
+                main_output,
+                cache_creation_input_tokens=main_cache_creation,
+                cache_read_input_tokens=main_cache_read,
+            ),
+            sub_agents=SubAgentTokenUsageDetail.from_counts(
+                sub_input,
+                sub_output,
+                sub_by_tool,
+                cache_creation_input_tokens=sub_cache_creation,
+                cache_read_input_tokens=sub_cache_read,
+                cache_by_tool=sub_cache_by_tool,
+            ),
         )
 
     def format_summary_lines(self) -> list[str]:
         """Format token usage as human-readable lines."""
+        has_cache = self.total.cache_read_input_tokens > 0 or self.total.cache_creation_input_tokens > 0
+
+        if not has_cache:
+            return self._format_summary_no_cache()
+        return self._format_summary_with_cache()
+
+    def _format_summary_no_cache(self) -> list[str]:
+        """Format summary when no caching is active."""
+        w = 60
         lines = [
             "",
-            "=" * 60,
+            "=" * w,
             "TOKEN USAGE SUMMARY",
-            "=" * 60,
+            "=" * w,
             f"{'Category':<25} {'Input':>12} {'Output':>12} {'Total':>12}",
-            "-" * 60,
+            "-" * w,
             f"{'Main Agent':<25} {self.main_agent.input_tokens:>12,} {self.main_agent.output_tokens:>12,} {self.main_agent.total_tokens:>12,}",
             f"{'Sub-agents (total)':<25} {self.sub_agents.input_tokens:>12,} {self.sub_agents.output_tokens:>12,} {self.sub_agents.total_tokens:>12,}",
         ]
@@ -268,11 +334,53 @@ class TokenUsageBreakdown(BaseModel):
             )
         lines.extend(
             [
-                "-" * 60,
+                "-" * w,
                 f"{'TOTAL':<25} {self.total.input_tokens:>12,} {self.total.output_tokens:>12,} {self.total.total_tokens:>12,}",
-                "=" * 60,
+                "=" * w,
             ]
         )
+        return lines
+
+    def _format_summary_with_cache(self) -> list[str]:
+        """Format summary with cache token breakdown."""
+        w = 75
+
+        def _input_col(source: TokenUsageBySource | SubAgentTokenUsageDetail) -> str:
+            return f"{source.input_tokens:,} + {source.cache_read_input_tokens:,}"
+
+        def _effective_total(source: TokenUsageBySource | SubAgentTokenUsageDetail) -> int:
+            return source.input_tokens + source.cache_read_input_tokens + source.output_tokens
+
+        lines = [
+            "",
+            "=" * w,
+            "TOKEN USAGE SUMMARY",
+            "=" * w,
+            f"{'Category':<25} {'Input (new + cached)':>22} {'Output':>12} {'Total':>12}",
+            "-" * w,
+            f"{'Main Agent':<25} {_input_col(self.main_agent):>22} {self.main_agent.output_tokens:>12,} {_effective_total(self.main_agent):>12,}",
+            f"{'Sub-agents (total)':<25} {_input_col(self.sub_agents):>22} {self.sub_agents.output_tokens:>12,} {_effective_total(self.sub_agents):>12,}",
+        ]
+        for tool_name, usage in self.sub_agents.by_tool.items():
+            lines.append(
+                f"  └─ {tool_name:<21}{_input_col(usage):>22} {usage.output_tokens:>12,} {_effective_total(usage):>12,}"
+            )
+        lines.extend(
+            [
+                "-" * w,
+                f"{'TOTAL':<25} {_input_col(self.total):>22} {self.total.output_tokens:>12,} {_effective_total(self.total):>12,}",
+                "-" * w,
+                f"{'Cache new (creation)':<25} {self.total.cache_creation_input_tokens:>22,}",
+            ]
+        )
+        if self.sub_agents.cache_creation_input_tokens:
+            lines.extend(
+                [
+                    f"{'  Main Agent':<25} {self.main_agent.cache_creation_input_tokens:>22,}",
+                    f"{'  Sub-agents':<25} {self.sub_agents.cache_creation_input_tokens:>22,}",
+                ]
+            )
+        lines.append("=" * w)
         return lines
 
 
@@ -282,6 +390,8 @@ class StreamDoneEvent(BaseModel):
     total_steps: int
     input_tokens: int
     output_tokens: int
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
     token_usage_breakdown: TokenUsageBreakdown | None = None
 
 

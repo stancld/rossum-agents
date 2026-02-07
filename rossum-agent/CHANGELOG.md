@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
+- Added prompt caching (`cache_control`) for system prompt, tools, and conversation history to reduce input token costs by up to 90% on cached content
 - Added `kb_grep` and `kb_get_article` tools for direct regex search and article retrieval from pre-scraped Knowledge Base articles
 - Added `scrape_knowledge_base.py` script to scrape Rossum Knowledge Base via sitemap + Jina Reader and produce S3-hosted JSON
 - Added task tracking system (`create_task`, `update_task`, `list_tasks` tools) for real-time progress visibility on multi-step operations, streamed via SSE `task_snapshot` events [#157](https://github.com/stancld/rossum-agents/pull/157)
@@ -16,6 +17,7 @@ All notable changes to this project will be documented in this file.
   - Uses UvicornWorker for ASGI compatibility
 
 ### Changed
+- Token usage breakdown now includes cache creation and cache read input token metrics
 - Refactored `search_knowledge_base` sub-agent from live DuckDuckGo web search (`ddgs`) to pre-scraped JSON file approach with local `kb_grep`/`kb_get_article` tools — faster, more reliable, no external search dependency at runtime
 - Migrated default model from Opus 4.5 to Opus 4.6 [#156](https://github.com/stancld/rossum-agents/pull/156)
 - Refactored API to use FastAPI's `app.state` for service instances instead of module-level globals [#153](https://github.com/stancld/rossum-agents/pull/153)
