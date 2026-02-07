@@ -152,6 +152,8 @@ class TestSubAgent:
         mock_response.stop_reason = "end_of_turn"
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 0
+        mock_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
@@ -242,6 +244,8 @@ class TestSubAgent:
         mock_response.stop_reason = "end_of_turn"
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 0
+        mock_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
@@ -277,6 +281,8 @@ class TestSubAgent:
         mock_response.stop_reason = "end_of_turn"
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 0
+        mock_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
@@ -395,6 +401,8 @@ class TestSubAgent:
         mock_response.stop_reason = "tool_use"
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 0
+        mock_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
@@ -437,6 +445,8 @@ class TestSubAgent:
         mock_response.stop_reason = "tool_use"
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
+        mock_response.usage.cache_creation_input_tokens = 0
+        mock_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response

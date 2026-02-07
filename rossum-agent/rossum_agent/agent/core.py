@@ -609,10 +609,11 @@ class RossumAgent:
             raise RuntimeError("Stream ended without final message")
 
         thinking_blocks = self._extract_thinking_blocks(state.final_message)
-        input_tokens = state.final_message.usage.input_tokens
+        raw_input_tokens = state.final_message.usage.input_tokens
         output_tokens = state.final_message.usage.output_tokens
         cache_creation = getattr(state.final_message.usage, "cache_creation_input_tokens", 0) or 0
         cache_read = getattr(state.final_message.usage, "cache_read_input_tokens", 0) or 0
+        input_tokens = raw_input_tokens + cache_creation + cache_read
         self._total_input_tokens += input_tokens
         self._total_output_tokens += output_tokens
         self._main_agent_input_tokens += input_tokens
@@ -621,11 +622,10 @@ class RossumAgent:
         self._total_cache_read_tokens += cache_read
         self._main_agent_cache_creation_tokens += cache_creation
         self._main_agent_cache_read_tokens += cache_read
-        total_effective_input = self._total_input_tokens + self._total_cache_read_tokens
         logger.info(
             f"Step {step_num}: input_tokens={input_tokens}, output_tokens={output_tokens}, "
             f"cache_creation={cache_creation}, cache_read={cache_read}, "
-            f"total_input={total_effective_input}, total_output={self._total_output_tokens}"
+            f"total_input={self._total_input_tokens}, total_output={self._total_output_tokens}"
         )
 
         step = AgentStep(

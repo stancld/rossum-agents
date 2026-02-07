@@ -141,7 +141,7 @@ class SubAgent(ABC):
                 report_token_usage(
                     SubAgentTokenUsage(
                         tool_name=self.config.tool_name,
-                        input_tokens=input_tokens,
+                        input_tokens=input_tokens + cache_creation + cache_read,
                         output_tokens=output_tokens,
                         iteration=current_iteration,
                         cache_creation_input_tokens=cache_creation,
