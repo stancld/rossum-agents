@@ -100,6 +100,8 @@ class TestToolCatalog:
             ("rules", "update_rule"),
             ("rules", "patch_rule"),
             ("rules", "delete_rule"),
+            ("users", "create_user"),
+            ("users", "update_user"),
             ("workspaces", "create_workspace"),
             ("workspaces", "delete_workspace"),
         }

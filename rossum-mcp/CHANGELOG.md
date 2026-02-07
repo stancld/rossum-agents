@@ -6,8 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Added
+- Added `create_user` tool for creating new users with full field support (queues, groups, metadata, auth_type, OIDC) [#163](https://github.com/stancld/rossum-agents/pull/163)
+- Added `update_user` tool for partial update (PATCH) of existing users [#163](https://github.com/stancld/rossum-agents/pull/163)
+
 ### Changed
-- `get_schema_tree_structure` now accepts `queue_id` as an alternative to `schema_id` — resolves schema automatically from queue
+- `get_schema_tree_structure` now accepts `queue_id` as an alternative to `schema_id` — resolves the queue's schema automatically
 
 ### Fixed
 - Fixed `create_rule` and `update_rule` requiring `schema_id` — now optional to match the API. Rules can be scoped by `queue_ids` alone; at least one of `schema_id` or `queue_ids` is required [#156](https://github.com/stancld/rossum-agents/pull/156)
