@@ -759,6 +759,7 @@ class TestAgentServiceRunAgent:
 
             events = []
             async for event in service.run_agent(
+                chat_id="test-chat",
                 prompt="Test prompt",
                 conversation_history=[],
                 rossum_api_token="test_token",
@@ -799,6 +800,7 @@ class TestAgentServiceRunAgent:
 
             events = []
             async for event in service.run_agent(
+                chat_id="test-chat",
                 prompt="Test prompt",
                 conversation_history=[],
                 rossum_api_token="test_token",
@@ -843,6 +845,7 @@ class TestAgentServiceRunAgent:
             mock_create_agent.return_value = mock_agent
 
             async for _ in service.run_agent(
+                chat_id="test-chat",
                 prompt="Test",
                 conversation_history=history,
                 rossum_api_token="token",
@@ -880,6 +883,7 @@ class TestAgentServiceRunAgent:
             mock_create_agent.return_value = mock_agent
 
             async for _ in service.run_agent(
+                chat_id="test-chat",
                 prompt="Test",
                 conversation_history=[],
                 rossum_api_token="token",
@@ -1372,6 +1376,7 @@ class TestAgentServiceRunAgentWithImages:
             mock_create_agent.return_value = mock_agent
 
             async for _ in service.run_agent(
+                chat_id="test-chat",
                 prompt="Test",
                 conversation_history=[],
                 rossum_api_token="token",
@@ -1419,6 +1424,7 @@ class TestAgentServiceUrlContext:
             mock_create_agent.return_value = mock_agent
 
             async for _ in service.run_agent(
+                chat_id="test-chat",
                 prompt="Test",
                 conversation_history=[],
                 rossum_api_token="token",

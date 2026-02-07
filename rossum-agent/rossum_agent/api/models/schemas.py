@@ -113,6 +113,12 @@ class DeleteResponse(BaseModel):
     deleted: bool
 
 
+class CancelResponse(BaseModel):
+    """Response for cancel operations."""
+
+    cancelled: bool
+
+
 class MessageRequest(BaseModel):
     """Request body for sending a message.
 

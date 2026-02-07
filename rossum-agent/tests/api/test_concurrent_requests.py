@@ -68,6 +68,7 @@ class TestConcurrentAgentService:
                 mock_extract.return_value = mock_url_context
 
                 async for event in agent_service.run_agent(
+                    chat_id=request_id,
                     prompt=f"Test prompt for {request_id}",
                     conversation_history=[],
                     rossum_api_token="test_token",
@@ -145,6 +146,7 @@ class TestConcurrentAgentService:
                 try:
                     final_answer = None
                     async for event in agent_service.run_agent(
+                        chat_id=request_id,
                         prompt=f"Test {request_id}",
                         conversation_history=[],
                         rossum_api_token="token",
@@ -208,6 +210,7 @@ class TestConcurrentAgentService:
                 mock_extract.return_value = mock_url_context
 
                 async for _ in agent_service.run_agent(
+                    chat_id=request_id,
                     prompt="test",
                     conversation_history=[],
                     rossum_api_token="token",
