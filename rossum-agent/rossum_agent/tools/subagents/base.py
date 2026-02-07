@@ -45,6 +45,18 @@ class SubAgentResult:
     tool_calls: list[dict[str, Any]] | None = None
 
 
+def _fmt_tool_call(name: str, inp: dict[str, Any]) -> str:
+    """Format a tool call as 'name(preview)' for progress display."""
+    if not isinstance(inp, dict):
+        return name
+    for key in ("pattern", "query", "slug", "text", "objective", "url", "path"):
+        val = inp.get(key)
+        if isinstance(val, str) and val.strip():
+            s = " ".join(val.strip().split())
+            return f"{name}({s[:50]}{'...' if len(s) > 50 else ''})"
+    return name
+
+
 class SubAgent(ABC):
     """Base class for sub-agents with iterative tool use.
 
@@ -188,7 +200,8 @@ class SubAgent(ABC):
                     if hasattr(block, "type") and block.type == "tool_use":
                         tool_name = block.name
                         tool_input = block.input
-                        iteration_tool_calls.append(tool_name)
+                        display_call = _fmt_tool_call(tool_name, tool_input)
+                        iteration_tool_calls.append(display_call)
                         all_tool_calls.append({"tool": tool_name, "input": tool_input})
 
                         logger.info(f"{self.config.tool_name} [iter {current_iteration}]: calling tool '{tool_name}'")
@@ -198,7 +211,7 @@ class SubAgent(ABC):
                                 tool_name=self.config.tool_name,
                                 iteration=current_iteration,
                                 max_iterations=self.config.max_iterations,
-                                current_tool=tool_name,
+                                current_tool=display_call,
                                 tool_calls=iteration_tool_calls.copy(),
                                 status="running_tool",
                             )
