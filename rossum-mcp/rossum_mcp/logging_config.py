@@ -4,16 +4,10 @@ import logging
 import sys
 
 
-def setup_logging(
-    app_name: str = "rossum-mcp",
-    log_level: str = "DEBUG",
-    log_file: str | None = None,
-    use_console: bool = True,
-) -> logging.Logger:
+def setup_logging(log_level: str = "DEBUG", log_file: str | None = None, use_console: bool = True) -> logging.Logger:
     """Configure logging with optional console handler.
 
     Args:
-        app_name: Application name for logging context
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         log_file: Path to log file (reserved for future use)
         use_console: Whether to add console handler (default: True)
