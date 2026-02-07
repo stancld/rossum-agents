@@ -91,6 +91,8 @@ from rossum_agent.tools import (
     get_internal_tool_names,
     get_internal_tools,
     get_mcp_mode,
+    get_tools_version,
+    is_skill_loaded,
     preload_categories_for_request,
     reset_dynamic_tools,
     set_mcp_connection,
@@ -234,6 +236,7 @@ class RossumAgent:
 
         self.memory = AgentMemory()
         self._tools_cache: list[ToolParam] | None = None
+        self._tools_cache_version: int = -1
         self._total_input_tokens: int = 0
         self._total_output_tokens: int = 0
         # Token breakdown tracking
@@ -340,19 +343,21 @@ class RossumAgent:
         """Get all available tools in Anthropic format.
 
         Initially loads only the discovery tool from MCP (list_tool_categories)
-        plus internal tools and deploy tools. Additional MCP tools are loaded dynamically
-        via load_tool_category and added to the tool list through get_dynamic_tools().
+        plus internal tools. Deploy and spawn tools are loaded when the
+        rossum-deployment skill is activated. Additional MCP tools are loaded
+        dynamically via load_tool_category.
         """
-        if self._tools_cache is None:
-            # Load only discovery tool from MCP initially to reduce context usage
+        current_version = get_tools_version()
+        if self._tools_cache is None or self._tools_cache_version != current_version:
             mcp_tools = await self.mcp_connection.get_tools()
             discovery_tools = [t for t in mcp_tools if t.name == DISCOVERY_TOOL_NAME]
             self._tools_cache = (
                 mcp_tools_to_anthropic_format(discovery_tools)
                 + get_internal_tools()
-                + get_deploy_tools()
+                + (get_deploy_tools() if is_skill_loaded("rossum-deployment") else [])
                 + self.additional_tools
             )
+            self._tools_cache_version = current_version
         # Include dynamically loaded tools
         return self._tools_cache + get_dynamic_tools()
 

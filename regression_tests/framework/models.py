@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -124,6 +124,7 @@ class RegressionTestCase:
         api_base_url: Rossum API base URL.
         prompt: The prompt to send to the agent. Use {sandbox_api_token} placeholder
             to inject sandbox token into prompt.
+        mode: MCP server mode — "read-only" or "read-write". Defaults to "read-write".
         api_token: Rossum API token (optional, can be provided via ROSSUM_API_TOKEN env var).
         rossum_url: Optional Rossum app URL for context extraction (e.g., queue/document URL).
         sandbox_api_token: Optional sandbox API token for cross-org operations.
@@ -136,6 +137,7 @@ class RegressionTestCase:
     name: str
     api_base_url: str
     prompt: str
+    mode: Literal["read-only", "read-write"] = "read-write"
     api_token: str | None = None
     rossum_url: str | None = None
     sandbox_api_token: str | None = None

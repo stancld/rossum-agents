@@ -7,9 +7,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
-- Added prompt caching (`cache_control`) for system prompt, tools, and conversation history to reduce input token costs by up to 90% on cached content
-- Added `kb_grep` and `kb_get_article` tools for direct regex search and article retrieval from pre-scraped Knowledge Base articles
-- Added `scrape_knowledge_base.py` script to scrape Rossum Knowledge Base via sitemap + Jina Reader and produce S3-hosted JSON
+- Added prompt caching (`cache_control`) for system prompt, tools, and conversation history to reduce input token costs by up to 90% on cached content [#161](https://github.com/stancld/rossum-agents/pull/161)
+- Added `kb_grep` and `kb_get_article` tools for direct regex search and article retrieval from pre-scraped Knowledge Base articles [#161](https://github.com/stancld/rossum-agents/pull/161)
+- Added `scrape_knowledge_base.py` script to scrape Rossum Knowledge Base via sitemap + Jina Reader and produce S3-hosted JSON [#161](https://github.com/stancld/rossum-agents/pull/161)
 - Added task tracking system (`create_task`, `update_task`, `list_tasks` tools) for real-time progress visibility on multi-step operations, streamed via SSE `task_snapshot` events [#157](https://github.com/stancld/rossum-agents/pull/157)
 - Added `search_elis_docs` sub-agent tool with `elis_openapi_jq` and `elis_openapi_grep` for querying the Rossum API OpenAPI specification directly [#154](https://github.com/stancld/rossum-agents/pull/154)
 - Added Gunicorn server support for production deployments via `--server gunicorn` CLI flag [#152](https://github.com/stancld/rossum-agents/pull/152)
@@ -18,18 +18,20 @@ All notable changes to this project will be documented in this file.
 - Added `prompt` and `context` field support to schema patching sub-agent for reasoning fields [#162](https://github.com/stancld/rossum-agents/pull/162)
 
 ### Changed
-- Token usage breakdown now includes cache creation and cache read input token metrics
-- Refactored `search_knowledge_base` sub-agent from live DuckDuckGo web search (`ddgs`) to pre-scraped JSON file approach with local `kb_grep`/`kb_get_article` tools — faster, more reliable, no external search dependency at runtime
+- Token usage breakdown now includes cache creation and cache read input token metrics [#161](https://github.com/stancld/rossum-agents/pull/161)
+- Replaced live DuckDuckGo-based `search_knowledge_base` with pre-scraped KB articles using local `kb_grep`/`kb_get_article` tools [#161](https://github.com/stancld/rossum-agents/pull/161)
 - Migrated default model from Opus 4.5 to Opus 4.6 [#156](https://github.com/stancld/rossum-agents/pull/156)
 - Refactored API to use FastAPI's `app.state` for service instances instead of module-level globals [#153](https://github.com/stancld/rossum-agents/pull/153)
+- Replaced `websockets` dependency with `wsproto` to fix deprecation warnings on Python 3.14
+- Lazy load deploy tools only when `rossum-deployment` skill is activated [#164](https://github.com/stancld/rossum-agents/pull/164)
 
 ### Fixed
-- Fixed schema patching sub-agent: hidden `update_schema` from agent tool loading to prevent accidental full-schema overwrites (agent must use `patch_schema_with_subagent` instead)
-- Fixed token counting to include cache creation and cache read tokens in input totals for accurate usage reporting
-- Fixed incorrect field names (`is_formula`/`is_reasoning`) in base prompt — replaced with correct API field names
+- Fixed schema patching sub-agent: excluded `update_schema` from available tools to prevent accidental full-schema overwrites [#161](https://github.com/stancld/rossum-agents/pull/161)
+- Fixed token counting to include cache creation and cache read tokens in input totals for accurate usage reporting [#161](https://github.com/stancld/rossum-agents/pull/161)
+- Fixed incorrect field names (`is_formula`/`is_reasoning`) in base prompt — replaced with correct API field names [#161](https://github.com/stancld/rossum-agents/pull/161)
 
 ### Removed
-- Removed `ddgs` dependency (replaced by pre-scraped KB article search)
+- Removed `ddgs` dependency (replaced by pre-scraped KB article search) [#161](https://github.com/stancld/rossum-agents/pull/161)
 - Removed Streamlit UI (`streamlit_app` submodule and all Streamlit dependencies) [#160](https://github.com/stancld/rossum-agents/pull/160)
 - Removed Teleport JWT user isolation (`user_detection.py`, `PyJWT`, `cryptography` dependencies) [#155](https://github.com/stancld/rossum-agents/pull/155)
 

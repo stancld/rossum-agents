@@ -60,8 +60,10 @@ class KBCache:
             data = json.loads(path.read_text())
         except (json.JSONDecodeError, OSError) as e:
             logger.warning(f"Cached KB data invalid, re-downloading: {e}")
-            path.unlink(missing_ok=True)
+            if path == self._cache_path:
+                path.unlink(missing_ok=True)
             path = self._ensure_downloaded()
+            current_mtime = path.stat().st_mtime
             data = json.loads(path.read_text())
 
         self._data = data
@@ -120,7 +122,8 @@ def _make_snippet(text: str, match: re.Match[str]) -> str:
     end = min(len(text), match.end() + _SNIPPET_CONTEXT)
     prefix = "..." if start > 0 else ""
     suffix = "..." if end < len(text) else ""
-    return prefix + text[start:end] + suffix
+    snippet = prefix + text[start:end] + suffix
+    return " ".join(snippet.split())
 
 
 @beta_tool
@@ -140,6 +143,10 @@ def kb_grep(pattern: str, case_insensitive: bool = True) -> str:
         Matching articles with snippets showing context around matches.
     """
     logger.debug(f"kb_grep called with pattern: {pattern!r}")
+
+    if not pattern or not pattern.strip():
+        return json.dumps({"status": "error", "message": "Empty pattern not allowed"})
+
     try:
         data = _cache.load()
     except (KeyError, httpx.HTTPStatusError, ValueError, OSError) as e:
@@ -234,8 +241,12 @@ def kb_get_article(slug: str) -> str:
 
     # Partial match fallback
     slug_lower = slug.lower()
-    for article in articles:
-        if slug_lower in article.get("slug", "").lower():
-            return _serialize_article(article)
+    partial_matches = [a for a in articles if slug_lower in a.get("slug", "").lower()]
+
+    if len(partial_matches) == 1:
+        return _serialize_article(partial_matches[0])
+    if len(partial_matches) > 1:
+        candidates = [a.get("slug", "") for a in partial_matches[:10]]
+        return json.dumps({"status": "error", "message": f"Ambiguous slug '{slug}', candidates: {candidates}"})
 
     return json.dumps({"status": "error", "message": f"No article found matching slug: {slug}"})

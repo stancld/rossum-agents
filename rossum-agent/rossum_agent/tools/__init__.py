@@ -55,7 +55,9 @@ from rossum_agent.tools.dynamic_tools import (
     get_load_tool_category_definition,
     get_load_tool_definition,
     get_loaded_categories,
+    get_tools_version,
     get_write_tools,
+    is_skill_loaded,
     load_tool,
     load_tool_category,
     preload_categories_for_request,
@@ -94,7 +96,7 @@ if TYPE_CHECKING:
     from anthropic._tools import BetaTool  # ty: ignore[unresolved-import] - private API
     from anthropic.types import ToolParam
 
-_BETA_TOOLS: list[BetaTool[..., str]] = [
+_ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     write_file,
     search_knowledge_base,
     search_elis_docs,
@@ -103,9 +105,6 @@ _BETA_TOOLS: list[BetaTool[..., str]] = [
     patch_schema_with_subagent,
     suggest_formula_field,
     load_skill,
-    spawn_mcp_connection,
-    call_on_connection,
-    close_connection,
     create_task,
     update_task,
     list_tasks,
@@ -115,15 +114,35 @@ _BETA_TOOLS: list[BetaTool[..., str]] = [
     kb_get_article,
 ]
 
+_DEPLOYMENT_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
+    spawn_mcp_connection,
+    call_on_connection,
+    close_connection,
+]
+
+_INTERNAL_TOOL_REGISTRY: dict[str, BetaTool[..., str]] = {
+    t.name: t for t in (_ALWAYS_INTERNAL_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS)
+}
+
+
+def _get_active_internal_tools() -> list[BetaTool[..., str]]:
+    """Get internal tools based on loaded skills."""
+    if is_skill_loaded("rossum-deployment"):
+        return _ALWAYS_INTERNAL_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS
+    return _ALWAYS_INTERNAL_TOOLS
+
 
 def get_internal_tools() -> list[ToolParam]:
-    """Get all internal tools in Anthropic format."""
-    return [tool.to_dict() for tool in _BETA_TOOLS] + [get_load_tool_category_definition(), get_load_tool_definition()]
+    """Get internal tools in Anthropic format (deployment tools only when skill is loaded)."""
+    return [tool.to_dict() for tool in _get_active_internal_tools()] + [
+        get_load_tool_category_definition(),
+        get_load_tool_definition(),
+    ]
 
 
 def get_internal_tool_names() -> set[str]:
-    """Get the names of all internal tools."""
-    return {tool.name for tool in _BETA_TOOLS} | {"load_tool_category", "load_tool"}
+    """Get names of all executable internal tools (always includes all for dispatch)."""
+    return set(_INTERNAL_TOOL_REGISTRY.keys()) | {"load_tool_category", "load_tool"}
 
 
 def execute_internal_tool(name: str, arguments: dict[str, object]) -> str:
@@ -149,10 +168,8 @@ def execute_internal_tool(name: str, arguments: dict[str, object]) -> str:
         tool_names = [str(t) for t in raw_tool_names] if isinstance(raw_tool_names, list) else [str(raw_tool_names)]
         return load_tool(tool_names)
 
-    for tool in _BETA_TOOLS:
-        if tool.name == name:
-            result: str = tool(**arguments)
-            return result
+    if tool := _INTERNAL_TOOL_REGISTRY.get(name):
+        return tool(**arguments)
 
     raise ValueError(f"Unknown internal tool: {name}")
 
@@ -165,7 +182,7 @@ def execute_tool(name: str, arguments: dict[str, object], tools: list[BetaTool[.
     raise ValueError(f"Unknown tool: {name}")
 
 
-INTERNAL_TOOLS = _BETA_TOOLS
+INTERNAL_TOOLS = _ALWAYS_INTERNAL_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS
 
 __all__ = [
     "DEPLOY_TOOLS",
@@ -215,8 +232,10 @@ __all__ = [
     "get_output_dir",
     "get_rossum_credentials",
     "get_task_tracker",
+    "get_tools_version",
     "get_write_tools",
     "is_read_only_mode",
+    "is_skill_loaded",
     "kb_get_article",
     "kb_grep",
     "list_tasks",

@@ -204,7 +204,9 @@ class SubAgent(ABC):
                         iteration_tool_calls.append(display_call)
                         all_tool_calls.append({"tool": tool_name, "input": tool_input})
 
-                        logger.info(f"{self.config.tool_name} [iter {current_iteration}]: calling tool '{tool_name}'")
+                        logger.info(
+                            f"{self.config.tool_name} [iter {current_iteration}]: calling tool '{display_call}'"
+                        )
 
                         report_progress(
                             SubAgentProgress(

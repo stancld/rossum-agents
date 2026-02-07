@@ -73,10 +73,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         name="agent_introduction",
         description="Rossum agent can introduce itself",
         api_base_url="https://api.elis.develop.r8.lol/v1",
+        mode="read-only",
         rossum_url=None,
         prompt="Hey, what can you do?",
         tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=7000, max_total_tokens=8000),
+        token_budget=TokenBudget(min_total_tokens=5000, max_total_tokens=6000),
         success_criteria=SuccessCriteria(
             required_keywords=["hook", "queue", "debug"],  # Simplified keywords for streamlined prompt
             max_steps=1,
@@ -87,10 +88,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         name="explain_aurora_sas_workflow",
         description="Explain a document workflow on a queue",
         api_base_url="https://api.elis.develop.r8.lol/v1",
+        mode="read-only",
         rossum_url="https://elis.develop.r8.lol/documents?filtering=%7B%22items%22%3A%5B%7B%22field%22%3A%22queue%22%2C%22value%22%3A%5B%223960192%22%5D%2C%22operator%22%3A%22isAnyOf%22%7D%5D%2C%22logicOperator%22%3A%22and%22%7D&level=queue&page=1&page_size=100",
         prompt="Explain a document workflow and learning workflow on this queue.",
         tool_expectation=ToolExpectation(expected_tools=["get_queue", "get_queue_engine"], mode=ToolMatchMode.SUBSET),
-        token_budget=TokenBudget(min_total_tokens=18000, max_total_tokens=38000),
+        token_budget=TokenBudget(min_total_tokens=18000, max_total_tokens=30000),
         success_criteria=SuccessCriteria(
             required_keywords=["document_type", "classification", "training", "workflow"],
             max_steps=4,
@@ -109,6 +111,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         name="analyze_broken_document_splitting",
         description="Analyze broken document splitting extension based on invoice ID field",
         api_base_url="https://api.elis.develop.r8.lol/v1",
+        mode="read-only",
         rossum_url=None,
         prompt=(
             "Please, investigate the errors with document splitting extension based on extracted invoice ID field on the queue 4014559.\n\n"
@@ -124,11 +127,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=120000, max_total_tokens=200000),
+        token_budget=TokenBudget(min_total_tokens=120000, max_total_tokens=160000),
         success_criteria=SuccessCriteria(
             require_subagent=True,
             required_keywords=[],
-            max_steps=6,
+            max_steps=7,
             file_expectation=FileExpectation(expected_files=["roast.md"]),
             custom_checks=[HIDDEN_MULTIVALUE_CHECK],
         ),
@@ -149,10 +152,10 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=["create_queue_from_template", "delete_queue"], mode=ToolMatchMode.SUBSET
         ),
-        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=50000),
+        token_budget=TokenBudget(min_total_tokens=25000, max_total_tokens=40000),
         success_criteria=SuccessCriteria(
             required_keywords=["deleted"],
-            max_steps=6,
+            max_steps=4,
             file_expectation=FileExpectation(),
             custom_checks=[QUEUE_DELETED_CHECK],
         ),
@@ -296,16 +299,16 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     ),
     RegressionTestCase(
         name="setup_invoice_queue_with_business_validation_rules",
-        description="Create Invoice queue with business validation using rules (not hooks)",
+        description="Create Invoice queue with rules business validation using rules (not hooks)",
         api_base_url="https://api.elis.rossum.ai/v1",
         rossum_url=None,
         prompt=(
-            "# Set up Invoice queue with business validation rules\n\n"
+            "# Set up Invoice queue with business validation\n\n"
             "Workspace: 1680043\n"
             "Region: EU\n\n"
             "## Tasks:\n\n"
             "1. Create a new queue: Invoices\n"
-            "2. Add business validation rules with these 3 checks:\n"
+            "2. Create a business validation rule with these 3 checks:\n"
             '    - Total amount is smaller than 400. Error message: "Total amount is larger than allowed 400."\n'
             '    - Sum of all total amount line items equals total amount. Error message: "Sum of all total amount line items does not equal total amount."\n'
             '    - All line items it holds: "quantity x unit price = total amount"\n\n'
@@ -318,10 +321,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=60000),
+        token_budget=TokenBudget(min_total_tokens=70000, max_total_tokens=160000),
         success_criteria=SuccessCriteria(
+            require_subagent=True,
             required_keywords=[],
-            max_steps=7,
+            max_steps=8,
             file_expectation=FileExpectation(),
             custom_checks=[BUSINESS_VALIDATION_RULES_CHECK],
         ),
@@ -352,7 +356,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             expected_tools=["create_queue_from_template", "load_skill", "update_queue"],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=35000, max_total_tokens=60000),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=50000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
             max_steps=4,

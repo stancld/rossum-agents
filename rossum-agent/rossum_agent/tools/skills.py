@@ -6,6 +6,7 @@ import logging
 from anthropic import beta_tool
 
 from rossum_agent.agent.skills import get_skill, get_skill_registry
+from rossum_agent.tools.dynamic_tools import mark_skill_loaded
 
 logger = logging.getLogger(__name__)
 
@@ -28,4 +29,5 @@ def load_skill(name: str) -> str:
         logger.error(f"Skill '{name}' not found. Available skills: {available}")
         return json.dumps({"status": "error", "message": f"Skill '{name}' not found.", "available_skills": available})
     logger.info(f"Loaded skill '{skill.name}'")
+    mark_skill_loaded(name)
     return json.dumps({"status": "success", "skill_name": skill.name, "instructions": skill.content})

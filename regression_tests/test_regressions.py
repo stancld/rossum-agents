@@ -164,9 +164,15 @@ def _evaluate_mermaid(final_answer: str, mermaid_exp, failures: list[str] | None
     return all_passed
 
 
+def _apply_mode_marker(case: RegressionTestCase) -> pytest.ParameterSet:
+    """Wrap test case in pytest.param with readonly/readwrite marker based on case.mode."""
+    marker = pytest.mark.readonly if case.mode == "read-only" else pytest.mark.readwrite
+    return pytest.param(case, marks=[marker], id=case.name)
+
+
 @pytest.mark.regression
 @pytest.mark.asyncio
-@pytest.mark.parametrize("case", REGRESSION_TEST_CASES, ids=lambda c: c.name)
+@pytest.mark.parametrize("case", [_apply_mode_marker(c) for c in REGRESSION_TEST_CASES])
 async def test_agent_regression(case, create_live_agent, show_answer, temp_output_dir):
     """Run a single regression test case against live API."""
     async with create_live_agent(case) as ctx:
@@ -176,6 +182,7 @@ async def test_agent_regression(case, create_live_agent, show_answer, temp_outpu
         print(f"Test: {case.name}")
         if case.description:
             print(f"Description: {case.description}")
+        print(f"Mode: {case.mode}")
         print(f"{'=' * 60}")
         print(f"Output dir: {temp_output_dir}")
         print(f"Steps: {run.step_count}")

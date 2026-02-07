@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from unittest.mock import patch
 
@@ -18,6 +19,7 @@ from rossum_agent.tools.knowledge_base_search import (
     _CACHE_TTL_SECONDS,
     _GREP_MATCH_LIMIT,
     KBCache,
+    _make_snippet,
     kb_get_article,
     kb_grep,
     refresh_knowledge_base,
@@ -176,6 +178,36 @@ class TestKBCache:
             mock_get.assert_called_once()
             assert data["articles"] == sample_data["articles"]
 
+    def test_corrupt_local_path_not_deleted(self, tmp_path, sample_data, monkeypatch):
+        """Test that corrupt local file (via env var) is not deleted during reload."""
+        local_file = tmp_path / "local_kb.json"
+        local_file.write_text("not valid json{{{")
+        monkeypatch.setenv("ROSSUM_KB_DATA_PATH", str(local_file))
+
+        cache = KBCache(cache_path=tmp_path / "cache_kb.json")
+
+        with pytest.raises(json.JSONDecodeError):
+            cache.load()
+
+        # The local file must NOT have been deleted
+        assert local_file.exists()
+
+    def test_corrupt_cache_redownload_updates_mtime(self, cache_path, sample_data):
+        """Test that re-download after corrupt cache correctly updates mtime."""
+        cache_path.write_text("not valid json{{{")
+        cache = KBCache(cache_path=cache_path)
+
+        with patch("rossum_agent.tools.knowledge_base_search.httpx.get") as mock_get:
+            mock_response = httpx.Response(200, text=json.dumps(sample_data), request=_DUMMY_REQUEST)
+            mock_get.return_value = mock_response
+
+            data1 = cache.load()
+            # Second load should use memory cache (mtime was updated correctly)
+            data2 = cache.load()
+
+            assert data1 is data2
+            mock_get.assert_called_once()
+
     def test_uses_env_var_for_url(self, cache_path, sample_data):
         """Test that ROSSUM_KB_DATA_URL env var is used."""
         cache = KBCache(cache_path=cache_path)
@@ -192,8 +224,32 @@ class TestKBCache:
             mock_get.assert_called_once_with("https://custom-url.example.com/kb.json", timeout=60)
 
 
+class TestMakeSnippet:
+    """Test _make_snippet helper."""
+
+    def test_normalizes_whitespace(self):
+        """Test that newlines and multiple spaces are collapsed to single spaces."""
+        text = "Before context.\n\n  Multiple   spaces\nand\nnewlines  here.  After context."
+        match = re.search("Multiple", text)
+        snippet = _make_snippet(text, match)
+
+        assert "\n" not in snippet
+        assert "  " not in snippet
+        assert "Multiple spaces and newlines here." in snippet
+
+
 class TestKbGrep:
     """Test kb_grep tool."""
+
+    def test_empty_pattern_returns_error(self, populated_cache):
+        """Test that empty or whitespace-only patterns return an error."""
+        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+            for pattern in ["", "   ", "\t"]:
+                result = kb_grep(pattern)
+                parsed = json.loads(result)
+
+                assert parsed["status"] == "error"
+                assert parsed["message"] == "Empty pattern not allowed"
 
     def test_basic_search(self, populated_cache):
         """Test basic keyword search."""
@@ -374,6 +430,37 @@ class TestKbGetArticle:
 
             assert parsed["status"] == "error"
             assert "Error loading KB data" in parsed["message"]
+
+    def test_ambiguous_partial_slug_returns_candidates(self, cache_path):
+        """Test that multiple partial matches return an error with candidate slugs."""
+        data = {
+            "scraped_at": "2026-01-01T00:00:00Z",
+            "articles": [
+                {
+                    "slug": "webhook-configuration",
+                    "url": "https://kb.example.com/docs/webhook-configuration",
+                    "title": "Webhook Configuration",
+                    "content": "Configure webhooks.",
+                },
+                {
+                    "slug": "webhook-events",
+                    "url": "https://kb.example.com/docs/webhook-events",
+                    "title": "Webhook Events",
+                    "content": "Webhook event types.",
+                },
+            ],
+        }
+        cache_path.write_text(json.dumps(data))
+        cache = KBCache(cache_path=cache_path)
+
+        with patch("rossum_agent.tools.knowledge_base_search._cache", cache):
+            result = kb_get_article("webhook")
+            parsed = json.loads(result)
+
+            assert parsed["status"] == "error"
+            assert "Ambiguous slug" in parsed["message"]
+            assert "webhook-configuration" in parsed["message"]
+            assert "webhook-events" in parsed["message"]
 
     def test_exact_match_preferred_over_partial(self, cache_path):
         """Test that exact slug match is preferred over partial match."""
