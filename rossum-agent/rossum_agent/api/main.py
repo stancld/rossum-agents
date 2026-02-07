@@ -141,6 +141,7 @@ def _run_uvicorn(args: argparse.Namespace) -> None:
         port=args.port,
         reload=args.reload,
         workers=args.workers if not args.reload else 1,
+        ws="wsproto",
     )
 
 
