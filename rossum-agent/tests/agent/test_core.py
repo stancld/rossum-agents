@@ -32,6 +32,7 @@ from rossum_agent.agent import (
 )
 from rossum_agent.agent.core import _parse_json_encoded_strings, _StreamState
 from rossum_agent.agent.models import StepType
+from rossum_agent.utils import add_message_cache_breakpoint
 
 
 class TestParseJsonEncodedStrings:
@@ -2478,3 +2479,165 @@ class TestRossumAgentTokenTracking:
         assert "TOTAL" in log_output
         assert "1,000" in log_output
         assert "3,000" in log_output
+
+    def test_initial_cache_counters_are_zero(self, mock_agent):
+        """Test that all cache token counters start at zero."""
+        assert mock_agent._total_cache_creation_tokens == 0
+        assert mock_agent._total_cache_read_tokens == 0
+        assert mock_agent._main_agent_cache_creation_tokens == 0
+        assert mock_agent._main_agent_cache_read_tokens == 0
+        assert mock_agent._sub_agent_cache_creation_tokens == 0
+        assert mock_agent._sub_agent_cache_read_tokens == 0
+        assert mock_agent._sub_agent_cache_usage == {}
+
+    def test_reset_clears_cache_counters(self, mock_agent):
+        """Test reset clears all cache token tracking state."""
+        mock_agent._total_cache_creation_tokens = 500
+        mock_agent._total_cache_read_tokens = 1000
+        mock_agent._main_agent_cache_creation_tokens = 300
+        mock_agent._main_agent_cache_read_tokens = 600
+        mock_agent._sub_agent_cache_creation_tokens = 200
+        mock_agent._sub_agent_cache_read_tokens = 400
+        mock_agent._sub_agent_cache_usage = {"debug_hook": (200, 400)}
+
+        mock_agent.reset()
+
+        assert mock_agent._total_cache_creation_tokens == 0
+        assert mock_agent._total_cache_read_tokens == 0
+        assert mock_agent._main_agent_cache_creation_tokens == 0
+        assert mock_agent._main_agent_cache_read_tokens == 0
+        assert mock_agent._sub_agent_cache_creation_tokens == 0
+        assert mock_agent._sub_agent_cache_read_tokens == 0
+        assert mock_agent._sub_agent_cache_usage == {}
+
+    def test_accumulate_sub_agent_cache_tokens(self, mock_agent):
+        """Test _accumulate_sub_agent_tokens accumulates cache metrics."""
+        from rossum_agent.tools import SubAgentTokenUsage
+
+        usage = SubAgentTokenUsage(
+            tool_name="debug_hook",
+            input_tokens=100,
+            output_tokens=50,
+            iteration=1,
+            cache_creation_input_tokens=30,
+            cache_read_input_tokens=60,
+        )
+        mock_agent._accumulate_sub_agent_tokens(usage)
+
+        assert mock_agent._total_cache_creation_tokens == 30
+        assert mock_agent._total_cache_read_tokens == 60
+        assert mock_agent._sub_agent_cache_creation_tokens == 30
+        assert mock_agent._sub_agent_cache_read_tokens == 60
+        assert mock_agent._sub_agent_cache_usage["debug_hook"] == (30, 60)
+
+    def test_get_token_usage_breakdown_includes_cache(self, mock_agent):
+        """Test that breakdown includes cache metrics."""
+        mock_agent._total_input_tokens = 1000
+        mock_agent._total_output_tokens = 500
+        mock_agent._main_agent_input_tokens = 1000
+        mock_agent._main_agent_output_tokens = 500
+        mock_agent._main_agent_cache_creation_tokens = 100
+        mock_agent._main_agent_cache_read_tokens = 800
+
+        breakdown = mock_agent.get_token_usage_breakdown()
+
+        assert breakdown.total.cache_creation_input_tokens == 100
+        assert breakdown.total.cache_read_input_tokens == 800
+        assert breakdown.main_agent.cache_creation_input_tokens == 100
+        assert breakdown.main_agent.cache_read_input_tokens == 800
+
+
+class TestCacheBreakpoints:
+    """Test cache breakpoint injection in _sync_stream_events and _add_message_cache_breakpoint."""
+
+    def test_add_message_cache_breakpoint_to_string_content(self):
+        """Test cache breakpoint converts string content to list with cache_control."""
+        messages = [{"role": "user", "content": "Hello"}]
+        add_message_cache_breakpoint(messages)
+
+        assert isinstance(messages[0]["content"], list)
+        assert messages[0]["content"][0]["type"] == "text"
+        assert messages[0]["content"][0]["text"] == "Hello"
+        assert messages[0]["content"][0]["cache_control"] == {"type": "ephemeral"}
+
+    def test_add_message_cache_breakpoint_to_list_content(self):
+        """Test cache breakpoint adds cache_control to last block in list."""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "First"},
+                    {"type": "text", "text": "Second"},
+                ],
+            }
+        ]
+        add_message_cache_breakpoint(messages)
+
+        assert "cache_control" not in messages[0]["content"][0]
+        assert messages[0]["content"][1]["cache_control"] == {"type": "ephemeral"}
+
+    def test_add_message_cache_breakpoint_empty_messages(self):
+        """Test cache breakpoint handles empty message list."""
+        messages = []
+        add_message_cache_breakpoint(messages)
+        assert messages == []
+
+    def test_add_message_cache_breakpoint_tool_result_content(self):
+        """Test cache breakpoint on message with tool_result content."""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "tc1", "content": "result"},
+                ],
+            }
+        ]
+        add_message_cache_breakpoint(messages)
+
+        assert messages[0]["content"][0]["cache_control"] == {"type": "ephemeral"}
+
+    def test_add_message_cache_breakpoint_removes_previous(self):
+        """Test that previous cache_control breakpoints are removed before adding new one.
+
+        This prevents exceeding Anthropic's 4-breakpoint limit during iterative tool use.
+        """
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "First", "cache_control": {"type": "ephemeral"}},
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": [{"type": "tool_use", "id": "tc1", "name": "tool", "input": {}}],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "tc1",
+                        "content": "result1",
+                        "cache_control": {"type": "ephemeral"},
+                    },
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": [{"type": "tool_use", "id": "tc2", "name": "tool", "input": {}}],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "tc2", "content": "result2"},
+                ],
+            },
+        ]
+        add_message_cache_breakpoint(messages)
+
+        # Previous breakpoints should be removed
+        assert "cache_control" not in messages[0]["content"][0]
+        assert "cache_control" not in messages[2]["content"][0]
+        # Only last message should have cache_control
+        assert messages[4]["content"][0]["cache_control"] == {"type": "ephemeral"}

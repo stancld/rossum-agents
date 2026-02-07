@@ -394,6 +394,8 @@ class AgentService:
                         total_steps=total_steps,
                         input_tokens=total_input_tokens,
                         output_tokens=total_output_tokens,
+                        cache_creation_input_tokens=agent._total_cache_creation_tokens,
+                        cache_read_input_tokens=agent._total_cache_read_tokens,
                         token_usage_breakdown=agent.get_token_usage_breakdown(),
                     )
                     agent.log_token_usage_summary()

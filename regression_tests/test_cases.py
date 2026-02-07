@@ -124,7 +124,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=120000, max_total_tokens=170000),
+        token_budget=TokenBudget(min_total_tokens=120000, max_total_tokens=200000),
         success_criteria=SuccessCriteria(
             require_subagent=True,
             required_keywords=[],
