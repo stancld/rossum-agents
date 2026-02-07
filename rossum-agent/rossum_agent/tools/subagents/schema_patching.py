@@ -14,6 +14,7 @@ import copy
 import json
 import logging
 import time
+from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -29,6 +30,39 @@ from rossum_agent.tools.subagents.base import (
 from rossum_agent.tools.subagents.mcp_helpers import call_mcp_tool
 
 logger = logging.getLogger(__name__)
+
+
+def _to_plain(obj: Any) -> Any:
+    """Recursively convert dataclass/Pydantic objects to plain dicts/lists."""
+    if isinstance(obj, dict):
+        return {k: _to_plain(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_to_plain(v) for v in obj]
+    if isinstance(obj, tuple):
+        return [_to_plain(v) for v in obj]
+    if hasattr(obj, "model_dump"):
+        return _to_plain(obj.model_dump())
+    if is_dataclass(obj) and not isinstance(obj, type):
+        return _to_plain(asdict(obj))
+    return obj
+
+
+def _extract_schema_content(mcp_result: Any) -> list[dict[str, Any]]:
+    """Extract schema content list from MCP result, handling dict, dataclass, or Pydantic."""
+    if mcp_result is None:
+        return []
+    if isinstance(mcp_result, dict):
+        content = mcp_result.get("content", [])
+        if isinstance(content, list):
+            return _to_plain(content)
+        return []
+    if hasattr(mcp_result, "content"):
+        content = mcp_result.content
+        if isinstance(content, list):
+            return _to_plain(content)
+        return []
+    return []
+
 
 _SCHEMA_PATCHING_SYSTEM_PROMPT = """Goal: Update schema to match EXACTLY the requested fields—programmatically.
 
@@ -330,14 +364,18 @@ def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
 
     if tool_name == "get_schema_tree_structure":
         mcp_result = call_mcp_tool("get_schema_tree_structure", tool_input)
-        return json.dumps(mcp_result, indent=2, default=str) if mcp_result else "No data returned"
+        plain_result = _to_plain(mcp_result) if mcp_result else None
+        return json.dumps(plain_result, indent=2, default=str) if plain_result else "No data returned"
 
     if tool_name == "get_full_schema":
         mcp_result = call_mcp_tool("get_schema", tool_input)
         if mcp_result and schema_id:
-            content = mcp_result.get("content", []) if isinstance(mcp_result, dict) else []
+            content = _extract_schema_content(mcp_result)
+            if not content:
+                logger.warning("get_full_schema: empty content extracted; result type=%s", type(mcp_result).__name__)
             _schema_content_cache[schema_id] = content
-        return json.dumps(mcp_result, indent=2, default=str) if mcp_result else "No data returned"
+        plain_result = _to_plain(mcp_result) if mcp_result else None
+        return json.dumps(plain_result, indent=2, default=str) if plain_result else "No data returned"
 
     if tool_name == "apply_schema_changes":
         if not schema_id or schema_id not in _schema_content_cache:
