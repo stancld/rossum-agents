@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Added Gunicorn server support for production deployments via `--server gunicorn` CLI flag [#152](https://github.com/stancld/rossum-agents/pull/152)
   - Gunicorn is now bundled with the `api` extra
   - Uses UvicornWorker for ASGI compatibility
+- Added `prompt` and `context` field support to schema patching sub-agent for reasoning fields [#162](https://github.com/stancld/rossum-agents/pull/162)
 
 ### Changed
 - Token usage breakdown now includes cache creation and cache read input token metrics

@@ -86,7 +86,7 @@ _SCHEMA_PATCHING_SYSTEM_PROMPT = """Goal: Update schema to match EXACTLY the req
 | type | Yes | string, number, date, enum |
 | table_id | If table | Multivalue ID for table columns |
 
-Optional: format, options (for enum), rir_field_names, hidden, can_export, ui_configuration
+Optional: format, options (for enum), rir_field_names, hidden, can_export, ui_configuration, prompt, context
 
 ## Constraints
 
@@ -171,6 +171,15 @@ _APPLY_SCHEMA_CHANGES_TOOL: dict[str, Any] = {
                                     "description": "Edit behavior in UI",
                                 },
                             },
+                        },
+                        "prompt": {
+                            "type": "string",
+                            "description": "LLM prompt for reasoning fields (max 2000 chars)",
+                        },
+                        "context": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Context field IDs for reasoning (TxScript format, e.g. field.invoice_id)",
                         },
                     },
                     "required": ["id", "label", "parent_section", "type"],
@@ -282,6 +291,12 @@ def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
 
     if spec.get("ui_configuration"):
         node["ui_configuration"] = spec["ui_configuration"]
+
+    if spec.get("prompt"):
+        node["prompt"] = spec["prompt"]
+
+    if spec.get("context"):
+        node["context"] = spec["context"]
 
     return node
 
