@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -16,7 +15,6 @@ from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
 from rossum_agent.tools.core import (
     SubAgentProgress,
     SubAgentTokenUsage,
-    get_output_dir,
     report_progress,
     report_token_usage,
 )
@@ -44,34 +42,6 @@ class SubAgentResult:
     output_tokens: int
     iterations_used: int
     tool_calls: list[dict[str, Any]] | None = None
-
-
-def save_iteration_context(
-    tool_name: str,
-    iteration: int,
-    max_iterations: int,
-    messages: list[dict[str, Any]],
-    system_prompt: str,
-    tools: list[dict[str, Any]],
-    max_tokens: int,
-) -> None:
-    """Save agent input context to file for debugging."""
-    try:
-        output_dir = get_output_dir()
-        context_file = output_dir / f"{tool_name}_context_iter_{iteration}.json"
-        context_data = {
-            "iteration": iteration,
-            "max_iterations": max_iterations,
-            "model": get_model_id(),
-            "max_tokens": max_tokens,
-            "system_prompt": system_prompt,
-            "messages": messages,
-            "tools": tools,
-        }
-        context_file.write_text(json.dumps(context_data, indent=2, default=str))
-        logger.info(f"{tool_name} sub-agent: saved context to {context_file}")
-    except Exception as e:
-        logger.warning(f"Failed to save {tool_name} context: {e}")
 
 
 class SubAgent(ABC):
@@ -134,16 +104,6 @@ class SubAgent(ABC):
                         max_iterations=self.config.max_iterations,
                         status="thinking",
                     )
-                )
-
-                save_iteration_context(
-                    tool_name=self.config.tool_name,
-                    iteration=current_iteration,
-                    max_iterations=self.config.max_iterations,
-                    messages=messages,
-                    system_prompt=self.config.system_prompt,
-                    tools=self.config.tools,
-                    max_tokens=self.config.max_tokens,
                 )
 
                 llm_start = time.perf_counter()
@@ -234,8 +194,10 @@ class SubAgent(ABC):
                             tool_start = time.perf_counter()
                             result = self.execute_tool(tool_name, tool_input)
                             tool_elapsed_ms = (time.perf_counter() - tool_start) * 1000
+                            result_preview = result[:200] + "..." if len(result) > 200 else result
                             logger.info(
                                 f"{self.config.tool_name}: tool '{tool_name}' executed in {tool_elapsed_ms:.1f}ms"
+                                f" | result: {result_preview}"
                             )
                             tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
                         except Exception as e:
@@ -251,6 +213,16 @@ class SubAgent(ABC):
 
                 if tool_results:
                     messages.append({"role": "user", "content": tool_results})
+
+                    report_progress(
+                        SubAgentProgress(
+                            tool_name=self.config.tool_name,
+                            iteration=current_iteration,
+                            max_iterations=self.config.max_iterations,
+                            tool_calls=iteration_tool_calls.copy(),
+                            status="reasoning",
+                        )
+                    )
 
             logger.warning(f"{self.config.tool_name}: max iterations ({self.config.max_iterations}) reached")
             text_parts = [block.text for block in response.content if hasattr(block, "text")] if response else []

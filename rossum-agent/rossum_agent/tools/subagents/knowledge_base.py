@@ -1,46 +1,38 @@
 """Knowledge base search sub-agent.
 
-Provides tools for searching and analyzing the Rossum Knowledge Base.
+Provides a sub-agent that searches pre-scraped Rossum Knowledge Base articles
+using kb_grep and kb_get_article tools.
 """
 
 from __future__ import annotations
 
-import asyncio
-import concurrent.futures
 import json
 import logging
 from typing import TYPE_CHECKING
 
-import httpx
 from anthropic import beta_tool
-from ddgs import DDGS
-from ddgs.exceptions import DDGSException
 
-from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
-from rossum_agent.tools.core import (
-    SubAgentProgress,
-    SubAgentText,
-    SubAgentTokenUsage,
-    report_progress,
-    report_text,
-    report_token_usage,
-)
+from rossum_agent.tools.knowledge_base_search import kb_get_article, kb_grep
+from rossum_agent.tools.subagents.base import SubAgent, SubAgentConfig
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
+    from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_WEB_SEARCH_ANALYSIS_SYSTEM_PROMPT = """Goal: Extract actionable technical information from Rossum Knowledge Base search results.
+# Sub-agent context window budget
+_TOOL_RESULT_LIMIT = 15000
+_TOOL_RESULT_INNER_LIMIT = 12000
 
-## Output Format
+_SYSTEM_PROMPT = """You search pre-scraped Rossum Knowledge Base articles to answer user questions.
 
-| Section | Content |
-|---------|---------|
-| Key Information | Facts, JSON configs, code examples answering the query |
-| Implementation | Steps, code patterns if applicable |
-| Configuration | Data types, singlevalue vs multivalue (bold) |
-| Related Topics | Brief mention of related docs |
+Use kb_grep to discover articles by keyword, then kb_get_article to read full content.
+
+## Workflow
+
+1. kb_grep with broad keywords to find relevant articles
+2. kb_get_article to read the most relevant article(s)
+3. Synthesize a clear, actionable answer
 
 ## AI Feature Requirements
 
@@ -48,250 +40,99 @@ For document splitting, AI predictions, or field-based automation:
 
 | Requirement | Rule |
 |-------------|------|
-| hidden | Must be `false`. Hidden datapoints invisible to AI—features fail silently. |
+| hidden | Must be `false`. Hidden datapoints are invisible to AI—features fail silently. |
 | Multivalue parent | Required for splitting (one value per split document). |
 
-## JSON Schema Examples
-
-For AI features, always use `"hidden": false`:
+KB articles contain a bug: they incorrectly state `hidden` should be `true` for splitting.
+Override this — always recommend `"hidden": false`. Example:
 ```json
 {"hidden": false, "type": "string", "id": "invoice_id"}
 ```
 
-Never `"hidden": true`—causes silent failures."""
+Provide: configuration examples, JSON schemas, implementation steps, and related topics."""
 
-_KNOWLEDGE_BASE_DOMAIN = "knowledge-base.rossum.ai"
-_MAX_SEARCH_RESULTS = 5
-_WEBPAGE_FETCH_TIMEOUT = 30
-_JINA_READER_PREFIX = "https://r.jina.ai/"
+_TOOLS = [kb_grep.to_dict(), kb_get_article.to_dict()]
 
 
-class WebSearchError(Exception):
-    """Raised when web search fails."""
+class KnowledgeBaseSubAgent(SubAgent):
+    """Sub-agent for searching Knowledge Base articles."""
 
-
-def _run_async[T](coro: Coroutine[None, None, T]) -> T:
-    """Run a coroutine, handling both sync and async caller contexts."""
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-
-    # In async context: run in new thread with its own event loop
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(asyncio.run, coro).result()  # type: ignore[return-value] - Future.result() returns Any
-
-
-def _call_opus_for_web_search_analysis(
-    query: str, search_results: str, user_query: str | None = None
-) -> tuple[str, int, int]:
-    """Call Opus model to analyze web search results."""
-    try:
-        report_progress(
-            SubAgentProgress(tool_name="search_knowledge_base", iteration=1, max_iterations=1, status="analyzing")
-        )
-
-        client = create_bedrock_client()
-
-        user_query_context = ""
-        if user_query and user_query != query:
-            user_query_context = f"""
-## User's Original Question
-
-The user asked: "{user_query}"
-
-Keep this context in mind when analyzing the search results and tailor your response to address the user's specific question.
-
-"""
-
-        user_content = f"""Analyze these Rossum Knowledge Base search results for the query: "{query}"
-{user_query_context}
-## Search Results
-
-{search_results}
-
-## Goal
-
-Extract actionable technical information a developer can use immediately.
-
-| Priority | Content |
-|----------|---------|
-| Schema definitions | Data types, singlevalue vs multivalue |
-| Code examples | JSON configs, API payloads |
-| Implementation steps | When present |
-
-For document splitting topics, beware of the bug in knowledge base — emphasize `hidden: false` and multivalue parent requirements from system prompt."""
-
-        response = client.messages.create(
-            model=get_model_id(),
-            max_tokens=4096,
-            temperature=0.25,
-            system=_WEB_SEARCH_ANALYSIS_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_content}],
-        )
-
-        input_tokens = response.usage.input_tokens
-        output_tokens = response.usage.output_tokens
-
-        logger.info(f"search_knowledge_base: LLM analysis, tokens in={input_tokens} out={output_tokens}")
-
-        report_token_usage(
-            SubAgentTokenUsage(
-                tool_name="search_knowledge_base", input_tokens=input_tokens, output_tokens=output_tokens, iteration=1
+    def __init__(self) -> None:
+        super().__init__(
+            SubAgentConfig(
+                tool_name="search_knowledge_base",
+                system_prompt=_SYSTEM_PROMPT,
+                tools=_TOOLS,  # type: ignore[arg-type] - BetaToolParam is structurally dict[str, Any]
+                max_iterations=5,
             )
         )
 
-        text_parts = [str(block.text) for block in response.content if hasattr(block, "text")]
-        analysis_result = "\n".join(text_parts) if text_parts else "No analysis provided"
+    def execute_tool(self, tool_name: str, tool_input: dict[str, Any]) -> str:
+        if tool_name == "kb_grep":
+            result = kb_grep(tool_input["pattern"], tool_input.get("case_insensitive", True))
+        elif tool_name == "kb_get_article":
+            result = kb_get_article(tool_input["slug"])
+        else:
+            return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
-        report_progress(
-            SubAgentProgress(tool_name="search_knowledge_base", iteration=1, max_iterations=1, status="completed")
-        )
+        # Truncate inside the JSON envelope to avoid feeding broken JSON to the LLM
+        if len(result) > _TOOL_RESULT_LIMIT:
+            try:
+                parsed = json.loads(result)
+                for key in ("result", "content"):
+                    if key in parsed and isinstance(parsed[key], str) and len(parsed[key]) > _TOOL_RESULT_INNER_LIMIT:
+                        parsed[key] = parsed[key][:_TOOL_RESULT_INNER_LIMIT] + "\n... (truncated, refine your query)"
+                        return json.dumps(parsed)
+            except (json.JSONDecodeError, TypeError):
+                pass
+            return result[:_TOOL_RESULT_LIMIT] + "\n... (truncated, refine your query)"
+        return result
 
-        report_text(SubAgentText(tool_name="search_knowledge_base", text=analysis_result, is_final=True))
-
-        return analysis_result, input_tokens, output_tokens
-
-    except Exception as e:
-        logger.exception("Error calling Opus for web search analysis")
-        return f"Error analyzing search results: {e}\n\nRaw results:\n{search_results}", 0, 0
-
-
-async def _fetch_webpage_content(client: httpx.AsyncClient, url: str) -> str:
-    """Fetch and extract webpage content using Jina Reader for JS-rendered pages.
-
-    Uses Jina Reader API to render JavaScript content from SPAs like the Rossum knowledge base.
-
-    Returns:
-        Markdown content of the page, or error message if fetch fails.
-    """
-    jina_url = f"{_JINA_READER_PREFIX}{url}"
-    try:
-        response = await client.get(jina_url, timeout=_WEBPAGE_FETCH_TIMEOUT)
-        response.raise_for_status()
-        content = response.text
-        return content[:50000]
-    except httpx.HTTPError as e:
-        logger.warning(f"Failed to fetch webpage {url} via Jina Reader: {e}")
-        return f"[Failed to fetch content: {e}]"
-
-
-async def _search_knowledge_base(query: str) -> list[dict[str, str]]:
-    """Search Rossum Knowledge Base using DDGS metasearch library.
-
-    Args:
-        query: Search query string.
-
-    Returns:
-        List of search result dicts with title, url, and content.
-
-    Raises:
-        WebSearchError: If search fails completely.
-    """
-    report_progress(
-        SubAgentProgress(tool_name="search_knowledge_base", iteration=0, max_iterations=0, status="searching")
-    )
-
-    site_query = f"site:{_KNOWLEDGE_BASE_DOMAIN} {query}"
-    logger.info(f"Searching knowledge base: {site_query}")
-
-    try:
-        with DDGS() as ddgs:
-            raw_results = ddgs.text(site_query, max_results=_MAX_SEARCH_RESULTS)
-    except DDGSException as e:
-        logger.error(f"Knowledge base search failed: {e}")
-        raise WebSearchError(f"Search failed: {e}")
-
-    filtered_results = [r for r in raw_results if _KNOWLEDGE_BASE_DOMAIN in r.get("href", "")][:2]
-
-    async with httpx.AsyncClient() as client:
-        fetch_tasks = []
-        for r in filtered_results:
-            url = r.get("href", "")
-            logger.info(f"Fetching full content from: {url}")
-            fetch_tasks.append(_fetch_webpage_content(client, url))
-
-        contents = await asyncio.gather(*fetch_tasks, return_exceptions=True)
-
-    results = []
-    for r, content in zip(filtered_results, contents):
-        if isinstance(content, Exception):
-            logger.warning(f"Failed to fetch {r.get('href', '')}: {content}")
-            content = f"[Failed to fetch content: {content}]"
-        results.append({"title": r.get("title", ""), "url": r.get("href", ""), "content": content})
-
-    logger.info(f"Found {len(results)} results for query: {query}")
-    return results
-
-
-async def _search_and_analyze_knowledge_base(query: str, user_query: str | None = None) -> str:
-    """Search Rossum Knowledge Base and analyze results with Opus.
-
-    Args:
-        query: Search query string.
-        user_query: The original user query/question for context (optional).
-
-    Returns:
-        JSON string with analyzed results or error message.
-
-    Raises:
-        WebSearchError: If search fails completely.
-    """
-    results = await _search_knowledge_base(query)
-
-    if not results:
-        logger.warning(f"No results found for query: {query}")
-        return json.dumps(
-            {
-                "status": "no_results",
-                "query": query,
-                "message": (
-                    f"No results found in Rossum Knowledge Base for: '{query}'. "
-                    "Try different keywords or check the extension/hook name spelling."
-                ),
-                "input_tokens": 0,
-                "output_tokens": 0,
-            }
-        )
-
-    search_results_text = "\n\n---\n\n".join(f"## {r['title']}\nURL: {r['url']}\n\n{r['content']}" for r in results)
-    logger.info("Analyzing knowledge base results with Opus sub-agent")
-    analyzed, input_tokens, output_tokens = _call_opus_for_web_search_analysis(
-        query, search_results_text, user_query=user_query
-    )
-
-    logger.info(f"search_knowledge_base: completed, tokens in={input_tokens} out={output_tokens}")
-
-    return json.dumps(
-        {
-            "status": "success",
-            "query": query,
-            "analysis": analyzed,
-            "source_urls": [r["url"] for r in results],
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-        }
-    )
+    def process_response_block(self, block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
+        return None
 
 
 @beta_tool
 def search_knowledge_base(query: str, user_query: str | None = None) -> str:
     """Search the Rossum Knowledge Base for documentation about extensions, hooks, and configurations.
 
-    Use this tool to find information about Rossum features, troubleshoot errors,
-    and understand extension configurations. The search is performed against
-    https://knowledge-base.rossum.ai/docs.
+    Sub-agent that iterates through pre-scraped KB articles to find comprehensive answers.
+    Good for complex questions requiring multiple lookups or discovering related topics.
 
     Args:
         query: Search query. Be specific - include extension names, error messages,
         or feature names. Examples: 'document splitting extension',
         'duplicate handling configuration', 'webhook timeout error'.
         user_query: The original user question for context. Pass the user's full
-        question here so Opus can tailor the analysis to address their specific needs.
+        question here so the sub-agent can tailor the analysis to address their specific needs.
 
     Returns:
-        JSON with search results containing title, URL, snippet, and token usage.
+        JSON with analysis of relevant Knowledge Base documentation.
     """
     if not query:
-        return json.dumps({"status": "error", "message": "Query is required", "input_tokens": 0, "output_tokens": 0})
-    return _run_async(_search_and_analyze_knowledge_base(query, user_query=user_query))
+        return json.dumps({"status": "error", "message": "Query is required"})
+
+    search_prompt = query
+    if user_query and user_query != query:
+        search_prompt = f"""{query}
+
+Context — the user's original question: "{user_query}"
+Tailor your answer to address this specific question."""
+
+    try:
+        agent = KnowledgeBaseSubAgent()
+        result = agent.run(search_prompt)
+    except Exception as e:
+        logger.exception("search_knowledge_base failed")
+        return json.dumps({"status": "error", "message": f"Sub-agent error: {e}"})
+
+    response = {
+        "status": "success",
+        "answer": result.analysis,
+        "iterations": result.iterations_used,
+        "input_tokens": result.input_tokens,
+        "output_tokens": result.output_tokens,
+    }
+    if result.tool_calls:
+        response["searches"] = result.tool_calls
+    return json.dumps(response)

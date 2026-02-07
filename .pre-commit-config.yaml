@@ -27,6 +27,7 @@ repos:
         exclude: >
           (?x)^(
             .*\.html|
+            rossum-agent/data/rossum-kb\.json|
           )$
 
   - repo: local

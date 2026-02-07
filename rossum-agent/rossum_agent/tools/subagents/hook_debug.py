@@ -30,91 +30,10 @@ if TYPE_CHECKING:
 from anthropic import beta_tool
 
 from rossum_agent.tools.subagents.base import SubAgent, SubAgentConfig, SubAgentResult
-from rossum_agent.tools.subagents.knowledge_base import (
-    WebSearchError,
-    _call_opus_for_web_search_analysis,
-    search_knowledge_base,
-)
+from rossum_agent.tools.subagents.knowledge_base import search_knowledge_base
 from rossum_agent.tools.subagents.mcp_helpers import call_mcp_tool
 
 logger = logging.getLogger(__name__)
-
-_WEB_SEARCH_NO_RESULTS = "__NO_RESULTS__"
-
-
-def _extract_web_search_text_from_block(block: Any) -> str | None:
-    """Extract full web search results text from a single web_search_tool_result block.
-
-    Args:
-        block: The response content block to process.
-
-    Returns:
-        Formatted text with full search results, _WEB_SEARCH_NO_RESULTS if search
-        returned empty, or None if not a web search block.
-
-    Raises:
-        WebSearchError: If web search returned an error.
-    """
-    if not (hasattr(block, "type") and block.type == "web_search_tool_result"):
-        return None
-
-    search_results_text = []
-    if hasattr(block, "content") and block.content:
-        for result in block.content:
-            result_type = getattr(result, "type", None)
-
-            if result_type == "web_search_result_error":
-                error_code = getattr(result, "error_code", "unknown")
-                error_message = getattr(result, "message", "Web search failed")
-                logger.error(f"Web search error: code={error_code}, message={error_message}")
-                raise WebSearchError(f"Web search failed: {error_code} - {error_message}")
-
-            if result_type == "web_search_result":
-                title = getattr(result, "title", "")
-                url = getattr(result, "url", "")
-                page_content = getattr(result, "page_content", "")
-                search_results_text.append(f"## {title}\nURL: {url}\n\n{page_content}\n")
-
-    if not search_results_text:
-        logger.warning("Web search returned no results for the query")
-        return _WEB_SEARCH_NO_RESULTS
-
-    return "\n---\n".join(search_results_text)
-
-
-def _extract_and_analyze_web_search_results(block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
-    """Extract web search results and analyze with Opus sub-agent.
-
-    Args:
-        block: The response content block to process.
-        iteration: Current iteration number for logging.
-        max_iterations: Maximum iterations for logging.
-
-    Returns:
-        Tool result dict with analyzed search results, or None if not a web search block.
-    """
-    full_results = _extract_web_search_text_from_block(block)
-    if full_results is None:
-        return None
-
-    if full_results == _WEB_SEARCH_NO_RESULTS:
-        logger.info(f"debug_hook sub-agent [iter {iteration}/{max_iterations}]: web search returned no results")
-        return {
-            "type": "tool_result",
-            "tool_use_id": block.id,
-            "content": "Web search returned no results for the query.",
-        }
-
-    logger.info(f"debug_hook sub-agent [iter {iteration}/{max_iterations}]: processing web search results")
-    query = getattr(block, "search_query", "Rossum documentation")
-    logger.info(f"debug_hook sub-agent [iter {iteration}/{max_iterations}]: analyzing with Opus sub-agent")
-    analyzed_results = _call_opus_for_web_search_analysis(query, full_results)
-    return {
-        "type": "tool_result",
-        "tool_use_id": block.id,
-        "content": f"Analyzed Rossum Knowledge Base search results:\n\n{analyzed_results}",
-    }
-
 
 _ALLOWED_BUILTIN_NAMES = {
     "abs",
@@ -179,7 +98,7 @@ Must call evaluate_python_hook at least once before final answer.
 | get_annotation | Fetch annotation data by ID |
 | get_schema | Optionally fetch schema |
 | evaluate_python_hook | Execute code against annotation |
-| web_search | Search Rossum KB for docs |
+| search_knowledge_base | Search Rossum KB for docs |
 
 ## Hook Structure
 
@@ -360,6 +279,7 @@ def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
     if tool_name == "search_knowledge_base":
         if not (query := tool_input.get("query", "")):
             return json.dumps({"status": "error", "message": "Query is required"})
+
         return search_knowledge_base(query)
     if tool_name in ("get_hook", "get_annotation", "get_schema"):
         mcp_result = call_mcp_tool(tool_name, tool_input)
@@ -399,8 +319,7 @@ class HookDebugSubAgent(SubAgent):
         return result
 
     def process_response_block(self, block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
-        """Process web search result blocks."""
-        return _extract_and_analyze_web_search_results(block, iteration, max_iterations)
+        return None
 
 
 def _call_opus_for_debug(hook_id: str, annotation_id: str, schema_id: str | None) -> SubAgentResult:
