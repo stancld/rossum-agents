@@ -31,7 +31,7 @@ from rossum_mcp.tools import (
 )
 from rossum_mcp.tools.base import get_mcp_mode, set_mcp_mode
 
-setup_logging(app_name="rossum-mcp-server", log_level="DEBUG", use_console=False)
+setup_logging(log_level="DEBUG", use_console=False)
 
 logger = logging.getLogger(__name__)
 
