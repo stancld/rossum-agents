@@ -22,13 +22,18 @@ All notable changes to this project will be documented in this file.
 - Migrated default model from Opus 4.5 to Opus 4.6 [#156](https://github.com/stancld/rossum-agents/pull/156)
 - Refactored API to use FastAPI's `app.state` for service instances instead of module-level globals [#153](https://github.com/stancld/rossum-agents/pull/153)
 
+### Fixed
+- Fixed schema patching sub-agent: hidden `update_schema` from agent tool loading to prevent accidental full-schema overwrites (agent must use `patch_schema_with_subagent` instead)
+- Fixed token counting to include cache creation and cache read tokens in input totals for accurate usage reporting
+- Fixed incorrect field names (`is_formula`/`is_reasoning`) in base prompt — replaced with correct API field names
+
 ### Removed
 - Removed `ddgs` dependency (replaced by pre-scraped KB article search)
 - Removed Streamlit UI (`streamlit_app` submodule and all Streamlit dependencies) [#160](https://github.com/stancld/rossum-agents/pull/160)
 - Removed Teleport JWT user isolation (`user_detection.py`, `PyJWT`, `cryptography` dependencies) [#155](https://github.com/stancld/rossum-agents/pull/155)
 
 
-## [1.0.0] - 2025-02-05
+## [1.0.0] - 2026-02-05
 
 ### Added
 - Added `create_schema_with_subagent` tool for creating new schemas from scratch via Opus sub-agent [#151](https://github.com/stancld/rossum-agents/pull/151)

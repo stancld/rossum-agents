@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Fixed `create_rule` and `update_rule` requiring `schema_id` — now optional to match the API. Rules can be scoped by `queue_ids` alone; at least one of `schema_id` or `queue_ids` is required [#156](https://github.com/stancld/rossum-agents/pull/156)
 - List tools now gracefully skip items that fail to deserialize instead of aborting the entire listing. A single broken item in a customer organization (API errors, unexpected data) no longer causes the agent to fail mid-run. Affected tools: `list_annotations`, `list_document_relations`, `list_email_templates`, `list_engines`, `list_hooks`, `list_hook_logs`, `list_queues`, `list_relations`, `list_rules`, `list_schemas`, `list_users`, `list_user_roles`, `list_workspaces`. [#158](https://github.com/stancld/rossum-agents/pull/158)
+- Fixed `patch_schema`, `update_schema`, and `prune_schema_fields` failing with HTTP 400 when schema contains `stretch`, `width`, `can_collapse`, or `width_chars` attributes on fields outside multivalue-tuples. These attributes are now automatically stripped from non-tuple fields.
 
 
 ## [1.1.1] - 2026-02-05
