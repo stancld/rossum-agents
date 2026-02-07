@@ -60,11 +60,15 @@ class DynamicToolsState:
 
     loaded_categories: set[str] = field(default_factory=set)
     tools: list[ToolParam] = field(default_factory=list)
+    loaded_skills: set[str] = field(default_factory=set)
+    version: int = 0
 
     def reset(self) -> None:
         """Reset state for a new conversation."""
         self.loaded_categories.clear()
         self.tools.clear()
+        self.loaded_skills.clear()
+        self.version += 1
 
 
 # Global state for backwards compatibility (used when agent instance not available)
@@ -92,6 +96,23 @@ def get_loaded_categories() -> set[str]:
 def get_dynamic_tools() -> list[ToolParam]:
     """Get the list of dynamically loaded tools (global state)."""
     return get_global_state().tools
+
+
+def mark_skill_loaded(name: str) -> None:
+    """Mark a skill as loaded and increment version to invalidate tool cache."""
+    state = get_global_state()
+    state.loaded_skills.add(name)
+    state.version += 1
+
+
+def is_skill_loaded(name: str) -> bool:
+    """Check if a skill has been loaded."""
+    return name in get_global_state().loaded_skills
+
+
+def get_tools_version() -> int:
+    """Get current tools version for cache invalidation."""
+    return get_global_state().version
 
 
 def _fetch_catalog_from_mcp() -> CatalogData:

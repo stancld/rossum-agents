@@ -45,12 +45,17 @@ class TestInternalToolsRegistration:
         assert isinstance(names, set)
         assert len(names) > 0
 
-    def test_internal_tool_names_match_tools(self) -> None:
-        """Test that tool names match between list and set."""
+    def test_internal_tool_names_superset_of_visible_tools(self) -> None:
+        """Test that executable tool names are a superset of visible tools.
+
+        get_internal_tool_names() returns all executable tools (for dispatch routing),
+        while get_internal_tools() returns only currently visible tools (deployment
+        tools are hidden until rossum-deployment skill is loaded).
+        """
         tools = get_internal_tools()
         names = get_internal_tool_names()
         tool_names = {t["name"] for t in tools}
-        assert tool_names == names
+        assert tool_names.issubset(names)
 
     def test_known_tools_are_registered(self) -> None:
         """Test that known internal tools are registered."""

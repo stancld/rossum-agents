@@ -76,7 +76,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url=None,
         prompt="Hey, what can you do?",
         tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=7000, max_total_tokens=8000),
+        token_budget=TokenBudget(min_total_tokens=5000, max_total_tokens=6000),
         success_criteria=SuccessCriteria(
             required_keywords=["hook", "queue", "debug"],  # Simplified keywords for streamlined prompt
             max_steps=1,
@@ -90,7 +90,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url="https://elis.develop.r8.lol/documents?filtering=%7B%22items%22%3A%5B%7B%22field%22%3A%22queue%22%2C%22value%22%3A%5B%223960192%22%5D%2C%22operator%22%3A%22isAnyOf%22%7D%5D%2C%22logicOperator%22%3A%22and%22%7D&level=queue&page=1&page_size=100",
         prompt="Explain a document workflow and learning workflow on this queue.",
         tool_expectation=ToolExpectation(expected_tools=["get_queue", "get_queue_engine"], mode=ToolMatchMode.SUBSET),
-        token_budget=TokenBudget(min_total_tokens=18000, max_total_tokens=38000),
+        token_budget=TokenBudget(min_total_tokens=18000, max_total_tokens=30000),
         success_criteria=SuccessCriteria(
             required_keywords=["document_type", "classification", "training", "workflow"],
             max_steps=4,
