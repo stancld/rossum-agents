@@ -43,6 +43,7 @@ async def simulate_event_generator(
     done_event: StreamDoneEvent | None = None
 
     async for event in agent_service.run_agent(
+        chat_id="test-chat",
         prompt="Hello",
         conversation_history=[],
         rossum_api_token="token",

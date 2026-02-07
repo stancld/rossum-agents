@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from rossum_agent.api.dependencies import (
     get_validated_credentials,
 )
 from rossum_agent.api.models.schemas import (
+    CancelResponse,
     DocumentContent,
     FileCreatedEvent,
     ImageContent,
@@ -32,6 +34,7 @@ from rossum_agent.api.models.schemas import (
 )
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
+from rossum_agent.redis_storage import ChatData
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +96,56 @@ def _yield_file_events(output_dir: Path | None, chat_id: str) -> Iterator[str]:
         logger.info(f"output_dir {output_dir} does not exist")
 
 
+def _save_chat_history(
+    chat_service: ChatService,
+    agent_service: AgentService,
+    credentials: RossumCredentials,
+    chat_id: str,
+    chat_data: ChatData,
+    history: list[dict],
+    user_prompt: str,
+    final_response: str | None,
+    images: list[ImageContent] | None,
+    documents: list[DocumentContent] | None,
+) -> None:
+    """Persist updated conversation history after a successful agent run."""
+    updated_history = agent_service.build_updated_history(
+        existing_history=history,
+        user_prompt=user_prompt,
+        final_response=final_response,
+        images=images,
+        documents=documents,
+    )
+    chat_service.save_messages(
+        user_id=credentials.user_id,
+        chat_id=chat_id,
+        messages=updated_history,
+        output_dir=agent_service.output_dir,
+        metadata=chat_data.metadata,
+    )
+
+
+async def _watch_disconnect(request: Request, chat_id: str, agent_service: AgentService) -> None:
+    """Poll for client disconnect and cancel the running agent."""
+    try:
+        while True:
+            if await request.is_disconnected():
+                logger.info(f"Client disconnected for chat {chat_id}, cancelling run")
+                agent_service.cancel_run(chat_id)
+                return
+            await asyncio.sleep(0.5)
+    except asyncio.CancelledError:
+        logger.debug(f"Disconnect watcher for chat {chat_id} cancelled")
+
+
+def _resolve_mcp_mode(message: MessageRequest, chat_data: ChatData) -> str:
+    """Resolve the effective MCP mode from the message and chat metadata."""
+    if message.mcp_mode is not None:
+        chat_data.metadata.mcp_mode = message.mcp_mode
+        return message.mcp_mode
+    return chat_data.metadata.mcp_mode
+
+
 @router.post(
     "/{chat_id}/messages",
     response_class=StreamingResponse,
@@ -113,29 +166,16 @@ async def send_message(
 ) -> StreamingResponse:
     """Send a message and stream the agent's response via SSE.
 
-    Args:
-        request: FastAPI request object (required for rate limiting).
-        chat_id: Chat session identifier.
-        message: Message request with content.
-        credentials: Validated Rossum credentials.
-        chat_service: Chat service instance.
-        agent_service: Agent service instance.
-
-    Returns:
-        StreamingResponse with SSE events.
-
-    Raises:
-        HTTPException: If chat not found.
+    If a previous request is still running for this chat, it will be cancelled
+    before starting the new one. Client disconnects are also detected and will
+    cancel the running agent.
     """
     chat_data = chat_service.get_chat_data(credentials.user_id, chat_id)
     if chat_data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
 
     history = chat_data.messages
-    mcp_mode = chat_data.metadata.mcp_mode
-    if message.mcp_mode is not None:
-        mcp_mode = message.mcp_mode
-        chat_data.metadata.mcp_mode = mcp_mode
+    mcp_mode = _resolve_mcp_mode(message, chat_data)
     user_prompt = message.content
     images: list[ImageContent] | None = message.images
     documents: list[DocumentContent] | None = message.documents
@@ -144,8 +184,11 @@ async def send_message(
         final_response: str | None = None
         done_event: StreamDoneEvent | None = None
 
+        watcher = asyncio.create_task(_watch_disconnect(request, chat_id, agent_service))
+
         try:
             async for event in agent_service.run_agent(
+                chat_id=chat_id,
                 prompt=user_prompt,
                 images=images,
                 documents=documents,
@@ -163,25 +206,30 @@ async def send_message(
                 if result.sse_event:
                     yield result.sse_event
 
+        except asyncio.CancelledError:
+            logger.info(f"Request cancelled for chat {chat_id}")
+            return
+
         except Exception as e:
             logger.error(f"Error during agent execution: {e}", exc_info=True)
             error_event = StepEvent(type="error", step_number=0, content=str(e), is_final=True)
             yield _format_sse_event("step", error_event.model_dump_json())
             return
 
-        updated_history = agent_service.build_updated_history(
-            existing_history=history,
+        finally:
+            watcher.cancel()
+
+        _save_chat_history(
+            chat_service=chat_service,
+            agent_service=agent_service,
+            credentials=credentials,
+            chat_id=chat_id,
+            chat_data=chat_data,
+            history=history,
             user_prompt=user_prompt,
             final_response=final_response,
             images=images,
             documents=documents,
-        )
-        chat_service.save_messages(
-            user_id=credentials.user_id,
-            chat_id=chat_id,
-            messages=updated_history,
-            output_dir=agent_service.output_dir,
-            metadata=chat_data.metadata,
         )
 
         for file_event in _yield_file_events(agent_service.output_dir, chat_id):
@@ -195,3 +243,26 @@ async def send_message(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post(
+    "/{chat_id}/cancel",
+    response_model=CancelResponse,
+    responses={
+        200: {"description": "Cancellation result"},
+        404: {"description": "Chat not found"},
+    },
+)
+async def cancel_message(
+    request: Request,
+    chat_id: str,
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
+    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
+    agent_service: Annotated[AgentService, Depends(get_agent_service)] = None,  # type: ignore[assignment]
+) -> CancelResponse:
+    """Cancel a running agent request for a chat."""
+    if not chat_service.chat_exists(credentials.user_id, chat_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
+
+    cancelled = agent_service.cancel_run(chat_id)
+    return CancelResponse(cancelled=cancelled)

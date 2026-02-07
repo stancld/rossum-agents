@@ -712,15 +712,22 @@ class RossumAgent:
             asyncio.create_task(execute_single_tool(tool_call, idx)) for idx, tool_call in enumerate(tool_calls, 1)
         ]
 
-        pending = set(tasks)
-        while pending:
-            _done, pending = await asyncio.wait(pending, timeout=0.05, return_when=asyncio.FIRST_COMPLETED)
+        try:
+            pending = set(tasks)
+            while pending:
+                _done, pending = await asyncio.wait(pending, timeout=0.05, return_when=asyncio.FIRST_COMPLETED)
+
+                while not progress_queue.empty():
+                    yield progress_queue.get_nowait()
 
             while not progress_queue.empty():
                 yield progress_queue.get_nowait()
-
-        while not progress_queue.empty():
-            yield progress_queue.get_nowait()
+        except asyncio.CancelledError:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
 
         tool_results = [results_by_id[tc.id] for tc in tool_calls if tc.id in results_by_id]
 
@@ -888,6 +895,9 @@ class RossumAgent:
                         return
 
                     break
+
+                except asyncio.CancelledError:
+                    raise
 
                 except RateLimitError as e:
                     rate_limit_retries += 1

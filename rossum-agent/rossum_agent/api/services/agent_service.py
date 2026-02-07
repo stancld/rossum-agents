@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import contextvars
+import dataclasses
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
@@ -56,6 +58,15 @@ class _RequestContext:
     event_queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent] | None = None
     event_loop: asyncio.AbstractEventLoop | None = None
     last_memory: AgentMemory | None = None
+
+
+@dataclass
+class _ChatRunState:
+    """Per-chat run tracking for cancellation support."""
+
+    lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock)
+    active_task: asyncio.Task | None = None
+    run_id: int = 0
 
 
 _request_context: contextvars.ContextVar[_RequestContext] = contextvars.ContextVar("request_context")
@@ -225,6 +236,7 @@ class AgentService:
 
     def __init__(self) -> None:
         """Initialize agent service."""
+        self._chat_runs: dict[str, _ChatRunState] = {}
 
     def _get_context(self) -> _RequestContext:
         """Get the current request context, creating if needed."""
@@ -234,6 +246,48 @@ class AgentService:
             ctx = _RequestContext()
             _request_context.set(ctx)
             return ctx
+
+    def _get_chat_run_state(self, chat_id: str) -> _ChatRunState:
+        """Get or create run state for a chat."""
+        if chat_id not in self._chat_runs:
+            self._chat_runs[chat_id] = _ChatRunState()
+        return self._chat_runs[chat_id]
+
+    async def _register_run(self, chat_id: str) -> int:
+        """Register a new run for a chat, cancelling any existing run.
+
+        Returns the new run_id for tracking.
+        """
+        state = self._get_chat_run_state(chat_id)
+        async with state.lock:
+            if state.active_task is not None and not state.active_task.done():
+                logger.info(f"Cancelling existing run for chat {chat_id} (run_id={state.run_id})")
+                state.active_task.cancel()
+                with contextlib.suppress(TimeoutError, asyncio.CancelledError, Exception):
+                    await asyncio.wait_for(asyncio.shield(state.active_task), timeout=2.0)
+            state.run_id += 1
+            state.active_task = asyncio.current_task()
+            logger.info(f"Registered run_id={state.run_id} for chat {chat_id}")
+            return state.run_id
+
+    async def _clear_run(self, chat_id: str, run_id: int) -> None:
+        """Clear the active run if it matches the given run_id."""
+        state = self._get_chat_run_state(chat_id)
+        async with state.lock:
+            if state.run_id == run_id:
+                state.active_task = None
+
+    def cancel_run(self, chat_id: str) -> bool:
+        """Cancel the active run for a chat.
+
+        Returns True if a run was cancelled, False if no active run.
+        """
+        state = self._chat_runs.get(chat_id)
+        if state is None or state.active_task is None or state.active_task.done():
+            return False
+        logger.info(f"Explicitly cancelling run for chat {chat_id} (run_id={state.run_id})")
+        state.active_task.cancel()
+        return True
 
     @property
     def output_dir(self) -> Path | None:
@@ -303,6 +357,7 @@ class AgentService:
 
     async def run_agent(
         self,
+        chat_id: str,
         prompt: str,
         conversation_history: list[dict[str, Any]],
         rossum_api_token: str,
@@ -326,6 +381,8 @@ class AgentService:
             logger.info(f"Including {len(images)} images in the prompt")
         if documents:
             logger.info(f"Including {len(documents)} documents in the prompt")
+
+        run_id = await self._register_run(chat_id)
 
         ctx = _RequestContext()
         _request_context.set(ctx)
@@ -353,68 +410,74 @@ class AgentService:
             system_prompt = system_prompt + "\n\n---\n" + context_section
 
         try:
-            async with connect_mcp_server(
-                rossum_api_token=rossum_api_token,
-                rossum_api_base_url=rossum_api_base_url,
-                mcp_mode=mcp_mode,
-            ) as mcp_connection:
-                agent = await create_agent(
-                    mcp_connection=mcp_connection, system_prompt=system_prompt, config=AgentConfig()
-                )
+            try:
+                async with connect_mcp_server(
+                    rossum_api_token=rossum_api_token,
+                    rossum_api_base_url=rossum_api_base_url,
+                    mcp_mode=mcp_mode,
+                ) as mcp_connection:
+                    agent = await create_agent(
+                        mcp_connection=mcp_connection, system_prompt=system_prompt, config=AgentConfig()
+                    )
 
-                set_mcp_connection(mcp_connection, asyncio.get_event_loop(), mcp_mode)
+                    set_mcp_connection(mcp_connection, asyncio.get_event_loop(), mcp_mode)
 
-                self._restore_conversation_history(agent, conversation_history)
+                    self._restore_conversation_history(agent, conversation_history)
 
-                total_steps = 0
-                total_input_tokens = 0
-                total_output_tokens = 0
+                    total_steps = 0
+                    total_input_tokens = 0
+                    total_output_tokens = 0
 
-                user_content = self._build_user_content(prompt, images, documents)
+                    user_content = self._build_user_content(prompt, images, documents)
 
-                try:
-                    async for step in agent.run(user_content):
+                    try:
+                        async for step in agent.run(user_content):
+                            for sub_event in self._drain_queue(ctx.event_queue):
+                                yield sub_event
+
+                            for event in convert_step_to_events(step):
+                                yield event
+
+                            if not step.is_streaming:
+                                total_steps = step.step_number
+                                total_input_tokens = agent._total_input_tokens
+                                total_output_tokens = agent._total_output_tokens
+
                         for sub_event in self._drain_queue(ctx.event_queue):
                             yield sub_event
 
-                        for event in convert_step_to_events(step):
-                            yield event
+                        ctx.last_memory = agent.memory
 
-                        if not step.is_streaming:
-                            total_steps = step.step_number
-                            total_input_tokens = agent._total_input_tokens
-                            total_output_tokens = agent._total_output_tokens
+                        yield StreamDoneEvent(
+                            total_steps=total_steps,
+                            input_tokens=total_input_tokens,
+                            output_tokens=total_output_tokens,
+                            cache_creation_input_tokens=agent._total_cache_creation_tokens,
+                            cache_read_input_tokens=agent._total_cache_read_tokens,
+                            token_usage_breakdown=agent.get_token_usage_breakdown(),
+                        )
+                        agent.log_token_usage_summary()
 
-                    for sub_event in self._drain_queue(ctx.event_queue):
-                        yield sub_event
-
-                    ctx.last_memory = agent.memory
-
-                    yield StreamDoneEvent(
-                        total_steps=total_steps,
-                        input_tokens=total_input_tokens,
-                        output_tokens=total_output_tokens,
-                        cache_creation_input_tokens=agent._total_cache_creation_tokens,
-                        cache_read_input_tokens=agent._total_cache_read_tokens,
-                        token_usage_breakdown=agent.get_token_usage_breakdown(),
-                    )
-                    agent.log_token_usage_summary()
-
-                except Exception as e:
-                    logger.error(f"Agent execution failed: {e}", exc_info=True)
-                    yield StepEvent(
-                        type="error",
-                        step_number=total_steps + 1,
-                        content=f"Agent execution failed: {e}",
-                        is_final=True,
-                    )
+                    except Exception as e:
+                        logger.error(f"Agent execution failed: {e}", exc_info=True)
+                        yield StepEvent(
+                            type="error",
+                            step_number=total_steps + 1,
+                            content=f"Agent execution failed: {e}",
+                            is_final=True,
+                        )
+            finally:
+                set_progress_callback(None)
+                set_text_callback(None)
+                set_task_snapshot_callback(None)
+                set_task_tracker(None)
+                set_output_dir(None)
+                set_rossum_credentials(None, None)
+        except asyncio.CancelledError:
+            logger.info(f"Run cancelled for chat {chat_id} (run_id={run_id})")
+            raise
         finally:
-            set_progress_callback(None)
-            set_text_callback(None)
-            set_task_snapshot_callback(None)
-            set_task_tracker(None)
-            set_output_dir(None)
-            set_rossum_credentials(None, None)
+            await self._clear_run(chat_id, run_id)
 
     def _save_documents_to_output_dir(self, documents: list[DocumentContent]) -> None:
         """Save uploaded documents to the output directory.

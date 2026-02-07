@@ -1181,6 +1181,20 @@ class TestAgentRun:
         assert steps[0].is_final is True
         assert "API error" in steps[0].error
 
+    @pytest.mark.asyncio
+    async def test_cancelled_error_propagates_instead_of_being_caught(self):
+        """Test that CancelledError in run() propagates rather than being caught as a generic Exception."""
+        agent = self._create_agent()
+
+        async def mock_stream_response(step_num):
+            raise asyncio.CancelledError
+            yield  # Make it a generator
+
+        with patch.object(agent, "_stream_model_response", side_effect=mock_stream_response):
+            with pytest.raises(asyncio.CancelledError):
+                async for _ in agent.run("Test prompt"):
+                    pass
+
 
 class TestExecuteTool:
     """Test RossumAgent._execute_tool_with_progress method."""
@@ -1459,6 +1473,56 @@ class TestExecuteToolsInParallel:
         # First step should be progress indicator
         assert steps[0].is_streaming is True
         assert steps[0].tool_progress == (0, 2)
+
+    @pytest.mark.asyncio
+    async def test_cancellation_cancels_child_tasks_and_reraises(self):
+        """Test that CancelledError cancels all child tool tasks and propagates."""
+        agent = self._create_agent()
+
+        child_task_cancelled = asyncio.Event()
+        tools_started = asyncio.Event()
+
+        async def slow_tool(name, args):
+            tools_started.set()
+            try:
+                await asyncio.sleep(100)
+            except asyncio.CancelledError:
+                child_task_cancelled.set()
+                raise
+            return "result"
+
+        agent.mcp_connection.call_tool = slow_tool
+
+        tool_calls = [
+            ToolCall(id="tc_1", name="tool_a", arguments={}),
+            ToolCall(id="tc_2", name="tool_b", arguments={}),
+        ]
+
+        step = AgentStep(step_number=1, tool_calls=tool_calls)
+
+        async def consume_generator():
+            async for _ in agent._execute_tools_with_progress(
+                step_num=1,
+                thinking_text="",
+                tool_calls=tool_calls,
+                step=step,
+                input_tokens=100,
+                output_tokens=50,
+            ):
+                pass
+
+        task = asyncio.create_task(consume_generator())
+        # Wait for child tools to start executing
+        await tools_started.wait()
+        # Cancel the parent task
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        # Child tasks should have been cancelled
+        await asyncio.sleep(0.05)
+        assert child_task_cancelled.is_set()
 
 
 class TestSerializeToolResult:
