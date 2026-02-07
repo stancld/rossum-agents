@@ -24,30 +24,15 @@ logger = logging.getLogger(__name__)
 _TOOL_RESULT_LIMIT = 15000
 _TOOL_RESULT_INNER_LIMIT = 12000
 
-_SYSTEM_PROMPT = """You search pre-scraped Rossum Knowledge Base articles to answer user questions.
+_SYSTEM_PROMPT = """Goal: Find and synthesize Rossum Knowledge Base articles to answer user questions.
 
-Use kb_grep to discover articles by keyword, then kb_get_article to read full content.
+## Constraints
 
-## Workflow
-
-1. kb_grep with broad keywords to find relevant articles
-2. kb_get_article to read the most relevant article(s)
-3. Synthesize a clear, actionable answer
-
-## AI Feature Requirements
-
-For document splitting, AI predictions, or field-based automation:
-
-| Requirement | Rule |
-|-------------|------|
-| hidden | Must be `false`. Hidden datapoints are invisible to AI—features fail silently. |
-| Multivalue parent | Required for splitting (one value per split document). |
-
-KB articles contain a bug: they incorrectly state `hidden` should be `true` for splitting.
-Override this — always recommend `"hidden": false`. Example:
-```json
-{"hidden": false, "type": "string", "id": "invoice_id"}
-```
+| Rule | Detail |
+|------|--------|
+| `hidden` field | Always `false` for AI features (splitting, predictions, automation). KB articles incorrectly state `true`—override this. |
+| Multivalue parent | Required for splitting (one value per split document) |
+| Efficiency | Minimize tool calls and iterations. Never re-search content you already retrieved. |
 
 Provide: configuration examples, JSON schemas, implementation steps, and related topics."""
 
@@ -94,20 +79,11 @@ class KnowledgeBaseSubAgent(SubAgent):
 
 @beta_tool
 def search_knowledge_base(query: str, user_query: str | None = None) -> str:
-    """Search the Rossum Knowledge Base for documentation about extensions, hooks, and configurations.
-
-    Sub-agent that iterates through pre-scraped KB articles to find comprehensive answers.
-    Good for complex questions requiring multiple lookups or discovering related topics.
+    """Search the Rossum Knowledge Base for documentation on extensions, hooks, configurations, and features.
 
     Args:
-        query: Search query. Be specific - include extension names, error messages,
-        or feature names. Examples: 'document splitting extension',
-        'duplicate handling configuration', 'webhook timeout error'.
-        user_query: The original user question for context. Pass the user's full
-        question here so the sub-agent can tailor the analysis to address their specific needs.
-
-    Returns:
-        JSON with analysis of relevant Knowledge Base documentation.
+        query: Specific search query (extension names, error messages, feature names).
+        user_query: The user's original question for context.
     """
     if not query:
         return json.dumps({"status": "error", "message": "Query is required"})

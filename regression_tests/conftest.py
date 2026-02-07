@@ -61,6 +61,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers."""
     config.addinivalue_line("markers", "regression: mark test as a regression test")
+    config.addinivalue_line("markers", "readonly: mark test as read-only (no Rossum API writes)")
+    config.addinivalue_line("markers", "readwrite: mark test as read-write (creates/modifies Rossum resources)")
 
 
 @pytest.fixture(scope="session")
@@ -174,11 +176,11 @@ def create_live_agent(
         config = AgentConfig(max_output_tokens=64000, max_steps=50, temperature=1.0, request_delay=3.0)
 
         async with connect_mcp_server(
-            rossum_api_token=token, rossum_api_base_url=case.api_base_url, mcp_mode="read-write"
+            rossum_api_token=token, rossum_api_base_url=case.api_base_url, mcp_mode=case.mode
         ) as mcp_connection:
             set_output_dir(temp_output_dir)
             set_rossum_credentials(case.api_base_url, token)
-            set_mcp_connection(mcp_connection, asyncio.get_event_loop(), "read-write")
+            set_mcp_connection(mcp_connection, asyncio.get_event_loop(), case.mode)
             client = create_bedrock_client()
             system_prompt = get_system_prompt()
 

@@ -23,8 +23,6 @@ class TestConstants:
         """Test _SYSTEM_PROMPT is a non-empty string."""
         assert isinstance(_SYSTEM_PROMPT, str)
         assert len(_SYSTEM_PROMPT) > 50
-        assert "kb_grep" in _SYSTEM_PROMPT
-        assert "kb_get_article" in _SYSTEM_PROMPT
 
     def test_tools_list_contains_expected_tools(self):
         """Test _TOOLS contains kb_grep and kb_get_article."""
