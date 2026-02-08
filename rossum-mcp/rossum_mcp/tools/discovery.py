@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 
 
 def register_discovery_tools(mcp: FastMCP) -> None:
-    """Register discovery tools with the FastMCP server."""
-
     @mcp.tool(
         description="List tool categories (descriptions, tool names, keywords). Use load_tool_category to load a category. read_only=false indicates write tools."
     )

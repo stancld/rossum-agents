@@ -82,8 +82,6 @@ async def _create_email_template(
 
 
 def register_email_template_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register email template-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve one email template by ID.")
     async def get_email_template(email_template_id: int) -> EmailTemplate:
         return await _get_email_template(client, email_template_id)

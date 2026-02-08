@@ -61,8 +61,6 @@ async def _delete_workspace(client: AsyncRossumAPIClient, workspace_id: int) -> 
 
 
 def register_workspace_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register workspace-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve workspace details.")
     async def get_workspace(workspace_id: int) -> Workspace:
         return await _get_workspace(client, workspace_id)

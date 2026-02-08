@@ -236,8 +236,6 @@ async def _create_queue_from_template(
 
 
 def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register queue-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve queue details.")
     async def get_queue(queue_id: int) -> Queue:
         return await _get_queue(client, queue_id)

@@ -132,8 +132,6 @@ async def _delete_annotation(client: AsyncRossumAPIClient, annotation_id: int) -
 
 
 def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register annotation-related tools with the FastMCP server."""
-
     @mcp.tool(description="Upload a document; use list_annotations to find the created annotation.")
     async def upload_document(file_path: str, queue_id: int) -> dict:
         return await _upload_document(client, file_path, queue_id)

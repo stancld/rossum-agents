@@ -234,8 +234,6 @@ async def _delete_hook(client: AsyncRossumAPIClient, hook_id: int) -> dict:
 
 
 def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register hook-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve one hook by ID (function hook code is in hook.config['code']).")
     async def get_hook(hook_id: int) -> Hook:
         return await _get_hook(client, hook_id)

@@ -189,8 +189,6 @@ async def _delete_rule(client: AsyncRossumAPIClient, rule_id: int) -> dict:
 
 
 def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register rule-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve rule details.")
     async def get_rule(rule_id: int) -> Rule:
         return await _get_rule(client, rule_id)

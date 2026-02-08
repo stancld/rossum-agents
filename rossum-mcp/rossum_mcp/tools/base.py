@@ -36,7 +36,6 @@ if _mcp_mode not in VALID_MODES:
 
 
 def get_mcp_mode() -> str:
-    """Return the current MCP mode."""
     return _mcp_mode
 
 

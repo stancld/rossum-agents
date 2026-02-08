@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from rossum_api.models.schema import Schema
 
+from rossum_mcp.tools.schemas import operations as ops
 from rossum_mcp.tools.schemas.models import (
     DatapointType,
     NodeCategory,
@@ -107,9 +108,6 @@ __all__ = [
 
 
 def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register schema-related tools with the FastMCP server."""
-    from rossum_mcp.tools.schemas import operations as ops  # noqa: PLC0415 - avoid circular import
-
     @mcp.tool(description="Retrieve schema details.")
     async def get_schema(schema_id: int) -> Schema | dict:
         return await ops.get_schema(client, schema_id)

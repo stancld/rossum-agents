@@ -139,8 +139,6 @@ async def _list_user_roles(client: AsyncRossumAPIClient) -> list[Group]:
 
 
 def register_user_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register user-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve one user by ID.")
     async def get_user(user_id: int) -> User:
         return await _get_user(client, user_id)

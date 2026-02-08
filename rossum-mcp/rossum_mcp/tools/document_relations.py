@@ -20,12 +20,11 @@ def register_document_relation_tools(mcp: FastMCP, client: AsyncRossumAPIClient)
 
     @mcp.tool(description="Retrieve document relation details.")
     async def get_document_relation(document_relation_id: int) -> DocumentRelation:
-        """Retrieve document relation details."""
         logger.debug(f"Retrieving document relation: document_relation_id={document_relation_id}")
         document_relation: DocumentRelation = await client.retrieve_document_relation(document_relation_id)
         return document_relation
 
-    @mcp.tool(description="List document relations (filterable); e.g. export/e-invoice links.")
+    @mcp.tool(description="List document relations with optional filters.; e.g. export/e-invoice links.")
     async def list_document_relations(
         id: int | None = None,
         type: str | None = None,
@@ -33,7 +32,6 @@ def register_document_relation_tools(mcp: FastMCP, client: AsyncRossumAPIClient)
         key: str | None = None,
         documents: int | None = None,
     ) -> list[DocumentRelation]:
-        """List all document relations with optional filters."""
         logger.debug(
             f"Listing document relations: id={id}, type={type}, annotation={annotation}, key={key}, documents={documents}"
         )
