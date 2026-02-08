@@ -11,7 +11,13 @@ from rossum_api import APIClientError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.schema import Schema
 
-from rossum_mcp.tools.base import TRUNCATED_MARKER, delete_resource, graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import (
+    TRUNCATED_MARKER,
+    delete_resource,
+    extract_id_from_url,
+    graceful_list,
+    is_read_write_mode,
+)
 from rossum_mcp.tools.schemas.models import SchemaNode, SchemaNodeUpdate  # noqa: TC001 - needed at runtime for FastMCP
 from rossum_mcp.tools.schemas.patching import PatchOperation, apply_schema_patch
 from rossum_mcp.tools.schemas.pruning import (
@@ -178,7 +184,7 @@ async def get_schema_tree_structure(
         return {"error": "Provide schema_id or queue_id, not both"}
     if queue_id:
         queue = await client.retrieve_queue(queue_id)
-        schema_id = int(queue.schema.rstrip("/").split("/")[-1])
+        schema_id = extract_id_from_url(queue.schema)
     schema = await get_schema(client, schema_id)  # type: ignore[arg-type]
     if isinstance(schema, dict):
         return schema

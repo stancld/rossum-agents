@@ -23,38 +23,68 @@ class GracefulListResult[T]:
     skipped_ids: list[int | str] = field(default_factory=list)
 
 
-BASE_URL = os.environ.get("ROSSUM_API_BASE_URL", "").rstrip("/")
-
 # Marker used to indicate omitted fields in list responses
 TRUNCATED_MARKER = "<omitted>"
 
 VALID_MODES = ("read-only", "read-write")
 
-_mcp_mode = os.environ.get("ROSSUM_MCP_MODE", "read-write").lower()
-if _mcp_mode not in VALID_MODES:
-    raise ValueError(f"Invalid ROSSUM_MCP_MODE: {_mcp_mode}. Must be one of: {VALID_MODES}")
+_base_url: str = ""
+_mcp_mode: str = ""
+_configured: bool = False
+
+
+def configure(base_url: str, mcp_mode: str) -> None:
+    global _base_url, _mcp_mode, _configured
+    _base_url = base_url.rstrip("/")
+    normalized = mcp_mode.lower()
+    if normalized not in VALID_MODES:
+        raise ValueError(f"Invalid ROSSUM_MCP_MODE: {mcp_mode}. Must be one of: {VALID_MODES}")
+    _mcp_mode = normalized
+    _configured = True
+
+
+def _ensure_configured() -> None:
+    global _configured
+    if _configured:
+        return
+    configure(
+        base_url=os.environ.get("ROSSUM_API_BASE_URL", ""),
+        mcp_mode=os.environ.get("ROSSUM_MCP_MODE", "read-write"),
+    )
+
+
+def extract_id_from_url(url: str) -> int:
+    """Extract the integer resource ID from a Rossum API URL."""
+    try:
+        return int(url.rstrip("/").split("/")[-1])
+    except (ValueError, IndexError) as e:
+        raise ValueError(f"Cannot extract resource ID from URL: {url}") from e
 
 
 def get_mcp_mode() -> str:
+    _ensure_configured()
     return _mcp_mode
 
 
 def set_mcp_mode(mode: str) -> None:
     """Set the MCP mode (case-insensitive)."""
-    global _mcp_mode
+    global _mcp_mode, _configured
     normalized = mode.lower()
     if normalized not in VALID_MODES:
         raise ValueError(f"Invalid mode '{mode}'. Must be one of: {VALID_MODES}")
     _mcp_mode = normalized
+    _configured = True
 
 
 def build_resource_url(resource_type: str, resource_id: int) -> str:
     """Build a full URL for a Rossum API resource."""
-    return f"{BASE_URL}/{resource_type}/{resource_id}"
+    _ensure_configured()
+    return f"{_base_url}/{resource_type}/{resource_id}"
 
 
 def is_read_write_mode() -> bool:
     """Check if server is in read-write mode."""
+    _ensure_configured()
     return _mcp_mode == "read-write"
 
 

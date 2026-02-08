@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 def reset_mcp_mode():
     """Reset MCP mode to read-write after each test."""
     yield
-    from rossum_mcp.tools.base import set_mcp_mode
+    from rossum_mcp.tools import base
 
-    set_mcp_mode("read-write")
+    base.configure(base_url=base._base_url, mcp_mode="read-write")
 
 
 @pytest.mark.unit
@@ -73,8 +73,9 @@ class TestMCPMode:
         monkeypatch.setenv("ROSSUM_MCP_MODE", "invalid-mode")
         from rossum_mcp.tools import base
 
+        importlib.reload(base)
         with pytest.raises(ValueError, match="Invalid ROSSUM_MCP_MODE"):
-            importlib.reload(base)
+            base.get_mcp_mode()
 
 
 @pytest.mark.unit

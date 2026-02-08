@@ -15,6 +15,7 @@ from rossum_api.models.schema import Schema
 from rossum_mcp.tools.base import (
     build_resource_url,
     delete_resource,
+    extract_id_from_url,
     graceful_list,
     is_read_write_mode,
     truncate_dict_fields,
@@ -72,7 +73,7 @@ async def _get_queue_schema(client: AsyncRossumAPIClient, queue_id: int) -> Sche
     logger.debug(f"Retrieving queue schema: queue_id={queue_id}")
     queue: Queue = await client.retrieve_queue(queue_id)
     schema_url = queue.schema
-    schema_id = int(schema_url.rstrip("/").split("/")[-1])
+    schema_id = extract_id_from_url(schema_url)
     schema: Schema = await client.retrieve_schema(schema_id)
     return schema
 
@@ -94,7 +95,7 @@ async def _get_queue_engine(client: AsyncRossumAPIClient, queue_id: int) -> Engi
 
     try:
         if isinstance(engine_url, str):
-            engine_id = int(engine_url.rstrip("/").split("/")[-1])
+            engine_id = extract_id_from_url(engine_url)
             engine: Engine = await client.retrieve_engine(engine_id)
         else:
             engine = deserialize_default(Resource.Engine, engine_url)
