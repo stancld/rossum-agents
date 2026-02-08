@@ -1,5 +1,3 @@
-"""Base utilities for Rossum MCP tools."""
-
 from __future__ import annotations
 
 import asyncio

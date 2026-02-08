@@ -1,8 +1,7 @@
 """Tool catalog for dynamic tool discovery.
 
 Provides lightweight metadata for all MCP tools organized by category.
-This is the single source of truth for tool categorization - the agent
-fetches this catalog from MCP to avoid data duplication.
+This is the single source of truth for tool categorization - the agent fetches this catalog from MCP to avoid data duplication.
 """
 
 from __future__ import annotations

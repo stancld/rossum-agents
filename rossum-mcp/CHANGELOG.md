@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - `get_schema_tree_structure` now accepts `queue_id` as an alternative to `schema_id` — resolves the queue's schema automatically [#151](https://github.com/stancld/rossum-agents/pull/151)
-- Optimized all MCP tool descriptions for Opus 4.5/4.6 — replaced procedural/warning preambles (`IMPORTANT`, `CRITICAL`, `ALWAYS`) with concise constraint-based descriptions, removed redundancy with type hints, compressed multi-paragraph descriptions
+- Optimized all MCP tool descriptions for Opus 4.5/4.6 — replaced procedural/warning preambles (`IMPORTANT`, `CRITICAL`, `ALWAYS`) with concise constraint-based descriptions, removed redundancy with type hints, compressed multi-paragraph descriptions [#166](https://github.com/stancld/rossum-agents/pull/166)
 
 ### Removed
 - Removed `RedisHandler` from `logging_config` — Redis log storage is no longer part of rossum-mcp. Agent chat history (via `RedisStorage` in rossum-agent) is unaffected.
