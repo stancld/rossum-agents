@@ -4,13 +4,10 @@ This folder contains practical examples and data for demonstrating the Rossum MC
 
 ## What's in this folder
 
-- **data/**: Sample invoice files for testing document processing
-- **QUEUE_SETUP.md**: Guide for setting up Rossum queues
-- **SORTING_WARMUP.md**: Multi-queue setup with sorting engine
-- **SPLITTING_AND_SORTING_DEMO.md**: Full S&S demo with training queues, inbox, and hooks
-- **CREATE_SAS_INBOX.md**: Quick inbox setup for Splitting & Sorting
+- **data/**: Sample document files for testing
+- **ORGANIZATION_SETUP.md**: End-to-end customer organization setup with queues, schemas, validations, and hooks
 - **EXPLAIN_HOOKS.md**: Example for explaining hook/extension functionality
-- **EXPLAIN_RULES_AND_ACTIONS.md**: Example for explaining rules and actions
+- **SPLITTING_AND_SORTING_DEMO.md**: Full S&S demo with training queues, inbox, and hooks
 - **README.md**: This file
 
 ## Using the Rossum Agent

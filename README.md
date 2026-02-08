@@ -33,7 +33,59 @@ Conversational AI toolkit for the Rossum intelligent document processing platfor
 ## What Can You Do?
 
 <details>
-<summary><strong>Example 1: Aurora Splitting & Sorting Demo</strong></summary>
+<summary><strong>Example 1: Organization Setup</strong></summary>
+
+Set up a complete customer organization with queues, schemas, validations, duplicate detection, email notifications, and UI configuration:
+
+```md
+1. Create two new queues: Invoices and Credit Notes.
+2. Update schemas w.r.t. schema specification (Invoices with 15 fields including line items table, Credit Notes as-is)
+3. Add a computed field "The Net Terms" to Invoices queue (Due Date - Issue Date → Net 15/30/Outstanding)
+4. Implement duplicate document detection on Document ID
+5. Add business validations: total amount cap, line items sum check, quantity × unit price check
+6. Add email notification extension on document status change to 'to_review'
+7. Update Invoice queue UI settings to display 8 key fields
+8. Verify setup by uploading a sample invoice twice (testing duplicate detection)
+```
+
+**What This Demonstrates:**
+
+- **Queue & Schema Setup**: Creates queues with detailed field specifications including line items tables
+- **Computed Fields**: Adds derived fields with business logic (date difference categorization)
+- **Duplicate Detection**: Configures document-level deduplication with user-facing messages
+- **Business Validations**: Implements multi-rule validation (amount caps, sum checks, arithmetic checks)
+- **Email Notifications**: Sets up templated email alerts triggered by document state changes
+- **UI Configuration**: Customizes queue column display for operational efficiency
+- **End-to-End Verification**: Validates the entire setup with real document uploads
+
+This example showcases the agent's ability to set up a production-ready organization from scratch - all from a single conversational prompt.
+
+</details>
+
+<details>
+<summary><strong>Example 2: Hook Analysis & Documentation</strong></summary>
+
+Automatically analyze and document all hooks/extensions configured on a queue:
+
+```md
+Briefly explain the functionality of every hook based on description and/or code one by one for a queue `2042843`.
+
+Store output in extension_explanation.md
+```
+
+**What This Does:**
+- Lists all hooks/extensions on the specified queue
+- Analyzes each hook's description and code
+- Generates clear, concise explanations of functionality
+- Documents trigger events and settings
+- Saves comprehensive documentation to a markdown file
+
+This example shows how the agent can analyze existing automation to help teams understand their configured workflows.
+
+</details>
+
+<details>
+<summary><strong>Example 3: Aurora Splitting & Sorting Demo</strong></summary>
 
 Set up a complete document splitting and sorting pipeline with training queues, splitter engine, automated hooks, and intelligent routing:
 
@@ -84,64 +136,6 @@ Set up a complete document splitting and sorting pipeline with training queues, 
 - **End-to-End Testing**: Validates the entire pipeline with test documents
 
 This example showcases the agent's ability to orchestrate complex workflows involving multiple queues, engines, schemas, automated hooks with custom logic, and intelligent document routing - all from a single conversational prompt.
-
-</details>
-
-<details>
-<summary><strong>Example 2: Hook Analysis & Documentation</strong></summary>
-
-Automatically analyze and document all hooks/extensions configured on a queue:
-
-```md
-Briefly explain the functionality of every hook based on description and/or code one by one for a queue `2042843`.
-
-Store output in extension_explanation.md
-```
-
-**What This Does:**
-- Lists all hooks/extensions on the specified queue
-- Analyzes each hook's description and code
-- Generates clear, concise explanations of functionality
-- Documents trigger events and settings
-- Saves comprehensive documentation to a markdown file
-
-This example shows how the agent can analyze existing automation to help teams understand their configured workflows.
-
-</details>
-
-<details>
-<summary><strong>Example 3: Queue Setup with Knowledge Warmup</strong></summary>
-
-Create a new queue, warm it up with training documents, and test automation performance:
-
-```md
-1. Create a new queue in the same namespace as queue `3904204`
-2. Set up the same schema field as queue `3904204`
-3. Update schema so that everything with confidence > 90% will be automated
-4. Rename the queue to: MCP Air Waybills
-5. Copy the queue knowledge from `3904204`
-6. Return the queue status to check the queue status
-7. Upload all documents from `examples/data/splitting_and_sorting/knowledge/air_waybill`
-   to the new queue
-8. Wait until all annotations are processed
-9. Finally, return queue URL and an automation rate (exported documents)
-```
-
-**Result:**
-
-```json
-{
-  "queue_url": "https://api.elis.rossum.ai/v1/queues/3920572",
-  "queue_id": 3920572,
-  "queue_name": "MCP Air Waybills",
-  "total_documents": 30,
-  "exported_documents": 26,
-  "to_review_documents": 4,
-  "automation_rate_percent": 86.7
-}
-```
-
-The agent automatically creates the queue, uploads documents, monitors processing, and calculates automation performance - achieving **86.7% automation rate** from just 30 training documents.
 
 </details>
 
