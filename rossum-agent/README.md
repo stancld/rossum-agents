@@ -157,7 +157,7 @@ The agent provides internal tools and access to 61 MCP tools via dynamic loading
 - `close_connection` - Close spawned connection
 
 **Skills:**
-- `load_skill` - Load domain-specific workflows (`rossum-deployment`, `hook-debugging`, `schema-patching`, `schema-pruning`, `organization-setup`, `schema-creation`, `ui-settings`, `rules-and-actions`)
+- `load_skill` - Load domain-specific workflows (`rossum-deployment`, `hook-debugging`, `schema-patching`, `schema-pruning`, `organization-setup`, `schema-creation`, `ui-settings`, `rules-and-actions`, `formula-fields`, `reasoning-fields`)
 
 **Task Tracking:**
 - `create_task` - Create a task to track progress on multi-step operations
