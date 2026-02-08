@@ -244,7 +244,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "load_skill",
-                "get_queue_template_names",
                 "create_queue_from_template",
                 "suggest_formula_field",
                 "patch_schema",
@@ -321,11 +320,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=110000, max_total_tokens=220000),
+        token_budget=TokenBudget(min_total_tokens=50000, max_total_tokens=80000),
         success_criteria=SuccessCriteria(
-            require_subagent=True,
+            require_subagent=False,
             required_keywords=[],
-            max_steps=9,
+            max_steps=5,
             file_expectation=FileExpectation(),
             custom_checks=[BUSINESS_VALIDATION_RULES_CHECK],
         ),
