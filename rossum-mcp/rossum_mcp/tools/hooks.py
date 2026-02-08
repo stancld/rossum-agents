@@ -238,14 +238,12 @@ async def _delete_hook(client: AsyncRossumAPIClient, hook_id: int) -> dict:
 def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     """Register hook-related tools with the FastMCP server."""
 
-    @mcp.tool(
-        description="Retrieve a single hook by ID. Use list_hooks first to get all hooks for a queue - only use get_hook if you need additional details for a specific hook not returned by list_hooks. For Python-based function hooks, the source code is accessible via hook.config['code']."
-    )
+    @mcp.tool(description="Retrieve one hook by ID (function hook code is in hook.config['code']).")
     async def get_hook(hook_id: int) -> Hook:
         return await _get_hook(client, hook_id)
 
     @mcp.tool(
-        description="List all hooks/extensions for a queue. ALWAYS use this first when you need information about hooks on a queue - it returns complete hook details including code, config, and settings in a single call. Only use get_hook afterward if you need details not present in the list response. For Python-based function hooks, the source code is accessible via hook.config['code']."
+        description="List hooks for a queue; returns full config/settings (function hook code in config['code'])."
     )
     async def list_hooks(
         queue_id: int | None = None, active: bool | None = None, first_n: int | None = None
@@ -253,7 +251,7 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await _list_hooks(client, queue_id, active, first_n)
 
     @mcp.tool(
-        description="Create a new hook. For function hooks: 'source' in config is auto-renamed to 'function', runtime defaults to 'python3.12', timeout_s is capped at 60s. If token_owner is provided, organization_group_admin users CANNOT be used."
+        description="Create a hook. Function hooks: config.source auto-renamed to config.function, default runtime python3.12, timeout_s capped at 60. token_owner cannot be an organization_group_admin user."
     )
     async def create_hook(
         name: str,
@@ -266,9 +264,7 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     ) -> Hook | dict:
         return await _create_hook(client, name, type, queues, events, config, settings, secret)
 
-    @mcp.tool(
-        description="Update an existing hook. Use this to modify hook properties like name, queues, config, events, or settings. Only provide the fields you want to change - other fields will remain unchanged."
-    )
+    @mcp.tool(description="Patch a hook; only provided fields change.")
     async def update_hook(
         hook_id: int,
         name: str | None = None,
@@ -280,9 +276,7 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     ) -> Hook | dict:
         return await _update_hook(client, hook_id, name, queues, events, config, settings, active)
 
-    @mcp.tool(
-        description="List hook execution logs. Use this to debug hook executions, monitor performance, and troubleshoot errors. Logs are retained for 7 days. Returns at most 100 logs per call."
-    )
+    @mcp.tool(description="List hook execution logs (7-day retention, max 100 per call).")
     async def list_hook_logs(
         hook_id: int | None = None,
         queue_id: int | None = None,
@@ -321,14 +315,12 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
             page_size,
         )
 
-    @mcp.tool(
-        description="List available hook templates from Rossum Store. Hook templates provide pre-built extension configurations (e.g., data validation, field mapping, notifications) that can be used to quickly create hooks instead of writing code from scratch. Use list_hook_templates first to find a suitable template, then use create_hook_from_template to create a hook based on that template."
-    )
+    @mcp.tool(description="List Rossum Store hook templates (use with create_hook_from_template).")
     async def list_hook_templates() -> list[HookTemplate]:
         return await _list_hook_templates(client)
 
     @mcp.tool(
-        description="Create a hook from a Rossum Store template. Uses pre-built configurations from the Rossum Store. The 'events' parameter is optional and can override template defaults. If the template has 'use_token_owner=True', a valid 'token_owner' user URL is required - use list_users to find one. CRITICAL RESTRICTION: organization_group_admin users are FORBIDDEN as token_owner - the API returns HTTP 400 error."
+        description="Create a hook from a template; events may override template defaults. If template requires use_token_owner, provide token_owner (not an organization_group_admin user)."
     )
     async def create_hook_from_template(
         name: str,

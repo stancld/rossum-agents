@@ -136,15 +136,15 @@ async def _delete_annotation(client: AsyncRossumAPIClient, annotation_id: int) -
 def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     """Register annotation-related tools with the FastMCP server."""
 
-    @mcp.tool(description="Upload a document to Rossum. Use list_annotations to get annotation ID.")
+    @mcp.tool(description="Upload a document; use list_annotations to find the created annotation.")
     async def upload_document(file_path: str, queue_id: int) -> dict:
         return await _upload_document(client, file_path, queue_id)
 
-    @mcp.tool(description="Retrieve annotation data. Use 'content' sideload to get extracted data.")
+    @mcp.tool(description="Retrieve an annotation; include sideload='content' to return extracted data.")
     async def get_annotation(annotation_id: int, sideloads: Sequence[Sideload] = ()) -> Annotation:
         return await _get_annotation(client, annotation_id, sideloads)
 
-    @mcp.tool(description="List annotations for a queue. Use ordering=['-created_at'] to sort by newest first.")
+    @mcp.tool(description="List queue annotations; ordering=['-created_at'] returns newest first.")
     async def list_annotations(
         queue_id: int,
         status: str | None = "importing,to_review,confirmed,exported",
@@ -153,22 +153,20 @@ def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> Non
     ) -> list[Annotation]:
         return await _list_annotations(client, queue_id, status, ordering, first_n)
 
-    @mcp.tool(description="Start annotation (move from 'to_review' to 'reviewing').")
+    @mcp.tool(description="Set annotation status to 'reviewing' (from 'to_review').")
     async def start_annotation(annotation_id: int) -> dict:
         return await _start_annotation(client, annotation_id)
 
     @mcp.tool(
-        description="Bulk update annotation fields. It can be used after `start_annotation` only. Use datapoint ID from content, NOT schema_id."
+        description="Bulk update extracted fields. Requires annotation in 'reviewing' status. Use datapoint IDs from content, not schema_id."
     )
     async def bulk_update_annotation_fields(annotation_id: int, operations: list[dict]) -> dict:
         return await _bulk_update_annotation_fields(client, annotation_id, operations)
 
-    @mcp.tool(
-        description="Confirm annotation (move to 'confirmed'). It can be used after `bulk_update_annotation_fields`."
-    )
+    @mcp.tool(description="Set annotation status to 'confirmed' (typically after field updates).")
     async def confirm_annotation(annotation_id: int) -> dict:
         return await _confirm_annotation(client, annotation_id)
 
-    @mcp.tool(description="Delete an annotation. Moves to 'deleted' status (soft delete).")
+    @mcp.tool(description="Soft-delete an annotation (status 'deleted').")
     async def delete_annotation(annotation_id: int) -> dict:
         return await _delete_annotation(client, annotation_id)

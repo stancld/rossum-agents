@@ -120,32 +120,16 @@ def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     async def list_schemas(name: str | None = None, queue_id: int | None = None) -> list[Schema]:
         return await ops.list_schemas(client, name, queue_id)
 
-    @mcp.tool(description="Update schema, typically for field-level thresholds.")
+    @mcp.tool(description="Update schema settings (commonly field thresholds).")
     async def update_schema(schema_id: int, schema_data: dict) -> Schema | dict:
         return await ops.update_schema(client, schema_id, schema_data)
 
-    @mcp.tool(description="Create a schema. Must have ≥1 section with children (datapoints).")
+    @mcp.tool(description="Create a schema; requires at least one section containing datapoints.")
     async def create_schema(name: str, content: list[dict]) -> Schema | dict:
         return await ops.create_schema(client, name, content)
 
     @mcp.tool(
-        description="""Patch schema nodes (add/update/remove fields in a schema).
-
-You MUST load `schema-patching` skill first to avoid errors.
-
-Operations:
-- add: Create new field. Requires parent_id (section or tuple id) and node_data.
-- update: Modify existing field. Requires node_data with fields to change.
-- remove: Delete field. Only requires node_id.
-
-Node types for add:
-- Datapoint (simple field): {"label": "Field Name", "category": "datapoint", "type": "string|number|date|enum"}
-- Enum field: Include "options": [{"value": "v1", "label": "Label 1"}, ...]
-- Multivalue (table): {"label": "Table", "category": "multivalue", "children": <tuple>}
-- Tuple (table row): {"id": "row_id", "label": "Row", "category": "tuple", "children": [<datapoints with id>]}
-
-Important: Datapoints inside a tuple MUST have an "id" field. Section-level datapoints get id from node_id parameter.
-"""
+        description="Patch schema nodes (add/update/remove). Prereq: load schema-patching skill. Ops: add (parent_id + node_data), update (node_id + node_data), remove (node_id only). Tuple datapoints require explicit id; section-level datapoints use the passed node_id."
     )
     async def patch_schema(
         schema_id: int,
@@ -157,22 +141,14 @@ Important: Datapoints inside a tuple MUST have an "id" field. Section-level data
     ) -> Schema | dict:
         return await ops.patch_schema(client, schema_id, operation, node_id, node_data, parent_id, position)
 
-    @mcp.tool(
-        description="Get lightweight tree structure of schema with only ids, labels, categories, and types. Accepts schema_id or queue_id (resolves to schema automatically)."
-    )
+    @mcp.tool(description="Lightweight schema tree (ids/labels/categories/types); accepts schema_id or queue_id.")
     async def get_schema_tree_structure(
         schema_id: int | None = None, queue_id: int | None = None
     ) -> list[dict] | dict:
         return await ops.get_schema_tree_structure(client, schema_id=schema_id, queue_id=queue_id)
 
     @mcp.tool(
-        description="""Remove multiple fields from schema at once. Efficient for pruning unwanted fields during setup.
-
-Use fields_to_keep OR fields_to_remove (not both):
-- fields_to_keep: Keep only these field IDs (plus sections). All others removed.
-- fields_to_remove: Remove these specific field IDs.
-
-Returns dict with removed_fields and remaining_fields lists. Sections cannot be removed."""
+        description="Remove many fields at once. Provide exactly one of: fields_to_keep (keep only these IDs + sections) or fields_to_remove (remove these IDs). Returns {removed_fields, remaining_fields}; sections are retained."
     )
     async def prune_schema_fields(
         schema_id: int,
@@ -181,6 +157,6 @@ Returns dict with removed_fields and remaining_fields lists. Sections cannot be 
     ) -> dict:
         return await ops.prune_schema_fields(client, schema_id, fields_to_keep, fields_to_remove)
 
-    @mcp.tool(description="Delete a schema. Fails if schema is linked to a queue or annotation (HTTP 409).")
+    @mcp.tool(description="Delete a schema; fails with 409 if linked to any queue/annotation.")
     async def delete_schema(schema_id: int) -> dict:
         return await ops.delete_schema(client, schema_id)

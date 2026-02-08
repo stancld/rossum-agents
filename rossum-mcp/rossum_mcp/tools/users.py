@@ -143,12 +143,12 @@ async def _list_user_roles(client: AsyncRossumAPIClient) -> list[Group]:
 def register_user_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     """Register user-related tools with the FastMCP server."""
 
-    @mcp.tool(description="Retrieve a single user by ID. Use list_users first to find users by username/email.")
+    @mcp.tool(description="Retrieve one user by ID.")
     async def get_user(user_id: int) -> User:
         return await _get_user(client, user_id)
 
     @mcp.tool(
-        description="List users. Filter by username/email to find specific users. Beware that users with 'organization_group_admin' role are special, e.g. cannot be used as token owners; you can filter them out with `is_organization_group_admin=False`."
+        description="List users (filterable by username/email). organization_group_admin users cannot be used as token owners; filter with is_organization_group_admin=false."
     )
     async def list_users(
         username: str | None = None,
@@ -163,7 +163,7 @@ def register_user_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         )
 
     @mcp.tool(
-        description="Create a new user. Username and email are required. Use list_user_roles to find valid group URLs. Queues and groups accept full API URLs."
+        description="Create a user (requires username + email). Use list_user_roles for role/group URLs; queue/group fields take full API URLs."
     )
     async def create_user(
         username: str,
@@ -181,9 +181,7 @@ def register_user_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
             client, username, email, queues, groups, first_name, last_name, is_active, metadata, oidc_id, auth_type
         )
 
-    @mcp.tool(
-        description="Update an existing user (PATCH). Only provide the fields you want to change - other fields remain unchanged. Use list_user_roles to find valid group URLs."
-    )
+    @mcp.tool(description="Patch a user; only provided fields change. Use list_user_roles for role/group URLs.")
     async def update_user(
         user_id: int,
         username: str | None = None,

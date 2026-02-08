@@ -27,9 +27,7 @@ def register_relation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         relation_data = await client._http_client.fetch_one(Resource.Relation, relation_id)
         return cast("Relation", client._deserializer(Resource.Relation, relation_data))
 
-    @mcp.tool(
-        description="List all relations with optional filters. Relations introduce common relations between annotations (edit, attachment, duplicate)."
-    )
+    @mcp.tool(description="List annotation relations (filterable); e.g. edit/attachment/duplicate.")
     async def list_relations(
         id: int | None = None,
         type: RelationType | None = None,

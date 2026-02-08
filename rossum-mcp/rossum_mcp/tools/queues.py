@@ -244,7 +244,7 @@ def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     async def get_queue(queue_id: int) -> Queue:
         return await _get_queue(client, queue_id)
 
-    @mcp.tool(description="List all queues with optional filters. id accepts comma-separated values (e.g. '1,2,3').")
+    @mcp.tool(description="List queues with filters; id supports comma-separated values.")
     async def list_queues(
         id: str | None = None, workspace_id: int | None = None, name: str | None = None
     ) -> list[Queue]:
@@ -291,20 +291,15 @@ def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     async def update_queue(queue_id: int, queue_data: dict) -> Queue | dict:
         return await _update_queue(client, queue_id, queue_data)
 
-    @mcp.tool(
-        description="Delete a queue. Deletion starts after 24 hours. Also deletes all related objects (annotations, documents)."
-    )
+    @mcp.tool(description="Delete a queue (deletion begins after ~24h); cascades to annotations/documents.")
     async def delete_queue(queue_id: int) -> dict:
         return await _delete_queue(client, queue_id)
 
-    @mcp.tool(description="Get available queue template names for create_queue_from_template.")
+    @mcp.tool(description="List template names usable by create_queue_from_template.")
     async def get_queue_template_names() -> list[str]:
         return list(QUEUE_TEMPLATE_NAMES)
 
-    @mcp.tool(
-        description="Create queue from a predefined template. Preferred method for new customer setup. "
-        "Templates include pre-configured schema and AI engine for common document types."
-    )
+    @mcp.tool(description="Create a queue from a template (includes schema + engine defaults).")
     async def create_queue_from_template(
         name: str,
         template_name: QueueTemplateName,

@@ -27,9 +27,7 @@ def register_document_relation_tools(mcp: FastMCP, client: AsyncRossumAPIClient)
         document_relation: DocumentRelation = await client.retrieve_document_relation(document_relation_id)
         return document_relation
 
-    @mcp.tool(
-        description="List all document relations with optional filters. Document relations introduce additional relations between annotations and documents (export, einvoice)."
-    )
+    @mcp.tool(description="List document relations (filterable); e.g. export/e-invoice links.")
     async def list_document_relations(
         id: int | None = None,
         type: str | None = None,
