@@ -15,11 +15,13 @@ from __future__ import annotations
 from regression_tests.custom_checks import (
     check_business_validation_hook_settings,
     check_business_validation_rules,
+    check_formula_field_for_table,
     check_knowledge_base_hidden_multivalue_warning,
     check_net_terms_formula_field_added,
     check_no_misleading_training_suggestions,
     check_queue_deleted,
     check_queue_ui_settings,
+    check_reasoning_field_configured,
 )
 from regression_tests.framework.models import (
     CustomCheck,
@@ -65,6 +67,16 @@ QUEUE_UI_SETTINGS_CHECK = CustomCheck(
 QUEUE_DELETED_CHECK = CustomCheck(
     name="Queue was scheduled for deletion",
     check_fn=check_queue_deleted,
+)
+
+REASONING_FIELD_CHECK = CustomCheck(
+    name="Reasoning field has correct type, context, and prompt",
+    check_fn=check_reasoning_field_configured,
+)
+
+FORMULA_FIELD_FOR_TABLE_CHECK = CustomCheck(
+    name="Formula field aggregates table column values",
+    check_fn=check_formula_field_for_table,
 )
 
 
@@ -158,6 +170,52 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             max_steps=4,
             file_expectation=FileExpectation(),
             custom_checks=[QUEUE_DELETED_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="create_invoice_queue_with_reasoning_and_formula_field",
+        description="Create invoice queue with reasoning field and formula field for table aggregation",
+        api_base_url="https://api.elis.develop.r8.lol/v1",
+        rossum_url=None,
+        prompt=(
+            "# Create Invoice queue with reasoning field and formula field\n\n"
+            "Workspace: 1782601\n"
+            "Region: EU\n\n"
+            "## Tasks:\n\n"
+            "1. Create a new queue from EU Invoice template with name: Invoices with Reasoning\n"
+            "2. Add a reasoning field to the schema:\n"
+            "    - Field name: month_in_spanish\n"
+            "    - Section: basic_info_section\n"
+            "    - Logic: Take the month from the date due field and return it in Spanish\n"
+            "3. Add a formula field to the schema:\n"
+            "    - Field name: total_quantity\n"
+            "    - Section: basic_info_section\n"
+            "    - Logic: Sum of all quantity values across line items\n"
+            "Output format: Return ONLY the field configurations as JSON/dict."
+        ),
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "load_skill",
+                "create_task",  # model should plan
+                ("patch_schema", "patch_schema_with_subagent"),
+                "suggest_formula_field",
+            ],
+            mode=ToolMatchMode.SUBSET,
+            forbidden_tools=[
+                "search_knowledge_base",
+                "kb_grep",
+                "elis_openapi_grep",
+                "elis_openapi_jq",
+                "search_elis_docs",
+            ],
+        ),
+        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=100000),
+        success_criteria=SuccessCriteria(
+            required_keywords=[],
+            max_steps=8,
+            file_expectation=FileExpectation(),
+            custom_checks=[REASONING_FIELD_CHECK, FORMULA_FIELD_FOR_TABLE_CHECK],
         ),
     ),
     RegressionTestCase(
@@ -319,6 +377,13 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "create_rule",
             ],
             mode=ToolMatchMode.SUBSET,
+            forbidden_tools=[
+                "search_knowledge_base",
+                "kb_grep",
+                "elis_openapi_grep",
+                "elis_openapi_jq",
+                "search_elis_docs",
+            ],
         ),
         token_budget=TokenBudget(min_total_tokens=50000, max_total_tokens=80000),
         success_criteria=SuccessCriteria(

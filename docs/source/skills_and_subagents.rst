@@ -54,6 +54,10 @@ Available Skills
      - Update queue UI settings (annotation list columns) without corrupting structure
    * - ``rules-and-actions``
      - Create validation rules with TxScript trigger conditions and actions via ``create_rule``
+   * - ``formula-fields``
+     - Create/configure formula fields with TxScript reference, messaging functions, and common patterns
+   * - ``reasoning-fields``
+     - Create AI-powered reasoning fields with prompt/context configuration and instruction-writing guidance
 
 Rossum Deployment Skill
 """""""""""""""""""""""

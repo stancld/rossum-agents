@@ -145,7 +145,7 @@ The ``rossum_agent`` package provides additional capabilities:
 * Hook debugging tools with sandboxed code execution and Opus sub-agent analysis
 * Deployment tools for pull/push/diff of Rossum configurations across environments
 * Multi-environment support with spawnable MCP connections
-* Skills system for domain-specific workflows (deployment, hook debugging)
+* Skills system for domain-specific workflows (deployment, hook debugging, formula fields, reasoning fields)
 * File output for saving reports, documentation, and analysis results
 * Integration with AI agent frameworks (Anthropic Claude via AWS Bedrock)
 * REST API interface

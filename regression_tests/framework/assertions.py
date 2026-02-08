@@ -37,22 +37,25 @@ def assert_tools_match(run: RegressionRun, expectation: ToolExpectation) -> None
     actual = run.all_tools
     expected = list(expectation.expected_tools)
 
-    if not expected:
-        return
+    if expected:
+        if expectation.mode == ToolMatchMode.EXACT_SEQUENCE:
+            # For exact sequence, flatten tuples to first option for comparison
+            flat_expected = [e[0] if isinstance(e, tuple) else e for e in expected]
+            if actual != flat_expected:
+                raise AssertionError(f"Tool sequence mismatch: expected exactly {flat_expected}, got {actual}")
 
-    if expectation.mode == ToolMatchMode.EXACT_SEQUENCE:
-        # For exact sequence, flatten tuples to first option for comparison
-        flat_expected = [e[0] if isinstance(e, tuple) else e for e in expected]
-        if actual != flat_expected:
-            raise AssertionError(f"Tool sequence mismatch: expected exactly {flat_expected}, got {actual}")
+        elif expectation.mode == ToolMatchMode.SUBSET:
+            missing = [e for e in expected if not _tool_matches(e, actual)]
+            if missing:
+                raise AssertionError(f"Tool subset mismatch: missing expected tools {missing}, got {actual}")
 
-    elif expectation.mode == ToolMatchMode.SUBSET:
-        missing = [e for e in expected if not _tool_matches(e, actual)]
-        if missing:
-            raise AssertionError(f"Tool subset mismatch: missing expected tools {missing}, got {actual}")
+        else:
+            raise ValueError(f"Unknown tool match mode: {expectation.mode}")
 
-    else:
-        raise ValueError(f"Unknown tool match mode: {expectation.mode}")
+    if expectation.forbidden_tools:
+        used_forbidden = [t for t in expectation.forbidden_tools if t in actual]
+        if used_forbidden:
+            raise AssertionError(f"Forbidden tools were used: {used_forbidden}")
 
 
 def assert_tokens_within_budget(run: RegressionRun, budget: TokenBudget) -> None:

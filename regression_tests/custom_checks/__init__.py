@@ -11,6 +11,9 @@ from regression_tests.custom_checks.business_validation_hook import (
 from regression_tests.custom_checks.business_validation_rules import (
     check_business_validation_rules,
 )
+from regression_tests.custom_checks.formula_field import (
+    check_formula_field_for_table,
+)
 from regression_tests.custom_checks.hidden_multivalue_warning import (
     check_knowledge_base_hidden_multivalue_warning,
 )
@@ -26,13 +29,18 @@ from regression_tests.custom_checks.queue_deletion import (
 from regression_tests.custom_checks.queue_ui_settings import (
     check_queue_ui_settings,
 )
+from regression_tests.custom_checks.reasoning_field import (
+    check_reasoning_field_configured,
+)
 
 __all__ = [
     "check_business_validation_hook_settings",
     "check_business_validation_rules",
+    "check_formula_field_for_table",
     "check_knowledge_base_hidden_multivalue_warning",
     "check_net_terms_formula_field_added",
     "check_no_misleading_training_suggestions",
     "check_queue_deleted",
     "check_queue_ui_settings",
+    "check_reasoning_field_configured",
 ]

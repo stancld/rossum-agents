@@ -8,6 +8,19 @@ import re
 from rossum_agent.bedrock_client import HAIKU_MODEL_ID, create_bedrock_client
 
 
+def extract_field_json_from_final_answer(final_answer: str, field_id: str) -> dict | None:
+    """Extract a field's JSON config from the final answer markdown."""
+    json_blocks = re.findall(r"```json\s*\n(.*?)\n```", final_answer, re.DOTALL)
+    for block in json_blocks:
+        try:
+            data = json.loads(block)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and data.get("id") == field_id:
+            return data
+    return None
+
+
 def call_haiku_check(prompt: str) -> tuple[bool, str]:
     """Call Haiku with a check prompt and parse the JSON response.
 

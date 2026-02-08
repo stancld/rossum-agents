@@ -34,10 +34,12 @@ class ToolExpectation:
         expected_tools: List of tool names expected to be called.
             For OR conditions, use tuple: ("get_schema", "get_queue_schema") means either is valid.
         mode: How to match tool calls (see ToolMatchMode enum).
+        forbidden_tools: List of tool names that must NOT be called.
     """
 
     expected_tools: Sequence[str | tuple[str, ...]] = field(default_factory=list)
     mode: ToolMatchMode = ToolMatchMode.SUBSET
+    forbidden_tools: Sequence[str] = field(default_factory=list)
 
 
 @dataclass

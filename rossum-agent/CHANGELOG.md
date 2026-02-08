@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
   - Uses UvicornWorker for ASGI compatibility
 - Added `prompt` and `context` field support to schema patching sub-agent for reasoning fields [#162](https://github.com/stancld/rossum-agents/pull/162)
 - Added `rules-and-actions` skill for creating validation rules with TxScript trigger conditions and actions via `create_rule` [#167](https://github.com/stancld/rossum-agents/pull/167)
+- Added `formula-fields` skill for creating/configuring formula fields with TxScript reference, messaging functions, and common patterns [#169](https://github.com/stancld/rossum-agents/pull/169)
+- Added `reasoning-fields` skill for creating AI-powered reasoning fields with prompt/context configuration and instruction-writing guidance [#169](https://github.com/stancld/rossum-agents/pull/169)
 
 ### Changed
 - Token usage breakdown now includes cache creation and cache read input token metrics [#161](https://github.com/stancld/rossum-agents/pull/161)
