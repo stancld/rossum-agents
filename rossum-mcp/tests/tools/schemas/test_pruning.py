@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from rossum_api import APIClientError
 from rossum_mcp.tools import base, schemas
-from rossum_mcp.tools.schemas import (
+from rossum_mcp.tools.schemas.pruning import (
     _collect_all_field_ids,
     _remove_fields_from_content,
 )

@@ -149,7 +149,9 @@ async def _create_queue(
                 os.environ["SPLITTING_SCREEN_FLAG_NAME"]: os.environ["SPLITTING_SCREEN_FLAG_VALUE"]
             }
         else:
-            logger.error("Splitting screen failed to update")
+            return {
+                "error": "splitting_screen_feature_flag requested but SPLITTING_SCREEN_FLAG_NAME and/or SPLITTING_SCREEN_FLAG_VALUE environment variables are not set"
+            }
 
     queue: Queue = await client.create_new_queue(queue_data)
     return queue

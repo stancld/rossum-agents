@@ -4,26 +4,24 @@ import logging
 import sys
 
 
-def setup_logging(log_level: str = "DEBUG", log_file: str | None = None, use_console: bool = True) -> logging.Logger:
-    """Configure logging with optional console handler.
+def setup_logging(log_level: str = "INFO") -> logging.Logger:
+    """Configure logging for the MCP server.
 
     Args:
-        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        log_file: Path to log file (reserved for future use)
-        use_console: Whether to add console handler (default: True)
-
-    Returns:
-        Configured root logger
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+                   Falls back to INFO on invalid values.
     """
     root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, log_level.upper()))
+
+    normalized = log_level.upper()
+    level = logging.getLevelNamesMapping().get(normalized, logging.INFO)
+    root_logger.setLevel(level)
+
     root_logger.handlers.clear()
 
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-    if use_console:
-        console = logging.StreamHandler(sys.stdout)
-        console.setFormatter(formatter)
-        root_logger.addHandler(console)
+    console = logging.StreamHandler(sys.stderr)
+    console.setFormatter(formatter)
+    root_logger.addHandler(console)
 
     return root_logger
