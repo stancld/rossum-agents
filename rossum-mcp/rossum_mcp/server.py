@@ -25,7 +25,7 @@ from rossum_mcp.tools import (
 )
 from rossum_mcp.tools.base import get_mcp_mode, set_mcp_mode
 
-setup_logging(log_level="DEBUG", use_console=False)
+setup_logging(log_level=os.environ.get("ROSSUM_MCP_LOG_LEVEL", "INFO"))
 
 logger = logging.getLogger(__name__)
 
