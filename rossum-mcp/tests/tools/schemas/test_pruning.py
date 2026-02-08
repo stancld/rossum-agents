@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import importlib
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, Mock  # noqa: TC003 - needed at runtime for fixtures
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from rossum_api import APIClientError
 from rossum_mcp.tools import base, schemas
 from rossum_mcp.tools.schemas import (
     _collect_all_field_ids,
@@ -511,3 +512,75 @@ class TestPruneSchemaFields:
         assert "invoice_number" in result["remaining_fields"]
         assert "header_section" in result["remaining_fields"]
         assert "payment_section" not in result["remaining_fields"]
+
+    @pytest.mark.asyncio
+    async def test_prune_schema_fields_retries_on_412(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that prune_schema_fields retries on 412 Precondition Failed."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        importlib.reload(schemas)
+
+        schemas.register_schema_tools(mock_mcp, mock_client)
+
+        mock_schema_dict = {
+            "id": 50,
+            "content": [
+                {
+                    "id": "header_section",
+                    "label": "Header",
+                    "category": "section",
+                    "children": [
+                        {"id": "invoice_number", "label": "Invoice Number", "category": "datapoint", "type": "string"},
+                        {"id": "invoice_date", "label": "Invoice Date", "category": "datapoint", "type": "date"},
+                    ],
+                }
+            ],
+        }
+        mock_client._http_client.request_json.return_value = mock_schema_dict
+        mock_client._http_client.update.side_effect = [
+            APIClientError("PATCH", "schemas/50", 412, "Precondition Failed"),
+            {},
+        ]
+
+        prune_schema_fields = mock_mcp._tools["prune_schema_fields"]
+        with patch("rossum_mcp.tools.schemas.operations.asyncio.sleep", new_callable=AsyncMock):
+            result = await prune_schema_fields(schema_id=50, fields_to_remove=["invoice_date"])
+
+        assert "invoice_date" in result["removed_fields"]
+        assert mock_client._http_client.update.call_count == 2
+        assert mock_client._http_client.request_json.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_prune_schema_fields_raises_after_max_retries_on_412(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that prune_schema_fields raises after exhausting retries on 412."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        importlib.reload(schemas)
+
+        schemas.register_schema_tools(mock_mcp, mock_client)
+
+        mock_schema_dict = {
+            "id": 50,
+            "content": [
+                {
+                    "id": "header_section",
+                    "label": "Header",
+                    "category": "section",
+                    "children": [
+                        {"id": "invoice_number", "label": "Invoice Number", "category": "datapoint", "type": "string"},
+                        {"id": "invoice_date", "label": "Invoice Date", "category": "datapoint", "type": "date"},
+                    ],
+                }
+            ],
+        }
+        mock_client._http_client.request_json.return_value = mock_schema_dict
+        mock_client._http_client.update.side_effect = APIClientError("PATCH", "schemas/50", 412, "Precondition Failed")
+
+        prune_schema_fields = mock_mcp._tools["prune_schema_fields"]
+        with patch("rossum_mcp.tools.schemas.operations.asyncio.sleep", new_callable=AsyncMock):
+            with pytest.raises(APIClientError, match="412"):
+                await prune_schema_fields(schema_id=50, fields_to_remove=["invoice_date"])

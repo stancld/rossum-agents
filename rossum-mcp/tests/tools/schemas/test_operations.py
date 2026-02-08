@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import importlib
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from rossum_api import APIClientError
 from rossum_mcp.tools import base, schemas
 from rossum_mcp.tools.schemas import register_schema_tools
 
@@ -49,8 +50,6 @@ class TestGetSchema:
     @pytest.mark.asyncio
     async def test_get_schema_not_found(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test schema not found returns error dict instead of raising exception."""
-        from rossum_api import APIClientError
-
         register_schema_tools(mock_mcp, mock_client)
 
         mock_client.retrieve_schema.side_effect = APIClientError(
@@ -463,6 +462,82 @@ class TestPatchSchema:
         assert header_section["children"][0]["id"] == "invoice_number"
 
     @pytest.mark.asyncio
+    async def test_patch_schema_retries_on_412(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that patch_schema retries on 412 Precondition Failed."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        importlib.reload(schemas)
+
+        schemas.register_schema_tools(mock_mcp, mock_client)
+
+        existing_content = [
+            {
+                "id": "header_section",
+                "label": "Header",
+                "category": "section",
+                "children": [{"id": "invoice_number", "label": "Invoice Number", "category": "datapoint"}],
+            }
+        ]
+
+        mock_schema = create_mock_schema(id=50, content=existing_content)
+        mock_client.retrieve_schema.return_value = mock_schema
+        mock_client._http_client.request_json.return_value = {"content": existing_content}
+        mock_client._http_client.update.side_effect = [
+            APIClientError("PATCH", "schemas/50", 412, "Precondition Failed"),
+            {},
+        ]
+
+        patch_schema = mock_mcp._tools["patch_schema"]
+        with patch("rossum_mcp.tools.schemas.operations.asyncio.sleep", new_callable=AsyncMock):
+            result = await patch_schema(
+                schema_id=50,
+                operation="add",
+                node_id="vendor_name",
+                parent_id="header_section",
+                node_data={"label": "Vendor Name", "type": "string", "category": "datapoint"},
+            )
+
+        assert result.id == 50
+        assert mock_client._http_client.update.call_count == 2
+        assert mock_client._http_client.request_json.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_patch_schema_raises_after_max_retries_on_412(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that patch_schema raises after exhausting retries on 412."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        importlib.reload(schemas)
+
+        schemas.register_schema_tools(mock_mcp, mock_client)
+
+        existing_content = [
+            {
+                "id": "header_section",
+                "label": "Header",
+                "category": "section",
+                "children": [{"id": "invoice_number", "label": "Invoice Number", "category": "datapoint"}],
+            }
+        ]
+
+        mock_client._http_client.request_json.return_value = {"content": existing_content}
+        mock_client._http_client.update.side_effect = APIClientError("PATCH", "schemas/50", 412, "Precondition Failed")
+
+        patch_schema = mock_mcp._tools["patch_schema"]
+        with patch("rossum_mcp.tools.schemas.operations.asyncio.sleep", new_callable=AsyncMock):
+            with pytest.raises(APIClientError, match="412"):
+                await patch_schema(
+                    schema_id=50,
+                    operation="add",
+                    node_id="vendor_name",
+                    parent_id="header_section",
+                    node_data={"label": "Vendor Name", "type": "string", "category": "datapoint"},
+                )
+
+    @pytest.mark.asyncio
     async def test_patch_schema_invalid_operation(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
@@ -631,8 +706,6 @@ class TestGetSchemaTreeStructure:
     @pytest.mark.asyncio
     async def test_get_schema_tree_structure_not_found(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test tree structure returns error dict when schema not found."""
-        from rossum_api import APIClientError
-
         register_schema_tools(mock_mcp, mock_client)
 
         mock_client.retrieve_schema.side_effect = APIClientError(

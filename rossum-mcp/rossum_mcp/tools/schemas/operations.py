@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Any
@@ -22,9 +23,52 @@ from rossum_mcp.tools.schemas.pruning import (
 from rossum_mcp.tools.schemas.validation import sanitize_schema_content
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from rossum_api import AsyncRossumAPIClient
 
+MAX_RETRIES_ON_PRECONDITION_FAILED = 3
+
 logger = logging.getLogger(__name__)
+
+
+async def _update_schema_with_retry(
+    client: AsyncRossumAPIClient,
+    schema_id: int,
+    prepare_content: Callable[[list], list | None],
+) -> tuple[list, list | None]:
+    """Fetch schema, transform content, update with retry on 412 Precondition Failed.
+
+    prepare_content receives the current content list and returns the transformed content,
+    or None to indicate no changes are needed.
+
+    Returns (original_content, transformed_content). transformed_content is None
+    when prepare_content returned None.
+    """
+    for attempt in range(MAX_RETRIES_ON_PRECONDITION_FAILED):
+        current_schema: dict = await client._http_client.request_json("GET", f"schemas/{schema_id}")
+        content = current_schema.get("content", [])
+        if not isinstance(content, list):
+            raise ValueError("Unexpected schema content format")
+
+        new_content = prepare_content(content)
+        if new_content is None:
+            return content, None
+
+        sanitized = sanitize_schema_content(new_content)
+        try:
+            await client._http_client.update(Resource.Schema, schema_id, {"content": sanitized})
+            return content, new_content
+        except APIClientError as e:
+            if e.status_code == 412 and attempt < MAX_RETRIES_ON_PRECONDITION_FAILED - 1:
+                logger.warning(
+                    f"Schema {schema_id} was modified concurrently (412 Precondition Failed), "
+                    f"retrying ({attempt + 1}/{MAX_RETRIES_ON_PRECONDITION_FAILED})..."
+                )
+                await asyncio.sleep(0.5 * (attempt + 1))
+                continue
+            raise
+    raise RuntimeError("Unreachable")
 
 
 def _truncate_schema_for_list(schema: Schema) -> Schema:
@@ -107,27 +151,22 @@ async def patch_schema(
         else:
             node_data_dict = asdict(node_data)
 
-    current_schema: dict = await client._http_client.request_json("GET", f"schemas/{schema_id}")
-    content_list = current_schema.get("content", [])
-    if not isinstance(content_list, list):
-        return {"error": "Unexpected schema content format"}
-
-    try:
-        patched_content = apply_schema_patch(
-            content=content_list,
+    def prepare(content: list) -> list:
+        return apply_schema_patch(
+            content=content,
             operation=operation,
             node_id=node_id,
             node_data=node_data_dict,
             parent_id=parent_id,
             position=position,
         )
+
+    try:
+        await _update_schema_with_retry(client, schema_id, prepare)
     except ValueError as e:
         return {"error": str(e)}
 
-    sanitized_content = sanitize_schema_content(patched_content)
-    await client._http_client.update(Resource.Schema, schema_id, {"content": sanitized_content})
-    updated_schema: Schema = await client.retrieve_schema(schema_id)
-    return updated_schema
+    return await client.retrieve_schema(schema_id)
 
 
 async def get_schema_tree_structure(
@@ -164,31 +203,36 @@ async def prune_schema_fields(
     if not fields_to_keep and not fields_to_remove:
         return {"error": "Must specify fields_to_keep or fields_to_remove"}
 
-    current_schema: dict = await client._http_client.request_json("GET", f"schemas/{schema_id}")
-    content = current_schema.get("content", [])
-    if not isinstance(content, list):
-        return {"error": "Unexpected schema content format"}
-    all_ids = _collect_all_field_ids(content)
+    def prepare(content: list) -> list | None:
+        all_ids = _collect_all_field_ids(content)
+        section_ids = {s.get("id") for s in content if s.get("category") == "section"}
 
-    section_ids = {s.get("id") for s in content if s.get("category") == "section"}
+        if fields_to_keep:
+            fields_to_keep_set = set(fields_to_keep) | section_ids
+            ancestor_ids = _collect_ancestor_ids(content, fields_to_keep_set)
+            fields_to_keep_set |= ancestor_ids
+            remove_set = all_ids - fields_to_keep_set
+        else:
+            remove_set = set(fields_to_remove) - section_ids  # type: ignore[arg-type]
 
-    if fields_to_keep:
-        fields_to_keep_set = set(fields_to_keep) | section_ids
-        ancestor_ids = _collect_ancestor_ids(content, fields_to_keep_set)
-        fields_to_keep_set |= ancestor_ids
-        remove_set = all_ids - fields_to_keep_set
-    else:
-        remove_set = set(fields_to_remove) - section_ids  # type: ignore[arg-type]
+        if not remove_set:
+            return None
 
-    if not remove_set:
+        pruned_content, _ = _remove_fields_from_content(content, remove_set)
+        return pruned_content
+
+    try:
+        original_content, result_content = await _update_schema_with_retry(client, schema_id, prepare)
+    except ValueError as e:
+        return {"error": str(e)}
+
+    if result_content is None:
+        all_ids = _collect_all_field_ids(original_content)
         return {"removed_fields": [], "remaining_fields": sorted(all_ids)}
 
-    pruned_content, removed = _remove_fields_from_content(content, remove_set)
-    sanitized_content = sanitize_schema_content(pruned_content)
-    await client._http_client.update(Resource.Schema, schema_id, {"content": sanitized_content})
-
-    remaining_ids = _collect_all_field_ids(pruned_content)
-    return {"removed_fields": sorted(removed), "remaining_fields": sorted(remaining_ids)}
+    all_ids = _collect_all_field_ids(original_content)
+    remaining_ids = _collect_all_field_ids(result_content)
+    return {"removed_fields": sorted(all_ids - remaining_ids), "remaining_fields": sorted(remaining_ids)}
 
 
 async def delete_schema(client: AsyncRossumAPIClient, schema_id: int) -> dict:
