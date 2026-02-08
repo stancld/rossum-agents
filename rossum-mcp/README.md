@@ -2,14 +2,14 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 61 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. 63 tools for queues, schemas, hooks, engines, and more.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI - rossum-mcp](https://img.shields.io/pypi/v/rossum-mcp?label=rossum-mcp)](https://pypi.org/project/rossum-mcp/)
 [![Coverage](https://codecov.io/gh/stancld/rossum-agents/branch/master/graph/badge.svg?flag=rossum-mcp)](https://codecov.io/gh/stancld/rossum-agents)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-61-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-63-blue.svg)](#available-tools)
 
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
@@ -97,7 +97,7 @@ Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
 
 ## Available Tools
 
-The server provides **59 tools** organized into categories:
+The server provides **63 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
@@ -105,11 +105,13 @@ The server provides **59 tools** organized into categories:
 | **Queue Management** | 9 | Create, configure, delete, and list queues |
 | **Schema Management** | 8 | Define, modify, and delete field structures |
 | **Engine Management** | 6 | Configure extraction and splitting engines |
-| **Extensions & Rules** | 14 | Webhooks, serverless functions, business rules |
+| **Extensions (Hooks)** | 8 | Webhooks, serverless functions |
+| **Rules & Actions** | 6 | Business rules with triggers and actions |
 | **Workspace Management** | 4 | Organize and delete workspaces |
-| **User Management** | 3 | List users and roles |
+| **User Management** | 5 | Create, update, list users and roles |
 | **Relations** | 4 | Annotation and document relations |
 | **Email Templates** | 3 | Automated email responses |
+| **MCP Mode** | 2 | Get/set read-only or read-write mode |
 | **Tool Discovery** | 1 | Dynamic tool loading |
 
 <details>
@@ -127,14 +129,17 @@ The server provides **59 tools** organized into categories:
 **Engine Management:**
 `get_engine`, `list_engines`, `create_engine`, `update_engine`, `create_engine_field`, `get_engine_fields`
 
-**Extensions & Rules:**
-`get_hook`, `list_hooks`, `create_hook`, `update_hook`, `list_hook_templates`, `create_hook_from_template`, `list_hook_logs`, `delete_hook`, `get_rule`, `list_rules`, `create_rule`, `update_rule`, `patch_rule`, `delete_rule`
+**Extensions (Hooks):**
+`get_hook`, `list_hooks`, `create_hook`, `update_hook`, `list_hook_templates`, `create_hook_from_template`, `list_hook_logs`, `delete_hook`
+
+**Rules & Actions:**
+`get_rule`, `list_rules`, `create_rule`, `update_rule`, `patch_rule`, `delete_rule`
 
 **Workspace Management:**
 `get_workspace`, `list_workspaces`, `create_workspace`, `delete_workspace`
 
 **User Management:**
-`get_user`, `list_users`, `list_user_roles`
+`get_user`, `list_users`, `create_user`, `update_user`, `list_user_roles`
 
 **Relations:**
 `get_relation`, `list_relations`, `get_document_relation`, `list_document_relations`
@@ -142,25 +147,15 @@ The server provides **59 tools** organized into categories:
 **Email Templates:**
 `get_email_template`, `list_email_templates`, `create_email_template`
 
+**MCP Mode:**
+`get_mcp_mode`, `set_mcp_mode`
+
 **Tool Discovery:**
 `list_tool_categories`
 
 </details>
 
 For detailed API documentation with parameters and examples, see [TOOLS.md](TOOLS.md).
-
-## Annotation Workflow
-
-Documents progress through these states:
-
-```
-importing → to_review → reviewing → confirmed → exporting → exported
-```
-
-**Key points:**
-- Wait for `to_review` before processing
-- Call `start_annotation` before updating fields
-- Call `confirm_annotation` to finalize
 
 ## Example Workflows
 
@@ -204,6 +199,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 - [Full Documentation](https://stancld.github.io/rossum-agents/)
 - [Tools Reference](TOOLS.md)
-- [Rossum API Documentation](https://elis.rossum.ai/api/docs/)
+- [Rossum API Documentation](https://rossum.app/api/docs)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [Main Repository](https://github.com/stancld/rossum-agents)
