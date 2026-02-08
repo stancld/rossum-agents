@@ -65,8 +65,6 @@ all = [
 where = ["."]
 include = ["rossum_mcp*"]
 
-
-
 [tool.coverage.run]
 omit = ["rossum_mcp/server.py"]
 

@@ -1,5 +1,3 @@
-"""Engine tools for Rossum MCP Server."""
-
 from __future__ import annotations
 
 import logging
@@ -117,8 +115,6 @@ async def _get_engine_fields(client: AsyncRossumAPIClient, engine_id: int | None
 
 
 def register_engine_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register engine-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve a single engine by ID.")
     async def get_engine(engine_id: int) -> Engine:
         return await _get_engine(client, engine_id)
@@ -133,13 +129,11 @@ def register_engine_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     async def update_engine(engine_id: int, engine_data: dict) -> Engine | dict:
         return await _update_engine(client, engine_id, engine_data)
 
-    @mcp.tool(
-        description="Create a new engine. IMPORTANT: When creating a new engine, check the schema to be used and create contained Engine fields immediately!"
-    )
+    @mcp.tool(description="Create an engine; create matching engine fields for the target schema immediately after.")
     async def create_engine(name: str, organization_id: int, engine_type: EngineType) -> Engine | dict:
         return await _create_engine(client, name, organization_id, engine_type)
 
-    @mcp.tool(description="Create engine field for each schema field. Must be called when creating engine + schema.")
+    @mcp.tool(description="Create an engine field corresponding to a schema field (used during engine+schema setup).")
     async def create_engine_field(
         engine_id: int,
         name: str,

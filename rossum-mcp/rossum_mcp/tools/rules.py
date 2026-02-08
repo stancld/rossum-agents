@@ -1,5 +1,3 @@
-"""Rule tools for Rossum MCP Server."""
-
 from __future__ import annotations
 
 import logging
@@ -191,8 +189,6 @@ async def _delete_rule(client: AsyncRossumAPIClient, rule_id: int) -> dict:
 
 
 def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register rule-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve rule details.")
     async def get_rule(rule_id: int) -> Rule:
         return await _get_rule(client, rule_id)
@@ -204,7 +200,7 @@ def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await _list_rules(client, schema_id, organization_id, enabled)
 
     @mcp.tool(
-        description="Create a new rule. Rules automate field operations based on trigger conditions (TxScript formulas like 'field.amount > 1000'). Actions require: id (unique str), type (show_message|hide_field|show_field|change_status|custom|etc), event (validation), payload (dict with type, content, schema_id for show_message). Provide at least one of schema_id or queue_ids to scope the rule."
+        description="Create a rule: trigger is a TxScript condition; action includes id, type, event, payload. Scope with schema_id and/or queue_ids (at least one required)."
     )
     async def create_rule(
         name: str,
@@ -216,9 +212,7 @@ def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     ) -> Rule | dict:
         return await _create_rule(client, name, trigger_condition, actions, enabled, schema_id, queue_ids)
 
-    @mcp.tool(
-        description="Full update of a rule (PUT). All fields required. Use patch_rule for partial updates. queue_ids limits rule to specific queues."
-    )
+    @mcp.tool(description="Replace a rule (PUT); all fields required. Use patch_rule for partial changes.")
     async def update_rule(
         rule_id: int,
         name: str,
@@ -229,9 +223,7 @@ def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     ) -> Rule | dict:
         return await _update_rule(client, rule_id, name, trigger_condition, actions, enabled, queue_ids)
 
-    @mcp.tool(
-        description="Partial update of a rule (PATCH). Only provided fields are updated. queue_ids limits rule to specific queues (empty list removes all)."
-    )
+    @mcp.tool(description="Patch a rule (PATCH); only provided fields change. queue_ids=[] clears queue scoping.")
     async def patch_rule(
         rule_id: int,
         name: str | None = None,

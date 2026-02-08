@@ -1,5 +1,3 @@
-"""Email template tools for Rossum MCP Server."""
-
 from __future__ import annotations
 
 import logging
@@ -84,16 +82,12 @@ async def _create_email_template(
 
 
 def register_email_template_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register email template-related tools with the FastMCP server."""
-
-    @mcp.tool(
-        description="Retrieve a single email template by ID. Use list_email_templates first to find templates for a queue."
-    )
+    @mcp.tool(description="Retrieve one email template by ID.")
     async def get_email_template(email_template_id: int) -> EmailTemplate:
         return await _get_email_template(client, email_template_id)
 
     @mcp.tool(
-        description="List all email templates with optional filtering. Email templates define automated or manual email responses sent from Rossum queues. Types: 'rejection' (for rejecting documents), 'rejection_default' (default rejection template), 'email_with_no_processable_attachments' (when email has no valid attachments), 'custom' (user-defined templates)."
+        description="List email templates (filterable). Types: rejection, rejection_default, email_with_no_processable_attachments, custom."
     )
     async def list_email_templates(
         queue_id: int | None = None,
@@ -104,7 +98,7 @@ def register_email_template_tools(mcp: FastMCP, client: AsyncRossumAPIClient) ->
         return await _list_email_templates(client, queue_id, type, name, first_n)
 
     @mcp.tool(
-        description="Create a new email template. Email templates can be automated (automate=True) to send emails automatically on specific triggers, or manual for user-initiated sending. The 'to', 'cc', and 'bcc' fields accept lists of recipient objects with 'type' ('annotator', 'constant', 'datapoint') and 'value' keys."
+        description="Create an email template; set automate=true for automatic sending. to/cc/bcc are recipient objects {type: annotator|constant|datapoint, value: ...}."
     )
     async def create_email_template(
         name: str,

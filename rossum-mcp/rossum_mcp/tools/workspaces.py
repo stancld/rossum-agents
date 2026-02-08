@@ -1,5 +1,3 @@
-"""Workspace tools for Rossum MCP Server."""
-
 from __future__ import annotations
 
 import logging
@@ -63,8 +61,6 @@ async def _delete_workspace(client: AsyncRossumAPIClient, workspace_id: int) -> 
 
 
 def register_workspace_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register workspace-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve workspace details.")
     async def get_workspace(workspace_id: int) -> Workspace:
         return await _get_workspace(client, workspace_id)
@@ -77,6 +73,6 @@ def register_workspace_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None
     async def create_workspace(name: str, organization_id: int, metadata: dict | None = None) -> Workspace | dict:
         return await _create_workspace(client, name, organization_id, metadata)
 
-    @mcp.tool(description="Delete a workspace. Fails if workspace contains queues.")
+    @mcp.tool(description="Delete a workspace; fails if it still contains queues.")
     async def delete_workspace(workspace_id: int) -> dict:
         return await _delete_workspace(client, workspace_id)

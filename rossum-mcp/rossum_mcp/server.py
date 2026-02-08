@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Rossum MCP Server
-
-Provides tools for uploading documents and retrieving annotations using Rossum API.
-Built with FastMCP for a cleaner, more Pythonic interface.
-"""
-
 from __future__ import annotations
 
 import logging
