@@ -27,20 +27,7 @@ from rossum_mcp.tools.schemas.operations import (
 )
 from rossum_mcp.tools.schemas.patching import (
     PatchOperation,
-    _apply_add_operation,
-    _apply_remove_operation,
-    _apply_update_operation,
-    _find_node_anywhere,
-    _find_node_in_children,
-    _find_parent_children_list,
-    _get_section_children_as_list,
     apply_schema_patch,
-)
-from rossum_mcp.tools.schemas.pruning import (
-    _collect_all_field_ids,
-    _collect_ancestor_ids,
-    _extract_schema_tree,
-    _remove_fields_from_content,
 )
 from rossum_mcp.tools.schemas.validation import (
     MAX_ID_LENGTH,
@@ -48,12 +35,6 @@ from rossum_mcp.tools.schemas.validation import (
     VALID_UI_CONFIGURATION_EDIT,
     VALID_UI_CONFIGURATION_TYPES,
     SchemaValidationError,
-    _validate_datapoint,
-    _validate_id,
-    _validate_multivalue,
-    _validate_node,
-    _validate_section,
-    _validate_tuple,
     sanitize_schema_content,
 )
 
@@ -76,23 +57,6 @@ __all__ = [
     "SchemaTreeNode",
     "SchemaTuple",
     "SchemaValidationError",
-    "_apply_add_operation",
-    "_apply_remove_operation",
-    "_apply_update_operation",
-    "_collect_all_field_ids",
-    "_collect_ancestor_ids",
-    "_extract_schema_tree",
-    "_find_node_anywhere",
-    "_find_node_in_children",
-    "_find_parent_children_list",
-    "_get_section_children_as_list",
-    "_remove_fields_from_content",
-    "_validate_datapoint",
-    "_validate_id",
-    "_validate_multivalue",
-    "_validate_node",
-    "_validate_section",
-    "_validate_tuple",
     "apply_schema_patch",
     "create_schema",
     "delete_schema",

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from rossum_mcp.tools import schemas
-from rossum_mcp.tools.schemas import (
+from rossum_mcp.tools.schemas import apply_schema_patch
+from rossum_mcp.tools.schemas.patching import (
     _apply_add_operation,
     _apply_remove_operation,
     _apply_update_operation,
@@ -12,7 +12,6 @@ from rossum_mcp.tools.schemas import (
     _find_node_in_children,
     _find_parent_children_list,
     _get_section_children_as_list,
-    apply_schema_patch,
 )
 
 
@@ -419,7 +418,7 @@ class TestRemoveOperation:
         ]
 
         with pytest.raises(ValueError, match="Cannot determine how to remove"):
-            schemas._apply_remove_operation(content, "top_level_node")
+            _apply_remove_operation(content, "top_level_node")
 
     def test_apply_remove_operation_top_level_section_without_category(self) -> None:
         """Test removing a top-level node with implicit section category (lines 395-396)."""
@@ -428,7 +427,7 @@ class TestRemoveOperation:
         ]
 
         with pytest.raises(ValueError, match="Cannot remove a section"):
-            schemas._apply_remove_operation(content, "implicit_section")
+            _apply_remove_operation(content, "implicit_section")
 
 
 @pytest.mark.unit
@@ -632,7 +631,7 @@ class TestNodeSearching:
         }
         children = [tuple_node]
 
-        node, _index, _parent_list, parent_node = schemas._find_node_in_children(children, "nested_field", None)
+        node, _index, _parent_list, parent_node = _find_node_in_children(children, "nested_field", None)
 
         assert node is not None
         assert node["id"] == "nested_field"
@@ -642,7 +641,7 @@ class TestNodeSearching:
         """Test _find_parent_children_list returns (None, True) for top-level multivalue section (line 279)."""
         content = [{"id": "multivalue_section", "category": "multivalue", "children": {"id": "inner"}}]
 
-        result, is_multivalue = schemas._find_parent_children_list(content, "multivalue_section")
+        result, is_multivalue = _find_parent_children_list(content, "multivalue_section")
 
         assert result is None
         assert is_multivalue is True
@@ -661,7 +660,7 @@ class TestNodeSearching:
             }
         ]
 
-        result, is_multivalue = schemas._find_parent_children_list(content, "target_tuple")
+        result, is_multivalue = _find_parent_children_list(content, "target_tuple")
 
         assert result == []
         assert is_multivalue is False
@@ -676,7 +675,7 @@ class TestNodeSearching:
             }
         ]
 
-        result, is_multivalue = schemas._find_parent_children_list(content, "nonexistent")
+        result, is_multivalue = _find_parent_children_list(content, "nonexistent")
 
         assert result is None
         assert is_multivalue is False
@@ -686,20 +685,20 @@ class TestNodeSearching:
         content = [{"id": "section", "children": []}]
 
         with pytest.raises(ValueError, match="node_data is required"):
-            schemas._apply_add_operation(content, "new_id", None, "section", None)
+            _apply_add_operation(content, "new_id", None, "section", None)
 
     def test_apply_add_operation_missing_parent_id_raises_error(self) -> None:
         """Test _apply_add_operation raises ValueError when parent_id is None (line 318)."""
         content = [{"id": "section", "children": []}]
 
         with pytest.raises(ValueError, match="parent_id is required"):
-            schemas._apply_add_operation(content, "new_id", {"label": "New"}, None, None)
+            _apply_add_operation(content, "new_id", {"label": "New"}, None, None)
 
     def test_get_section_children_as_list_returns_empty_for_invalid_type(self) -> None:
         """Test _get_section_children_as_list returns [] for non-list/dict children (line 349)."""
         section = {"id": "section", "children": "invalid_string"}
 
-        result = schemas._get_section_children_as_list(section)
+        result = _get_section_children_as_list(section)
 
         assert result == []
 
@@ -720,4 +719,4 @@ class TestNodeSearching:
         ]
 
         with pytest.raises(ValueError, match="Cannot remove 'inner_tuple' from multivalue"):
-            schemas._apply_remove_operation(content, "inner_tuple")
+            _apply_remove_operation(content, "inner_tuple")
