@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import logging
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -615,7 +614,7 @@ class TestCreateQueue:
 
     @pytest.mark.asyncio
     async def test_create_queue_with_splitting_screen_flag_missing_env(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch, caplog: pytest.LogCaptureFixture
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         """Test create_queue with splitting_screen_feature_flag when env vars are missing."""
         monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
@@ -625,16 +624,12 @@ class TestCreateQueue:
         importlib.reload(base)
         register_queue_tools(mock_mcp, mock_client)
 
-        mock_queue = create_mock_queue(id=200, name="New Queue")
-        mock_client.create_new_queue.return_value = mock_queue
-
         create_queue = mock_mcp._tools["create_queue"]
-        with caplog.at_level(logging.ERROR):
-            await create_queue(name="New Queue", workspace_id=1, schema_id=10, splitting_screen_feature_flag=True)
+        result = await create_queue(name="New Queue", workspace_id=1, schema_id=10, splitting_screen_feature_flag=True)
 
-        call_args = mock_client.create_new_queue.call_args[0][0]
-        assert "settings" not in call_args
-        assert "Splitting screen failed to update" in caplog.text
+        assert "error" in result
+        assert "splitting_screen_feature_flag requested" in result["error"]
+        mock_client.create_new_queue.assert_not_called()
 
 
 @pytest.mark.unit
