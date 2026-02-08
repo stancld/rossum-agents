@@ -38,7 +38,7 @@ Or run from source:
 
 ```bash
 git clone https://github.com/stancld/rossum-agents.git
-cd rossum-mcp/rossum-mcp
+cd rossum-agents/rossum-mcp
 uv sync
 python rossum_mcp/server.py
 ```

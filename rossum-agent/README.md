@@ -26,7 +26,7 @@
 
 | Capability | Description |
 |------------|-------------|
-| **Rossum MCP Integration** | Full access to 61 MCP tools for document processing |
+| **Rossum MCP Integration** | Full access to 63 MCP tools for document processing |
 | **Hook Debugging** | Sandboxed execution with Opus sub-agent analysis |
 | **Deployment Tools** | Pull, push, diff, copy configs across environments |
 | **Knowledge Base Search** | AI-powered Rossum documentation search |
@@ -53,7 +53,7 @@ rossum-agent-api
 
 ```bash
 git clone https://github.com/stancld/rossum-agents.git
-cd rossum-mcp/rossum-agent
+cd rossum-agents/rossum-agent
 uv sync
 ```
 
@@ -115,7 +115,7 @@ asyncio.run(main())
 
 ## Available Tools
 
-The agent provides internal tools and access to 61 MCP tools via dynamic loading.
+The agent provides internal tools and access to 63 MCP tools via dynamic loading.
 
 <details>
 <summary><strong>Internal Tools</strong></summary>
@@ -205,7 +205,7 @@ flowchart TB
     end
 
     subgraph MCP["Rossum MCP Server"]
-        Tools[61 MCP Tools]
+        Tools[63 MCP Tools]
     end
 
     API[Rossum API]

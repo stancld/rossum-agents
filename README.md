@@ -19,7 +19,7 @@
 [![CodeFactor](https://www.codefactor.io/repository/github/stancld/rossum-agents/badge)](https://www.codefactor.io/repository/github/stancld/rossum-agents)
 
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-59-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-63-blue.svg)](#available-tools)
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![Claude Opus 4.6](https://img.shields.io/badge/Claude-Opus_4.6-blueviolet.svg)](https://www.anthropic.com/claude/opus)
 
@@ -147,6 +147,7 @@ This repository contains four standalone Python packages:
 - **[rossum-agent/](rossum-agent/)** - Specialized AI agent toolkit with REST API
 - **[rossum-agent-client/](rossum-agent-client/)** - Typed Python client for the Rossum Agent API
 - **[rossum-deploy/](rossum-deploy/)** - Minimalistic pull/diff/push deployment tool (lightweight alternative to [deployment-manager](https://github.com/rossumai/deployment-manager))
+- **[rossum-agent-tui/](rossum-agent-tui/)** - Terminal UI for development and testing (Node.js)
 
 Each package can be installed and used independently or together for complete functionality.
 
@@ -163,7 +164,7 @@ rossum-agent-api
 Or with Docker:
 
 ```bash
-git clone https://github.com/stancld/rossum-agents.git && cd rossum-mcp
+git clone https://github.com/stancld/rossum-agents.git && cd rossum-agents
 echo "ROSSUM_API_TOKEN=your-token" > .env
 echo "ROSSUM_API_BASE_URL=https://api.elis.rossum.ai/v1" >> .env
 docker-compose up rossum-agent
@@ -179,7 +180,7 @@ docker-compose up rossum-agent
 
 ```bash
 git clone https://github.com/stancld/rossum-agents.git
-cd rossum-mcp
+cd rossum-agents
 
 # Create .env file with required variables
 cat > .env << EOF
@@ -208,7 +209,7 @@ redis-cli LRANGE logs:$(date +%Y-%m-%d) 0 -1
 
 ```bash
 git clone https://github.com/stancld/rossum-agents.git
-cd rossum-mcp
+cd rossum-agents
 
 # Install all packages with all features
 uv sync --all-extras
@@ -293,16 +294,21 @@ See the [full documentation](https://stancld.github.io/rossum-agents/skills_and_
 
 ## MCP Tools
 
-The MCP server provides **56 tools** for document processing, queue/schema management, hooks, engines, and more.
+The MCP server provides **63 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
-| Document Processing | 6 | Upload, retrieve, update, confirm annotations |
-| Queue Management | 8 | Create, configure, list queues |
-| Schema Management | 7 | Define and modify field structures |
-| Engine Management | 6 | Extraction and splitting engines |
-| Extensions & Rules | 9 | Webhooks, serverless functions, rules |
-| Other | 14 | Workspaces, users, relations, email templates |
+| Document Processing | 7 | Upload, retrieve, update, confirm, delete annotations |
+| Queue Management | 9 | Create, configure, delete, and list queues |
+| Schema Management | 8 | Define, modify, and delete field structures |
+| Engine Management | 6 | Configure extraction and splitting engines |
+| Extensions (Hooks) | 8 | Webhooks, serverless functions |
+| Rules & Actions | 6 | Business rules with triggers and actions |
+| Workspace Management | 4 | Organize and delete workspaces |
+| User Management | 5 | Create, update, list users and roles |
+| Relations | 4 | Annotation and document relations |
+| Email Templates | 3 | Automated email responses |
+| MCP Mode & Discovery | 3 | Get/set mode, tool catalog |
 
 See [rossum-mcp/README.md](rossum-mcp/README.md) for the tool list and [rossum-mcp/TOOLS.md](rossum-mcp/TOOLS.md) for detailed API documentation.
 

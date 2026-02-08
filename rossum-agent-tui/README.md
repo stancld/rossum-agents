@@ -1,6 +1,9 @@
 # Rossum Agent TUI
 
-Terminal UI for interacting with the Rossum Agent API.
+Terminal UI for interacting with the Rossum Agent API. Development test-bed for the [Rossum Agent](../rossum-agent/).
+
+> [!NOTE]
+> This is a development tool, not a production application. Tests are not required for this package.
 
 ## Setup
 
@@ -82,3 +85,13 @@ npm run dev    # watch mode (recompiles on changes)
 npm run build  # one-off build
 npm start      # run from dist/
 ```
+
+## License
+
+MIT License - see [LICENSE](../LICENSE) for details.
+
+## Resources
+
+- [Rossum Agent README](../rossum-agent/README.md)
+- [Full Documentation](https://stancld.github.io/rossum-agents/)
+- [Main Repository](https://github.com/stancld/rossum-agents)

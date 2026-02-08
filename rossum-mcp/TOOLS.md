@@ -1,8 +1,8 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 59 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 63 MCP tools. For quick start and setup, see [README.md](README.md).
 
-## Document Processing (6 tools)
+## Document Processing (7 tools)
 
 ### upload_document
 
@@ -219,9 +219,16 @@ Updates an existing queue's settings including automation thresholds.
 - `queue_id` (integer, required): Queue ID to update
 - `queue_data` (object, required): Dictionary containing queue fields to update
 
+### delete_queue
+
+Deletes a queue. Deletion begins after approximately 24 hours and cascades to annotations and documents.
+
+**Parameters:**
+- `queue_id` (integer, required): Queue ID to delete
+
 ---
 
-## Schema Management (7 tools)
+## Schema Management (8 tools)
 
 ### get_schema
 
@@ -416,7 +423,7 @@ Retrieves engine fields for a specific engine or all engine fields.
 
 ---
 
-## Extensions & Rules (14 tools)
+## Extensions — Hooks (8 tools)
 
 ### get_hook
 
@@ -483,6 +490,17 @@ Lists hook execution logs for debugging.
 - `hook_id`, `queue_id`, `annotation_id` (optional): Filter options
 - `log_level` (string, optional): 'INFO', 'ERROR', or 'WARNING'
 - `timestamp_before`, `timestamp_after` (string, optional): ISO 8601 timestamps
+
+### delete_hook
+
+Deletes a hook by ID.
+
+**Parameters:**
+- `hook_id` (integer, required): Hook ID to delete
+
+---
+
+## Rules & Actions (6 tools)
 
 ### get_rule
 
@@ -606,13 +624,6 @@ patch_rule(rule_id=67890, queue_ids=[101, 102])
 patch_rule(rule_id=67890, queue_ids=[])
 ```
 
-### delete_hook
-
-Deletes a hook by ID.
-
-**Parameters:**
-- `hook_id` (integer, required): Hook ID to delete
-
 ### delete_rule
 
 Deletes a rule by ID.
@@ -648,7 +659,7 @@ Deletes a workspace by ID.
 
 ---
 
-## User Management (3 tools)
+## User Management (5 tools)
 
 ### get_user
 
@@ -665,6 +676,36 @@ Lists users in the organization. Use this to find a user's URL for `token_owner`
 - `username`, `email`, `first_name`, `last_name` (optional): Filter options
 - `is_active` (boolean, optional): Filter by active status
 - `is_organization_group_admin` (boolean, optional): Filter by admin role
+
+### create_user
+
+Creates a new user. Use `list_user_roles` for role/group URLs; queue/group fields take full API URLs.
+
+**Parameters:**
+- `username` (string, required): Username for the new user
+- `email` (string, required): Email address for the new user
+- `queues` (array of strings, optional): List of queue URLs to assign
+- `groups` (array of strings, optional): List of group/role URLs to assign
+- `first_name`, `last_name` (string, optional): User's name
+- `is_active` (boolean, optional, default: true): Whether the user is active
+- `metadata` (object, optional): Custom metadata
+- `oidc_id` (string, optional): OIDC identity for SSO
+- `auth_type` (string, optional, default: "password"): Authentication type
+
+### update_user
+
+Patches a user; only provided fields change. Use `list_user_roles` for role/group URLs.
+
+**Parameters:**
+- `user_id` (integer, required): User ID to update
+- `username`, `email`, `first_name`, `last_name` (string, optional): Updated fields
+- `queues` (array of strings, optional): New list of queue URLs
+- `groups` (array of strings, optional): New list of group/role URLs
+- `is_active` (boolean, optional): Active status
+- `metadata` (object, optional): Updated metadata
+- `oidc_id` (string, optional): Updated OIDC identity
+- `auth_type` (string, optional): Updated authentication type
+- `ui_settings` (object, optional): Updated UI settings
 
 ### list_user_roles
 
@@ -752,7 +793,18 @@ Creates a new email template.
 
 ---
 
-## Tool Discovery (1 tool)
+## MCP Mode & Discovery (3 tools)
+
+### get_mcp_mode_tool
+
+Get the current MCP operation mode (read-only or read-write).
+
+### set_mcp_mode_tool
+
+Set the MCP operation mode. Use 'read-only' to disable write operations, 'read-write' to enable them.
+
+**Parameters:**
+- `mode` (string, required): Target mode — "read-only" or "read-write"
 
 ### list_tool_categories
 
@@ -768,7 +820,7 @@ Lists all available tool categories with descriptions, tool names, and keywords 
 - `document_relations` - Document relations (2 tools)
 - `relations` - Annotation relations (2 tools)
 - `rules` - Validation rules (6 tools)
-- `users` - User management (3 tools)
+- `users` - User management (5 tools)
 - `workspaces` - Workspace management (4 tools)
 
 ---
