@@ -29,6 +29,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 - `load_skill("schema-patching")` → modify schemas, add/remove fields, formulas
 - `load_skill("schema-pruning")` → bulk remove unwanted fields from schema
 - `load_skill("ui-settings")` → update queue UI settings, annotation list columns
+- `load_skill("rules-and-actions")` → create validation rules with TxScript conditions and actions
 
 **MCP Tools** (pre-loaded based on request keywords, or load manually):
 - `load_tool_category(["queues", "schemas"])` to load multiple categories at once

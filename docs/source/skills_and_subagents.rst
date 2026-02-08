@@ -52,6 +52,8 @@ Available Skills
      - Create new schemas from scratch with correct content array structure
    * - ``ui-settings``
      - Update queue UI settings (annotation list columns) without corrupting structure
+   * - ``rules-and-actions``
+     - Create validation rules with TxScript trigger conditions and actions via ``create_rule``
 
 Rossum Deployment Skill
 """""""""""""""""""""""
