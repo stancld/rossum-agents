@@ -445,6 +445,10 @@ class TestUpdateRule:
         )
         mock_client.retrieve_rule.return_value = existing_rule
         mock_client._http_client.update = AsyncMock()
+
+        async def retrieve_after_update(rule_id: int) -> Rule:
+            return updated_rule
+
         mock_client.retrieve_rule.side_effect = [existing_rule, updated_rule]
 
         test_action = {
@@ -461,11 +465,87 @@ class TestUpdateRule:
             trigger_condition="field.total > 5000",
             actions=[test_action],
             enabled=False,
+            queue_ids=[10, 20],
         )
 
         assert result.id == 123
         assert result.name == "Updated Rule"
         mock_client._http_client.update.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_update_rule_with_empty_queue_ids(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that update_rule with empty queue_ids sends an empty queues list."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
+        importlib.reload(base)
+
+        from rossum_mcp.tools.rules import register_rule_tools
+
+        register_rule_tools(mock_mcp, mock_client)
+
+        existing_rule = create_mock_rule(
+            id=123,
+            name="Old Name",
+            schema="https://api.test.rossum.ai/v1/schemas/50",
+        )
+        updated_rule = create_mock_rule(id=123, name="Updated Rule")
+        mock_client.retrieve_rule.side_effect = [existing_rule, updated_rule]
+        mock_client._http_client.update = AsyncMock()
+
+        update_rule = mock_mcp._tools["update_rule"]
+        await update_rule(
+            rule_id=123,
+            name="Updated Rule",
+            trigger_condition="True",
+            actions=[],
+            enabled=True,
+            queue_ids=[],
+        )
+
+        call_args = mock_client._http_client.update.call_args
+        payload = call_args[0][2]
+        assert payload["queues"] == []
+
+    @pytest.mark.asyncio
+    async def test_update_rule_overrides_queues_when_provided(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that update_rule uses provided queue_ids."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
+        importlib.reload(base)
+
+        from rossum_mcp.tools.rules import register_rule_tools
+
+        register_rule_tools(mock_mcp, mock_client)
+
+        existing_rule = create_mock_rule(
+            id=123,
+            name="Old Name",
+            schema="https://api.test.rossum.ai/v1/schemas/50",
+        )
+        updated_rule = create_mock_rule(id=123, name="Updated Rule")
+        mock_client.retrieve_rule.side_effect = [existing_rule, updated_rule]
+        mock_client._http_client.update = AsyncMock()
+
+        update_rule = mock_mcp._tools["update_rule"]
+        await update_rule(
+            rule_id=123,
+            name="Updated Rule",
+            trigger_condition="True",
+            actions=[],
+            enabled=True,
+            queue_ids=[30, 40],
+        )
+
+        call_args = mock_client._http_client.update.call_args
+        payload = call_args[0][2]
+        assert payload["queues"] == [
+            "https://api.test.rossum.ai/v1/queues/30",
+            "https://api.test.rossum.ai/v1/queues/40",
+        ]
 
     @pytest.mark.asyncio
     async def test_update_rule_read_only_mode(
@@ -486,6 +566,7 @@ class TestUpdateRule:
             trigger_condition="True",
             actions=[],
             enabled=True,
+            queue_ids=[],
         )
 
         assert result["error"] == "update_rule is not available in read-only mode"

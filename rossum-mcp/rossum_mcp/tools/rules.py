@@ -119,7 +119,7 @@ async def _update_rule(
     trigger_condition: str,
     actions: list[RuleAction],
     enabled: bool,
-    queue_ids: list[int] | None = None,
+    queue_ids: list[int],
 ) -> Rule | dict:
     """Full update (PUT) - all fields required."""
     if not is_read_write_mode():
@@ -133,13 +133,11 @@ async def _update_rule(
         "trigger_condition": trigger_condition,
         "actions": actions,
         "enabled": enabled,
+        "queues": [build_resource_url("queues", qid) for qid in queue_ids],
     }
 
     if existing_rule.schema is not None:
         rule_data["schema"] = existing_rule.schema
-
-    if queue_ids is not None:
-        rule_data["queues"] = [build_resource_url("queues", qid) for qid in queue_ids]
 
     logger.debug(f"Rule update payload: {rule_data}")
     await client._http_client.update(Resource.Rule, rule_id, rule_data)
@@ -219,7 +217,7 @@ def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         trigger_condition: str,
         actions: list[RuleAction],
         enabled: bool,
-        queue_ids: list[int] | None = None,
+        queue_ids: list[int],
     ) -> Rule | dict:
         return await _update_rule(client, rule_id, name, trigger_condition, actions, enabled, queue_ids)
 
