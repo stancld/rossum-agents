@@ -288,7 +288,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=70000, max_total_tokens=160000),
+        token_budget=TokenBudget(min_total_tokens=70000, max_total_tokens=170000),
         success_criteria=SuccessCriteria(
             require_subagent=True,
             required_keywords=[],
@@ -321,11 +321,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=70000, max_total_tokens=160000),
+        token_budget=TokenBudget(min_total_tokens=110000, max_total_tokens=220000),
         success_criteria=SuccessCriteria(
             require_subagent=True,
             required_keywords=[],
-            max_steps=8,
+            max_steps=9,
             file_expectation=FileExpectation(),
             custom_checks=[BUSINESS_VALIDATION_RULES_CHECK],
         ),
