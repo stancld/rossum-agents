@@ -20,6 +20,9 @@ All notable changes to this project will be documented in this file.
 - Removed `RedisHandler` from `logging_config` — Redis log storage is no longer part of rossum-mcp. Agent chat history (via `RedisStorage` in rossum-agent) is unaffected.
 
 ### Fixed
+- `create_schema`, `update_schema`, and `prune_schema_fields` now reject empty schema content instead of sending it to the API and wiping all fields [#172](https://github.com/stancld/rossum-agents/pull/172)
+- `update_queue` now validates `annotation_list_table` column `meta_name` values against the set of valid meta names, preventing silent API 400 errors [#172](https://github.com/stancld/rossum-agents/pull/172)
+- `create_hook`, `update_hook`, and `create_hook_from_template` now validate hook event strings against the `event.action` format before API call, with clear error listing valid values [#172](https://github.com/stancld/rossum-agents/pull/172)
 - `patch_schema` and `prune_schema_fields` now retry up to 3 times on HTTP 412 Precondition Failed (concurrent schema modification), with linear backoff
 - Fixed `create_rule` and `update_rule` requiring `schema_id` — now optional to match the API. Rules can be scoped by `queue_ids` alone; at least one of `schema_id` or `queue_ids` is required [#156](https://github.com/stancld/rossum-agents/pull/156)
 - List tools now gracefully skip items that fail to deserialize instead of aborting the entire listing. A single broken item in a customer organization (API errors, unexpected data) no longer causes the agent to fail mid-run. Affected tools: `list_annotations`, `list_document_relations`, `list_email_templates`, `list_engines`, `list_hooks`, `list_hook_logs`, `list_queues`, `list_relations`, `list_rules`, `list_schemas`, `list_users`, `list_user_roles`, `list_workspaces`. [#158](https://github.com/stancld/rossum-agents/pull/158)
