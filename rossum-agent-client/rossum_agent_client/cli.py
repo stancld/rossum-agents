@@ -147,7 +147,7 @@ def run_chat(
     mcp_mode: Literal["read-only", "read-write"],
     show_thinking: bool = False,
     output_files: dict[str, str] | None = None,
-) -> None:
+) -> str:
     """Run a chat session with the given prompt."""
     chat = client.create_chat(mcp_mode=mcp_mode)
     print(f"Chat: {chat.chat_id}", file=sys.stderr)
@@ -177,6 +177,8 @@ def run_chat(
             print(f"Saved: {safe_filename}", file=sys.stderr)
         else:
             print(f"Saved: {safe_filename} (content of generated {original_filename})", file=sys.stderr)
+
+    return chat.chat_id
 
 
 type McpMode = Literal["read-only", "read-write"]
