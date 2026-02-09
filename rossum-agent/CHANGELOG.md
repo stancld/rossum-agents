@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+
+## [1.1.0] - 2026-02-09
+
 ### Added
 - Added API request cancellation: explicit `POST /chats/{chat_id}/cancel` endpoint, automatic cancellation on client disconnect, and automatic cancellation of superseded requests when a new message is sent to the same chat [#165](https://github.com/stancld/rossum-agents/pull/165)
 - Added prompt caching (`cache_control`) for system prompt, tools, and conversation history to reduce input token costs by up to 90% on cached content [#161](https://github.com/stancld/rossum-agents/pull/161)
