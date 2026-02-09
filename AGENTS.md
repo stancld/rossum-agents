@@ -21,7 +21,7 @@
 
 ## Architecture
 
-- **rossum-mcp**: FastMCP server in `rossum_mcp/server.py`; tools registered from `rossum_mcp/tools/` modules, 63 tools
+- **rossum-mcp**: FastMCP server in `rossum_mcp/server.py`; tools registered from `rossum_mcp/tools/` modules, 66 tools
 - **rossum-agent**: AI agent with prompts in `rossum_agent/prompts/`, skills in `rossum_agent/skills/`
 - **rossum-agent-tui**: Development test-bed TUI for rossum-agent. Not production code — no tests required.
 - **New skills**: Add to `rossum_agent/prompts/base_prompt.py` ROSSUM_EXPERT_INTRO section

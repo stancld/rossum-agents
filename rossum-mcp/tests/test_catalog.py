@@ -22,6 +22,8 @@ class TestToolCatalog:
             "document_relations",
             "relations",
             "rules",
+            "organization_groups",
+            "organization_limits",
             "users",
             "workspaces",
         }

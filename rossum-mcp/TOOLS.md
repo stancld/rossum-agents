@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 63 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 66 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ## Document Processing (7 tools)
 
@@ -659,6 +659,51 @@ Deletes a workspace by ID.
 
 ---
 
+## Organization Groups (2 tools)
+
+### get_organization_group
+
+Retrieves organization group details by ID.
+
+**Parameters:**
+- `organization_group_id` (integer, required): Organization group ID
+
+### list_organization_groups
+
+Lists organization groups with optional name filter.
+
+**Parameters:**
+- `name` (string, optional): Filter by name
+
+---
+
+## Organization Limits (1 tool)
+
+### get_organization_limit
+
+Retrieves email sending limits and usage counters for an organization.
+
+**Parameters:**
+- `organization_id` (integer, required): Organization ID
+
+**Returns:**
+```json
+{
+  "email_limits": {
+    "count_today": 5,
+    "count_today_notification": 2,
+    "count_total": 100,
+    "email_per_day_limit": 50,
+    "email_per_day_limit_notification": 20,
+    "email_total_limit": 10000,
+    "last_sent_at": "2026-02-09T10:00:00Z",
+    "last_sent_at_notification": "2026-02-09T09:00:00Z"
+  }
+}
+```
+
+---
+
 ## User Management (5 tools)
 
 ### get_user
@@ -822,6 +867,8 @@ Lists all available tool categories with descriptions, tool names, and keywords 
 - `rules` - Validation rules (6 tools)
 - `users` - User management (5 tools)
 - `workspaces` - Workspace management (4 tools)
+- `organization_groups` - Organization group management (2 tools)
+- `organization_limits` - Organization limits (1 tool)
 
 ---
 

@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Added `create_user` tool for creating new users with full field support (queues, groups, metadata, auth_type, OIDC) [#163](https://github.com/stancld/rossum-agents/pull/163)
 - Added `update_user` tool for partial update (PATCH) of existing users [#163](https://github.com/stancld/rossum-agents/pull/163)
+- Added `get_organization_group` and `list_organization_groups` tools for viewing organization group (license) details [#170](https://github.com/stancld/rossum-agents/pull/170)
+- Added `get_organization_limit` tool for retrieving email sending limits and usage counters for an organization [#170](https://github.com/stancld/rossum-agents/pull/170)
 
 ### Changed
 - `get_schema_tree_structure` now accepts `queue_id` as an alternative to `schema_id` — resolves the queue's schema automatically [#151](https://github.com/stancld/rossum-agents/pull/151)
