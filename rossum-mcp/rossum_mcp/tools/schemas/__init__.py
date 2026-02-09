@@ -80,7 +80,7 @@ def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     async def list_schemas(name: str | None = None, queue_id: int | None = None) -> list[Schema]:
         return await ops.list_schemas(client, name, queue_id)
 
-    @mcp.tool(description="Update schema settings (commonly field thresholds).")
+    @mcp.tool(description="Update schema settings; requires full schema.")
     async def update_schema(schema_id: int, schema_data: dict) -> Schema | dict:
         return await ops.update_schema(client, schema_id, schema_data)
 

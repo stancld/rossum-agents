@@ -514,6 +514,40 @@ class TestPruneSchemaFields:
         assert "payment_section" not in result["remaining_fields"]
 
     @pytest.mark.asyncio
+    async def test_prune_schema_fields_rejects_empty_result(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that pruning all fields raises ValueError instead of emptying the schema."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        importlib.reload(schemas)
+
+        schemas.register_schema_tools(mock_mcp, mock_client)
+
+        mock_schema_dict = {
+            "id": 50,
+            "content": [
+                {
+                    "id": "header_section",
+                    "label": "Header",
+                    "category": "section",
+                    "children": [
+                        {"id": "invoice_number", "label": "Invoice Number", "category": "datapoint", "type": "string"}
+                    ],
+                }
+            ],
+        }
+        mock_client._http_client.request_json.return_value = mock_schema_dict
+
+        prune_schema_fields = mock_mcp._tools["prune_schema_fields"]
+        result = await prune_schema_fields(schema_id=50, fields_to_remove=["invoice_number"])
+
+        assert isinstance(result, dict)
+        assert "error" in result
+        assert "empty content" in result["error"]
+        mock_client._http_client.update.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_prune_schema_fields_retries_on_412(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
