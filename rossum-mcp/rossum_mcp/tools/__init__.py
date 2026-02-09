@@ -14,6 +14,8 @@ from rossum_mcp.tools.document_relations import register_document_relation_tools
 from rossum_mcp.tools.email_templates import register_email_template_tools
 from rossum_mcp.tools.engines import register_engine_tools
 from rossum_mcp.tools.hooks import register_hook_tools
+from rossum_mcp.tools.organization_groups import register_organization_group_tools
+from rossum_mcp.tools.organization_limits import register_organization_limit_tools
 from rossum_mcp.tools.queues import register_queue_tools
 from rossum_mcp.tools.relations import register_relation_tools
 from rossum_mcp.tools.rules import register_rule_tools
@@ -32,6 +34,8 @@ __all__ = [
     "register_email_template_tools",
     "register_engine_tools",
     "register_hook_tools",
+    "register_organization_group_tools",
+    "register_organization_limit_tools",
     "register_queue_tools",
     "register_relation_tools",
     "register_rule_tools",

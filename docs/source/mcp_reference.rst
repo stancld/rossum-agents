@@ -758,6 +758,63 @@ list_user_roles
 **Implementation:**
   Lists all user roles (groups of permissions) in the organization.
 
+get_organization_group
+^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``get_organization_group(organization_group_id: int)``
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.retrieve_organization_group(org_group_id)``
+
+**API Endpoint:**
+  ``GET /v1/organization_groups/{org_group_id}``
+
+**SDK Documentation:**
+  https://github.com/rossumai/rossum-sdk
+
+**Implementation:**
+  Retrieves a single organization group by ID.
+
+list_organization_groups
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``list_organization_groups(name: str | None)``
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.list_organization_groups(**filters)``
+
+**API Endpoint:**
+  ``GET /v1/organization_groups``
+
+**SDK Documentation:**
+  https://github.com/rossumai/rossum-sdk
+
+**Implementation:**
+  Lists organization groups with optional name filter. Uses graceful deserialization
+  to skip items that fail to parse.
+
+get_organization_limit
+^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``get_organization_limit(organization_id: int)``
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.retrieve_organization_limit(org_id)``
+
+**API Endpoint:**
+  ``GET /v1/organizations/{org_id}/limits``
+
+**SDK Documentation:**
+  https://github.com/rossumai/rossum-sdk
+
+**Implementation:**
+  Retrieves email sending limits and usage counters for a given organization.
+  Returns ``OrganizationLimit`` with nested ``EmailLimits`` containing daily/total
+  email counts and limits.
+
 list_tool_categories
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -824,6 +881,12 @@ list_tool_categories
    * - ``workspaces``
      - Workspace management: organize queues
      - workspace, organization
+   * - ``organization_groups``
+     - Organization group management: view license groups
+     - organization group, license, trial, production, deployment
+   * - ``organization_limits``
+     - Organization limits: email sending limits and usage
+     - organization limit, email limit, quota, email usage
 
 **Example:**
 

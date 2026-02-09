@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_hook
+from rossum_api.models.hook_template import HookTemplate
 from rossum_mcp.tools import base
 from rossum_mcp.tools.hooks import register_hook_tools
 
@@ -607,33 +608,30 @@ class TestListHookTemplates:
         """Test successful hook templates listing."""
         register_hook_tools(mock_mcp, mock_client)
 
-        template_data = [
-            {
-                "url": "https://api.test.rossum.ai/v1/hook_templates/1",
-                "name": "Validation Template",
-                "description": "Validates data",
-                "type": "function",
-                "events": ["annotation_content.initialize"],
-                "config": {"code": "..."},
-                "settings_schema": {"type": "object"},
-                "guide": "Some guide",
-                "use_token_owner": False,
-            },
-            {
-                "url": "https://api.test.rossum.ai/v1/hook_templates/2",
-                "name": "Webhook Template",
-                "type": "webhook",
-                "events": ["annotation_status.changed"],
-                "config": {},
-                "use_token_owner": True,
-            },
+        templates = [
+            HookTemplate(
+                id=1,
+                name="Validation Template",
+                url="https://api.test.rossum.ai/v1/hook_templates/1",
+                type="function",
+                description="Validates data",
+                settings_schema={"type": "object"},
+                guide="Some guide",
+            ),
+            HookTemplate(
+                id=2,
+                name="Webhook Template",
+                url="https://api.test.rossum.ai/v1/hook_templates/2",
+                type="webhook",
+            ),
         ]
 
-        async def async_iter():
-            for item in template_data:
-                yield item
+        async def mock_fetch_all(resource, **kwargs):
+            for t in templates:
+                yield t
 
-        mock_client.request_paginated = Mock(side_effect=lambda *args: async_iter())
+        mock_client._http_client.fetch_all = mock_fetch_all
+        mock_client._deserializer = Mock(side_effect=lambda resource, raw: raw)
 
         list_hook_templates = mock_mcp._tools["list_hook_templates"]
         result = await list_hook_templates()
@@ -643,13 +641,10 @@ class TestListHookTemplates:
         assert result[0].name == "Validation Template"
         assert result[0].description == "Validates data"
         assert result[0].settings_schema == {"type": "object"}
-        assert result[0].use_token_owner is False
         assert result[0].guide == "<omitted>"  # guide is truncated to save context
         assert result[1].id == 2
         assert result[1].name == "Webhook Template"
-        assert result[1].description == ""  # default
-        assert result[1].use_token_owner is True
-        mock_client.request_paginated.assert_called_once_with("hook_templates")
+        assert result[1].description is None
 
 
 @pytest.mark.unit

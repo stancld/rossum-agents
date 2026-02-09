@@ -145,6 +145,23 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
         ],
         keywords=["rule", "validation", "constraint"],
     ),
+    "organization_groups": ToolCategory(
+        name="organization_groups",
+        description="Organization group management: view license groups shared across organizations",
+        tools=[
+            ToolInfo("get_organization_group", "Retrieve organization group details"),
+            ToolInfo("list_organization_groups", "List organization groups"),
+        ],
+        keywords=["organization group", "license", "trial", "production", "deployment"],
+    ),
+    "organization_limits": ToolCategory(
+        name="organization_limits",
+        description="Organization limits: view email sending limits and usage counters",
+        tools=[
+            ToolInfo("get_organization_limit", "Retrieve organization email limits"),
+        ],
+        keywords=["organization limit", "email limit", "quota", "email usage"],
+    ),
     "users": ToolCategory(
         name="users",
         description="User management: create, update, list users and roles",

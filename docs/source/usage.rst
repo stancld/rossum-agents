@@ -1770,6 +1770,82 @@ None
    for role in roles:
        print(f"{role.name} (ID: {role.id})")
 
+Organization Groups
+-------------------
+
+get_organization_group
+^^^^^^^^^^^^^^^^^^^^^^
+
+Retrieves organization group (license) details by ID.
+
+**Parameters:**
+
+- ``organization_group_id`` (integer, required): Organization group ID
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "id": 1,
+     "name": "Production Group",
+     "is_trial": false,
+     "is_production": true,
+     "deployment_location": "eu"
+   }
+
+list_organization_groups
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Lists organization groups with optional name filter.
+
+**Parameters:**
+
+- ``name`` (string, optional): Filter by name
+
+**Returns:**
+
+.. code-block:: json
+
+   [
+     {
+       "id": 1,
+       "name": "Production Group",
+       "is_trial": false,
+       "is_production": true,
+       "deployment_location": "eu"
+     }
+   ]
+
+Organization Limits
+-------------------
+
+get_organization_limit
+^^^^^^^^^^^^^^^^^^^^^^
+
+Retrieves email sending limits and usage counters for an organization.
+
+**Parameters:**
+
+- ``organization_id`` (integer, required): Organization ID
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "email_limits": {
+       "count_today": 5,
+       "count_today_notification": 2,
+       "count_total": 100,
+       "email_per_day_limit": 50,
+       "email_per_day_limit_notification": 20,
+       "email_total_limit": 10000,
+       "last_sent_at": "2026-02-09T10:00:00Z",
+       "last_sent_at_notification": "2026-02-09T09:00:00Z"
+     }
+   }
+
 Relations Management
 --------------------
 

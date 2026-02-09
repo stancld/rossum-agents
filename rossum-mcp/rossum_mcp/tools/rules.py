@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Literal, TypedDict
+from dataclasses import asdict
+from typing import TYPE_CHECKING
 
 from rossum_api.domain_logic.resources import Resource
-from rossum_api.models.rule import Rule
+from rossum_api.models.rule import Rule, RuleAction
 
 from rossum_mcp.tools.base import build_resource_url, delete_resource, graceful_list, is_read_write_mode
 
@@ -15,40 +16,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-RuleActionType = Literal[
-    "show_message",
-    "add_automation_blocker",
-    "add_validation_source",
-    "change_queue",
-    "send_email",
-    "hide_field",
-    "show_field",
-    "show_hide_field",
-    "change_status",
-    "add_label",
-    "remove_label",
-    "custom",
-]
-
-
-class RuleActionPayload(TypedDict, total=False):
-    """Payload for rule actions. Fields depend on action type."""
-
-    type: Literal["info", "warning", "error"]  # for show_message
-    content: str  # message content or template
-    schema_id: str  # target field schema_id
-    queue_url: str  # for change_queue
-    status: str  # for change_status
-    label: str  # for add_label/remove_label
-
-
-class RuleAction(TypedDict):
-    """Rule action definition."""
-
-    id: str  # unique action identifier
-    type: RuleActionType
-    event: Literal["validation"]
-    payload: RuleActionPayload
+def _actions_to_dicts(actions: list[RuleAction]) -> list[dict]:
+    """Serialize actions for API payloads, handling both dataclass instances and raw dicts."""
+    return [asdict(a) if isinstance(a, RuleAction) else a for a in actions]
 
 
 async def _get_rule(client: AsyncRossumAPIClient, rule_id: int) -> Rule:
@@ -96,7 +66,7 @@ async def _create_rule(
     rule_data: dict = {
         "name": name,
         "trigger_condition": trigger_condition,
-        "actions": actions,
+        "actions": _actions_to_dicts(actions),
         "enabled": enabled,
     }
 
@@ -131,7 +101,7 @@ async def _update_rule(
     rule_data: dict = {
         "name": name,
         "trigger_condition": trigger_condition,
-        "actions": actions,
+        "actions": _actions_to_dicts(actions),
         "enabled": enabled,
         "queues": [build_resource_url("queues", qid) for qid in queue_ids],
     }
@@ -167,7 +137,7 @@ async def _patch_rule(
     if trigger_condition is not None:
         patch_data["trigger_condition"] = trigger_condition
     if actions is not None:
-        patch_data["actions"] = actions
+        patch_data["actions"] = _actions_to_dicts(actions)
     if enabled is not None:
         patch_data["enabled"] = enabled
     if queue_ids is not None:

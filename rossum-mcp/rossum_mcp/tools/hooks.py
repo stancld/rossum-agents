@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.hook import Hook, HookRunData, HookType
+from rossum_api.models.hook_template import HookTemplate
 
 from rossum_mcp.tools.base import (
     TRUNCATED_MARKER,
     delete_resource,
-    extract_id_from_url,
     graceful_list,
     is_read_write_mode,
 )
@@ -22,26 +21,6 @@ if TYPE_CHECKING:
 type Timestamp = Annotated[str, "ISO 8601 timestamp (e.g., '2024-01-15T10:30:00Z')"]
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class HookTemplate:
-    """Represents a hook template from Rossum Store.
-
-    Hook templates provide pre-built extension configurations that can be
-    used to quickly create hooks with standard functionality.
-    """
-
-    id: int
-    url: str
-    name: str
-    description: str
-    type: str
-    events: list[str]
-    config: dict[str, Any]
-    settings_schema: dict[str, Any] | None
-    guide: str | None
-    use_token_owner: bool
 
 
 async def _get_hook(client: AsyncRossumAPIClient, hook_id: int) -> Hook:
@@ -186,24 +165,10 @@ async def _list_hook_logs(
 
 
 async def _list_hook_templates(client: AsyncRossumAPIClient) -> list[HookTemplate]:
-    templates: list[HookTemplate] = []
-    async for item in client.request_paginated("hook_templates"):
-        url = item["url"]
-        templates.append(
-            HookTemplate(
-                id=extract_id_from_url(url),
-                url=url,
-                name=item["name"],
-                description=item.get("description", ""),
-                type=item["type"],
-                events=[],
-                config={},
-                settings_schema=item.get("settings_schema"),
-                guide=TRUNCATED_MARKER,
-                use_token_owner=item.get("use_token_owner", False),
-            )
-        )
-    return templates
+    result = await graceful_list(client, Resource.HookTemplate, "hook_template")
+    for template in result.items:
+        template.guide = TRUNCATED_MARKER
+    return result.items
 
 
 async def _create_hook_from_template(

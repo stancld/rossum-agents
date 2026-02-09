@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **61 tools** organized into ten categories:
+The MCP server provides **66 tools** organized into twelve categories:
 
 **Document Processing**
 
@@ -81,6 +81,15 @@ The MCP server provides **61 tools** organized into ten categories:
 * **get_workspace** - Retrieve workspace details by ID
 * **list_workspaces** - List all workspaces with optional filtering
 * **create_workspace** - Create a new workspace
+
+**Organization Groups**
+
+* **get_organization_group** - Retrieve organization group (license) details by ID
+* **list_organization_groups** - List organization groups with optional name filter
+
+**Organization Limits**
+
+* **get_organization_limit** - Retrieve email sending limits and usage counters for an organization
 
 **User Management**
 
