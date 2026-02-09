@@ -1,0 +1,17 @@
+**/.venv/
+**/.pytest_cache/
+**/__pycache__/
+**/*.egg-info/
+**/.ruff_cache/
+**/outputs/
+**/.git/
+**/tests/
+**/scripts/
+**/docs/
+**/.agents/
+**/.claude/
+regression_tests/
+rossum-agent-tui/
+rossum-agent-client/
+examples/
+.git/

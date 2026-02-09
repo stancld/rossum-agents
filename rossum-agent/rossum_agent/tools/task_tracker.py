@@ -8,9 +8,12 @@ a snapshot callback that streams TaskSnapshotEvents to the frontend via SSE.
 from __future__ import annotations
 
 import json
+import re
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
+
+_NUMBERED_PREFIX = re.compile(r"^(\d+)\.\s")
 
 from anthropic import beta_tool
 
@@ -44,6 +47,14 @@ class TaskTracker:
     _next_id: int = 1
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
+    def _sorted_tasks_unlocked(self) -> list[Task]:
+        """Return tasks sorted by numbered prefix if all have one, else by creation order."""
+        tasks = list(self.tasks.values())
+        if tasks and all(_NUMBERED_PREFIX.match(t.subject) for t in tasks):
+            tasks.sort(key=lambda t: int(_NUMBERED_PREFIX.match(t.subject).group(1)))  # type: ignore[union-attr]
+            return tasks
+        return tasks
+
     def _snapshot_unlocked(self) -> list[dict[str, object]]:
         """Build snapshot without acquiring lock (caller must hold lock)."""
         return [
@@ -53,7 +64,7 @@ class TaskTracker:
                 "status": t.status.value,
                 "description": t.description,
             }
-            for t in self.tasks.values()
+            for t in self._sorted_tasks_unlocked()
         ]
 
     def _create_task_unlocked(self, subject: str, description: str) -> Task:
@@ -100,7 +111,7 @@ class TaskTracker:
 
     def list_tasks(self) -> list[Task]:
         with self._lock:
-            return list(self.tasks.values())
+            return self._sorted_tasks_unlocked()
 
     def snapshot(self) -> list[dict[str, object]]:
         with self._lock:

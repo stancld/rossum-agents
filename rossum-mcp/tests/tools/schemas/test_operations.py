@@ -260,6 +260,22 @@ class TestUpdateSchema:
         assert result.name == "Updated Schema"
 
     @pytest.mark.asyncio
+    async def test_update_schema_rejects_empty_content(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+
+        register_schema_tools(mock_mcp, mock_client)
+
+        update_schema = mock_mcp._tools["update_schema"]
+        result = await update_schema(schema_id=50, schema_data={"content": []})
+
+        assert isinstance(result, dict)
+        assert "empty content" in result["error"]
+        mock_client._http_client.update.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_update_schema_read_only_mode(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
@@ -308,6 +324,22 @@ class TestCreateSchema:
         assert result.id == 100
         assert result.name == "New Schema"
         mock_client.create_new_schema.assert_called_once_with({"name": "New Schema", "content": content})
+
+    @pytest.mark.asyncio
+    async def test_create_schema_rejects_empty_content(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+
+        register_schema_tools(mock_mcp, mock_client)
+
+        create_schema = mock_mcp._tools["create_schema"]
+        result = await create_schema(name="New Schema", content=[])
+
+        assert isinstance(result, dict)
+        assert "empty content" in result["error"]
+        mock_client.create_new_schema.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_create_schema_read_only_mode(

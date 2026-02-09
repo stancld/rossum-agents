@@ -30,6 +30,9 @@ All notable changes to this project will be documented in this file.
 - Lazy load deploy tools only when `rossum-deployment` skill is activated [#164](https://github.com/stancld/rossum-agents/pull/164)
 
 ### Fixed
+- Fixed default column list in `ui-settings` skill — removed non-existent `created_by`/`modified_by` meta names, added correct `modifier` [#172](https://github.com/stancld/rossum-agents/pull/172)
+- Added read-only mode warning: agent now immediately stops and warns the user when a write operation is requested in read-only mode, instead of attempting and failing [#172](https://github.com/stancld/rossum-agents/pull/172)
+- Task tracker tasks are now created in planned execution order for consistent progress display [#172](https://github.com/stancld/rossum-agents/pull/172)
 - Fixed schema patching sub-agent: excluded `update_schema` from available tools to prevent accidental full-schema overwrites [#161](https://github.com/stancld/rossum-agents/pull/161)
 - Fixed token counting to include cache creation and cache read tokens in input totals for accurate usage reporting [#161](https://github.com/stancld/rossum-agents/pull/161)
 - Fixed incorrect field names (`is_formula`/`is_reasoning`) in base prompt — replaced with correct API field names [#161](https://github.com/stancld/rossum-agents/pull/161)

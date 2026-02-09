@@ -671,6 +671,63 @@ class TestUpdateQueue:
         assert result["error"] == "update_queue is not available in read-only mode"
         mock_client._http_client.update.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_update_queue_rejects_invalid_meta_name(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        register_queue_tools(mock_mcp, mock_client)
+
+        update_queue = mock_mcp._tools["update_queue"]
+        result = await update_queue(
+            queue_id=100,
+            queue_data={
+                "settings": {
+                    "annotation_list_table": {
+                        "columns": [
+                            {"column_type": "meta", "meta_name": "created_by", "visible": True},
+                        ]
+                    }
+                }
+            },
+        )
+
+        assert "error" in result
+        assert "created_by" in result["error"]
+        assert "Invalid meta_name" in result["error"]
+        mock_client._http_client.update.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_update_queue_allows_valid_meta_names(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        register_queue_tools(mock_mcp, mock_client)
+
+        mock_queue = create_mock_queue(id=100, name="Test Queue")
+        mock_client._http_client.update.return_value = {"id": 100}
+        mock_client._deserializer = Mock(return_value=mock_queue)
+
+        update_queue = mock_mcp._tools["update_queue"]
+        result = await update_queue(
+            queue_id=100,
+            queue_data={
+                "settings": {
+                    "annotation_list_table": {
+                        "columns": [
+                            {"column_type": "meta", "meta_name": "created_at", "visible": True},
+                            {"column_type": "meta", "meta_name": "modifier", "visible": True},
+                        ]
+                    }
+                }
+            },
+        )
+
+        assert result.id == 100
+        mock_client._http_client.update.assert_called_once()
+
 
 @pytest.mark.unit
 class TestGetQueueTemplateNames:
