@@ -10,7 +10,7 @@ import pytest
 from conftest import create_mock_hook
 from rossum_api.models.hook_template import HookTemplate
 from rossum_mcp.tools import base
-from rossum_mcp.tools.hooks import register_hook_tools
+from rossum_mcp.tools.hooks import _validate_events, register_hook_tools
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -315,6 +315,29 @@ class TestCreateHook:
 @pytest.mark.unit
 class TestCreateHookFromTemplate:
     """Tests for create_hook_from_template tool."""
+
+    @pytest.mark.asyncio
+    async def test_create_hook_from_template_invalid_events(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that invalid event format raises ValueError."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        register_hook_tools(mock_mcp, mock_client)
+
+        mock_http_client = AsyncMock()
+        mock_http_client.base_url = "https://api.test.rossum.ai/v1"
+        mock_client._http_client = mock_http_client
+
+        create_hook_from_template = mock_mcp._tools["create_hook_from_template"]
+        with pytest.raises(ValueError, match=r"Invalid event.*annotation_content.*event\.action"):
+            await create_hook_from_template(
+                name="My Hook",
+                hook_template_id=5,
+                queues=["https://api.test.rossum.ai/v1/queues/1"],
+                events=["annotation_content"],
+            )
+        mock_http_client.request_json.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_create_hook_from_template_webhook_with_external_url(
@@ -681,3 +704,20 @@ class TestDeleteHook:
 
         assert result["error"] == "delete_hook is not available in read-only mode"
         mock_client.delete_hook.assert_not_called()
+
+
+@pytest.mark.unit
+class TestValidateEvents:
+    """Tests for _validate_events helper."""
+
+    def test_valid_events(self) -> None:
+        result = _validate_events(["annotation_content.initialize", "upload.created"])
+        assert result == ["annotation_content.initialize", "upload.created"]
+
+    def test_invalid_event_raises(self) -> None:
+        with pytest.raises(ValueError, match=r"Invalid event.*annotation_content.*event\.action"):
+            _validate_events(["annotation_content"])
+
+    def test_mixed_valid_invalid_raises(self) -> None:
+        with pytest.raises(ValueError, match=r"Invalid event.*bad_event"):
+            _validate_events(["annotation_content.initialize", "bad_event"])

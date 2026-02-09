@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from rossum_api.domain_logic.resources import Resource
-from rossum_api.models.hook import Hook, HookRunData, HookType
+from rossum_api.models.hook import Hook, HookEventAndAction, HookRunData, HookType
 from rossum_api.models.hook_template import HookTemplate
 
 from rossum_mcp.tools.base import (
@@ -22,10 +22,21 @@ type Timestamp = Annotated[str, "ISO 8601 timestamp (e.g., '2024-01-15T10:30:00Z
 
 logger = logging.getLogger(__name__)
 
+VALID_HOOK_EVENTS = {e.value for e in HookEventAndAction}
+
+
+def _validate_events(events: list[str]) -> list[str]:
+    invalid = [e for e in events if e not in VALID_HOOK_EVENTS]
+    if invalid:
+        valid_list = ", ".join(sorted(VALID_HOOK_EVENTS))
+        raise ValueError(
+            f"Invalid event(s): {invalid}. Events must use 'event.action' format. Valid values: {valid_list}"
+        )
+    return events
+
 
 async def _get_hook(client: AsyncRossumAPIClient, hook_id: int) -> Hook:
-    hook: Hook = await client.retrieve_hook(hook_id)
-    return hook
+    return await client.retrieve_hook(hook_id)
 
 
 async def _list_hooks(
@@ -62,7 +73,7 @@ async def _create_hook(
     if queues is not None:
         hook_data["queues"] = queues
     if events is not None:
-        hook_data["events"] = events
+        hook_data["events"] = _validate_events(events)
     if config is None:
         config = {}
     if type == "function" and "source" in config:
@@ -109,7 +120,7 @@ async def _update_hook(
     if queues is not None:
         hook_data["queues"] = queues
     if events is not None:
-        hook_data["events"] = events
+        hook_data["events"] = _validate_events(events)
     if config is not None:
         hook_data["config"] = config
     if settings is not None:
@@ -188,7 +199,7 @@ async def _create_hook_from_template(
 
     hook_data: dict[str, Any] = {"name": name, "hook_template": hook_template_url, "queues": queues}
     if events is not None:
-        hook_data["events"] = events
+        hook_data["events"] = _validate_events(events)
     if token_owner is not None:
         hook_data["token_owner"] = token_owner
 
