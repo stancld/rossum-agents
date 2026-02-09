@@ -39,7 +39,7 @@ docs = [
     "sphinx>=7.0.0",
     "sphinx-autodoc-typehints>=1.25.0",
     "sphinx-copybutton>=0.5.2",
-    "sphinx-rtd-theme>=2.0.0",
+    "furo",
 ]
 tests = [
     "coverage>=7.0.0",
@@ -58,7 +58,7 @@ all = [
     "sphinx>=7.0.0",
     "sphinx-autodoc-typehints>=1.25.0",
     "sphinx-copybutton>=0.5.2",
-    "sphinx-rtd-theme>=2.0.0",
+    "furo",
 ]
 
 [tool.setuptools.packages.find]

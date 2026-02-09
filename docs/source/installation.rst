@@ -4,7 +4,7 @@ Installation
 Prerequisites
 -------------
 
-* Python 3.10 or higher
+* Python 3.12+
 * Rossum account with API credentials
 * A Rossum queue ID
 

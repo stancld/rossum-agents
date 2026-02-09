@@ -8,7 +8,7 @@ Overview
 --------
 
 The Rossum MCP Server acts as a bridge between the Model Context Protocol and the
-`Rossum SDK <https://github.com/rossumai/rossum-sdk>`_. Each MCP tool corresponds
+`Rossum API <https://github.com/rossumai/rossum-api>`_. Each MCP tool corresponds
 to specific Rossum SDK client methods and API endpoints.
 
 Tool-to-SDK Mapping
@@ -21,13 +21,13 @@ upload_document
   ``upload_document(file_path: str, queue_id: int)``
 
 **Rossum SDK Method:**
-  ``SyncRossumAPIClient.upload_document(queue_id, files)``
+  ``AsyncRossumAPIClient.upload_document(queue_id, files)``
 
 **API Endpoint:**
   ``POST /v1/queues/{queue_id}/upload``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   The tool wraps the SDK's upload_document method in an async executor to maintain
@@ -40,7 +40,7 @@ get_annotation
   ``get_annotation(annotation_id: int, sideloads: Sequence[str])``
 
 **Rossum SDK Method:**
-  ``SyncRossumAPIClient.retrieve_annotation(annotation_id, sideloads)``
+  ``AsyncRossumAPIClient.retrieve_annotation(annotation_id, sideloads)``
 
 **API Endpoint:**
   ``GET /v1/annotations/{annotation_id}``
@@ -49,7 +49,7 @@ get_annotation
   - ``sideload``: Content and related objects (e.g., ``['content']``)
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   See ``rossum_mcp.server:69-98``
@@ -61,7 +61,7 @@ list_annotations
   ``list_annotations(queue_id: int, status: str)``
 
 **Rossum SDK Method:**
-  ``SyncRossumAPIClient.list_annotations(**params)``
+  ``AsyncRossumAPIClient.list_annotations(**params)``
 
 **API Endpoint:**
   ``GET /v1/annotations``
@@ -72,7 +72,7 @@ list_annotations
   - ``page_size``: Results per page (default: 100)
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   See ``rossum_mcp.server:100-134``
@@ -84,13 +84,13 @@ get_queue
   ``get_queue(queue_id: int)``
 
 **Rossum SDK Method:**
-  ``SyncRossumAPIClient.retrieve_queue(queue_id)``
+  ``AsyncRossumAPIClient.retrieve_queue(queue_id)``
 
 **API Endpoint:**
   ``GET /v1/queues/{queue_id}``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   See ``rossum_mcp.server:136-156``
@@ -102,13 +102,13 @@ get_schema
   ``get_schema(schema_id: int)``
 
 **Rossum SDK Method:**
-  ``SyncRossumAPIClient.retrieve_schema(schema_id)``
+  ``AsyncRossumAPIClient.retrieve_schema(schema_id)``
 
 **API Endpoint:**
   ``GET /v1/schemas/{schema_id}``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   See ``rossum_mcp.server:158-174``
@@ -122,15 +122,15 @@ get_queue_schema
 **Rossum SDK Methods:**
   Combines two SDK calls:
 
-  1. ``SyncRossumAPIClient.retrieve_queue(queue_id)``
-  2. ``SyncRossumAPIClient.retrieve_schema(schema_id)``
+  1. ``AsyncRossumAPIClient.retrieve_queue(queue_id)``
+  2. ``AsyncRossumAPIClient.retrieve_schema(schema_id)``
 
 **API Endpoints:**
   1. ``GET /v1/queues/{queue_id}``
   2. ``GET /v1/schemas/{schema_id}``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   This is a convenience method that retrieves both queue and schema information
@@ -145,15 +145,15 @@ get_queue_engine
 **Rossum SDK Methods:**
   Combines two SDK calls:
 
-  1. ``SyncRossumAPIClient.retrieve_queue(queue_id)``
-  2. ``SyncRossumAPIClient.retrieve_engine(engine_id)`` (if engine URL is a string)
+  1. ``AsyncRossumAPIClient.retrieve_queue(queue_id)``
+  2. ``AsyncRossumAPIClient.retrieve_engine(engine_id)`` (if engine URL is a string)
 
 **API Endpoints:**
   1. ``GET /v1/queues/{queue_id}``
   2. ``GET /v1/engines/{engine_id}`` (if needed)
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   This convenience method retrieves both queue and engine information. It handles
@@ -207,7 +207,7 @@ create_queue
   automation_level: str, training_enabled: bool)``
 
 **Rossum SDK Method:**
-  ``SyncRossumAPIClient.create_new_queue(queue_data: dict)``
+  ``AsyncRossumAPIClient.create_new_queue(queue_data: dict)``
 
 **API Endpoint:**
   ``POST /v1/queues``
@@ -218,7 +218,7 @@ create_queue
   training settings.
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Creates a new queue with full configuration options. Constructs URLs for workspace,
@@ -232,7 +232,7 @@ update_queue
   ``update_queue(queue_id: int, queue_data: dict)``
 
 **Rossum SDK Method:**
-  ``SyncRossumAPIClient.internal_client.update(Resource.Queue, queue_id, queue_data)``
+  ``AsyncRossumAPIClient.internal_client.update(Resource.Queue, queue_id, queue_data)``
 
 **API Endpoint:**
   ``PATCH /v1/queues/{queue_id}``
@@ -242,7 +242,7 @@ update_queue
   automation_level, default_score_threshold).
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Updates specific queue fields using PATCH semantics. Commonly used to configure
@@ -255,7 +255,7 @@ update_schema
   ``update_schema(schema_id: int, schema_data: dict)``
 
 **Rossum SDK Method:**
-  ``SyncRossumAPIClient.internal_client.update(Resource.Schema, schema_id, schema_data)``
+  ``AsyncRossumAPIClient.internal_client.update(Resource.Schema, schema_id, schema_data)``
 
 **API Endpoint:**
   ``PATCH /v1/schemas/{schema_id}``
@@ -265,7 +265,7 @@ update_schema
   configuration including score_threshold properties.
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Updates schema configuration, typically used to set field-level automation
@@ -291,7 +291,7 @@ update_engine
   - ``training_queues`` (list[str]): List of queue URLs for training
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Updates engine configuration using PATCH semantics. Commonly used to manage
@@ -331,7 +331,7 @@ list_hooks
   - ``active``: Filter by active status (true/false)
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Lists all hooks/extensions (webhooks or serverless functions) configured in
@@ -373,7 +373,7 @@ create_hook
   queue URLs, event triggers, configuration, and security settings.
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Creates a new webhook or serverless function hook. The hook will trigger on specified
@@ -435,7 +435,7 @@ list_rules
   - ``enabled``: Filter by enabled status (true/false)
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Lists all business rules configured in your organization. Rules define custom business
@@ -586,7 +586,7 @@ update_hook
   Partial JSON object with only the fields to update.
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Updates an existing hook's properties. Only provided fields are updated; others remain
@@ -605,7 +605,7 @@ list_hook_templates
   ``GET /v1/hook_templates``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Lists all available hook templates from Rossum Store. Hook templates provide pre-built
@@ -627,7 +627,7 @@ create_hook_from_template
   JSON object with hook name, template URL, queues, optional events, and optional token_owner.
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Creates a hook from a Rossum Store template. If the template has ``use_token_owner=True``,
@@ -650,7 +650,7 @@ patch_schema
   JSON object with modified schema content array.
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Patches a schema by adding, updating, or removing individual nodes without replacing the
@@ -670,7 +670,7 @@ get_schema_tree_structure
   ``GET /v1/schemas/{schema_id}``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Returns a lightweight tree structure of the schema with only ids, labels, categories, and types.
@@ -690,7 +690,7 @@ prune_schema_fields
   ``PUT /v1/schemas/{schema_id}``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Removes multiple fields from a schema at once, keeping only specified fields and their
@@ -709,7 +709,7 @@ get_user
   ``GET /v1/users/{user_id}``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Retrieves a single user by ID. Use ``list_users`` first to find users by username or email.
@@ -734,7 +734,7 @@ list_users
   - ``is_active``: Filter by active status
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Lists users with optional filtering. The ``is_organization_group_admin`` filter is applied
@@ -753,7 +753,7 @@ list_user_roles
   ``GET /v1/groups``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Lists all user roles (groups of permissions) in the organization.
@@ -771,7 +771,7 @@ get_organization_group
   ``GET /v1/organization_groups/{org_group_id}``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Retrieves a single organization group by ID.
@@ -789,7 +789,7 @@ list_organization_groups
   ``GET /v1/organization_groups``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Lists organization groups with optional name filter. Uses graceful deserialization
@@ -808,7 +808,7 @@ get_organization_limit
   ``GET /v1/organizations/{org_id}/limits``
 
 **SDK Documentation:**
-  https://github.com/rossumai/rossum-sdk
+  https://github.com/rossumai/rossum-api
 
 **Implementation:**
   Retrieves email sending limits and usage counters for a given organization.
@@ -992,23 +992,6 @@ delete_workspace
 **Implementation:**
   Fails if workspace contains queues.
 
-Async Wrapper Pattern
-----------------------
-
-Since the Rossum SDK uses synchronous HTTP clients (``SyncRossumAPIClient``), but
-MCP requires async handlers, the server uses a consistent pattern:
-
-.. code-block:: python
-
-   async def tool_method(self, ...):
-       loop = asyncio.get_event_loop()
-       with concurrent.futures.ThreadPoolExecutor() as pool:
-           return await loop.run_in_executor(
-               pool, self._tool_method_sync, ...
-           )
-
-This ensures the synchronous SDK calls don't block the async MCP event loop.
-
 Rossum API Resources
 ---------------------
 
@@ -1029,10 +1012,10 @@ The token is passed to the SDK client as:
 
 .. code-block:: python
 
-   from rossum_api import SyncRossumAPIClient
+   from rossum_api import AsyncRossumAPIClient
    from rossum_api.dtos import Token
 
-   client = SyncRossumAPIClient(
+   client = AsyncRossumAPIClient(
        base_url=base_url,
        credentials=Token(token=api_token)
    )

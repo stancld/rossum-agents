@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from rossum_api.domain_logic.resources import Resource
 
@@ -16,9 +16,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
+
 
 @dataclass
-class GracefulListResult[T]:
+class GracefulListResult(Generic[T]):  # noqa: UP046 - PEP 695 breaks sphinx-autodoc-typehints with PEP 563
     items: list[T]
     skipped_ids: list[int | str] = field(default_factory=list)
 
