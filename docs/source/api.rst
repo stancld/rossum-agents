@@ -3,79 +3,144 @@ API Reference
 
 This page provides detailed API documentation for the Rossum MCP Server.
 
-RossumMCPServer
----------------
+Server Module
+-------------
 
 .. automodule:: rossum_mcp.server
    :members:
    :undoc-members:
    :show-inheritance:
 
-Main Server Class
-^^^^^^^^^^^^^^^^^
+Base Utilities
+--------------
 
-.. autoclass:: rossum_mcp.server.RossumMCPServer
+.. automodule:: rossum_mcp.tools.base
    :members:
    :undoc-members:
    :show-inheritance:
-   :special-members: __init__
 
-Methods
-^^^^^^^
+Tool Catalog & Discovery
+------------------------
 
-Document Upload
-"""""""""""""""
+Tool Catalog
+~~~~~~~~~~~~
 
-.. automethod:: rossum_mcp.server.RossumMCPServer.upload_document
-.. automethod:: rossum_mcp.server.RossumMCPServer._upload_document_sync
+.. automodule:: rossum_mcp.tools.catalog
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-Annotation Retrieval
-""""""""""""""""""""
+Discovery
+~~~~~~~~~
 
-.. automethod:: rossum_mcp.server.RossumMCPServer.get_annotation
-.. automethod:: rossum_mcp.server.RossumMCPServer._get_annotation_sync
-.. automethod:: rossum_mcp.server.RossumMCPServer.list_annotations
-.. automethod:: rossum_mcp.server.RossumMCPServer._list_annotations_sync
+.. automodule:: rossum_mcp.tools.discovery
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-Queue and Schema
-""""""""""""""""
+Document Processing
+-------------------
 
-.. automethod:: rossum_mcp.server.RossumMCPServer.get_queue
-.. automethod:: rossum_mcp.server.RossumMCPServer._get_queue_sync
-.. automethod:: rossum_mcp.server.RossumMCPServer.get_schema
-.. automethod:: rossum_mcp.server.RossumMCPServer._get_schema_sync
-.. automethod:: rossum_mcp.server.RossumMCPServer.get_queue_schema
-.. automethod:: rossum_mcp.server.RossumMCPServer._get_queue_schema_sync
+.. automodule:: rossum_mcp.tools.annotations
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-Server Management
-"""""""""""""""""
+Queue Management
+----------------
 
-.. automethod:: rossum_mcp.server.RossumMCPServer.setup_handlers
+.. automodule:: rossum_mcp.tools.queues
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-The ``setup_handlers`` method registers two critical MCP protocol handlers:
+Schema Management
+-----------------
 
-1. **list_tools()** - Returns the list of available MCP tools:
+.. automodule:: rossum_mcp.tools.schemas
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-   - ``upload_document`` - Upload documents to Rossum queues
-   - ``get_annotation`` - Retrieve annotation data by ID
-   - ``list_annotations`` - List annotations for a queue with filtering
-   - ``get_queue`` - Get queue details including schema_id
-   - ``get_schema`` - Get schema details and content
-   - ``get_queue_schema`` - Get complete queue schema in one call
+Engine Management
+-----------------
 
-2. **call_tool()** - Executes the requested tool with provided arguments
+.. automodule:: rossum_mcp.tools.engines
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-Each tool definition includes:
+Extensions & Hooks
+------------------
 
-- Tool name and description
-- Input schema (JSON Schema format)
-- Required and optional parameters
-- Parameter types and descriptions
+.. automodule:: rossum_mcp.tools.hooks
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-.. automethod:: rossum_mcp.server.RossumMCPServer.run
+Rules & Actions
+---------------
 
-Functions
-^^^^^^^^^
+.. automodule:: rossum_mcp.tools.rules
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-.. autofunction:: rossum_mcp.server.async_main
-.. autofunction:: rossum_mcp.server.main
+Workspace Management
+--------------------
+
+.. automodule:: rossum_mcp.tools.workspaces
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+User Management
+---------------
+
+.. automodule:: rossum_mcp.tools.users
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Relations
+---------
+
+Relations
+~~~~~~~~~
+
+.. automodule:: rossum_mcp.tools.relations
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Document Relations
+~~~~~~~~~~~~~~~~~~
+
+.. automodule:: rossum_mcp.tools.document_relations
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Email Templates
+---------------
+
+.. automodule:: rossum_mcp.tools.email_templates
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Organization Groups
+-------------------
+
+.. automodule:: rossum_mcp.tools.organization_groups
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Organization Limits
+-------------------
+
+.. automodule:: rossum_mcp.tools.organization_limits
+   :members:
+   :undoc-members:
+   :show-inheritance:

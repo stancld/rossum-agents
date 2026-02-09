@@ -193,7 +193,7 @@ status of a document.
      "schema": "67890",
      "modifier": "11111",
      "document": "22222",
-     "content": [...],
+     "content": ["..."],
      "created_at": "2024-01-01T00:00:00Z",
      "modified_at": "2024-01-01T00:00:00Z"
    }
@@ -271,7 +271,7 @@ to obtain the schema_id.
      "id": "67890",
      "name": "Invoice Schema",
      "url": "https://elis.rossum.ai/api/v1/schemas/67890",
-     "content": [...]
+     "content": ["..."]
    }
 
 get_queue_schema
@@ -294,7 +294,7 @@ way to get a queue's schema.
      "schema_id": "67890",
      "schema_name": "Invoice Schema",
      "schema_url": "https://elis.rossum.ai/api/v1/schemas/67890",
-     "schema_content": [...]
+     "schema_content": ["..."]
    }
 
 get_queue_engine
@@ -506,7 +506,7 @@ Field-level thresholds override the queue's default_score_threshold.
      "id": "67890",
      "name": "Invoice Schema",
      "url": "https://elis.rossum.ai/api/v1/schemas/67890",
-     "content": [...],
+     "content": ["..."],
      "message": "Schema 'Invoice Schema' (ID 67890) updated successfully"
    }
 
@@ -616,7 +616,7 @@ Updates an existing engine's settings including learning and training queues.
      "url": "https://elis.rossum.ai/api/v1/engines/12345",
      "type": "extractor",
      "learning_enabled": true,
-     "training_queues": [...],
+     "training_queues": ["..."],
      "description": "Engine description",
      "message": "Engine 'My Engine' (ID 12345) updated successfully"
    }
@@ -666,7 +666,7 @@ Creates a new schema with sections and datapoints.
      "id": 12345,
      "name": "My Schema",
      "url": "https://elis.rossum.ai/api/v1/schemas/12345",
-     "content": [...],
+     "content": ["..."],
      "message": "Schema 'My Schema' created successfully with ID 12345"
    }
 
@@ -917,7 +917,7 @@ to update annotation field values. Must be called after ``start_annotation``.
            "content": {
              "value": "new_value",
              "page": 1,
-             "position": [x, y, w, h]
+             "position": [0, 0, 100, 50]
            }
          }
        }
@@ -1499,7 +1499,7 @@ Full update (PUT) of a business rule. All fields are required.
      "url": "https://elis.rossum.ai/api/v1/rules/67890",
      "schema": "https://elis.rossum.ai/api/v1/schemas/12345",
      "trigger_condition": "field.amount > 5000",
-     "actions": [...],
+     "actions": ["..."],
      "enabled": true
    }
 

@@ -6,16 +6,21 @@ from __future__ import annotations
 
 import os
 import sys
+import tomllib
 
 sys.path.insert(0, os.path.abspath("../../"))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+with open(os.path.abspath("../../rossum-mcp/pyproject.toml"), "rb") as f:
+    _pyproject = tomllib.load(f)
+
 project = "Rossum MCP Server"
 copyright = "2025, Dan Stancl"
 author = "Dan Stancl"
-release = "1.0.0"
+version = _pyproject["project"]["version"]
+release = version
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -83,16 +88,44 @@ exclude_patterns = []
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
 html_static_path = ["_static"]
+html_logo = "_static/rossum-logo.svg"
+html_favicon = "_static/rossum-logo.svg"
+html_title = "Rossum MCP Server"
+
 html_theme_options = {
-    "navigation_depth": 4,
-    "collapse_navigation": False,
-    "sticky_navigation": True,
-    "includehidden": True,
-    "titles_only": False,
-    "display_version": True,
+    "light_css_variables": {
+        "color-brand-primary": "#1E6EE5",
+        "color-brand-content": "#1E6EE5",
+        "color-admonition-background": "rgba(30, 110, 229, 0.05)",
+        "color-sidebar-background": "#ffffff",
+        "color-sidebar-search-background": "#f5f7fa",
+        "color-sidebar-search-border": "#e0e6ed",
+        "color-sidebar-link-text--top-level": "#0d1117",
+        "color-sidebar-item-background--hover": "rgba(30, 110, 229, 0.08)",
+        "color-sidebar-item-expander-background--hover": "rgba(30, 110, 229, 0.08)",
+        "font-stack": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+        "font-stack--monospace": "'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace",
+    },
+    "dark_css_variables": {
+        "color-brand-primary": "#61A0FF",
+        "color-brand-content": "#61A0FF",
+        "color-admonition-background": "rgba(97, 160, 255, 0.1)",
+    },
+    "sidebar_hide_name": False,
+    "navigation_with_keys": True,
+    "top_of_page_buttons": ["view"],
+    "source_repository": "https://github.com/stancld/rossum-agents",
+    "source_branch": "master",
+    "source_directory": "docs/source/",
 }
 
 # -- Options for todo extension ----------------------------------------------
 todo_include_todos = True
+
+
+# Custom CSS and JS
+def setup(app):
+    app.add_css_file("custom.css")
+    app.add_js_file("custom.js")

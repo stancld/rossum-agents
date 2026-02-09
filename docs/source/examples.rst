@@ -11,8 +11,57 @@ The examples show real-world use cases from simple document processing to comple
 Real-World Use Cases
 --------------------
 
-Example 1: Aurora Splitting & Sorting Demo
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Example 1: Organization Setup
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Set up a complete customer organization with queues, schemas, validations, duplicate detection, email notifications, and UI configuration:
+
+.. code-block:: text
+
+   1. Create two new queues: Invoices and Credit Notes.
+   2. Update schemas w.r.t. schema specification (Invoices with 15 fields including line items table, Credit Notes as-is)
+   3. Add a computed field "The Net Terms" to Invoices queue (Due Date - Issue Date → Net 15/30/Outstanding)
+   4. Implement duplicate document detection on Document ID
+   5. Add business validations: total amount cap, line items sum check, quantity × unit price check
+   6. Add email notification extension on document status change to 'to_review'
+   7. Update Invoice queue UI settings to display 8 key fields
+   8. Verify setup by uploading a sample invoice twice (testing duplicate detection)
+
+**What This Demonstrates:**
+
+- **Queue & Schema Setup**: Creates queues with detailed field specifications including line items tables
+- **Computed Fields**: Adds derived fields with business logic (date difference categorization)
+- **Duplicate Detection**: Configures document-level deduplication with user-facing messages
+- **Business Validations**: Implements multi-rule validation (amount caps, sum checks, arithmetic checks)
+- **Email Notifications**: Sets up templated email alerts triggered by document state changes
+- **UI Configuration**: Customizes queue column display for operational efficiency
+- **End-to-End Verification**: Validates the entire setup with real document uploads
+
+This example showcases the agent's ability to set up a production-ready organization from scratch - all from a single conversational prompt.
+
+Example 2: Hook Analysis & Documentation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Automatically analyze and document all hooks/extensions configured on a queue:
+
+.. code-block:: text
+
+   Briefly explain the functionality of every hook based on description and/or code one by one for a queue `2042843`.
+
+   Store output in extension_explanation.md
+
+**What This Does:**
+
+- Lists all hooks/extensions on the specified queue
+- Analyzes each hook's description and code
+- Generates clear, concise explanations of functionality
+- Documents trigger events and settings
+- Saves comprehensive documentation to a markdown file
+
+This example shows how the agent can analyze existing automation to help teams understand their configured workflows.
+
+Example 3: Aurora Splitting & Sorting Demo
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Set up a complete document splitting and sorting pipeline with training queues, splitter engine, automated hooks, and intelligent routing:
 
@@ -64,28 +113,7 @@ Set up a complete document splitting and sorting pipeline with training queues, 
 
 This example showcases the agent's ability to orchestrate complex workflows involving multiple queues, engines, schemas, automated hooks with custom logic, and intelligent document routing - all from a single conversational prompt.
 
-Example 2: Hook Analysis & Documentation
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Automatically analyze and document all hooks/extensions configured on a queue:
-
-.. code-block:: text
-
-   Briefly explain the functionality of every hook based on description and/or code one by one for a queue `2042843`.
-
-   Store output in extension_explanation.md
-
-**What This Does:**
-
-- Lists all hooks/extensions on the specified queue
-- Analyzes each hook's description and code
-- Generates clear, concise explanations of functionality
-- Documents trigger events and settings
-- Saves comprehensive documentation to a markdown file
-
-This example shows how the agent can analyze existing automation to help teams understand their configured workflows.
-
-Example 3: Queue Setup with Knowledge Warmup
+Example 4: Queue Setup with Knowledge Warmup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Create a new queue, warm it up with training documents, and test automation performance:

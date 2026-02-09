@@ -34,10 +34,11 @@ def create_app() -> FastMCP:
     """Create and configure the MCP server.
 
     Reads configuration from environment variables:
-    - ROSSUM_API_BASE_URL (required)
-    - ROSSUM_API_TOKEN (required)
-    - ROSSUM_MCP_MODE (optional, default: read-write)
-    - ROSSUM_MCP_LOG_LEVEL (optional, default: INFO)
+
+    - ``ROSSUM_API_BASE_URL`` (required)
+    - ``ROSSUM_API_TOKEN`` (required)
+    - ``ROSSUM_MCP_MODE`` (optional, default: read-write)
+    - ``ROSSUM_MCP_LOG_LEVEL`` (optional, default: INFO)
     """
     setup_logging(log_level=os.environ.get("ROSSUM_MCP_LOG_LEVEL", "INFO"))
 

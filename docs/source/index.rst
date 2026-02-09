@@ -30,7 +30,7 @@ Welcome to Rossum MCP Server
 
 A Model Context Protocol (MCP) server and AI agent toolkit for the Rossum intelligent document processing platform. Transforms complex workflow setup, debugging, and configuration into natural language conversations.
 
-Built with Python and the official `rossum-sdk <https://github.com/rossumai/rossum-sdk>`_.
+Built with Python and the official `rossum-api <https://github.com/rossumai/rossum-api>`_.
 
 Vision & Roadmap
 ----------------
@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **66 tools** organized into twelve categories:
+The MCP server provides **63 tools** organized into twelve categories:
 
 **Document Processing**
 

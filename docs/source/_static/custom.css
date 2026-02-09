@@ -1,0 +1,155 @@
+/* ============================================================
+   Rossum Agents — Custom theme overrides
+   Matches the visual design of https://rossum.app/api/docs/
+   ============================================================ */
+
+/* -- Narrower sidebar ------------------------------------------- */
+.sidebar-drawer {
+    width: 200px !important;
+}
+
+body {
+    --sidebar-width: 200px !important;
+}
+
+.sidebar-brand {
+    padding: 1rem 0.75rem 0.5rem;
+}
+
+.sidebar-logo {
+    max-width: 120px;
+    margin: 0 auto;
+    padding: 0.25rem 0;
+}
+
+.sidebar-tree .reference {
+    font-size: 0.8rem;
+    letter-spacing: 0.01em;
+}
+
+.sidebar-tree li.current > .reference {
+    font-weight: 600;
+}
+
+/* -- Headings --------------------------------------------------- */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+h1 { font-size: 1.75rem; }
+h2 { font-size: 1.35rem; margin-top: 2rem; }
+
+/* -- Links ------------------------------------------------------ */
+a {
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* -- Code blocks ------------------------------------------------ */
+.highlight {
+    border-radius: 6px;
+}
+
+.highlight pre {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    overflow-x: auto;
+}
+
+code.literal {
+    border-radius: 4px;
+    padding: 0.15em 0.4em;
+    font-size: 0.85em;
+}
+
+/* -- Admonitions ------------------------------------------------ */
+.admonition {
+    border-radius: 6px;
+    box-shadow: none;
+}
+
+/* -- API class / method blocks ---------------------------------- */
+dl.py.class > dt,
+dl.py.method > dt,
+dl.py.function > dt,
+dl.py.attribute > dt {
+    font-size: 0.85rem;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.sig:not(.sig-inline) {
+    background: rgba(30, 110, 229, 0.06) !important;
+    border-left: 3px solid #1E6EE5;
+    border-radius: 0 6px 6px 0;
+    padding: 0.75rem 1rem !important;
+    text-indent: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+.sig:not(.sig-inline):hover {
+    background: rgba(30, 110, 229, 0.10) !important;
+}
+
+/* -- Right-side TOC (on this page) ------------------------------ */
+.toc-tree {
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.toc-tree li > a {
+    display: block;
+    white-space: normal;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    padding: 0.2em 0.5em;
+    border-radius: 4px;
+    background: rgba(30, 110, 229, 0.06);
+    margin-bottom: 2px;
+}
+
+.toc-tree li > a:hover {
+    background: rgba(30, 110, 229, 0.14);
+}
+
+.toc-tree li.scroll-current > a {
+    background: rgba(30, 110, 229, 0.18);
+    font-weight: 600;
+}
+
+/* -- Tables ----------------------------------------------------- */
+table.docutils {
+    border-collapse: collapse;
+    width: 100%;
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 0.875rem;
+}
+
+table.docutils td, table.docutils th {
+    padding: 0.5rem 0.75rem;
+}
+
+/* -- Version badge under sidebar title --------------------------- */
+.sidebar-version-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #1E6EE5;
+    background: rgba(30, 110, 229, 0.1);
+    border-radius: 4px;
+    padding: 0.1em 0.5em;
+    margin-top: 0.25rem;
+    letter-spacing: 0.02em;
+}
+
+/* -- Footer ----------------------------------------------------- */
+.bottom-of-page {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
