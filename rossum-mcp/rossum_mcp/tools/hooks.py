@@ -19,13 +19,12 @@ if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
 
 type Timestamp = Annotated[str, "ISO 8601 timestamp (e.g., '2024-01-15T10:30:00Z')"]
-
 logger = logging.getLogger(__name__)
 
 VALID_HOOK_EVENTS = {e.value for e in HookEventAndAction}
 
 
-def _validate_events(events: list[str]) -> list[str]:
+def _validate_events(events: list[HookEventAndAction]) -> list[HookEventAndAction]:
     invalid = [e for e in events if e not in VALID_HOOK_EVENTS]
     if invalid:
         valid_list = ", ".join(sorted(VALID_HOOK_EVENTS))
@@ -60,7 +59,7 @@ async def _create_hook(
     name: str,
     type: HookType,
     queues: list[str] | None = None,
-    events: list[str] | None = None,
+    events: list[HookEventAndAction] | None = None,
     config: dict | None = None,
     settings: dict | None = None,
     secret: str | None = None,
@@ -97,7 +96,7 @@ async def _update_hook(
     hook_id: int,
     name: str | None = None,
     queues: list[str] | None = None,
-    events: list[str] | None = None,
+    events: list[HookEventAndAction] | None = None,
     config: dict | None = None,
     settings: dict | None = None,
     active: bool | None = None,
@@ -187,7 +186,7 @@ async def _create_hook_from_template(
     name: str,
     hook_template_id: int,
     queues: list[str],
-    events: list[str] | None = None,
+    events: list[HookEventAndAction] | None = None,
     token_owner: str | None = None,
 ) -> Hook | dict:
     if not is_read_write_mode():
@@ -235,7 +234,7 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         name: str,
         type: HookType,
         queues: list[str] | None = None,
-        events: list[str] | None = None,
+        events: list[HookEventAndAction] | None = None,
         config: dict | None = None,
         settings: dict | None = None,
         secret: str | None = None,
@@ -247,7 +246,7 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         hook_id: int,
         name: str | None = None,
         queues: list[str] | None = None,
-        events: list[str] | None = None,
+        events: list[HookEventAndAction] | None = None,
         config: dict | None = None,
         settings: dict | None = None,
         active: bool | None = None,
@@ -304,7 +303,7 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         name: str,
         hook_template_id: int,
         queues: list[str],
-        events: list[str] | None = None,
+        events: list[HookEventAndAction] | None = None,
         token_owner: str | None = None,
     ) -> Hook | dict:
         return await _create_hook_from_template(client, name, hook_template_id, queues, events, token_owner)
