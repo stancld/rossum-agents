@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [1.2.0] - 2026-02-09
 
 ### Added
 - Added `create_user` tool for creating new users with full field support (queues, groups, metadata, auth_type, OIDC) [#163](https://github.com/stancld/rossum-agents/pull/163)
