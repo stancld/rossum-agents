@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from rossum_api.models.rule import Rule
+from rossum_api.models.rule import Rule, RuleAction, ShowMessagePayload
 from rossum_mcp.tools import base
+from rossum_mcp.tools.rules import _actions_to_dicts
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -746,3 +747,58 @@ class TestDeleteRule:
 
         assert result["error"] == "delete_rule is not available in read-only mode"
         mock_client.delete_rule.assert_not_called()
+
+
+@pytest.mark.unit
+class TestActionsToDict:
+    """Tests for _actions_to_dicts helper."""
+
+    def test_converts_dataclass_instances(self) -> None:
+        action = RuleAction(
+            id="act1",
+            type="show_message",
+            event="validation",
+            payload=ShowMessagePayload(type="error", content="Bad value", schema_id="amount"),
+        )
+        result = _actions_to_dicts([action])
+
+        assert result == [
+            {
+                "id": "act1",
+                "type": "show_message",
+                "event": "validation",
+                "enabled": True,
+                "payload": {"type": "error", "content": "Bad value", "schema_id": "amount"},
+            }
+        ]
+
+    def test_passes_through_raw_dicts(self) -> None:
+        raw = {
+            "id": "act1",
+            "type": "show_message",
+            "event": "validation",
+            "payload": {"type": "error", "content": "X"},
+        }
+        result = _actions_to_dicts([raw])
+
+        assert result == [raw]
+
+    def test_handles_mixed_list(self) -> None:
+        dataclass_action = RuleAction(
+            id="act1",
+            type="show_message",
+            event="validation",
+            payload=ShowMessagePayload(type="info", content="OK"),
+        )
+        dict_action = {"id": "act2", "type": "custom", "event": "validation", "payload": {}}
+        result = _actions_to_dicts([dataclass_action, dict_action])
+
+        assert len(result) == 2
+        assert result[0] == {
+            "id": "act1",
+            "type": "show_message",
+            "event": "validation",
+            "enabled": True,
+            "payload": {"type": "info", "content": "OK", "schema_id": None},
+        }
+        assert result[1] is dict_action
