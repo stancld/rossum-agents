@@ -19,7 +19,7 @@ keywords = ["mcp", "rossum", "document-processing", "agent", "ai"]
 dependencies = [
     "fastmcp>=2.0.0",
     "mcp>=1.0.0",
-    "rossum-api>=3.8.0",
+    "rossum-api>=3.9.0",
 ]
 
 [project.optional-dependencies]
@@ -92,7 +92,7 @@ all = [
     "pyyaml>=6.0",
     "redis>=7.0.0",
     "requests>=2.32",
-    "rossum-api>=3.8.0",
+    "rossum-api>=3.9.0",
     "slowapi>=0.1.9",
     "sphinx>=7.0.0",
     "sphinx-autodoc-typehints>=1.25.0",
