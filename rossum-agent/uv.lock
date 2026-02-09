@@ -1738,7 +1738,7 @@ wheels = [
 
 [[package]]
 name = "rossum-agent"
-version = "1.1.0.dev0"
+version = "1.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -1849,8 +1849,8 @@ requires-dist = [
     { name = "redis", marker = "extra == 'tests'", specifier = ">=7.0.0" },
     { name = "requests", specifier = ">=2.32" },
     { name = "rossum-api", specifier = ">=3.9.0" },
-    { name = "rossum-deploy", git = "https://github.com/stancld/rossum-agents.git?subdirectory=rossum-deploy" },
-    { name = "rossum-mcp", git = "https://github.com/stancld/rossum-agents.git?subdirectory=rossum-mcp" },
+    { name = "rossum-deploy", specifier = ">=0.1.0" },
+    { name = "rossum-mcp", specifier = ">=1.2.0" },
     { name = "slowapi", marker = "extra == 'all'", specifier = ">=0.1.9" },
     { name = "slowapi", marker = "extra == 'api'", specifier = ">=0.1.9" },
     { name = "sphinx", marker = "extra == 'all'", specifier = ">=7.0.0" },
@@ -1889,21 +1889,29 @@ wheels = [
 
 [[package]]
 name = "rossum-deploy"
-version = "0.2.0.dev0"
-source = { git = "https://github.com/stancld/rossum-agents.git?subdirectory=rossum-deploy#d58616b2f9df0553cb4b02710d1b9d6af49a399e" }
+version = "0.1.0.post0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
     { name = "rossum-api" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/db/e3/dfafce6bdb4494d64132dc32d490ce9c990345f761f38baa828ff53dd376/rossum_deploy-0.1.0.post0.tar.gz", hash = "sha256:b1bf4211995c6d4abb909fea7691352bb6393f39940ba3c799cbd6ab66d9eb6a", size = 41751, upload-time = "2025-12-31T12:44:08.945Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7a/f7/3a2c7c0082f9d4249a5473c229d8335490e7805b9fcecd50b99b7e36860c/rossum_deploy-0.1.0.post0-py3-none-any.whl", hash = "sha256:c9fca916d506470f925af3ef62d1cc6b88f0cade1304dec535615b06df15119d", size = 24584, upload-time = "2025-12-31T12:44:07.694Z" },
+]
 
 [[package]]
 name = "rossum-mcp"
-version = "1.3.0.dev0"
-source = { git = "https://github.com/stancld/rossum-agents.git?subdirectory=rossum-mcp#d58616b2f9df0553cb4b02710d1b9d6af49a399e" }
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastmcp" },
     { name = "pydantic" },
     { name = "rossum-api" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/19/0b10e832cc95a7f83c6b28858be859300b426a20cafa3bc8edbe0f8629b2/rossum_mcp-1.2.0.tar.gz", hash = "sha256:5aa681f8a38cf52575c345a7dbaceedfc4daa4c5c11d217ebad3fee81ee1bcd7", size = 36223, upload-time = "2026-02-09T17:28:07.708Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/66/f6442fc1ce03259d1bbb98c444699e900476328ea8e582b08bcee617ad97/rossum_mcp-1.2.0-py3-none-any.whl", hash = "sha256:d515eed7760f97c509a8fedc02972aeb00499bc85d33f1dc19c49638100820ee", size = 43352, upload-time = "2026-02-09T17:28:06.305Z" },
 ]
 
 [[package]]

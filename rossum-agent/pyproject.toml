@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rossum-agent"
-version = "1.1.0dev"
+version = "1.1.0"
 description = "AI agent toolkit for Rossum: document workflows conversationally, debug pipelines automatically, and enable agentic configuration of intelligent document processing."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -92,10 +92,6 @@ all = [
     "uvicorn>=0.32.0",
     "wsproto>=1.2.0",
 ]
-
-[tool.uv.sources]
-rossum-deploy = { git = "https://github.com/stancld/rossum-agents.git", subdirectory = "rossum-deploy" }
-rossum-mcp = { git = "https://github.com/stancld/rossum-agents.git", subdirectory = "rossum-mcp" }
 
 [tool.pytest.ini_options]
 markers = [
