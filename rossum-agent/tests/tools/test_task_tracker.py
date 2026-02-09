@@ -64,6 +64,28 @@ class TestTaskTracker:
         tracker = TaskTracker()
         assert tracker.list_tasks() == []
 
+    def test_list_tasks_sorted_by_numbered_prefix(self) -> None:
+        tracker = TaskTracker()
+        tracker.create_task(subject="3. Deploy")
+        tracker.create_task(subject="1. Create queue")
+        tracker.create_task(subject="2. Prune schema")
+        tasks = tracker.list_tasks()
+        assert [t.subject for t in tasks] == ["1. Create queue", "2. Prune schema", "3. Deploy"]
+
+    def test_list_tasks_preserves_creation_order_without_prefix(self) -> None:
+        tracker = TaskTracker()
+        tracker.create_task(subject="Deploy")
+        tracker.create_task(subject="Create queue")
+        tasks = tracker.list_tasks()
+        assert [t.subject for t in tasks] == ["Deploy", "Create queue"]
+
+    def test_list_tasks_preserves_creation_order_with_partial_prefix(self) -> None:
+        tracker = TaskTracker()
+        tracker.create_task(subject="1. Create queue")
+        tracker.create_task(subject="Deploy")
+        tasks = tracker.list_tasks()
+        assert [t.subject for t in tasks] == ["1. Create queue", "Deploy"]
+
     def test_snapshot(self) -> None:
         tracker = TaskTracker()
         tracker.create_task(subject="Deploy", description="Push to prod")
@@ -74,6 +96,14 @@ class TestTaskTracker:
             {"id": "1", "subject": "Deploy", "status": "completed", "description": "Push to prod"},
             {"id": "2", "subject": "Verify", "status": "pending", "description": ""},
         ]
+
+    def test_snapshot_sorted_by_numbered_prefix(self) -> None:
+        tracker = TaskTracker()
+        tracker.create_task(subject="3. Deploy")
+        tracker.create_task(subject="1. Create queue")
+        tracker.create_task(subject="2. Prune schema")
+        snapshot = tracker.snapshot()
+        assert [s["subject"] for s in snapshot] == ["1. Create queue", "2. Prune schema", "3. Deploy"]
 
     def test_create_task_atomic(self) -> None:
         tracker = TaskTracker()

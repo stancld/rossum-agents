@@ -58,9 +58,11 @@ Organization setup is always a multi-step operation. Use `create_task` for each 
 
 | Phase | Action |
 |-------|--------|
-| After parsing the request | `create_task` for every distinct step (queue creation, schema update, hook setup, etc.) |
+| After parsing the request | `create_task` for every distinct step, subject prefixed with step number (`1. ...`, `2. ...`) |
 | Starting a step | `update_task(status="in_progress")` |
 | Finishing a step | `update_task(status="completed")` |
+
+Create tasks in the order you intend to execute them. Execute tasks sequentially from first to last.
 
 ## Constraints
 
