@@ -79,7 +79,7 @@ def check_business_validation_rules(steps: list[AgentStep], api_base_url: str, a
         error_actions = [
             a
             for a in (rule.actions or [])
-            if a.type == "show_message" and a.payload.get("type") == expected["action_type"]
+            if a.type == "show_message" and getattr(a.payload, "type", None) == expected["action_type"]
         ]
         if not error_actions:
             return False, f"Rule '{rule.name}' missing show_message action with type '{expected['action_type']}'"
@@ -98,8 +98,8 @@ def _extract_rule_id_from_final_answer(steps: list[AgentStep]) -> str | None:
 
 
 def _extract_fields(condition: str) -> set[str]:
-    """Extract field names from a trigger condition (e.g., '{amount_total}')."""
-    return set(re.findall(r"\{(\w+)[,}\s]", condition))
+    """Extract field names from a TxScript trigger condition (e.g., 'field.amount_total')."""
+    return set(re.findall(r"field\.(\w+)", condition))
 
 
 def _get_operator_type(condition: str) -> str:

@@ -84,7 +84,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
         name="agent_introduction",
         description="Rossum agent can introduce itself",
-        api_base_url="https://api.elis.develop.r8.lol/v1",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
         mode="read-only",
         rossum_url=None,
         prompt="Hey, what can you do?",
@@ -99,9 +99,9 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
         name="explain_aurora_sas_workflow",
         description="Explain a document workflow on a queue",
-        api_base_url="https://api.elis.develop.r8.lol/v1",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
         mode="read-only",
-        rossum_url="https://elis.develop.r8.lol/documents?filtering=%7B%22items%22%3A%5B%7B%22field%22%3A%22queue%22%2C%22value%22%3A%5B%223960192%22%5D%2C%22operator%22%3A%22isAnyOf%22%7D%5D%2C%22logicOperator%22%3A%22and%22%7D&level=queue&page=1&page_size=100",
+        rossum_url="https://mr-fabry.rossum.app/documents?filtering=%7B%22items%22%3A%5B%7B%22field%22%3A%22queue%22%2C%22value%22%3A%5B%222500259%22%5D%2C%22operator%22%3A%22isAnyOf%22%7D%5D%2C%22logicOperator%22%3A%22and%22%7D&level=queue&page=1&page_size=100",
         prompt="Explain a document workflow and learning workflow on this queue.",
         tool_expectation=ToolExpectation(expected_tools=["get_queue", "get_queue_engine"], mode=ToolMatchMode.SUBSET),
         token_budget=TokenBudget(min_total_tokens=18000, max_total_tokens=30000),
@@ -122,11 +122,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
         name="analyze_broken_document_splitting",
         description="Analyze broken document splitting extension based on invoice ID field",
-        api_base_url="https://api.elis.develop.r8.lol/v1",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
         mode="read-only",
         rossum_url=None,
         prompt=(
-            "Please, investigate the errors with document splitting extension based on extracted invoice ID field on the queue 4014559.\n\n"
+            "Please, investigate the errors with document splitting extension based on extracted invoice ID field on the queue 2500317.\n\n"
             "Give me a one-paragraph executive summary of the root cause and store it in `roast.md`."
         ),
         tool_expectation=ToolExpectation(
@@ -139,7 +139,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=120000, max_total_tokens=160000),
+        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=120000),
         success_criteria=SuccessCriteria(
             require_subagent=True,
             required_keywords=[],
@@ -151,11 +151,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
         name="create_and_delete_credit_note_queue",
         description="Create a credit note queue from template and then delete it",
-        api_base_url="https://api.elis.develop.r8.lol/v1",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
         rossum_url=None,
         prompt=(
             "# Create and delete a Credit Note queue\n\n"
-            "Workspace: 1782601\n\n"
+            "Workspace: 785638\n\n"
             "## Tasks:\n\n"
             "1. Create a new queue from EU Credit Note template with name: Test Credit Note Queue\n"
             "2. Delete the queue you just created\n\n"
@@ -175,11 +175,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
         name="create_invoice_queue_with_reasoning_and_formula_field",
         description="Create invoice queue with reasoning field and formula field for table aggregation",
-        api_base_url="https://api.elis.develop.r8.lol/v1",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
         rossum_url=None,
         prompt=(
             "# Create Invoice queue with reasoning field and formula field\n\n"
-            "Workspace: 1782601\n"
+            "Workspace: 785638\n"
             "Region: EU\n\n"
             "## Tasks:\n\n"
             "1. Create a new queue from EU Invoice template with name: Invoices with Reasoning\n"
@@ -213,7 +213,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=100000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
-            max_steps=8,
+            max_steps=6,
             file_expectation=FileExpectation(),
             custom_checks=[REASONING_FIELD_CHECK, FORMULA_FIELD_FOR_TABLE_CHECK],
         ),
@@ -221,11 +221,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
         name="fix_document_splitting_in_sandbox",
         description="Fix document splitting extension by deploying to sandbox",
-        api_base_url="https://api.elis.develop.r8.lol/v1",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
         rossum_url=None,
         prompt=(
             "# Fix document splitting extension settings.\n\n"
-            "There's a broken document splitting extension on the queue 4014559. "
+            "There's a broken document splitting extension on the queue 2500317. "
             "Create a new queue in the same namespace as the referred queue. New name: Splitting & sorting (fixed).\n\n"
             "Set up the same document splitting extension based on invoice_id. Make sure it matches the requirements from knowledge base.\n\n"
             "## Sandbox usage\n\n"
@@ -261,11 +261,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
         name="setup_customer_queues_and_schema",
         description="Set up customer with Invoices and Credit Notes queues with custom schema and formula field",
-        api_base_url="https://api.elis.rossum.ai/v1",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
         rossum_url=None,
         prompt=(
             "# Set up a new customer\n\n"
-            "Workspace: 1680043\n"
+            "Workspace: 785641\n"
             "Region: EU\n\n"
             "## Tasks:\n\n"
             "1. Create two new queues: Invoices and Credit Notes.\n"
@@ -321,11 +321,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
         name="setup_invoice_queue_with_business_validation_hook",
         description="Create Invoice queue with business validation hook and return hook_id",
-        api_base_url="https://api.elis.rossum.ai/v1",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
         rossum_url=None,
         prompt=(
             "# Set up Invoice queue with business validation hook\n\n"
-            "Workspace: 1680043\n"
+            "Workspace: 785643\n"
             "Region: EU\n\n"
             "## Tasks:\n\n"
             "1. Create a new queue: Invoices\n"
@@ -357,11 +357,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
         name="setup_invoice_queue_with_business_validation_rules",
         description="Create Invoice queue with rules business validation using rules (not hooks)",
-        api_base_url="https://api.elis.rossum.ai/v1",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
         rossum_url=None,
         prompt=(
             "# Set up Invoice queue with business validation\n\n"
-            "Workspace: 1680043\n"
+            "Workspace: 785643\n"
             "Region: EU\n\n"
             "## Tasks:\n\n"
             "1. Create a new queue: Invoices\n"
@@ -397,11 +397,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
         name="setup_us_invoice_queue_with_ui_settings",
         description="Create US Invoice queue from template and configure UI settings",
-        api_base_url="https://api.elis.rossum.ai/v1",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
         rossum_url=None,
         prompt=(
             "# Set up US Invoice queue with custom UI settings\n\n"
-            "Workspace: 1680043\n"
+            "Workspace: 785643\n"
             "Region: US\n\n"
             "## Tasks:\n\n"
             "1. Create a new queue from US Invoice template: Invoices\n"

@@ -29,8 +29,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
-from defusedxml import ElementTree  # ty: ignore[unresolved-import]
-from tqdm import tqdm  # ty: ignore[unresolved-import] - runtime dependency
+from defusedxml import ElementTree
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 

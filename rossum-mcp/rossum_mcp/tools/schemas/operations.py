@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
 
     from rossum_api import AsyncRossumAPIClient
 
-MAX_RETRIES_ON_PRECONDITION_FAILED = 3
+MAX_RETRIES_ON_PRECONDITION_FAILED = 5
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ async def _update_schema_with_retry(
                     f"Schema {schema_id} was modified concurrently (412 Precondition Failed), "
                     f"retrying ({attempt + 1}/{MAX_RETRIES_ON_PRECONDITION_FAILED})..."
                 )
-                await asyncio.sleep(0.5 * (attempt + 1))
+                await asyncio.sleep(0.5 * (attempt + 1) + random.uniform(0, 0.5))
                 continue
             raise
     raise RuntimeError("Unreachable")

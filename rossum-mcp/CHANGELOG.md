@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Added `get_organization_limit` tool for retrieving email sending limits and usage counters for an organization [#170](https://github.com/stancld/rossum-agents/pull/170)
 
 ### Changed
+- `create_hook` and `update_hook` now use `HookEventAndAction` enum for the `events` parameter, exposing valid event values directly in the JSON schema so the LLM picks from enumerated options instead of guessing [#173](https://github.com/stancld/rossum-agents/pull/173)
 - `get_schema_tree_structure` now accepts `queue_id` as an alternative to `schema_id` — resolves the queue's schema automatically [#151](https://github.com/stancld/rossum-agents/pull/151)
 - Optimized all MCP tool descriptions for Opus 4.5/4.6 — replaced procedural/warning preambles (`IMPORTANT`, `CRITICAL`, `ALWAYS`) with concise constraint-based descriptions, removed redundancy with type hints, compressed multi-paragraph descriptions [#166](https://github.com/stancld/rossum-agents/pull/166)
 
