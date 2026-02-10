@@ -53,7 +53,6 @@ class MCPConnection:
         # Prefer structured_content (raw dict) over data (parsed pydantic model)
         # because FastMCP's json_schema_to_type has a bug where nested dict fields
         # like config: dict[str, Any] become empty dataclasses, losing all data.
-        # See: https://github.com/jlowin/fastmcp/issues/XXX
         if result.structured_content is not None:
             return result.structured_content
         if result.data is not None:
