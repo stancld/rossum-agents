@@ -115,7 +115,7 @@ asyncio.run(main())
 
 ## Available Tools
 
-The agent provides internal tools and access to 63 MCP tools via dynamic loading.
+The agent provides internal tools and access to 66 MCP tools via dynamic loading.
 
 <details>
 <summary><strong>Internal Tools</strong></summary>

@@ -19,7 +19,7 @@
 [![CodeFactor](https://www.codefactor.io/repository/github/stancld/rossum-agents/badge)](https://www.codefactor.io/repository/github/stancld/rossum-agents)
 
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-63-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-66-blue.svg)](#available-tools)
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![Claude Opus 4.6](https://img.shields.io/badge/Claude-Opus_4.6-blueviolet.svg)](https://www.anthropic.com/claude/opus)
 
@@ -294,7 +294,7 @@ See the [full documentation](https://stancld.github.io/rossum-agents/skills_and_
 
 ## MCP Tools
 
-The MCP server provides **63 tools** organized into categories:
+The MCP server provides **66 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
@@ -305,6 +305,8 @@ The MCP server provides **63 tools** organized into categories:
 | Extensions (Hooks) | 8 | Webhooks, serverless functions |
 | Rules & Actions | 6 | Business rules with triggers and actions |
 | Workspace Management | 4 | Organize and delete workspaces |
+| Organization Groups | 2 | View license groups across organizations |
+| Organization Limits | 1 | Email sending limits and usage counters |
 | User Management | 5 | Create, update, list users and roles |
 | Relations | 4 | Annotation and document relations |
 | Email Templates | 3 | Automated email responses |
