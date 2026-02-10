@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **63 tools** organized into twelve categories:
+The MCP server provides **66 tools** organized into twelve categories:
 
 **Document Processing**
 
@@ -106,7 +106,7 @@ The MCP server provides **63 tools** organized into twelve categories:
 * **create_engine_field** - Define engine fields and link to schemas
 * **get_engine_fields** - Retrieve engine fields for a specific engine or all fields
 
-**Extensions & Rules**
+**Extensions (Hooks)**
 
 * **get_hook** - Get hook/extension details
 * **list_hooks** - List webhooks and extensions
@@ -115,11 +115,16 @@ The MCP server provides **63 tools** organized into twelve categories:
 * **list_hook_templates** - List available hook templates from Rossum Store
 * **create_hook_from_template** - Create hooks from pre-built templates
 * **list_hook_logs** - List hook execution logs for debugging and monitoring
+* **delete_hook** - Delete a hook/extension
+
+**Rules & Actions**
+
 * **get_rule** - Get business rule details
 * **list_rules** - List business rules with trigger conditions and actions
 * **create_rule** - Create business rules with trigger conditions and actions
 * **update_rule** - Full update of business rules (PUT)
 * **patch_rule** - Partial update of business rules (PATCH)
+* **delete_rule** - Delete a business rule
 
 **Relations Management**
 
