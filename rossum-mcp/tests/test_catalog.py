@@ -71,6 +71,22 @@ class TestToolCatalog:
         }
         assert tool_names == expected
 
+    def test_hooks_category_tools(self) -> None:
+        hooks = TOOL_CATALOG["hooks"]
+        tool_names = {t.name for t in hooks.tools}
+        expected = {
+            "get_hook",
+            "list_hooks",
+            "create_hook",
+            "update_hook",
+            "list_hook_logs",
+            "list_hook_templates",
+            "create_hook_from_template",
+            "test_hook",
+            "delete_hook",
+        }
+        assert tool_names == expected
+
     def test_write_tools_are_marked(self) -> None:
         write_tools = [
             (cat_name, t.name) for cat_name, cat in TOOL_CATALOG.items() for t in cat.tools if not t.read_only
@@ -96,6 +112,7 @@ class TestToolCatalog:
             ("hooks", "create_hook"),
             ("hooks", "update_hook"),
             ("hooks", "create_hook_from_template"),
+            ("hooks", "test_hook"),
             ("hooks", "delete_hook"),
             ("email_templates", "create_email_template"),
             ("rules", "create_rule"),

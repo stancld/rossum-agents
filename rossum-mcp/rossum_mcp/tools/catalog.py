@@ -100,6 +100,7 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
             ToolInfo("list_hook_logs", "View hook execution logs"),
             ToolInfo("list_hook_templates", "List Rossum Store templates"),
             ToolInfo("create_hook_from_template", "Create hook from template", read_only=False),
+            ToolInfo("test_hook", "Test hook with payload", read_only=False),
             ToolInfo("delete_hook", "Delete hook", read_only=False),
         ],
         keywords=["hook", "extension", "webhook", "automation", "function", "serverless"],

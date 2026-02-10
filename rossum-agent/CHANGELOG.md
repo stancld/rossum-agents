@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Added
+- Added `txscript` skill — standalone TxScript language reference for formula fields, serverless functions, and rule trigger conditions
+
+### Changed
+- Replaced local hook sandbox (`evaluate_python_hook`, `debug_hook`) with native Rossum API endpoint (`test_hook` MCP tool)
+- Refactored `formula-fields` and `rules-and-actions` skills — extracted inline TxScript reference to the new `txscript` skill
+
+### Removed
+- Removed `hook-debugging` skill (hook testing now uses MCP tools directly)
+- Removed hook debug sub-agent (`HookDebugSubAgent`, `debug_hook`, `evaluate_python_hook`)
+
 
 ## [1.1.3] - 2026-02-12
 

@@ -306,7 +306,7 @@ class TestTokenUsageBreakdown:
             sub_input=2000,
             sub_output=1000,
             sub_by_tool={
-                "debug_hook": (1200, 600),
+                "search_knowledge_base": (1200, 600),
                 "patch_schema_with_subagent": (800, 400),
             },
         )
@@ -318,9 +318,9 @@ class TestTokenUsageBreakdown:
         assert breakdown.sub_agents.input_tokens == 2000
         assert breakdown.sub_agents.output_tokens == 1000
         assert breakdown.sub_agents.total_tokens == 3000
-        assert breakdown.sub_agents.by_tool["debug_hook"].input_tokens == 1200
-        assert breakdown.sub_agents.by_tool["debug_hook"].output_tokens == 600
-        assert breakdown.sub_agents.by_tool["debug_hook"].total_tokens == 1800
+        assert breakdown.sub_agents.by_tool["search_knowledge_base"].input_tokens == 1200
+        assert breakdown.sub_agents.by_tool["search_knowledge_base"].output_tokens == 600
+        assert breakdown.sub_agents.by_tool["search_knowledge_base"].total_tokens == 1800
         assert breakdown.sub_agents.by_tool["patch_schema_with_subagent"].input_tokens == 800
 
     def test_format_summary_lines(self):
@@ -331,14 +331,14 @@ class TestTokenUsageBreakdown:
             main_output=500,
             sub_input=2000,
             sub_output=1000,
-            sub_by_tool={"debug_hook": (2000, 1000)},
+            sub_by_tool={"search_knowledge_base": (2000, 1000)},
         )
         lines = breakdown.format_summary_lines()
         output = "\n".join(lines)
         assert "TOKEN USAGE SUMMARY" in output
         assert "Main Agent" in output
         assert "Sub-agents (total)" in output
-        assert "debug_hook" in output
+        assert "search_knowledge_base" in output
         assert "TOTAL" in output
         assert "1,000" in output
         assert "3,000" in output

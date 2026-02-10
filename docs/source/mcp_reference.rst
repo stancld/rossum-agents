@@ -634,6 +634,23 @@ create_hook_from_template
   a valid token_owner user URL must be provided. Organization group admin users cannot be
   used as token owners.
 
+test_hook
+^^^^^^^^^
+
+**MCP Tool:**
+  ``test_hook(hook_id: int, event: HookEvent, action: HookAction, annotation: str | None, status: str | None, previous_status: str | None, config: dict | None)``
+
+**API Endpoint:**
+  ``POST /v1/hooks/{hook_id}/test``
+
+**Request Body:**
+  JSON object with ``event``, ``action``, optional ``annotation`` URL, optional ``status``/``previous_status``,
+  and optional ``config`` override.
+
+**Implementation:**
+  Tests a hook by generating a payload from the given event/action parameters and sending it directly.
+  Returns hook response and logs.
+
 patch_schema
 ^^^^^^^^^^^^
 

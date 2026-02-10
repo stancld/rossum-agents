@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 66 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 67 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ## Document Processing (7 tools)
 
@@ -423,7 +423,7 @@ Retrieves engine fields for a specific engine or all engine fields.
 
 ---
 
-## Extensions — Hooks (8 tools)
+## Extensions — Hooks (9 tools)
 
 ### get_hook
 
@@ -490,6 +490,21 @@ Lists hook execution logs for debugging.
 - `hook_id`, `queue_id`, `annotation_id` (optional): Filter options
 - `log_level` (string, optional): 'INFO', 'ERROR', or 'WARNING'
 - `timestamp_before`, `timestamp_after` (string, optional): ISO 8601 timestamps
+
+### test_hook
+
+Tests a hook by auto-generating a realistic payload and executing it. For `annotation_content`/`annotation_status` events, annotation and status are auto-resolved from the hook's queues if not provided.
+
+**Parameters:**
+- `hook_id` (integer, required): Hook ID to test
+- `event` (HookEvent, required): Hook event (e.g., `annotation_content`, `upload`)
+- `action` (HookAction, required): Hook action (e.g., `initialize`, `export`)
+- `annotation` (string, optional): Annotation URL for real data
+- `status` (string, optional): Annotation status
+- `previous_status` (string, optional): Previous annotation status
+- `config` (dict, optional): Config override for the test run
+
+**Returns:** Dict with hook response and execution logs.
 
 ### delete_hook
 
@@ -860,7 +875,7 @@ Lists all available tool categories with descriptions, tool names, and keywords 
 - `queues` - Queue management (9 tools)
 - `schemas` - Schema management (8 tools)
 - `engines` - AI engine management (6 tools)
-- `hooks` - Extensions/webhooks (8 tools)
+- `hooks` - Extensions/webhooks (9 tools)
 - `email_templates` - Email templates (3 tools)
 - `document_relations` - Document relations (2 tools)
 - `relations` - Annotation relations (2 tools)

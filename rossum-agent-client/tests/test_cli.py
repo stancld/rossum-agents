@@ -626,7 +626,11 @@ class TestPrintTokenSummary:
                 input_tokens=2000,
                 output_tokens=1000,
                 total_tokens=3000,
-                by_tool={"debug_hook": TokenUsageBySource(input_tokens=2000, output_tokens=1000, total_tokens=3000)},
+                by_tool={
+                    "search_knowledge_base": TokenUsageBySource(
+                        input_tokens=2000, output_tokens=1000, total_tokens=3000
+                    )
+                },
             ),
         )
         event = StreamDoneEvent(total_steps=5, input_tokens=3000, output_tokens=1500, token_usage_breakdown=breakdown)
@@ -636,7 +640,7 @@ class TestPrintTokenSummary:
         assert "TOKEN USAGE SUMMARY" in captured.err
         assert "Main Agent" in captured.err
         assert "Sub-agents (total)" in captured.err
-        assert "debug_hook" in captured.err
+        assert "search_knowledge_base" in captured.err
         assert "TOTAL" in captured.err
 
     def test_prints_breakdown_without_sub_agents(self, capsys: pytest.CaptureFixture[str]) -> None:

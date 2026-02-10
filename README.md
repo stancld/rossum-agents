@@ -19,7 +19,7 @@
 [![CodeFactor](https://www.codefactor.io/repository/github/stancld/rossum-agents/badge)](https://www.codefactor.io/repository/github/stancld/rossum-agents)
 
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-66-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-67-blue.svg)](#available-tools)
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![Claude Opus 4.6](https://img.shields.io/badge/Claude-Opus_4.6-blueviolet.svg)](https://www.anthropic.com/claude/opus)
 
@@ -274,18 +274,22 @@ The Rossum Agent includes specialized capabilities for complex workflows:
 | Skill | Purpose |
 |-------|---------|
 | `rossum-deployment` | Deploy configuration changes safely via sandbox with before/after diff |
-| `hook-debugging` | Identify and fix hook issues using knowledge base and Opus sub-agent |
 | `schema-patching` | Add, update, or remove individual schema fields |
 | `schema-pruning` | Remove unwanted fields from schema in one call |
 | `organization-setup` | Set up Rossum for new customers with regional templates |
 | `ui-settings` | Update queue UI settings without corrupting structure |
+| `hooks` | Hook templates, token_owner, testing, debugging |
+| `txscript` | TxScript language reference for formula fields, serverless functions, and rule trigger conditions |
+| `rules-and-actions` | Create validation rules with TxScript conditions and actions |
+| `formula-fields` | Create/configure formula fields with TxScript |
+| `reasoning-fields` | Create AI-powered reasoning fields with prompt + context |
 
 **Sub-Agents** - Opus-powered components for complex iterative tasks:
 
 | Sub-Agent | Invoked Via | Purpose |
 |-----------|-------------|---------|
-| Hook Debug | `debug_hook(hook_id, annotation_id)` | Iterative hook debugging with sandboxed code execution |
 | Knowledge Base | `search_knowledge_base(query)` | Search Rossum docs with Opus-powered analysis |
+| Schema Creation | `create_schema_with_subagent(...)` | Create new schemas via Opus sub-agent |
 | Schema Patching | `patch_schema_with_subagent(schema_id, changes)` | Programmatic bulk schema modifications |
 
 See the [full documentation](https://stancld.github.io/rossum-agents/skills_and_subagents.html) for details.
@@ -294,7 +298,7 @@ See the [full documentation](https://stancld.github.io/rossum-agents/skills_and_
 
 ## MCP Tools
 
-The MCP server provides **66 tools** organized into categories:
+The MCP server provides **67 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
@@ -302,7 +306,7 @@ The MCP server provides **66 tools** organized into categories:
 | Queue Management | 9 | Create, configure, delete, and list queues |
 | Schema Management | 8 | Define, modify, and delete field structures |
 | Engine Management | 6 | Configure extraction and splitting engines |
-| Extensions (Hooks) | 8 | Webhooks, serverless functions |
+| Extensions (Hooks) | 9 | Webhooks, serverless functions |
 | Rules & Actions | 6 | Business rules with triggers and actions |
 | Workspace Management | 4 | Organize and delete workspaces |
 | Organization Groups | 2 | View license groups across organizations |

@@ -69,14 +69,14 @@ class TestSubAgentProgress:
 
     def test_with_custom_values(self) -> None:
         progress = SubAgentProgress(
-            tool_name="debug_hook",
+            tool_name="search_knowledge_base",
             iteration=3,
             max_iterations=10,
             current_tool="list_annotations",
             tool_calls=["get_hook", "list_rules"],
             status="completed",
         )
-        assert progress.tool_name == "debug_hook"
+        assert progress.tool_name == "search_knowledge_base"
         assert progress.iteration == 3
         assert progress.max_iterations == 10
         assert progress.current_tool == "list_annotations"
@@ -95,11 +95,11 @@ class TestSubAgentText:
 
     def test_with_custom_values(self) -> None:
         text = SubAgentText(
-            tool_name="debug_hook",
+            tool_name="search_knowledge_base",
             text="Final analysis complete",
             is_final=True,
         )
-        assert text.tool_name == "debug_hook"
+        assert text.tool_name == "search_knowledge_base"
         assert text.text == "Final analysis complete"
         assert text.is_final is True
 
@@ -120,7 +120,7 @@ class TestSubAgentTokenUsage:
 
     def test_with_iteration(self) -> None:
         usage = SubAgentTokenUsage(
-            tool_name="debug_hook",
+            tool_name="search_knowledge_base",
             input_tokens=1000,
             output_tokens=500,
             iteration=3,
@@ -162,7 +162,7 @@ class TestCallbacks:
         set_progress_callback(callback)
 
         progress = SubAgentProgress(
-            tool_name="debug_hook",
+            tool_name="search_knowledge_base",
             iteration=2,
             max_iterations=10,
             current_tool="get_annotation",
@@ -181,7 +181,7 @@ class TestCallbacks:
         callback = MagicMock()
         set_text_callback(callback)
 
-        text = SubAgentText(tool_name="debug_hook", text="Analysis output", is_final=True)
+        text = SubAgentText(tool_name="search_knowledge_base", text="Analysis output", is_final=True)
         report_text(text)
 
         callback.assert_called_once_with(text)
@@ -209,7 +209,7 @@ class TestCallbacks:
         set_token_callback(callback)
 
         usage = SubAgentTokenUsage(
-            tool_name="debug_hook",
+            tool_name="search_knowledge_base",
             input_tokens=1000,
             output_tokens=500,
             iteration=2,

@@ -62,8 +62,6 @@ class TestInternalToolsRegistration:
         names = get_internal_tool_names()
         assert "write_file" in names
         assert "search_knowledge_base" in names
-        assert "evaluate_python_hook" in names
-        assert "debug_hook" in names
         assert "load_skill" in names
 
 

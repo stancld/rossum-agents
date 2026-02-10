@@ -15,36 +15,12 @@ create_rule(
 
 ## Trigger Conditions (TxScript)
 
-Conditions are TxScript expressions that must evaluate strictly to `True` (not truthy — wrap with `bool()` if needed).
+Full language reference: load `txscript` skill. Key rules-specific behavior:
 
-### Evaluation Modes
-
-| Mode | When | Example |
-|------|------|---------|
-| Simple | Condition references only header fields | `field.amount_total > 400` |
-| Line-item | Condition references a table column field | `field.item_quantity * field.item_amount_total != field.item_amount` |
-
-Line-item mode evaluates once per row; duplicate actions are deduplicated automatically.
-
-### Field References
-
-| Syntax | Scope |
-|--------|-------|
-| `field.amount_total` | Header field value |
-| `field.item_amount_total` | Line-item column (triggers line-item mode) |
-| `field.item_amount_total.all_values` | All row values as `TableColumn` (NumPy-like) |
-
-### Operators & Functions
-
-| Pattern | Example |
-|---------|---------|
-| Comparison | `field.amount_total > 400` |
-| Equality (round floats) | `round(field.amount_total, 2) != round(sum(field.item_amount_total.all_values), 2)` |
-| Multiplication check | `field.item_quantity * field.item_amount_total != field.item_amount` |
-| Sum | `sum(field.item_amount_total.all_values)` |
-| Empty check | `is_empty(field.amount_due)` |
-| Default | `default_to(field.amount_total, 0)` |
-| Boolean wrap | `bool(field.amount_total > 400)` |
+- Conditions must evaluate strictly to `True` (not truthy — wrap with `bool()` if needed)
+- Uses formula-field context: `field.x` syntax, no imports
+- Referencing a line-item field (e.g., `field.item_x`) triggers per-row evaluation; duplicate actions are deduplicated
+- Use `.all_values` for cross-row aggregation: `sum(field.item_amount.all_values)`
 
 ## Action Objects
 

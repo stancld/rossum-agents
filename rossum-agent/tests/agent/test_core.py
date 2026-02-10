@@ -2422,7 +2422,7 @@ class TestRossumAgentTokenTracking:
         mock_agent._main_agent_output_tokens = 300
         mock_agent._sub_agent_input_tokens = 400
         mock_agent._sub_agent_output_tokens = 200
-        mock_agent._sub_agent_usage = {"debug_hook": (400, 200)}
+        mock_agent._sub_agent_usage = {"search_knowledge_base": (400, 200)}
 
         mock_agent.reset()
 
@@ -2471,7 +2471,7 @@ class TestRossumAgentTokenTracking:
         mock_agent._sub_agent_input_tokens = 2000
         mock_agent._sub_agent_output_tokens = 1000
         mock_agent._sub_agent_usage = {
-            "debug_hook": (1500, 700),
+            "search_knowledge_base": (1500, 700),
             "patch_schema_with_subagent": (500, 300),
         }
 
@@ -2480,44 +2480,46 @@ class TestRossumAgentTokenTracking:
         assert breakdown.total.total_tokens == 4500
         assert breakdown.main_agent.total_tokens == 1500
         assert breakdown.sub_agents.total_tokens == 3000
-        assert breakdown.sub_agents.by_tool["debug_hook"].input_tokens == 1500
-        assert breakdown.sub_agents.by_tool["debug_hook"].total_tokens == 2200
+        assert breakdown.sub_agents.by_tool["search_knowledge_base"].input_tokens == 1500
+        assert breakdown.sub_agents.by_tool["search_knowledge_base"].total_tokens == 2200
         assert breakdown.sub_agents.by_tool["patch_schema_with_subagent"].total_tokens == 800
 
     def test_accumulate_sub_agent_tokens(self, mock_agent):
         """Test _accumulate_sub_agent_tokens accumulates properly."""
         from rossum_agent.tools import SubAgentTokenUsage
 
-        usage1 = SubAgentTokenUsage(tool_name="debug_hook", input_tokens=100, output_tokens=50, iteration=1)
+        usage1 = SubAgentTokenUsage(tool_name="search_knowledge_base", input_tokens=100, output_tokens=50, iteration=1)
         mock_agent._accumulate_sub_agent_tokens(usage1)
 
         assert mock_agent._total_input_tokens == 100
         assert mock_agent._total_output_tokens == 50
         assert mock_agent._sub_agent_input_tokens == 100
         assert mock_agent._sub_agent_output_tokens == 50
-        assert mock_agent._sub_agent_usage["debug_hook"] == (100, 50)
+        assert mock_agent._sub_agent_usage["search_knowledge_base"] == (100, 50)
 
-        usage2 = SubAgentTokenUsage(tool_name="debug_hook", input_tokens=200, output_tokens=100, iteration=2)
+        usage2 = SubAgentTokenUsage(
+            tool_name="search_knowledge_base", input_tokens=200, output_tokens=100, iteration=2
+        )
         mock_agent._accumulate_sub_agent_tokens(usage2)
 
         assert mock_agent._total_input_tokens == 300
         assert mock_agent._total_output_tokens == 150
         assert mock_agent._sub_agent_input_tokens == 300
         assert mock_agent._sub_agent_output_tokens == 150
-        assert mock_agent._sub_agent_usage["debug_hook"] == (300, 150)
+        assert mock_agent._sub_agent_usage["search_knowledge_base"] == (300, 150)
 
     def test_accumulate_sub_agent_tokens_multiple_tools(self, mock_agent):
         """Test accumulating tokens from multiple sub-agent tools."""
         from rossum_agent.tools import SubAgentTokenUsage
 
-        usage1 = SubAgentTokenUsage(tool_name="debug_hook", input_tokens=100, output_tokens=50, iteration=1)
+        usage1 = SubAgentTokenUsage(tool_name="search_knowledge_base", input_tokens=100, output_tokens=50, iteration=1)
         usage2 = SubAgentTokenUsage(
             tool_name="patch_schema_with_subagent", input_tokens=200, output_tokens=100, iteration=1
         )
         mock_agent._accumulate_sub_agent_tokens(usage1)
         mock_agent._accumulate_sub_agent_tokens(usage2)
 
-        assert mock_agent._sub_agent_usage["debug_hook"] == (100, 50)
+        assert mock_agent._sub_agent_usage["search_knowledge_base"] == (100, 50)
         assert mock_agent._sub_agent_usage["patch_schema_with_subagent"] == (200, 100)
         assert mock_agent._sub_agent_input_tokens == 300
         assert mock_agent._sub_agent_output_tokens == 150
@@ -2530,7 +2532,7 @@ class TestRossumAgentTokenTracking:
         mock_agent._main_agent_output_tokens = 500
         mock_agent._sub_agent_input_tokens = 2000
         mock_agent._sub_agent_output_tokens = 1000
-        mock_agent._sub_agent_usage = {"debug_hook": (2000, 1000)}
+        mock_agent._sub_agent_usage = {"search_knowledge_base": (2000, 1000)}
 
         with caplog.at_level(logging.INFO):
             mock_agent.log_token_usage_summary()
@@ -2539,7 +2541,7 @@ class TestRossumAgentTokenTracking:
         assert "TOKEN USAGE SUMMARY" in log_output
         assert "Main Agent" in log_output
         assert "Sub-agents (total)" in log_output
-        assert "debug_hook" in log_output
+        assert "search_knowledge_base" in log_output
         assert "TOTAL" in log_output
         assert "1,000" in log_output
         assert "3,000" in log_output
@@ -2562,7 +2564,7 @@ class TestRossumAgentTokenTracking:
         mock_agent._main_agent_cache_read_tokens = 600
         mock_agent._sub_agent_cache_creation_tokens = 200
         mock_agent._sub_agent_cache_read_tokens = 400
-        mock_agent._sub_agent_cache_usage = {"debug_hook": (200, 400)}
+        mock_agent._sub_agent_cache_usage = {"search_knowledge_base": (200, 400)}
 
         mock_agent.reset()
 
@@ -2579,7 +2581,7 @@ class TestRossumAgentTokenTracking:
         from rossum_agent.tools import SubAgentTokenUsage
 
         usage = SubAgentTokenUsage(
-            tool_name="debug_hook",
+            tool_name="search_knowledge_base",
             input_tokens=100,
             output_tokens=50,
             iteration=1,
@@ -2592,7 +2594,7 @@ class TestRossumAgentTokenTracking:
         assert mock_agent._total_cache_read_tokens == 60
         assert mock_agent._sub_agent_cache_creation_tokens == 30
         assert mock_agent._sub_agent_cache_read_tokens == 60
-        assert mock_agent._sub_agent_cache_usage["debug_hook"] == (30, 60)
+        assert mock_agent._sub_agent_cache_usage["search_knowledge_base"] == (30, 60)
 
     def test_get_token_usage_breakdown_includes_cache(self, mock_agent):
         """Test that breakdown includes cache metrics."""
