@@ -36,3 +36,7 @@
 - **Outcome**: accepted
 - **Note**: Split individual changes into individual commits (not one bundled commit)
 - **MR**: https://github.com/stancld/rossum-agents/pull/137
+
+## 2026-02-10
+- **Outcome**: accepted
+- **MR**: https://github.com/stancld/rossum-agents/pull/175
