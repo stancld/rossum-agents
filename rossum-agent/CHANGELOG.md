@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.1.0] - 2026-02-09
+## [1.1.1] - 2026-02-10
 
 ### Added
 - Added SSE keepalive mechanism to prevent reverse proxies from dropping connections during prolonged agent thinking periods [#174](https://github.com/stancld/rossum-agents/pull/174)
