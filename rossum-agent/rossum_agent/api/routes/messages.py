@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
@@ -35,6 +36,12 @@ from rossum_agent.api.models.schemas import (
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
 from rossum_agent.redis_storage import ChatData
+
+# To prevent (legacy) proxy servers from dropping connections during long periods of thinking,
+# we are sending SSE_KEEPALIVE_COMMENT every SSE_KEEPALIVE_INTERVAL as per recommendation:
+# https://html.spec.whatwg.org/multipage/server-sent-events.html#authoring-notes
+SSE_KEEPALIVE_INTERVAL = 15
+SSE_KEEPALIVE_COMMENT = ": keepalive\n\n"
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +153,39 @@ def _resolve_mcp_mode(message: MessageRequest, chat_data: ChatData) -> str:
     return chat_data.metadata.mcp_mode
 
 
+async def _with_sse_keepalive(
+    events: AsyncIterator[AgentEvent],
+    interval: float = SSE_KEEPALIVE_INTERVAL,
+) -> AsyncIterator[tuple[AgentEvent | None, bool]]:
+    """Wrap an async event stream with periodic SSE keepalive signals.
+
+    Yields (event, False) for real events and (None, True) for keepalive ticks.
+    This prevents reverse proxies from closing idle connections during long
+    model thinking pauses.
+
+    Uses asyncio.wait() instead of asyncio.wait_for() to avoid cancelling the
+    pending anext() task on timeout, which would corrupt the async generator state.
+    """
+    pending: asyncio.Task = asyncio.create_task(anext(events))  # type: ignore[arg-type]
+    try:
+        while True:
+            done, _ = await asyncio.wait({pending}, timeout=interval)
+            if not done:
+                yield None, True
+                continue
+            try:
+                event = pending.result()
+            except StopAsyncIteration:
+                break
+            yield event, False
+            pending = asyncio.create_task(anext(events))  # type: ignore[arg-type]
+    finally:
+        if not pending.done():
+            pending.cancel()
+            with contextlib.suppress(asyncio.CancelledError, StopAsyncIteration):
+                await pending
+
+
 @router.post(
     "/{chat_id}/messages",
     response_class=StreamingResponse,
@@ -187,7 +227,7 @@ async def send_message(
         watcher = asyncio.create_task(_watch_disconnect(request, chat_id, agent_service))
 
         try:
-            async for event in agent_service.run_agent(
+            agent_events = agent_service.run_agent(
                 chat_id=chat_id,
                 prompt=user_prompt,
                 images=images,
@@ -197,7 +237,11 @@ async def send_message(
                 rossum_api_base_url=credentials.api_url,
                 rossum_url=message.rossum_url,
                 mcp_mode=mcp_mode,
-            ):
+            )
+            async for event, is_keepalive in _with_sse_keepalive(agent_events):
+                if is_keepalive:
+                    yield SSE_KEEPALIVE_COMMENT
+                    continue
                 result = _process_agent_event(event)
                 if result.done_event:
                     done_event = result.done_event

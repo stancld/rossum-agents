@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
@@ -15,9 +16,11 @@ from rossum_agent.api.models.schemas import (
     TaskSnapshotEvent,
 )
 from rossum_agent.api.routes.messages import (
+    SSE_KEEPALIVE_INTERVAL,
     ProcessedEvent,
     _format_sse_event,
     _process_agent_event,
+    _with_sse_keepalive,
     _yield_file_events,
 )
 
@@ -342,3 +345,69 @@ class TestProcessAgentEvent:
         assert result.sse_event is not None
         assert "step" in result.sse_event
         assert result.final_response_update is None
+
+
+class TestWithSSEKeepalive:
+    """Tests for _with_sse_keepalive wrapper."""
+
+    @pytest.mark.asyncio
+    async def test_forwards_events_without_delay(self):
+        """Events yielded immediately are forwarded without keepalive interleaving."""
+
+        async def fast_events():
+            yield StepEvent(type="thinking", step_number=1, content="Thinking...")
+            yield StepEvent(type="final_answer", step_number=2, content="Done!", is_final=True)
+
+        results = []
+        async for event, is_keepalive in _with_sse_keepalive(fast_events()):
+            results.append((event, is_keepalive))
+
+        real_events = [event for event, is_keepalive in results if not is_keepalive]
+        assert len(real_events) == 2
+        assert [e.type for e in real_events] == ["thinking", "final_answer"]
+
+        keepalive_events = [event for event, is_keepalive in results if is_keepalive]
+        assert len(keepalive_events) == 0
+
+    @pytest.mark.asyncio
+    async def test_emits_keepalive_during_pause(self):
+        """A keepalive tick is emitted when no event arrives within the interval."""
+
+        TEST_KEEPALIVE_INTERVAL = 0.05
+        TEST_EVENTS_DELAY = 0.15
+
+        async def slow_events():
+            yield StepEvent(type="thinking", step_number=1, content="Thinking...")
+            await asyncio.sleep(TEST_EVENTS_DELAY)
+            yield StepEvent(type="final_answer", step_number=2, content="Done!", is_final=True)
+
+        results = []
+        async for event, is_keepalive in _with_sse_keepalive(slow_events(), interval=TEST_KEEPALIVE_INTERVAL):
+            results.append((event, is_keepalive))
+
+        real_events = [event for event, is_keepalive in results if not is_keepalive]
+        assert len(real_events) == 2
+        assert [e.type for e in real_events] == ["thinking", "final_answer"]
+
+        keepalive_events = [event for event, is_keepalive in results if is_keepalive]
+        assert len(keepalive_events) >= 1
+        assert all(event is None for event in keepalive_events)
+
+    @pytest.mark.asyncio
+    async def test_empty_stream(self):
+        """An empty async iterator yields nothing."""
+
+        async def no_events():
+            return
+            yield
+
+        results = []
+        async for event, is_keepalive in _with_sse_keepalive(no_events()):
+            results.append((event, is_keepalive))
+
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_keepalive_interval_is_reasonable(self):
+        """The keepalive interval should be well below common proxy timeouts (60s)."""
+        assert SSE_KEEPALIVE_INTERVAL < 60
