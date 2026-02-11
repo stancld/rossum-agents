@@ -60,6 +60,8 @@ async def simulate_event_generator(
                 final_response = event.content
             yield f"event: step\ndata: {event.model_dump_json()}\n\n"
 
+    output_dir = agent_service.get_output_dir("chat_123")
+
     updated_history = agent_service.build_updated_history(
         existing_history=[], user_prompt="Hello", final_response=final_response
     )
@@ -67,11 +69,11 @@ async def simulate_event_generator(
         user_id=credentials.user_id,
         chat_id="chat_123",
         messages=updated_history,
-        output_dir=agent_service.output_dir,
+        output_dir=output_dir,
     )
 
-    if agent_service.output_dir and agent_service.output_dir.exists():
-        for file_path in agent_service.output_dir.iterdir():
+    if output_dir and output_dir.exists():
+        for file_path in output_dir.iterdir():
             if file_path.is_file():
                 file_event = FileCreatedEvent(
                     filename=file_path.name, url=f"/api/v1/chats/chat_123/files/{file_path.name}"
@@ -153,7 +155,7 @@ class TestEventGeneratorOrder:
         chat_service.save_messages.return_value = True
 
         agent_service = MagicMock()
-        agent_service.output_dir = tmp_path
+        agent_service.get_output_dir.return_value = tmp_path
         agent_service.build_updated_history.return_value = []
         agent_service.run_agent = mock_run_agent_standard
 
@@ -180,7 +182,7 @@ class TestEventGeneratorOrder:
         chat_service.save_messages.return_value = True
 
         agent_service = MagicMock()
-        agent_service.output_dir = None
+        agent_service.get_output_dir.return_value = None
         agent_service.build_updated_history.return_value = []
         agent_service.run_agent = mock_run_agent_standard
 
@@ -207,7 +209,7 @@ class TestEventGeneratorOrder:
         chat_service.save_messages.return_value = True
 
         agent_service = MagicMock()
-        agent_service.output_dir = tmp_path
+        agent_service.get_output_dir.return_value = tmp_path
         agent_service.build_updated_history.return_value = []
 
         async def mock_run_agent_minimal(*args, **kwargs):

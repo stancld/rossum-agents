@@ -125,15 +125,10 @@ class TestAgentServiceDocumentStorage:
 
     def test_save_documents_to_output_dir(self) -> None:
         """Test that documents are saved correctly to output directory."""
-        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
-
         service = AgentService()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = _RequestContext()
-            ctx.output_dir = Path(tmpdir)
-            _request_context.set(ctx)
-
+            output_dir = Path(tmpdir)
             pdf_content = b"%PDF-1.4 test content"
             data = base64.b64encode(pdf_content).decode()
             docs = [
@@ -144,7 +139,7 @@ class TestAgentServiceDocumentStorage:
                 )
             ]
 
-            service._save_documents_to_output_dir(docs)
+            service._save_documents_to_output_dir(docs, output_dir)
 
             saved_file = Path(tmpdir) / "test_invoice.pdf"
             assert saved_file.exists()
@@ -152,15 +147,10 @@ class TestAgentServiceDocumentStorage:
 
     def test_save_multiple_documents(self) -> None:
         """Test saving multiple documents."""
-        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
-
         service = AgentService()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = _RequestContext()
-            ctx.output_dir = Path(tmpdir)
-            _request_context.set(ctx)
-
+            output_dir = Path(tmpdir)
             docs = []
             for i in range(3):
                 content = f"PDF content {i}".encode()
@@ -173,32 +163,12 @@ class TestAgentServiceDocumentStorage:
                     )
                 )
 
-            service._save_documents_to_output_dir(docs)
+            service._save_documents_to_output_dir(docs, output_dir)
 
             for i in range(3):
                 saved_file = Path(tmpdir) / f"doc{i}.pdf"
                 assert saved_file.exists()
                 assert saved_file.read_bytes() == f"PDF content {i}".encode()
-
-    def test_save_documents_no_output_dir(self) -> None:
-        """Test that saving documents without output dir logs warning."""
-        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
-
-        service = AgentService()
-        ctx = _RequestContext()
-        ctx.output_dir = None
-        _request_context.set(ctx)
-
-        data = base64.b64encode(b"PDF").decode()
-        docs = [
-            DocumentContent(
-                media_type="application/pdf",
-                data=data,
-                filename="test.pdf",
-            )
-        ]
-
-        service._save_documents_to_output_dir(docs)
 
 
 class TestBuildUpdatedHistoryWithDocuments:
@@ -206,12 +176,7 @@ class TestBuildUpdatedHistoryWithDocuments:
 
     def test_history_includes_document_info(self) -> None:
         """Test that document filenames are included in history."""
-        from rossum_agent.api.services.agent_service import _request_context, _RequestContext
-
         service = AgentService()
-        ctx = _RequestContext()
-        ctx.last_memory = None
-        _request_context.set(ctx)
 
         data = base64.b64encode(b"PDF").decode()
         docs = [

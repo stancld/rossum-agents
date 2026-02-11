@@ -4,16 +4,11 @@ import datetime as dt
 import shutil
 import tempfile
 import uuid
-from contextvars import ContextVar
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-
-# Context variable for session-specific output directory
-# This allows thread-safe per-session output directories
-_session_output_dir: ContextVar[Path | None] = ContextVar("session_output_dir", default=None)
 
 # Base directory for all session outputs
 BASE_OUTPUT_DIR = Path(tempfile.gettempdir()) / "rossum_agent_outputs"
@@ -31,55 +26,24 @@ def create_session_output_dir() -> Path:
     return session_dir
 
 
-def set_session_output_dir(output_dir: Path) -> None:
-    """Set the output directory for the current session context.
-
-    Args:
-        output_dir: Path to the session-specific output directory
-    """
-    _session_output_dir.set(output_dir)
-
-
-def get_session_output_dir() -> Path:
-    """Get the output directory for the current session.
-
-    Returns:
-        Path to session output directory, or creates a default one if not set
-    """
-    output_dir = _session_output_dir.get()
-    if output_dir is None:
-        # Fallback for non-session contexts (e.g., CLI usage)
-        output_dir = Path("./outputs")
-        output_dir.mkdir(exist_ok=True)
-    return output_dir
-
-
-def get_generated_files(output_dir: Path | None = None) -> list[str]:
+def get_generated_files(output_dir: Path) -> list[str]:
     """Get list of files in the outputs directory (recursively).
 
     Args:
-        output_dir: Optional explicit output directory. If not provided,
-                   uses the session context output directory.
+        output_dir: The output directory to list files from.
     """
-    if output_dir is None:
-        output_dir = get_session_output_dir()
-
     if not output_dir.exists():
         return []
 
     return [str(f.resolve()) for f in output_dir.rglob("*") if f.is_file()]
 
 
-def get_generated_files_with_metadata(output_dir: Path | None = None) -> dict[str, float]:
+def get_generated_files_with_metadata(output_dir: Path) -> dict[str, float]:
     """Get files in the outputs directory with their modification times (recursively).
 
     Args:
-        output_dir: Optional explicit output directory. If not provided,
-                   uses the session context output directory.
+        output_dir: The output directory to list files from.
     """
-    if output_dir is None:
-        output_dir = get_session_output_dir()
-
     if not output_dir.exists():
         return {}
 
