@@ -68,6 +68,24 @@ Add docstring only when: non-obvious formats, complex filtering, unclear default
 
 Import return types at module level (not TYPE_CHECKING) for FastMCP serialization.
 
+### Adding New MCP Tools
+
+| Step | Action |
+|------|--------|
+| Install latest SDK | Run `uv add rossum-api@latest` to get the newest `rossum-api` package |
+| Leverage SDK | Check if `rossum-api` already provides models, dataclasses, type literals, or helper methods for the feature before writing custom code |
+| Use typed constructs | Prefer dataclasses, `Literal` types, enums, and typed models from `rossum-api` over plain strings or untyped dicts |
+| API docs fallback | If the SDK doesn't cover the needed functionality, consult https://rossum.app/api/docs for the raw API spec |
+
+### Adding New Rossum Capabilities (formula fields, reasoning fields, etc.)
+
+When implementing support for Rossum-specific features, research them first:
+
+| Source | URL | Purpose |
+|--------|-----|---------|
+| Knowledge Base | https://knowledge-base.rossum.ai/ | Feature concepts, configuration, and usage guides |
+| API Docs | https://rossum.app/api/docs | API endpoints, request/response schemas |
+
 ## Documentation Updates
 
 When adding/modifying tools, update:
