@@ -17,6 +17,8 @@ authors = [
 ]
 keywords = ["mcp", "rossum", "document-processing", "agent", "ai"]
 dependencies = [
+    # Transitive dep (fastmcp -> authlib); pinned to fix Snyk SNYK-PYTHON-CRYPTOGRAPHY-15263096
+    "cryptography>=46.0.5",
     "fastmcp>=2.0.0",
     "mcp>=1.0.0",
     "rossum-api>=3.9.0",
