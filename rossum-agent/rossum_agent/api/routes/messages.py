@@ -166,7 +166,7 @@ async def _with_sse_keepalive(
     Uses asyncio.wait() instead of asyncio.wait_for() to avoid cancelling the
     pending anext() task on timeout, which would corrupt the async generator state.
     """
-    pending: asyncio.Task = asyncio.create_task(anext(events))  # type: ignore[arg-type]
+    pending: asyncio.Task = asyncio.create_task(anext(events))
     try:
         while True:
             done, _ = await asyncio.wait({pending}, timeout=interval)
@@ -178,7 +178,7 @@ async def _with_sse_keepalive(
             except StopAsyncIteration:
                 break
             yield event, False
-            pending = asyncio.create_task(anext(events))  # type: ignore[arg-type]
+            pending = asyncio.create_task(anext(events))
     finally:
         if not pending.done():
             pending.cancel()
