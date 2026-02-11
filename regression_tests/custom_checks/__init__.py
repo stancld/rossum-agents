@@ -14,6 +14,9 @@ from regression_tests.custom_checks.business_validation_rules import (
 from regression_tests.custom_checks.formula_field import (
     check_formula_field_for_table,
 )
+from regression_tests.custom_checks.formula_field_updated import (
+    check_formula_field_updated,
+)
 from regression_tests.custom_checks.hidden_multivalue_warning import (
     check_knowledge_base_hidden_multivalue_warning,
 )
@@ -43,6 +46,7 @@ __all__ = [
     "check_business_validation_hook_settings",
     "check_business_validation_rules",
     "check_formula_field_for_table",
+    "check_formula_field_updated",
     "check_hook_test_results_reported",
     "check_knowledge_base_hidden_multivalue_warning",
     "check_net_terms_formula_field_added",

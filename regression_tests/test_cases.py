@@ -16,6 +16,7 @@ from regression_tests.custom_checks import (
     check_business_validation_hook_settings,
     check_business_validation_rules,
     check_formula_field_for_table,
+    check_formula_field_updated,
     check_hook_test_results_reported,
     check_knowledge_base_hidden_multivalue_warning,
     check_net_terms_formula_field_added,
@@ -84,6 +85,11 @@ FORMULA_FIELD_FOR_TABLE_CHECK = CustomCheck(
 HOOK_TEST_RESULTS_CHECK = CustomCheck(
     name="Hook testing reported test_hook results",
     check_fn=check_hook_test_results_reported,
+)
+
+FORMULA_FIELD_UPDATED_CHECK = CustomCheck(
+    name="Formula field was updated with a new formula",
+    check_fn=check_formula_field_updated,
 )
 
 SERVERLESS_HOOK_TXSCRIPT_CHECK = CustomCheck(
@@ -431,6 +437,45 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             max_steps=10,
             file_expectation=FileExpectation(),
             custom_checks=[SERVERLESS_HOOK_TXSCRIPT_CHECK, HOOK_TEST_RESULTS_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="create_queue_add_formula_then_update_formula",
+        description="Multi-turn: create queue, add formula field, then update it",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        rossum_url=None,
+        prompt=(
+            "# Create queue, add formula field, then update it\n\n"
+            "Workspace: 'Another workspace'\n"
+            "Region: EU\n\n"
+            "## Tasks:\n\n"
+            "1. Create a new queue from EU Invoice template: Formula Update Queue\n"
+            "2. Add a formula field to the schema:\n"
+            "    - Field name: total_quantity\n"
+            "    - Section: basic_info_section\n"
+            "    - Logic: Sum of all quantity values across line items\n"
+            "    - After adding, store the full schema JSON to `schema_v1.json`\n"
+            "3. Update the formula field you just created:\n"
+            "    - Field name: total_quantity\n"
+            "    - New logic: Sum of all total amount values across line items\n"
+            "    - After updating, store the full schema JSON to `schema_v2.json`"
+        ),
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "suggest_formula_field",
+                ("patch_schema", "patch_schema_with_subagent"),
+                "get_schema",
+                "write_file",
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=120000, max_total_tokens=300000),
+        success_criteria=SuccessCriteria(
+            required_keywords=[],
+            max_steps=12,
+            file_expectation=FileExpectation(expected_files=["schema_v1.json", "schema_v2.json"]),
+            custom_checks=[FORMULA_FIELD_UPDATED_CHECK],
         ),
     ),
 ]

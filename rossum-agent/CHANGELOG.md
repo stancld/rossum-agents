@@ -7,21 +7,29 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
-- Added `txscript` skill — standalone TxScript language reference for formula fields, serverless functions, and rule trigger conditions
+- Added `txscript` skill — standalone TxScript language reference for formula fields, serverless functions, and rule trigger conditions [#176](https://github.com/stancld/rossum-agents/pull/176)
+- Added `fields_to_update` support to schema patching sub-agent for updating existing field properties (formula, label, type, ui_configuration) without removing and re-adding fields [#181](https://github.com/stancld/rossum-agents/pull/181)
+- Added `formula` property support to `_build_field_node` so new formula fields retain their formula code [#181](https://github.com/stancld/rossum-agents/pull/181)
+
+### Fixed
+- Fixed schema patching sub-agent inability to update existing formula fields — previously only supported add/remove, now supports in-place updates via `action: "update"` [#181](https://github.com/stancld/rossum-agents/pull/181)
+- Updated `schema-patching` and `formula-fields` skills with guidance on updating existing fields and explanation of why `update_schema` is intentionally hidden [#181](https://github.com/stancld/rossum-agents/pull/181)
 
 ### Changed
-- Replaced local hook sandbox (`evaluate_python_hook`, `debug_hook`) with native Rossum API endpoint (`test_hook` MCP tool)
-- Refactored `formula-fields` and `rules-and-actions` skills — extracted inline TxScript reference to the new `txscript` skill
+- Replaced local hook sandbox (`evaluate_python_hook`, `debug_hook`) with native Rossum API endpoint (`test_hook` MCP tool) [#176](https://github.com/stancld/rossum-agents/pull/176)
+- Refactored `formula-fields` and `rules-and-actions` skills — extracted inline TxScript reference to the new `txscript` skill [#176](https://github.com/stancld/rossum-agents/pull/176)
 
 ### Removed
-- Removed `hook-debugging` skill (hook testing now uses MCP tools directly)
-- Removed hook debug sub-agent (`HookDebugSubAgent`, `debug_hook`, `evaluate_python_hook`)
+- Removed `hook-debugging` skill (hook testing now uses MCP tools directly) [#176](https://github.com/stancld/rossum-agents/pull/176)
+- Removed hook debug sub-agent (`HookDebugSubAgent`, `debug_hook`, `evaluate_python_hook`) [#176](https://github.com/stancld/rossum-agents/pull/176)
 
 
 ## [1.1.3] - 2026-02-12
 
 ### Fixed
 - Upgraded `rossum-api` dependency to fix hook-template deserialization
+
+
 
 ## [1.1.2] - 2026-02-11
 
