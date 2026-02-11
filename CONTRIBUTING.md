@@ -96,6 +96,24 @@ pre-commit run --all-files     # lint and format (ruff, codespell, etc.)
 
 ---
 
+## Example prompts for Amp Code / Claude Code
+
+This repo has an `AGENTS.md` that gives agents all the context they need. Keep your prompts short — the agent knows where things live.
+
+🔧 > Add a new MCP tool `list_inbox_emails` that lists emails received by a queue's inbox.
+
+🧠 > Create a new agent skill for managing email templates.
+
+🧪 > Add a regression test that verifies the agent can list queues and describe their schema.
+
+🐛 > The `update_queue` tool doesn't handle queues with no schema. Fix it.
+
+🗺️ > Walk me through how skills get loaded and used by the agent.
+
+✨ > Add a `hook_type` filter parameter to the `list_hooks` tool.
+
+---
+
 ## Submitting your changes
 
 Open a PR to `master` and ping **@stancld** for review.
