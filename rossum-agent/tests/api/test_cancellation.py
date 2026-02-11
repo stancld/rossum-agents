@@ -261,7 +261,7 @@ class TestSendMessageCancellation:
 
         mock_agent_service = MagicMock()
         mock_agent_service.run_agent = mock_run_agent
-        mock_agent_service.output_dir = None
+        mock_agent_service.get_output_dir.return_value = None
         mock_agent_service.build_updated_history.return_value = []
 
         app.state.chat_service = mock_chat_service
@@ -298,7 +298,7 @@ class TestSendMessageCancellation:
 
         mock_agent_service = MagicMock()
         mock_agent_service.run_agent = mock_run_agent_that_gets_cancelled
-        mock_agent_service.output_dir = None
+        mock_agent_service.get_output_dir.return_value = None
 
         app.state.chat_service = mock_chat_service
         app.state.agent_service = mock_agent_service

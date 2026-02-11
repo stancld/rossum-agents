@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import contextvars
 import logging
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from rossum_agent.agent.memory import AgentMemory
 from rossum_agent.api.dependencies import (
     RossumCredentials,
     get_agent_service,
@@ -114,6 +116,8 @@ def _save_chat_history(
     final_response: str | None,
     images: list[ImageContent] | None,
     documents: list[DocumentContent] | None,
+    output_dir: Path | None,
+    memory: AgentMemory | None,
 ) -> None:
     """Persist updated conversation history after a successful agent run."""
     updated_history = agent_service.build_updated_history(
@@ -122,12 +126,13 @@ def _save_chat_history(
         final_response=final_response,
         images=images,
         documents=documents,
+        memory=memory,
     )
     chat_service.save_messages(
         user_id=credentials.user_id,
         chat_id=chat_id,
         messages=updated_history,
-        output_dir=agent_service.output_dir,
+        output_dir=output_dir,
         metadata=chat_data.metadata,
     )
 
@@ -165,20 +170,26 @@ async def _with_sse_keepalive(
 
     Uses asyncio.wait() instead of asyncio.wait_for() to avoid cancelling the
     pending anext() task on timeout, which would corrupt the async generator state.
+
+    Context is captured from each completed task and passed to the next one,
+    so that context variables set by the async generator (e.g. output_dir)
+    propagate across iterations.
     """
-    pending: asyncio.Task = asyncio.create_task(anext(events))
+    ctx: contextvars.Context | None = None
+    pending: asyncio.Task = asyncio.create_task(anext(events))  # type: ignore[arg-type]
     try:
         while True:
             done, _ = await asyncio.wait({pending}, timeout=interval)
             if not done:
                 yield None, True
                 continue
+            ctx = pending.get_context()
             try:
                 event = pending.result()
             except StopAsyncIteration:
                 break
             yield event, False
-            pending = asyncio.create_task(anext(events))
+            pending = asyncio.create_task(anext(events), context=ctx)  # type: ignore[arg-type]
     finally:
         if not pending.done():
             pending.cancel()
@@ -263,6 +274,9 @@ async def send_message(
         finally:
             watcher.cancel()
 
+        output_dir = agent_service.get_output_dir(chat_id)
+        memory = agent_service.pop_last_memory(chat_id)
+
         _save_chat_history(
             chat_service=chat_service,
             agent_service=agent_service,
@@ -274,9 +288,11 @@ async def send_message(
             final_response=final_response,
             images=images,
             documents=documents,
+            output_dir=output_dir,
+            memory=memory,
         )
 
-        for file_event in _yield_file_events(agent_service.output_dir, chat_id):
+        for file_event in _yield_file_events(output_dir, chat_id):
             yield file_event
 
         if done_event:

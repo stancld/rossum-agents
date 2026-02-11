@@ -7,8 +7,16 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
-- Added SSE keepalive mechanism to prevent reverse proxies from dropping connections during prolonged agent thinking periods [#174](https://github.com/stancld/rossum-agents/pull/174)
 - Added Slack integration: `POST /chats/{chat_id}/report-to-slack` endpoint to send chat transcripts to a Slack channel via `slack-sdk`, available as an optional `slack` extra [#178](https://github.com/stancld/rossum-agents/pull/178)
+
+### Fixed
+- Fixed output files lost after SSE keepalive by moving chat-bound state (`output_dir`, `last_memory`) off context vars to `_ChatRunState` keyed by chat_id — `asyncio.create_task()` in keepalive copied the context, so mutations inside the task never propagated back to the caller
+
+
+## [1.1.1] - 2026-02-10
+
+### Added
+- Added SSE keepalive mechanism to prevent reverse proxies from dropping connections during prolonged agent thinking periods [#174](https://github.com/stancld/rossum-agents/pull/174)
 
 
 ## [1.1.0] - 2026-02-09

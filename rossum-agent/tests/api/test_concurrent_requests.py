@@ -40,7 +40,7 @@ class TestConcurrentAgentService:
             async def mock_run(prompt):
                 ctx = _request_context.get()
                 observed_contexts[request_id] = {
-                    "output_dir": str(ctx.output_dir) if ctx.output_dir else None,
+                    "output_dir": str(agent_service.get_output_dir(request_id)),
                     "has_queue": ctx.event_queue is not None,
                     "queue_id": id(ctx.event_queue) if ctx.event_queue else None,
                 }
@@ -56,7 +56,6 @@ class TestConcurrentAgentService:
                 patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
                 patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
                 patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=output_dir),
-                patch("rossum_agent.api.services.agent_service.set_session_output_dir"),
                 patch("rossum_agent.api.services.agent_service.get_system_prompt", return_value="test prompt"),
                 patch("rossum_agent.api.services.agent_service.extract_url_context") as mock_extract,
             ):
@@ -132,7 +131,6 @@ class TestConcurrentAgentService:
                 patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
                 patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
                 patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=output_dir),
-                patch("rossum_agent.api.services.agent_service.set_session_output_dir"),
                 patch("rossum_agent.api.services.agent_service.get_system_prompt", return_value="test"),
                 patch("rossum_agent.api.services.agent_service.extract_url_context") as mock_extract,
             ):
@@ -186,7 +184,7 @@ class TestConcurrentAgentService:
             mock_agent.log_token_usage_summary = MagicMock()
 
             async def mock_run(prompt):
-                output_dirs_observed[request_id] = str(agent_service.output_dir)
+                output_dirs_observed[request_id] = str(agent_service.get_output_dir(request_id))
                 yield AgentStep(step_number=1, final_answer="done", is_final=True)
 
             mock_agent.run = mock_run
@@ -198,7 +196,6 @@ class TestConcurrentAgentService:
                 patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
                 patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
                 patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=output_dir),
-                patch("rossum_agent.api.services.agent_service.set_session_output_dir"),
                 patch("rossum_agent.api.services.agent_service.get_system_prompt", return_value="test"),
                 patch("rossum_agent.api.services.agent_service.extract_url_context") as mock_extract,
             ):

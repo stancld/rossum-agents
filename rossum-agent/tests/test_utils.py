@@ -13,9 +13,7 @@ from rossum_agent.utils import (
     generate_chat_id,
     get_generated_files,
     get_generated_files_with_metadata,
-    get_session_output_dir,
     is_valid_chat_id,
-    set_session_output_dir,
 )
 
 
@@ -77,41 +75,6 @@ class TestGetGeneratedFiles:
         result1.append("fake_file")
         assert len(result1) == 2
         assert len(result2) == 1
-
-    def test_uses_session_context_when_no_arg_provided(self, tmp_path):
-        """Test that session context is used when no output_dir is provided."""
-        output_dir = tmp_path / "session_outputs"
-        output_dir.mkdir()
-        (output_dir / "session_file.txt").write_text("content")
-
-        set_session_output_dir(output_dir)
-
-        result = get_generated_files()
-
-        assert len(result) == 1
-        assert "session_file.txt" in result[0]
-
-
-class TestSessionOutputDir:
-    """Test session output directory context management."""
-
-    def test_set_and_get_session_output_dir(self, tmp_path):
-        """Test setting and getting session output directory."""
-        output_dir = tmp_path / "my_session"
-        output_dir.mkdir()
-
-        set_session_output_dir(output_dir)
-        result = get_session_output_dir()
-
-        assert result == output_dir
-
-    def test_default_fallback_when_not_set(self):
-        """Test that a default directory is created when session is not set."""
-        # Reset context by setting to None internally (simulate fresh context)
-        # This is tricky to test since contextvars persist within the same thread
-        # Just verify get_session_output_dir returns a Path
-        result = get_session_output_dir()
-        assert isinstance(result, Path)
 
 
 class TestGenerateChatId:
@@ -337,35 +300,3 @@ class TestGetGeneratedFilesWithMetadata:
         result = get_generated_files_with_metadata(output_dir)
 
         assert len(result) == 2
-
-    def test_uses_session_context_when_no_arg_provided(self, tmp_path):
-        """Test that session context is used when no output_dir is provided."""
-        output_dir = tmp_path / "session_outputs"
-        output_dir.mkdir()
-        (output_dir / "session_file.txt").write_text("content")
-
-        set_session_output_dir(output_dir)
-
-        result = get_generated_files_with_metadata()
-
-        assert len(result) == 1
-        assert any("session_file.txt" in path for path in result)
-
-
-class TestSessionOutputDirFallback:
-    """Test session output directory fallback behavior."""
-
-    def test_fallback_creates_default_outputs_dir(self):
-        """Test that fallback creates default ./outputs directory when context is None."""
-        from rossum_agent.utils import _session_output_dir
-
-        token = _session_output_dir.set(None)
-        try:
-            result = get_session_output_dir()
-            assert isinstance(result, Path)
-            assert result == Path("./outputs")
-            assert result.exists()
-        finally:
-            _session_output_dir.reset(token)
-            if Path("./outputs").exists() and not list(Path("./outputs").iterdir()):
-                Path("./outputs").rmdir()
