@@ -22,7 +22,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from rossum_agent.api.routes import chats, files, health, messages
+from rossum_agent.api.routes import chats, files, health, messages, slack
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
 from rossum_agent.api.services.file_service import FileService
@@ -132,6 +132,7 @@ app.include_router(health.router, prefix="/api/v1")
 app.include_router(chats.router, prefix="/api/v1")
 app.include_router(messages.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
+app.include_router(slack.router, prefix="/api/v1")
 
 
 def _run_uvicorn(args: argparse.Namespace) -> None:

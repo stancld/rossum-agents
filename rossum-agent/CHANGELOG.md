@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Added SSE keepalive mechanism to prevent reverse proxies from dropping connections during prolonged agent thinking periods [#174](https://github.com/stancld/rossum-agents/pull/174)
+- Added Slack integration: `POST /chats/{chat_id}/report-to-slack` endpoint to send chat transcripts to a Slack channel via `slack-sdk`, available as an optional `slack` extra [#178](https://github.com/stancld/rossum-agents/pull/178)
 
 
 ## [1.1.0] - 2026-02-09
