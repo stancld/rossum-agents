@@ -410,6 +410,16 @@ class FileCreatedEvent(BaseModel):
     url: str
 
 
+class ReportToSlackRequest(BaseModel):
+    rossum_url: str | None = Field(default=None, description="Optional Rossum app URL for context (queue, etc.)")
+
+
+class ReportToSlackResponse(BaseModel):
+    chat_id: str
+    channel: str
+    slack_ts: str
+
+
 class HealthResponse(BaseModel):
     """Response for health check endpoint."""
 

@@ -37,7 +37,7 @@ from rossum_agent.tools import (
     set_text_callback,
 )
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
-from rossum_agent.utils import create_session_output_dir, get_display_tool_name, set_session_output_dir
+from rossum_agent.utils import create_session_output_dir, get_display_tool_name
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
@@ -54,10 +54,8 @@ logger = logging.getLogger(__name__)
 class _RequestContext:
     """Per-request context for agent execution."""
 
-    output_dir: Path | None = None
     event_queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent] | None = None
     event_loop: asyncio.AbstractEventLoop | None = None
-    last_memory: AgentMemory | None = None
 
 
 @dataclass
@@ -67,6 +65,8 @@ class _ChatRunState:
     lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock)
     active_task: asyncio.Task | None = None
     run_id: int = 0
+    output_dir: Path | None = None
+    last_memory: AgentMemory | None = None
 
 
 _request_context: contextvars.ContextVar[_RequestContext] = contextvars.ContextVar("request_context")
@@ -276,6 +276,7 @@ class AgentService:
         async with state.lock:
             if state.run_id == run_id:
                 state.active_task = None
+                state.last_memory = None
 
     def cancel_run(self, chat_id: str) -> bool:
         """Cancel the active run for a chat.
@@ -289,10 +290,19 @@ class AgentService:
         state.active_task.cancel()
         return True
 
-    @property
-    def output_dir(self) -> Path | None:
-        """Get the output directory for the current run."""
-        return self._get_context().output_dir
+    def get_output_dir(self, chat_id: str) -> Path | None:
+        """Get the output directory for a chat's run."""
+        state = self._chat_runs.get(chat_id)
+        return state.output_dir if state else None
+
+    def pop_last_memory(self, chat_id: str) -> AgentMemory | None:
+        """Get and clear the last memory for a chat's run."""
+        state = self._chat_runs.get(chat_id)
+        if not state:
+            return None
+        memory = state.last_memory
+        state.last_memory = None
+        return memory
 
     def _enqueue_event_threadsafe(
         self,
@@ -387,14 +397,14 @@ class AgentService:
         ctx = _RequestContext()
         _request_context.set(ctx)
 
-        ctx.output_dir = create_session_output_dir()
-        set_session_output_dir(ctx.output_dir)
-        set_output_dir(ctx.output_dir)
+        output_dir = create_session_output_dir()
+        set_output_dir(output_dir)
         set_rossum_credentials(rossum_api_base_url, rossum_api_token)
-        logger.info(f"Created session output directory: {ctx.output_dir}")
+        self._get_chat_run_state(chat_id).output_dir = output_dir
+        logger.info(f"Created session output directory: {output_dir}")
 
         if documents:
-            self._save_documents_to_output_dir(documents)
+            self._save_documents_to_output_dir(documents, output_dir)
 
         ctx.event_queue = asyncio.Queue(maxsize=100)
         ctx.event_loop = asyncio.get_running_loop()
@@ -428,7 +438,7 @@ class AgentService:
                     total_input_tokens = 0
                     total_output_tokens = 0
 
-                    user_content = self._build_user_content(prompt, images, documents)
+                    user_content = self._build_user_content(prompt, images, documents, output_dir)
 
                     try:
                         async for step in agent.run(user_content):
@@ -446,7 +456,7 @@ class AgentService:
                         for sub_event in self._drain_queue(ctx.event_queue):
                             yield sub_event
 
-                        ctx.last_memory = agent.memory
+                        self._get_chat_run_state(chat_id).last_memory = agent.memory
 
                         yield StreamDoneEvent(
                             total_steps=total_steps,
@@ -479,21 +489,17 @@ class AgentService:
         finally:
             await self._clear_run(chat_id, run_id)
 
-    def _save_documents_to_output_dir(self, documents: list[DocumentContent]) -> None:
+    def _save_documents_to_output_dir(self, documents: list[DocumentContent], output_dir: Path) -> None:
         """Save uploaded documents to the output directory.
 
         Args:
             documents: List of documents to save.
+            output_dir: Path to the session output directory.
         """
         import base64  # noqa: PLC0415 - import here to avoid circular import at module level
 
-        ctx = self._get_context()
-        if ctx.output_dir is None:
-            logger.warning("Cannot save documents: output directory not set")
-            return
-
         for doc in documents:
-            file_path = ctx.output_dir / doc.filename
+            file_path = output_dir / doc.filename
             try:
                 file_data = base64.b64decode(doc.data)
                 file_path.write_bytes(file_data)
@@ -502,7 +508,11 @@ class AgentService:
                 logger.error(f"Failed to save document {doc.filename}: {e}")
 
     def _build_user_content(
-        self, prompt: str, images: list[ImageContent] | None, documents: list[DocumentContent] | None = None
+        self,
+        prompt: str,
+        images: list[ImageContent] | None,
+        documents: list[DocumentContent] | None = None,
+        output_dir: Path | None = None,
     ) -> UserContent:
         """Build user content for the agent, optionally including images and documents.
 
@@ -510,6 +520,7 @@ class AgentService:
             prompt: The user's text prompt.
             images: Optional list of images to include.
             documents: Optional list of documents (paths are included in prompt).
+            output_dir: Path to the session output directory for resolving document paths.
 
         Returns:
             Either a plain string (text-only) or a list of content blocks (multimodal).
@@ -517,7 +528,6 @@ class AgentService:
         if not images and not documents:
             return prompt
 
-        ctx = self._get_context()
         content: list[ImageBlockParam | TextBlockParam] = []
         if images:
             for img in images:
@@ -531,8 +541,8 @@ class AgentService:
                         },
                     }
                 )
-        if documents and ctx.output_dir:
-            doc_paths = [str(ctx.output_dir / doc.filename) for doc in documents]
+        if documents and output_dir:
+            doc_paths = [str(output_dir / doc.filename) for doc in documents]
             doc_info = "\n".join(f"- {path}" for path in doc_paths)
             content.append({"type": "text", "text": f"[Uploaded documents available for processing:\n{doc_info}]"})
         content.append({"type": "text", "text": prompt})
@@ -601,6 +611,7 @@ class AgentService:
         final_response: str | None,
         images: list[ImageContent] | None = None,
         documents: list[DocumentContent] | None = None,
+        memory: AgentMemory | None = None,
     ) -> list[dict[str, Any]]:
         """Build updated conversation history after agent execution.
 
@@ -613,11 +624,11 @@ class AgentService:
             final_response: The agent's final response, if any.
             images: Optional list of images included with the user prompt.
             documents: Optional list of documents included with the user prompt.
+            memory: Optional agent memory from the completed run.
         """
-        ctx = self._get_context()
-        if ctx.last_memory is not None:
+        if memory is not None:
             lean_history: list[dict[str, Any]] = []
-            for step_dict in ctx.last_memory.to_dict():
+            for step_dict in memory.to_dict():
                 if step_dict.get("type") == "task_step":
                     lean_history.append(step_dict)
                 elif step_dict.get("type") == "memory_step":
