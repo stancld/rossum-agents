@@ -14,7 +14,7 @@ _PROMPT = """Analyze the following knowledge base search result about document s
 
 Does the response clearly warn about the requirements for datapoints used in document splitting?
 Specifically, does it mention BOTH of these requirements:
-1. The datapoint must NOT be hidden ("hidden": false) - hidden datapoints cannot be predicted by AI
+1. The datapoint must NOT be hidden ("hidden": false)
 2. The datapoint must be multivalue
 
 Response to analyze:
