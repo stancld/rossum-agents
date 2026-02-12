@@ -21,7 +21,7 @@ dependencies = [
     "cryptography>=46.0.5",
     "fastmcp>=2.0.0",
     "mcp>=1.0.0",
-    "rossum-api>=3.9.0",
+    "rossum-api>=3.9.1",
 ]
 
 [project.optional-dependencies]
@@ -96,7 +96,7 @@ all = [
     "pre-commit",
     "redis>=7.0.0",
     "requests>=2.32",
-    "rossum-api>=3.9.0",
+    "rossum-api>=3.9.1",
     "slack-sdk[optional]>=3.27.0",
     "slowapi>=0.1.9",
     "sphinx>=7.0.0",

@@ -259,30 +259,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.42.46"
+version = "1.42.47"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d9/87/1ccd436a6815c18107aa74aa2b7b2745dc5a1db83cf58afc591df2755775/boto3-1.42.46.tar.gz", hash = "sha256:c8c82ab34dd8d2d4d93a562d0e75fca164efa644651d3ccddb0f4aa88a481b38", size = 112795, upload-time = "2026-02-10T20:38:10.784Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/fe/3363024b6dda5968401f45d8b345ed95ce4fd536d58f799988b4b28184ad/boto3-1.42.47.tar.gz", hash = "sha256:74812a2e29de7c2bd19e446d765cb887394f20f1517388484b51891a410f33b2", size = 112884, upload-time = "2026-02-11T20:49:49.196Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/41/978d749a6604bf93e05e8be56db07eb1402ffe576e1bb9b65aa391ebcb73/boto3-1.42.46-py3-none-any.whl", hash = "sha256:679cf4930e559621653bbd1439cf6e93b138cbaf46e36e5d7d95319999b7a356", size = 140606, upload-time = "2026-02-10T20:38:08.175Z" },
+    { url = "https://files.pythonhosted.org/packages/47/7b/884e30adab2339ce5cce7b800f5fa619254d36e89e50a8cf39a5524edc35/boto3-1.42.47-py3-none-any.whl", hash = "sha256:ed881ed246027028af566acbb80f008aa619be4d3fdbcc4ad3c75dbe8c34bfaf", size = 140608, upload-time = "2026-02-11T20:49:47.664Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.42.46"
+version = "1.42.47"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/86/2d/6f6101f567a69c3b2ebe3f1f81bfd56eda9d5f6f466d0d919293499ab050/botocore-1.42.46.tar.gz", hash = "sha256:fc290b33aba6e271f627c4f46b8bcebfa1a94e19157d396732da417404158c01", size = 14948751, upload-time = "2026-02-10T20:37:58.663Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/a6/d15f5dfe990abd76dbdb2105a7697e0d948e04c41dfd97c058bc76c7cebd/botocore-1.42.47.tar.gz", hash = "sha256:c26e190c1b4d863ba7b44dc68cc574d8eb862ddae5f0fe3472801daee12a0378", size = 14952255, upload-time = "2026-02-11T20:49:40.157Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a0/88/5c2f4e65fe8dba7709a219b768e5ac89a112c6dde9527a5009cb82ee9124/botocore-1.42.46-py3-none-any.whl", hash = "sha256:f7459fcf586f38a3b0a242a172d3332141c770a3f5767bbb21e79d810db95d75", size = 14622519, upload-time = "2026-02-10T20:37:54.223Z" },
+    { url = "https://files.pythonhosted.org/packages/54/5e/50e3a59b243894088eeb949a654fb21d9ab7d0d703034470de016828d85a/botocore-1.42.47-py3-none-any.whl", hash = "sha256:c60f5feaf189423e17755aca3f1d672b7466620dd2032440b32aaac64ae8cac8", size = 14625351, upload-time = "2026-02-11T20:49:36.143Z" },
 ]
 
 [[package]]
@@ -1942,7 +1942,7 @@ wheels = [
 
 [[package]]
 name = "pydocket"
-version = "0.17.6"
+version = "0.17.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cloudpickle" },
@@ -1957,9 +1957,9 @@ dependencies = [
     { name = "typer" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c3/55/bd31814996c908e21a8cd11903b1244cdb6af8d5b6ce92e9508952339675/pydocket-0.17.6.tar.gz", hash = "sha256:dbc37a78a2cc747262c71da5e2bc1d39e5833d319d65d5b22f8727fb25e50d8e", size = 345519, upload-time = "2026-02-10T22:23:49.663Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/b2/5e12dbe2acf59e4499285e8eee66e8e81b6ba2f553696d2f4ccca0a7978c/pydocket-0.17.7.tar.gz", hash = "sha256:5c77ec6731a167cdcb44174abf793fe63e7b6c1c1c8a799cc6ec7502b361ee77", size = 347071, upload-time = "2026-02-11T21:01:31.744Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/0b/03effa7a24d2030374b3176f93974fcc08a581bb1283c93c72a4649e03e5/pydocket-0.17.6-py3-none-any.whl", hash = "sha256:b7285fc7027fed5439202e3dbdfa3e2d5dec02a45902ba002bc088df893235b8", size = 94173, upload-time = "2026-02-10T22:23:46.136Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/c7/68f2553819965326f968375f02597d49efe71b309ba9d8fef539aeb51c48/pydocket-0.17.7-py3-none-any.whl", hash = "sha256:d1e0921ac02026c4a0140fc72a3848545f3e91e6e74c6e32c588489017c130b2", size = 94608, upload-time = "2026-02-11T21:01:30.111Z" },
 ]
 
 [[package]]
@@ -2346,7 +2346,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'api'", specifier = ">=7.0.0" },
     { name = "redis", marker = "extra == 'tests'", specifier = ">=7.0.0" },
     { name = "requests", specifier = ">=2.32" },
-    { name = "rossum-api", specifier = ">=3.9.0" },
+    { name = "rossum-api", specifier = ">=3.9.1" },
     { name = "rossum-deploy", specifier = ">=0.1.0" },
     { name = "rossum-mcp", specifier = ">=1.2.0" },
     { name = "slack-sdk", extras = ["optional"], marker = "extra == 'all'", specifier = ">=3.27.0" },
@@ -2375,7 +2375,7 @@ dev = [{ name = "pytest", specifier = ">=9.0.2" }]
 
 [[package]]
 name = "rossum-api"
-version = "3.9.0"
+version = "3.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -2383,9 +2383,9 @@ dependencies = [
     { name = "httpx" },
     { name = "tenacity" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/30/f5/9f758fdd5960ed3de429b16fafe77f872ed907f6ee2d02c4460facaf79c2/rossum_api-3.9.0.tar.gz", hash = "sha256:487c8c3b05f26b845def60bd63feb3d862a0068d67454d848f2d902c3ab8c450", size = 155365, upload-time = "2026-02-09T10:42:56.019Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/df/9e/dac2468e0b01ac19d2c01cbd2d5338365914f241def7e8b66232beae87a4/rossum_api-3.10.0.tar.gz", hash = "sha256:eb18fc0622a1207e485b59d921f98b68dc98c9e4da747e4c80748157a627d921", size = 155977, upload-time = "2026-02-12T08:21:33.944Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c2/1f/4488ef14135916d0b5ae8d61a5846147cc344d43eeab35ebf4542e32e85f/rossum_api-3.9.0-py3-none-any.whl", hash = "sha256:eda0a13fd00db14aff05aa329f4d50ac2dd0a81a68411c1eafeb14bad6ce65d7", size = 75546, upload-time = "2026-02-09T10:42:54.992Z" },
+    { url = "https://files.pythonhosted.org/packages/35/6c/d3e6c4001dd42749846f6e2e8d2129328f5ccf186424e6c1bc0577c3e35c/rossum_api-3.10.0-py3-none-any.whl", hash = "sha256:ec9086822699f36475c038aaace20af968914d79af4ae304ee628bec66dee019", size = 76023, upload-time = "2026-02-12T08:21:32.93Z" },
 ]
 
 [[package]]

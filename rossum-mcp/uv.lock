@@ -1497,7 +1497,7 @@ wheels = [
 
 [[package]]
 name = "rossum-api"
-version = "3.9.0"
+version = "3.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -1505,9 +1505,9 @@ dependencies = [
     { name = "httpx" },
     { name = "tenacity" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/30/f5/9f758fdd5960ed3de429b16fafe77f872ed907f6ee2d02c4460facaf79c2/rossum_api-3.9.0.tar.gz", hash = "sha256:487c8c3b05f26b845def60bd63feb3d862a0068d67454d848f2d902c3ab8c450", size = 155365, upload-time = "2026-02-09T10:42:56.019Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/df/9e/dac2468e0b01ac19d2c01cbd2d5338365914f241def7e8b66232beae87a4/rossum_api-3.10.0.tar.gz", hash = "sha256:eb18fc0622a1207e485b59d921f98b68dc98c9e4da747e4c80748157a627d921", size = 155977, upload-time = "2026-02-12T08:21:33.944Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c2/1f/4488ef14135916d0b5ae8d61a5846147cc344d43eeab35ebf4542e32e85f/rossum_api-3.9.0-py3-none-any.whl", hash = "sha256:eda0a13fd00db14aff05aa329f4d50ac2dd0a81a68411c1eafeb14bad6ce65d7", size = 75546, upload-time = "2026-02-09T10:42:54.992Z" },
+    { url = "https://files.pythonhosted.org/packages/35/6c/d3e6c4001dd42749846f6e2e8d2129328f5ccf186424e6c1bc0577c3e35c/rossum_api-3.10.0-py3-none-any.whl", hash = "sha256:ec9086822699f36475c038aaace20af968914d79af4ae304ee628bec66dee019", size = 76023, upload-time = "2026-02-12T08:21:32.93Z" },
 ]
 
 [[package]]
@@ -1565,8 +1565,8 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'all'", specifier = ">=0.21.0" },
     { name = "pytest-asyncio", marker = "extra == 'tests'", specifier = ">=0.21.0" },
     { name = "pytest-cov", marker = "extra == 'tests'", specifier = ">=4.0.0" },
-    { name = "rossum-api", specifier = ">=3.9.0" },
-    { name = "rossum-api", marker = "extra == 'all'", specifier = ">=3.9.0" },
+    { name = "rossum-api", specifier = ">=3.9.1" },
+    { name = "rossum-api", marker = "extra == 'all'", specifier = ">=3.9.1" },
     { name = "sphinx", marker = "extra == 'all'", specifier = ">=7.0.0" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'all'", specifier = ">=1.25.0" },

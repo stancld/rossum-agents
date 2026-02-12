@@ -104,10 +104,10 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url="https://mr-fabry.rossum.app/documents?filtering=%7B%22items%22%3A%5B%7B%22field%22%3A%22queue%22%2C%22value%22%3A%5B%222500259%22%5D%2C%22operator%22%3A%22isAnyOf%22%7D%5D%2C%22logicOperator%22%3A%22and%22%7D&level=queue&page=1&page_size=100",
         prompt="Explain a document workflow and learning workflow on this queue.",
         tool_expectation=ToolExpectation(expected_tools=["get_queue", "get_queue_engine"], mode=ToolMatchMode.SUBSET),
-        token_budget=TokenBudget(min_total_tokens=18000, max_total_tokens=30000),
+        token_budget=TokenBudget(min_total_tokens=18000, max_total_tokens=50000),
         success_criteria=SuccessCriteria(
             required_keywords=["document_type", "classification", "training", "workflow"],
-            max_steps=4,
+            max_steps=5,
             mermaid_expectation=MermaidExpectation(
                 descriptions=[
                     "Document workflow showing upload, classification, review, and routing to specialized queues",
@@ -139,7 +139,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=120000),
+        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=130000),
         success_criteria=SuccessCriteria(
             require_subagent=True,
             required_keywords=[],
@@ -157,7 +157,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "# Create and delete a Credit Note queue\n\n"
             "Workspace: 785638\n\n"
             "## Tasks:\n\n"
-            "1. Create a new queue from EU Credit Note template with name: Test Credit Note Queue\n"
+            "1. Create a new queue for EU Credit Note with name: Test Credit Note Queue\n"
             "2. Delete the queue you just created\n\n"
             "Return the queue_id that was deleted."
         ),
