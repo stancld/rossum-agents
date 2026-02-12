@@ -79,8 +79,6 @@ from rossum_agent.tools.spawn_mcp import (
 )
 from rossum_agent.tools.subagents import (
     OPUS_MODEL_ID,
-    debug_hook,
-    evaluate_python_hook,
     patch_schema_with_subagent,
     search_elis_docs,
     search_knowledge_base,
@@ -100,8 +98,6 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     write_file,
     search_knowledge_base,
     search_elis_docs,
-    evaluate_python_hook,
-    debug_hook,
     patch_schema_with_subagent,
     suggest_formula_field,
     load_skill,
@@ -205,7 +201,6 @@ __all__ = [
     "close_connection",
     "create_task",
     "create_workspace",
-    "debug_hook",
     "deploy_compare_workspaces",
     "deploy_copy_org",
     "deploy_copy_workspace",
@@ -215,7 +210,6 @@ __all__ = [
     "deploy_to_org",
     "elis_openapi_grep",
     "elis_openapi_jq",
-    "evaluate_python_hook",
     "execute_internal_tool",
     "execute_tool",
     "get_deploy_tool_names",

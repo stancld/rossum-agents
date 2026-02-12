@@ -7,6 +7,20 @@
 1. Call `suggest_formula_field(label, hint, schema_id, section_id, field_schema_id)` to get AI-generated formula
 2. Call `patch_schema_with_subagent(schema_id, changes)` to add the field with the generated formula to the schema
 
+### Updating Existing Formulas
+
+To fix or modify an existing formula field, use `action: "update"`:
+
+```
+patch_schema_with_subagent(schema_id="12345", changes='[{"action": "update", "id": "existing_field_id", "formula": "new_formula_code"}]')
+```
+
+Or use MCP `patch_schema` directly for simple formula updates:
+
+```
+patch_schema(schema_id=12345, operation="update", node_id="field_id", node_data={"formula": "new_code"})
+```
+
 ## When to Use
 
 | Scenario | Use Formula Field |
@@ -16,29 +30,13 @@
 | Aggregation across line items | Yes — `sum()`, `all_values` |
 | Ambiguous interpretation | No — use reasoning field instead |
 
-## TxScript Basics
+## TxScript
 
-| Concept | Syntax |
-|---------|--------|
-| Reference field | `field.invoice_id` |
-| Empty check | `is_empty(field.amount_due)` |
-| Set check | `is_set(field.amount_total_base)` |
-| Default fallback | `default_to(field.discount_rate, 0)` |
-| No return statements | Last expression = output |
-| Line item per-row | `field.item_quantity * field.item_price` |
-| All row values | `field.item_amount_total.all_values` |
-| Regex substitution | `substitute(r'[^a-z0-9]', '', field.sender_vat_id, flags=re.IGNORECASE)` |
-| Pre-imported | `timedelta`, `datetime`, `date`, `re` |
-
-## Messaging Functions
-
-| Function | Effect |
-|----------|--------|
-| `show_info("msg", field.x)` | Informational, field-level |
-| `show_warning("msg", field.x)` | Warning, field-level |
-| `show_error("msg", field.x)` | Error — blocks export |
-| `show_info("msg")` | Document-level info |
-| `automation_blocker("reason", field.x)` | Blocks automation |
+Full language reference: load `txscript` skill. Key formula-field specifics:
+- No imports needed — all helpers are globals
+- No `return` — last expression is the output
+- 2000 character limit
+- Can only write to own value
 
 ## Common Patterns
 
@@ -84,6 +82,7 @@ Formula fields require:
 | Always produce result | Empty formula = empty field |
 | Round floats | `round(x, 2)` for equality checks |
 | Use `suggest_formula_field` first | Get AI-generated formula, then patch |
+| No `update_schema` | Hidden intentionally — use `patch_schema` or `patch_schema_with_subagent` |
 
 ## Cross-Reference
 

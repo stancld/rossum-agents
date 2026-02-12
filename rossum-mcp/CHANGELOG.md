@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+## [1.2.2] - 2026-02-12
+
+### Added
+- Added `test_hook` tool for testing hooks — auto-generates a realistic payload via `/generate_payload` and executes it via `POST /v1/hooks/{hook_id}/test`
+
+## [1.2.1] - 2026-02-12
+
+### Fixed
+- Fixed `list_hook_templates` returning only ~3 templates due to excessive context — after `rossum-api` upgrade, `HookTemplate` became a dataclass with many verbose fields (guide, config, settings, schemas, etc.) that filled the context window. Now uses `dataclasses.replace()` to truncate these fields, returning all templates. [#182](https://github.com/stancld/rossum-agents/pull/182)
 
 ## [1.2.0] - 2026-02-09
 

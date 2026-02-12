@@ -55,7 +55,7 @@ The ``rossum_agent`` package provides a REST API interface:
    # Or run with Docker Compose
    docker-compose up rossum-agent
 
-The agent includes file output, knowledge base search, hook debugging, deployment tools,
+The agent includes file output, knowledge base search, hook testing, deployment tools,
 and multi-environment MCP connections. See the :doc:`examples` section for complete workflows.
 
 Using Rossum Deploy
@@ -2327,93 +2327,28 @@ The sub-agent iterates through pre-scraped KB articles using ``kb_grep`` and ``k
      "searches": [{"tool": "kb_grep", "input": {"pattern": "splitting"}}]
    }
 
-Hook Debugging Tools
-^^^^^^^^^^^^^^^^^^^^
+Hook Testing Tools (MCP)
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-evaluate_python_hook
-""""""""""""""""""""
+Hook testing uses the native Rossum API endpoint via the ``test_hook`` MCP tool.
 
-Execute Rossum function hook Python code against test annotation/schema data for debugging.
+test_hook
+"""""""""
 
-This tool runs the provided code in a restricted sandbox, looks for a function named
-``rossum_hook_request_handler``, and calls it with a payload containing the annotation
-and optional schema data. Use this to verify hook logic without making actual API calls.
-
-**IMPORTANT**: This is for debugging only. No imports or external I/O are allowed.
+Test a hook by generating a payload from the given event/action and sending it directly.
+Returns hook response and logs.
 
 **Parameters:**
 
-- ``code`` (string, required): Full Python source containing a function:
-  ``def rossum_hook_request_handler(payload): ...``
-  The function receives a dict with 'annotation' and optionally 'schema' keys.
-- ``annotation_json`` (string, required): JSON string of the annotation object as seen in hook payload["annotation"].
-  Get this from the ``get_annotation`` MCP tool.
-- ``schema_json`` (string, optional): JSON string of the schema object as seen in payload["schema"].
-  Get this from the ``get_schema`` MCP tool.
+- ``hook_id`` (int, required): The hook ID.
+- ``event`` (HookEvent, required): Hook event (e.g. ``annotation_content``, ``upload``).
+- ``action`` (HookAction, required): Hook action (e.g. ``initialize``, ``export``).
+- ``annotation`` (string, optional): Annotation URL to use real data.
+- ``status`` (string, optional): Annotation status.
+- ``previous_status`` (string, optional): Previous annotation status.
+- ``config`` (dict, optional): Config override for the test run.
 
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "status": "success",
-     "result": {"status": "ok", "document_id": 12345},
-     "stdout": "Debug: Processing annotation\nDocument ID: 12345\n",
-     "stderr": "",
-     "exception": null,
-     "elapsed_ms": 5.123
-   }
-
-**Sandbox Environment:**
-
-- Available modules: ``collections``, ``datetime``, ``decimal``, ``functools``, ``itertools``, ``json``, ``math``, ``re``, ``string``
-- No imports or external I/O allowed
-- Limited builtins (safe subset for data manipulation)
-
-debug_hook
-""""""""""
-
-Debug a Rossum hook using an Opus sub-agent for expert analysis. This is the PRIMARY tool
-for debugging Python function hooks.
-
-Simply pass the hook ID and annotation ID, and the Opus sub-agent will:
-
-1. Fetch hook code and annotation data via MCP tools
-2. Execute and analyze errors with Claude Opus for deep reasoning
-3. Iteratively fix and verify the code works
-4. Return detailed analysis with working code
-
-**Parameters:**
-
-- ``hook_id`` (string, required): The hook ID (from get_hook or hook URL). The sub-agent will fetch the code.
-- ``annotation_id`` (string, required): The annotation ID to use for testing. The sub-agent will fetch the data.
-- ``schema_id`` (string, optional): Optional schema ID if schema context is needed.
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "hook_id": "12345",
-     "annotation_id": "67890",
-     "analysis": "## What the hook does\n\nThis hook validates...\n\n## Issues Found\n\n1. KeyError...\n\n## Fixed Code\n\n```python\n...\n```",
-     "elapsed_ms": 2500.0
-   }
-
-**Features:**
-
-- **Opus-powered analysis**: Uses Claude Opus 4 for deep reasoning about hook behavior
-- **Automatic data fetching**: Fetches hook code and annotation data automatically
-- **Iterative debugging**: Continues fixing until the code works
-- **Fix suggestions**: Provides corrected code snippets you can use directly
-
-**Example usage:**
-
-.. code-block:: python
-
-   # Simply pass the IDs - the sub-agent fetches everything
-   result = debug_hook(hook_id="12345", annotation_id="67890")
-   print(result["analysis"])
+**Returns:** Dict with hook response and execution logs.
 
 Multi-Environment Tools
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -2480,7 +2415,7 @@ The skill will provide detailed instructions, workflows, and context for the tas
 
 **Parameters:**
 
-- ``name`` (string, required): The name of the skill to load (e.g., "rossum-deployment", "hook-debugging")
+- ``name`` (string, required): The name of the skill to load (e.g., "rossum-deployment", "txscript")
 
 **Returns:**
 

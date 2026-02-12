@@ -37,7 +37,7 @@ dependencies = [
     "requests>=2.32",
     "rossum-api>=3.9.1",
     "rossum-deploy>=0.1.0",
-    "rossum-mcp>=1.2.0",
+    "rossum-mcp>=1.2.2",
     "tqdm>=4.66",
 ]
 

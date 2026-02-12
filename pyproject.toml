@@ -65,6 +65,7 @@ mcp = [
 tests = [
     "coverage>=7.0.0",
     "gunicorn>=23.0.0",
+    "pre-commit",
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
@@ -86,6 +87,7 @@ all = [
     "jinja2>=3.0",
     "mcp>=1.0.0",
     "myst-parser>=2.0.0",
+    "pre-commit",
     "python-dotenv",
     "python-multipart>=0.0.22",
     "pytest>=7.0.0",
@@ -108,6 +110,11 @@ all = [
     "ty>=0.0.11",
     "uvicorn[standard]>=0.32.0",
 ]
+
+[tool.uv]
+# diskcache uses pickle.load (CVE-2025-69872, SNYK-PYTHON-DISKCACHE-15268422).
+# It's an unused transitive dep (fastmcp -> py-key-value-aio[disk]).
+exclude-dependencies = ["diskcache"]
 
 [tool.setuptools.packages.find]
 where = ["rossum-mcp", "rossum-deploy", "rossum-agent", "rossum-agent-client"]

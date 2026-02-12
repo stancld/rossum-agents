@@ -69,11 +69,12 @@ _SCHEMA_PATCHING_SYSTEM_PROMPT = """Goal: Update schema to match EXACTLY the req
 ## Workflow
 
 1. get_schema_tree_structure → see current field IDs
-2. get_full_schema → get complete schema con
+2. get_full_schema → get complete schema content
 3. Analyze current vs requested fields
 4. Call apply_schema_changes with:
    - fields_to_keep: list of field IDs to retain
    - fields_to_add: list of new field specifications
+   - fields_to_update: list of updates to existing fields (e.g., formula changes)
 5. Return summary of changes
 
 ## Field Specification Format (for fields_to_add)
@@ -132,7 +133,7 @@ _GET_FULL_SCHEMA_TOOL: dict[str, Any] = {
 
 _APPLY_SCHEMA_CHANGES_TOOL: dict[str, Any] = {
     "name": "apply_schema_changes",
-    "description": "Programmatically filter schema and add new fields, then PUT in one call.",
+    "description": "Programmatically filter, update, and add fields in schema, then PUT in one call.",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -185,6 +186,29 @@ _APPLY_SCHEMA_CHANGES_TOOL: dict[str, Any] = {
                     "required": ["id", "label", "parent_section", "type"],
                 },
                 "description": "New fields to add to schema.",
+            },
+            "fields_to_update": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "description": "Existing field ID to update"},
+                        "formula": {"type": "string", "description": "New formula code"},
+                        "label": {"type": "string"},
+                        "type": {"type": "string"},
+                        "hidden": {"type": "boolean"},
+                        "can_export": {"type": "boolean"},
+                        "ui_configuration": {
+                            "type": "object",
+                            "properties": {
+                                "type": {"type": "string"},
+                                "edit": {"type": "string"},
+                            },
+                        },
+                    },
+                    "required": ["id"],
+                },
+                "description": "Existing fields to update (e.g., change formula, label, type).",
             },
         },
         "required": ["schema_id"],
@@ -298,6 +322,9 @@ def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
     if spec.get("context"):
         node["context"] = spec["context"]
 
+    if spec.get("formula"):
+        node["formula"] = spec["formula"]
+
     return node
 
 
@@ -336,17 +363,60 @@ def _add_fields_to_content(
     return modified, added
 
 
+def _update_fields_in_content(
+    content: list[dict[str, Any]],
+    fields_to_update: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Update existing fields in schema content. Returns (modified_content, updated_ids)."""
+    modified = copy.deepcopy(content)
+    updated: list[str] = []
+
+    updates_by_id = {spec["id"]: spec for spec in fields_to_update}
+
+    def _apply_updates(nodes: list[dict[str, Any]]) -> None:
+        for node in nodes:
+            node_id = node.get("id", "")
+            if node_id in updates_by_id:
+                spec = updates_by_id[node_id]
+                for key, value in spec.items():
+                    if key == "id":
+                        continue
+                    node[key] = value
+                updated.append(node_id)
+
+            children = node.get("children")
+            if isinstance(children, list):
+                _apply_updates(children)
+            elif isinstance(children, dict):
+                child_id = children.get("id", "")
+                if child_id in updates_by_id:
+                    spec = updates_by_id[child_id]
+                    for key, value in spec.items():
+                        if key == "id":
+                            continue
+                        children[key] = value
+                    updated.append(child_id)
+                nested = children.get("children")
+                if isinstance(nested, list):
+                    _apply_updates(nested)
+
+    _apply_updates(modified)
+    return modified, updated
+
+
 def _apply_schema_changes(
     schema_id: int,
     current_content: list[dict[str, Any]],
     fields_to_keep: list[str] | None,
     fields_to_add: list[dict[str, Any]] | None,
+    fields_to_update: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Apply changes to schema content and PUT to API."""
     result: dict[str, Any] = {
         "schema_id": schema_id,
         "fields_removed": [],
         "fields_added": [],
+        "fields_updated": [],
         "fields_kept": [],
     }
 
@@ -363,6 +433,10 @@ def _apply_schema_changes(
     if fields_to_add:
         modified_content, added = _add_fields_to_content(modified_content, fields_to_add)
         result["fields_added"] = added
+
+    if fields_to_update:
+        modified_content, updated = _update_fields_in_content(modified_content, fields_to_update)
+        result["fields_updated"] = updated
 
     mcp_result = call_mcp_tool("update_schema", {"schema_id": schema_id, "schema_data": {"content": modified_content}})
     result["fields_kept"] = sorted(_collect_field_ids(modified_content))
@@ -399,8 +473,9 @@ def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
         current_content = _schema_content_cache[schema_id]
         fields_to_keep = tool_input.get("fields_to_keep")
         fields_to_add = tool_input.get("fields_to_add")
+        fields_to_update = tool_input.get("fields_to_update")
 
-        result = _apply_schema_changes(schema_id, current_content, fields_to_keep, fields_to_add)
+        result = _apply_schema_changes(schema_id, current_content, fields_to_keep, fields_to_add, fields_to_update)
         del _schema_content_cache[schema_id]
         return json.dumps(result, indent=2, default=str)
 
@@ -436,21 +511,28 @@ def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> Su
         SubAgentResult with analysis text and token counts.
     """
     changes_text = "\n".join(
-        f"- {c.get('action', 'add')} field '{c.get('id')}' ({c.get('type', 'string')}) "
-        f"in section '{c.get('parent_section')}'"
+        f"- {c.get('action', 'add')} field '{c.get('id')}' ({c.get('type', 'string')})"
+        + (f" in section '{c.get('parent_section')}'" if c.get("parent_section") else "")
         + (f" with label '{c.get('label')}'" if c.get("label") else "")
         + (f" [TABLE: {c.get('table_id')}]" if c.get("table_field") or c.get("table_id") else "")
+        + (f" formula='{c.get('formula')}'" if c.get("formula") else "")
         for c in changes
     )
 
-    user_content = f"""Update schema {schema_id} to have EXACTLY these fields:
+    actions = {c.get("action", "add") for c in changes}
+    if actions == {"update"}:
+        intro = f"Update the following fields in schema {schema_id} (keep all other fields unchanged):"
+    else:
+        intro = f"Update schema {schema_id} to have EXACTLY these fields:"
+
+    user_content = f"""{intro}
 
 {changes_text}
 
 Workflow:
 1. get_schema_tree_structure to see current field IDs
 2. get_full_schema to load content
-3. apply_schema_changes with fields_to_keep (IDs to retain) and/or fields_to_add
+3. apply_schema_changes with fields_to_keep (IDs to retain), fields_to_add, and/or fields_to_update
 4. Return summary"""
 
     sub_agent = SchemaPatchingSubAgent()
@@ -471,12 +553,13 @@ def patch_schema_with_subagent(schema_id: str, changes: str) -> str:
     Args:
         schema_id: The schema ID to update.
         changes: JSON array of field specifications. Each object should have:
-            - action: "add" or "remove" (default: "add")
+            - action: "add", "update", or "remove" (default: "add")
             - id: Field ID
-            - parent_section: Section ID for the field
+            - parent_section: Section ID for the field (required for "add")
             - type: Field type (string, number, date, enum)
             - label: Field label (optional, defaults to id)
             - table_id: Multivalue ID if this is a table column
+            - formula: TxScript formula code (for formula fields)
 
     Returns:
         JSON with update results including fields added, removed, and summary.

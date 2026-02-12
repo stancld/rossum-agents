@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from rossum_api.domain_logic.resources import Resource
-from rossum_api.models.hook import Hook, HookEventAndAction, HookRunData, HookType
+from rossum_api.models.hook import Hook, HookAction, HookEvent, HookEventAndAction, HookRunData, HookType
 from rossum_api.models.hook_template import HookTemplate
 
 from rossum_mcp.tools.base import (
-    TRUNCATED_MARKER,
     delete_resource,
     graceful_list,
     is_read_write_mode,
@@ -174,11 +174,29 @@ async def _list_hook_logs(
     return result.items
 
 
+def _truncate_hook_template_for_list(template: HookTemplate) -> HookTemplate:
+    """Keep only fields useful for browsing: id, name, url, type, events, description, use_token_owner."""
+    return dataclasses.replace(
+        template,
+        sideload=[],
+        metadata={},
+        config={},
+        test={},
+        settings={},
+        settings_schema=None,
+        secrets_schema=None,
+        guide=None,
+        read_more_url=None,
+        extension_image_url=None,
+        settings_description=[],
+        store_description=None,
+        external_url=None,
+    )
+
+
 async def _list_hook_templates(client: AsyncRossumAPIClient) -> list[HookTemplate]:
     result = await graceful_list(client, Resource.HookTemplate, "hook_template")
-    for template in result.items:
-        template.guide = TRUNCATED_MARKER
-    return result.items
+    return [_truncate_hook_template_for_list(t) for t in result.items]
 
 
 async def _create_hook_from_template(
@@ -208,6 +226,76 @@ async def _create_hook_from_template(
         hook: Hook = await client.retrieve_hook(hook_id)
         return hook
     return {"error": "Hook wasn't likely created. Hook ID not available."}
+
+
+async def _test_hook(
+    client: AsyncRossumAPIClient,
+    hook_id: int,
+    event: HookEvent,
+    action: HookAction,
+    annotation: str | None = None,
+    status: str | None = None,
+    previous_status: str | None = None,
+    config: dict | None = None,
+) -> dict:
+    payload = await _generate_hook_payload(client, hook_id, event, action, annotation, status, previous_status)
+    if "error" in payload:
+        return payload
+    body: dict = {"payload": payload}
+    if config is not None:
+        body["config"] = config
+    return await client._http_client.request_json("POST", f"hooks/{hook_id}/test", json=body)
+
+
+_ANNOTATION_EVENTS = {"annotation_content", "annotation_status"}
+_DEFAULT_STATUS = "to_review"
+_DEFAULT_PREVIOUS_STATUS = "importing"
+
+
+async def _resolve_annotation_for_hook(client: AsyncRossumAPIClient, hook_id: int) -> str | None:
+    """Find an annotation URL from one of the hook's queues."""
+    hook = await client.retrieve_hook(hook_id)
+    for queue_url in hook.queues or []:
+        queue_id = int(str(queue_url).rstrip("/").split("/")[-1])
+        params: dict = {"queue": queue_id, "page_size": 1, "status": "to_review,confirmed,exported,importing"}
+        async for annotation in client.list_annotations(**params):
+            return str(annotation.url)
+    return None
+
+
+async def _generate_hook_payload(
+    client: AsyncRossumAPIClient,
+    hook_id: int,
+    event: HookEvent,
+    action: HookAction,
+    annotation: str | None = None,
+    status: str | None = None,
+    previous_status: str | None = None,
+) -> dict:
+    if event in _ANNOTATION_EVENTS:
+        if annotation is None:
+            annotation = await _resolve_annotation_for_hook(client, hook_id)
+            if annotation is None:
+                return {
+                    "error": (
+                        f"Event '{event}' requires an annotation but no annotations found on the hook's queues. "
+                        "Either upload a document to one of the hook's queues first, "
+                        "or pass an annotation URL from another queue explicitly via the 'annotation' parameter."
+                    )
+                }
+        if status is None:
+            status = _DEFAULT_STATUS
+        if previous_status is None:
+            previous_status = _DEFAULT_PREVIOUS_STATUS
+
+    body: dict = {"event": event, "action": action}
+    if annotation is not None:
+        body["annotation"] = annotation
+    if status is not None:
+        body["status"] = status
+    if previous_status is not None:
+        body["previous_status"] = previous_status
+    return await client._http_client.request_json("POST", f"hooks/{hook_id}/generate_payload", json=body)
 
 
 async def _delete_hook(client: AsyncRossumAPIClient, hook_id: int) -> dict:
@@ -307,6 +395,22 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         token_owner: str | None = None,
     ) -> Hook | dict:
         return await _create_hook_from_template(client, name, hook_template_id, queues, events, token_owner)
+
+    @mcp.tool(
+        description="Test a hook by auto-generating a realistic payload and executing it. For annotation_content/annotation_status events, annotation and status are auto-resolved from the hook's queues if not provided. If no annotations exist on the hook's queues, ask the user to upload a document first — never upload documents yourself."
+    )
+    async def test_hook(
+        hook_id: int,
+        event: HookEvent,
+        action: HookAction,
+        annotation: str | None = None,
+        status: str | None = None,
+        previous_status: str | None = None,
+        config: dict | None = None,
+    ) -> dict:
+        if not is_read_write_mode():
+            return {"error": "test_hook requires read-write mode (hook execution has side effects)."}
+        return await _test_hook(client, hook_id, event, action, annotation, status, previous_status, config)
 
     @mcp.tool(description="Delete a hook.")
     async def delete_hook(hook_id: int) -> dict:

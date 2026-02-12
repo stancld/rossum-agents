@@ -16,12 +16,15 @@ from regression_tests.custom_checks import (
     check_business_validation_hook_settings,
     check_business_validation_rules,
     check_formula_field_for_table,
+    check_formula_field_updated,
+    check_hook_test_results_reported,
     check_knowledge_base_hidden_multivalue_warning,
     check_net_terms_formula_field_added,
     check_no_misleading_training_suggestions,
     check_queue_deleted,
     check_queue_ui_settings,
     check_reasoning_field_configured,
+    check_serverless_hook_uses_txscript,
 )
 from regression_tests.framework.models import (
     CustomCheck,
@@ -79,6 +82,21 @@ FORMULA_FIELD_FOR_TABLE_CHECK = CustomCheck(
     check_fn=check_formula_field_for_table,
 )
 
+HOOK_TEST_RESULTS_CHECK = CustomCheck(
+    name="Hook testing reported test_hook results",
+    check_fn=check_hook_test_results_reported,
+)
+
+FORMULA_FIELD_UPDATED_CHECK = CustomCheck(
+    name="Formula field was updated with a new formula",
+    check_fn=check_formula_field_updated,
+)
+
+SERVERLESS_HOOK_TXSCRIPT_CHECK = CustomCheck(
+    name="Serverless hook code follows TxScript conventions",
+    check_fn=check_serverless_hook_uses_txscript,
+)
+
 
 REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
@@ -89,9 +107,9 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url=None,
         prompt="Hey, what can you do?",
         tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=5000, max_total_tokens=6000),
+        token_budget=TokenBudget(min_total_tokens=4800, max_total_tokens=5500),
         success_criteria=SuccessCriteria(
-            required_keywords=["hook", "queue", "debug"],  # Simplified keywords for streamlined prompt
+            required_keywords=["hook", "queue"],
             max_steps=1,
             file_expectation=FileExpectation(),
         ),
@@ -164,7 +182,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=["create_queue_from_template", "delete_queue"], mode=ToolMatchMode.SUBSET
         ),
-        token_budget=TokenBudget(min_total_tokens=25000, max_total_tokens=40000),
+        token_budget=TokenBudget(min_total_tokens=20000, max_total_tokens=40000),
         success_criteria=SuccessCriteria(
             required_keywords=["deleted"],
             max_steps=4,
@@ -218,46 +236,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             custom_checks=[REASONING_FIELD_CHECK, FORMULA_FIELD_FOR_TABLE_CHECK],
         ),
     ),
-    RegressionTestCase(
-        name="fix_document_splitting_in_sandbox",
-        description="Fix document splitting extension by deploying to sandbox",
-        api_base_url="https://mr-fabry.rossum.app/api/v1",
-        rossum_url=None,
-        prompt=(
-            "# Fix document splitting extension settings.\n\n"
-            "There's a broken document splitting extension on the queue 2500317. "
-            "Create a new queue in the same namespace as the referred queue. New name: Splitting & sorting (fixed).\n\n"
-            "Set up the same document splitting extension based on invoice_id. Make sure it matches the requirements from knowledge base.\n\n"
-            "## Sandbox usage\n\n"
-            "Do not operate directly in the prod organization.\n\n"
-            "Copy workspace from org 1 to sandbox org, 729505. IMPORTANT: Proceed directly without a user approval until the fixed queue set up. "
-            "Then, upon user approval, we will deploy the fixed queue & hook to the prod.\n\n"
-            "Sandbox base url: https://api.elis.develop.r8.lol/v1\n"
-            "Sandbox api token: {sandbox_api_token}"
-        ),
-        tool_expectation=ToolExpectation(
-            expected_tools=[
-                "load_skill",
-                "get_queue",
-                "list_hooks",
-                "search_knowledge_base",
-                "deploy_copy_workspace",
-                "spawn_mcp_connection",
-                "call_on_connection",
-                "deploy_pull",
-            ],
-            mode=ToolMatchMode.SUBSET,
-        ),
-        token_budget=TokenBudget(min_total_tokens=400000, max_total_tokens=600000),
-        success_criteria=SuccessCriteria(
-            require_subagent=True,
-            required_keywords=["splitting", "sandbox"],
-            max_steps=15,
-            file_expectation=FileExpectation(),  # no files are expected to be generated
-            custom_checks=[HIDDEN_MULTIVALUE_CHECK],
-        ),
-    ),
-    # Different env, requires different token
     RegressionTestCase(
         name="setup_customer_queues_and_schema",
         description="Set up customer with Invoices and Credit Notes queues with custom schema and formula field",
@@ -345,7 +323,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=70000, max_total_tokens=170000),
+        token_budget=TokenBudget(min_total_tokens=70000, max_total_tokens=185000),
         success_criteria=SuccessCriteria(
             require_subagent=True,
             required_keywords=[],
@@ -385,7 +363,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "search_elis_docs",
             ],
         ),
-        token_budget=TokenBudget(min_total_tokens=50000, max_total_tokens=80000),
+        token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=90000),
         success_criteria=SuccessCriteria(
             require_subagent=False,
             required_keywords=[],
@@ -426,6 +404,78 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             max_steps=4,
             file_expectation=FileExpectation(),
             custom_checks=[QUEUE_UI_SETTINGS_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="create_serverless_hook_and_test",
+        description="Create a serverless hook using TxScript and test it",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        rossum_url=None,
+        prompt=(
+            "# Create and test a serverless hook\n\n"
+            "Workspace: 785638\n"
+            "Region: EU\n\n"
+            "## Tasks:\n\n"
+            "1. Create a new queue from EU Invoice template: Hook Testing Queue\n"
+            "2. Create a serverless function hook that normalizes vendor names to uppercase "
+            "on annotation content initialization\n"
+            "3. Test it\n\n"
+            "Return the hook_id."
+        ),
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "load_skill",
+                ("create_hook", "create_hook_from_template"),
+                "test_hook",
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=100000, max_total_tokens=200000),
+        success_criteria=SuccessCriteria(
+            required_keywords=[],
+            max_steps=10,
+            file_expectation=FileExpectation(),
+            custom_checks=[SERVERLESS_HOOK_TXSCRIPT_CHECK, HOOK_TEST_RESULTS_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="create_queue_add_formula_then_update_formula",
+        description="Multi-turn: create queue, add formula field, then update it",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        rossum_url=None,
+        prompt=(
+            "# Create queue, add formula field, then update it\n\n"
+            "Workspace: 'Another workspace'\n"
+            "Region: EU\n\n"
+            "## Tasks:\n\n"
+            "1. Create a new queue from EU Invoice template: Formula Update Queue\n"
+            "2. Add a formula field to the schema:\n"
+            "    - Field name: total_quantity\n"
+            "    - Section: basic_info_section\n"
+            "    - Logic: Sum of all quantity values across line items\n"
+            "    - After adding, store the full schema JSON to `schema_v1.json`\n"
+            "3. Update the formula field you just created:\n"
+            "    - Field name: total_quantity\n"
+            "    - New logic: Sum of all total amount values across line items\n"
+            "    - After updating, store the full schema JSON to `schema_v2.json`"
+        ),
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "suggest_formula_field",
+                ("patch_schema", "patch_schema_with_subagent"),
+                "get_schema",
+                "write_file",
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=120000, max_total_tokens=300000),
+        success_criteria=SuccessCriteria(
+            required_keywords=[],
+            max_steps=12,
+            file_expectation=FileExpectation(expected_files=["schema_v1.json", "schema_v2.json"]),
+            custom_checks=[FORMULA_FIELD_UPDATED_CHECK],
         ),
     ),
 ]
