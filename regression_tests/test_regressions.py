@@ -134,7 +134,7 @@ def _evaluate_custom_checks(
         passed, reasoning = check.check_fn(steps, api_base_url, api_token)
         all_passed &= _check(f"Custom: {check.name}", passed, reasoning, failures)
         if passed:
-            print(f"    LLM reasoning: {reasoning}")
+            print(f"    Detail: {reasoning}")
     return all_passed
 
 

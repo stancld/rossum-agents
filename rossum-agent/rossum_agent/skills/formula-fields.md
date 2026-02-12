@@ -7,6 +7,20 @@
 1. Call `suggest_formula_field(label, hint, schema_id, section_id, field_schema_id)` to get AI-generated formula
 2. Call `patch_schema_with_subagent(schema_id, changes)` to add the field with the generated formula to the schema
 
+### Updating Existing Formulas
+
+To fix or modify an existing formula field, use `action: "update"`:
+
+```
+patch_schema_with_subagent(schema_id="12345", changes='[{"action": "update", "id": "existing_field_id", "formula": "new_formula_code"}]')
+```
+
+Or use MCP `patch_schema` directly for simple formula updates:
+
+```
+patch_schema(schema_id=12345, operation="update", node_id="field_id", node_data={"formula": "new_code"})
+```
+
 ## When to Use
 
 | Scenario | Use Formula Field |
@@ -68,6 +82,7 @@ Formula fields require:
 | Always produce result | Empty formula = empty field |
 | Round floats | `round(x, 2)` for equality checks |
 | Use `suggest_formula_field` first | Get AI-generated formula, then patch |
+| No `update_schema` | Hidden intentionally — use `patch_schema` or `patch_schema_with_subagent` |
 
 ## Cross-Reference
 

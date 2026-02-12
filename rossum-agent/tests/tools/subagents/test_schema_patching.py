@@ -20,6 +20,7 @@ from rossum_agent.tools.subagents.schema_patching import (
     _execute_opus_tool,
     _filter_content,
     _schema_content_cache,
+    _update_fields_in_content,
     patch_schema_with_subagent,
 )
 
@@ -61,6 +62,7 @@ class TestConstants:
         assert "schema_id" in props
         assert "fields_to_keep" in props
         assert "fields_to_add" in props
+        assert "fields_to_update" in props
 
 
 class TestCollectFieldIds:
@@ -328,6 +330,13 @@ class TestBuildFieldNode:
 
         assert node["rir_field_names"] == ["invoice_number"]
 
+    def test_formula_field(self):
+        """Test that formula is included in built node."""
+        spec = {"id": "calc_field", "label": "Calculated", "type": "string", "formula": "field.a + field.b"}
+        node = _build_field_node(spec)
+
+        assert node["formula"] == "field.a + field.b"
+
 
 class TestAddFieldsToContent:
     """Test _add_fields_to_content function."""
@@ -397,6 +406,126 @@ class TestAddFieldsToContent:
 
         assert len(modified[0]["children"]) == 2
         assert set(added) == {"field1", "field2"}
+
+
+class TestUpdateFieldsInContent:
+    """Test _update_fields_in_content function."""
+
+    def test_update_formula_on_existing_field(self):
+        """Test updating formula text on an existing field."""
+        content = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [
+                    {
+                        "id": "qr_code_iban",
+                        "category": "datapoint",
+                        "type": "string",
+                        "formula": 'field.qr_code.split("\\n")[3]',
+                    },
+                ],
+            }
+        ]
+        updates = [{"id": "qr_code_iban", "formula": 'lines[3] if len(lines) > 3 else ""'}]
+        modified, updated_ids = _update_fields_in_content(content, updates)
+
+        assert "qr_code_iban" in updated_ids
+        assert modified[0]["children"][0]["formula"] == 'lines[3] if len(lines) > 3 else ""'
+
+    def test_update_multiple_fields(self):
+        """Test updating multiple fields at once."""
+        content = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [
+                    {"id": "field1", "category": "datapoint", "formula": "old1"},
+                    {"id": "field2", "category": "datapoint", "formula": "old2"},
+                ],
+            }
+        ]
+        updates = [
+            {"id": "field1", "formula": "new1"},
+            {"id": "field2", "formula": "new2"},
+        ]
+        modified, updated_ids = _update_fields_in_content(content, updates)
+
+        assert set(updated_ids) == {"field1", "field2"}
+        assert modified[0]["children"][0]["formula"] == "new1"
+        assert modified[0]["children"][1]["formula"] == "new2"
+
+    def test_update_label(self):
+        """Test updating field label."""
+        content = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [{"id": "field1", "category": "datapoint", "label": "Old Label"}],
+            }
+        ]
+        updates = [{"id": "field1", "label": "New Label"}]
+        modified, updated_ids = _update_fields_in_content(content, updates)
+
+        assert "field1" in updated_ids
+        assert modified[0]["children"][0]["label"] == "New Label"
+
+    def test_update_field_in_table(self):
+        """Test updating a field inside a multivalue/tuple structure."""
+        content = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [
+                    {
+                        "id": "table1",
+                        "category": "multivalue",
+                        "children": {
+                            "id": "row1",
+                            "category": "tuple",
+                            "children": [
+                                {"id": "col1", "category": "datapoint", "formula": "old"},
+                            ],
+                        },
+                    },
+                ],
+            }
+        ]
+        updates = [{"id": "col1", "formula": "new"}]
+        modified, updated_ids = _update_fields_in_content(content, updates)
+
+        assert "col1" in updated_ids
+        tuple_children = modified[0]["children"][0]["children"]["children"]
+        assert tuple_children[0]["formula"] == "new"
+
+    def test_update_nonexistent_field_returns_empty(self):
+        """Test that updating a nonexistent field doesn't crash."""
+        content = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [{"id": "field1", "category": "datapoint"}],
+            }
+        ]
+        updates = [{"id": "nonexistent", "formula": "code"}]
+        modified, updated_ids = _update_fields_in_content(content, updates)
+
+        assert updated_ids == []
+        assert modified[0]["children"][0]["id"] == "field1"
+
+    def test_does_not_modify_original(self):
+        """Test that original content is not modified."""
+        content = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [{"id": "field1", "category": "datapoint", "formula": "old"}],
+            }
+        ]
+        updates = [{"id": "field1", "formula": "new"}]
+        _update_fields_in_content(content, updates)
+
+        assert content[0]["children"][0]["formula"] == "old"
 
 
 class TestExecuteOpusTool:
@@ -469,6 +598,35 @@ class TestExecuteOpusTool:
             mock_mcp.assert_called_once()
             parsed = json.loads(result)
             assert "field2" in parsed["fields_added"]
+            assert 123 not in _schema_content_cache
+
+        _schema_content_cache.clear()
+
+    def test_apply_schema_changes_passes_fields_to_update(self):
+        """Test apply_schema_changes forwards fields_to_update to _apply_schema_changes."""
+        _schema_content_cache[123] = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [{"id": "field1", "category": "datapoint", "formula": "old"}],
+            }
+        ]
+
+        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
+            mock_mcp.return_value = {"id": 123}
+            result = _execute_opus_tool(
+                "apply_schema_changes",
+                {
+                    "schema_id": 123,
+                    "fields_to_update": [{"id": "field1", "formula": "new"}],
+                },
+            )
+
+            parsed = json.loads(result)
+            assert "field1" in parsed["fields_updated"]
+            call_args = mock_mcp.call_args[0]
+            updated_content = call_args[1]["schema_data"]["content"]
+            assert updated_content[0]["children"][0]["formula"] == "new"
             assert 123 not in _schema_content_cache
 
         _schema_content_cache.clear()
@@ -663,6 +821,82 @@ class TestCallOpusForPatching:
             assert result.input_tokens == 0
             assert result.output_tokens == 0
 
+    def test_update_only_changes_uses_keep_all_intro(self):
+        """Test that update-only changes produce 'keep all other fields' intro."""
+        mock_response = MagicMock()
+        mock_response.stop_reason = "end_of_turn"
+        mock_response.content = [MagicMock(text="Done", type="text")]
+        mock_response.content[0].text = "Done"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+
+        with (
+            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage"),
+        ):
+            mock_client.return_value.messages.create.return_value = mock_response
+
+            changes = [{"action": "update", "id": "field1", "formula": "new_code"}]
+            _call_opus_for_patching("123", changes)
+
+            call_args = mock_client.return_value.messages.create.call_args
+            user_content = call_args[1]["messages"][0]["content"]
+            user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
+            assert "keep all other fields unchanged" in user_text
+            assert "EXACTLY" not in user_text
+
+    def test_mixed_actions_uses_exactly_intro(self):
+        """Test that mixed add+update changes use 'EXACTLY' intro."""
+        mock_response = MagicMock()
+        mock_response.stop_reason = "end_of_turn"
+        mock_response.content = [MagicMock(text="Done", type="text")]
+        mock_response.content[0].text = "Done"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+
+        with (
+            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage"),
+        ):
+            mock_client.return_value.messages.create.return_value = mock_response
+
+            changes = [
+                {"action": "add", "id": "new_f", "parent_section": "s1", "type": "string"},
+                {"action": "update", "id": "old_f", "formula": "code"},
+            ]
+            _call_opus_for_patching("123", changes)
+
+            call_args = mock_client.return_value.messages.create.call_args
+            user_content = call_args[1]["messages"][0]["content"]
+            user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
+            assert "EXACTLY" in user_text
+
+    def test_formula_included_in_changes_text(self):
+        """Test that formula code appears in the user prompt sent to the sub-agent."""
+        mock_response = MagicMock()
+        mock_response.stop_reason = "end_of_turn"
+        mock_response.content = [MagicMock(text="Done", type="text")]
+        mock_response.content[0].text = "Done"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+
+        with (
+            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage"),
+        ):
+            mock_client.return_value.messages.create.return_value = mock_response
+
+            changes = [{"action": "update", "id": "calc", "formula": "field.a + field.b"}]
+            _call_opus_for_patching("123", changes)
+
+            call_args = mock_client.return_value.messages.create.call_args
+            user_content = call_args[1]["messages"][0]["content"]
+            user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
+            assert "formula='field.a + field.b'" in user_text
+
 
 class TestApplySchemaChanges:
     """Test _apply_schema_changes function."""
@@ -725,3 +959,30 @@ class TestApplySchemaChanges:
             assert "field1" in result["fields_kept"]
             assert "field2" in result["fields_added"]
             assert "field2" in result["fields_kept"]
+
+    def test_updates_existing_fields(self):
+        """Test that existing fields are updated."""
+        content = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [
+                    {"id": "field1", "category": "datapoint", "formula": "old_code"},
+                ],
+            }
+        ]
+
+        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
+            mock_mcp.return_value = {"id": 123}
+            result = _apply_schema_changes(
+                123,
+                content,
+                None,
+                None,
+                [{"id": "field1", "formula": "new_code"}],
+            )
+
+            assert "field1" in result["fields_updated"]
+            call_args = mock_mcp.call_args[0]
+            updated_content = call_args[1]["schema_data"]["content"]
+            assert updated_content[0]["children"][0]["formula"] == "new_code"
