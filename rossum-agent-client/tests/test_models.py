@@ -317,12 +317,14 @@ class TestSubAgentTokenUsageDetail:
             input_tokens=500,
             output_tokens=250,
             total_tokens=750,
-            by_tool={"debug_hook": TokenUsageBySource(input_tokens=500, output_tokens=250, total_tokens=750)},
+            by_tool={
+                "search_knowledge_base": TokenUsageBySource(input_tokens=500, output_tokens=250, total_tokens=750)
+            },
         )
         assert detail.input_tokens == 500
         assert detail.total_tokens == 750
-        assert "debug_hook" in detail.by_tool
-        assert detail.by_tool["debug_hook"].input_tokens == 500
+        assert "search_knowledge_base" in detail.by_tool
+        assert detail.by_tool["search_knowledge_base"].input_tokens == 500
 
     def test_empty_by_tool(self) -> None:
         detail = SubAgentTokenUsageDetail(input_tokens=0, output_tokens=0, total_tokens=0, by_tool={})
@@ -334,7 +336,7 @@ class TestSubAgentTokenUsageDetail:
             output_tokens=500,
             total_tokens=1500,
             by_tool={
-                "debug_hook": TokenUsageBySource(input_tokens=600, output_tokens=300, total_tokens=900),
+                "search_knowledge_base": TokenUsageBySource(input_tokens=600, output_tokens=300, total_tokens=900),
                 "patch_schema": TokenUsageBySource(input_tokens=400, output_tokens=200, total_tokens=600),
             },
         )
@@ -350,7 +352,9 @@ class TestTokenUsageBreakdown:
                 input_tokens=500,
                 output_tokens=250,
                 total_tokens=750,
-                by_tool={"debug_hook": TokenUsageBySource(input_tokens=500, output_tokens=250, total_tokens=750)},
+                by_tool={
+                    "search_knowledge_base": TokenUsageBySource(input_tokens=500, output_tokens=250, total_tokens=750)
+                },
             ),
         )
         assert breakdown.total.total_tokens == 2250
@@ -391,7 +395,9 @@ class TestTokenUsageBreakdown:
                 output_tokens=1000,
                 total_tokens=3000,
                 by_tool={
-                    "debug_hook": TokenUsageBySource(input_tokens=1500, output_tokens=700, total_tokens=2200),
+                    "search_knowledge_base": TokenUsageBySource(
+                        input_tokens=1500, output_tokens=700, total_tokens=2200
+                    ),
                     "patch_schema": TokenUsageBySource(input_tokens=500, output_tokens=300, total_tokens=800),
                 },
             ),
@@ -400,7 +406,7 @@ class TestTokenUsageBreakdown:
         output = "\n".join(lines)
 
         assert "Sub-agents (total)" in output
-        assert "debug_hook" in output
+        assert "search_knowledge_base" in output
         assert "patch_schema" in output
 
     def test_format_summary_lines_includes_total(self) -> None:

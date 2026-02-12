@@ -65,6 +65,7 @@ mcp = [
 tests = [
     "coverage>=7.0.0",
     "gunicorn>=23.0.0",
+    "pre-commit",
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
@@ -86,6 +87,7 @@ all = [
     "jinja2>=3.0",
     "mcp>=1.0.0",
     "myst-parser>=2.0.0",
+    "pre-commit",
     "python-dotenv",
     "python-multipart>=0.0.22",
     "pytest>=7.0.0",

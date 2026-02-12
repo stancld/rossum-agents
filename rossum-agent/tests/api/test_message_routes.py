@@ -269,7 +269,7 @@ class TestProcessAgentEvent:
 
     def test_process_sub_agent_text_event(self):
         """Test processing SubAgentTextEvent."""
-        event = SubAgentTextEvent(tool_name="debug_hook", text="Analyzing...", is_final=False)
+        event = SubAgentTextEvent(tool_name="search_knowledge_base", text="Analyzing...", is_final=False)
 
         result = _process_agent_event(event)
 

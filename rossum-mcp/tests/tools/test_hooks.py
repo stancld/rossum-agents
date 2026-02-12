@@ -10,7 +10,7 @@ import pytest
 from conftest import create_mock_hook
 from rossum_api.models.hook_template import HookTemplate
 from rossum_mcp.tools import base
-from rossum_mcp.tools.hooks import _validate_events, register_hook_tools
+from rossum_mcp.tools.hooks import _generate_hook_payload, _validate_events, register_hook_tools
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -728,3 +728,198 @@ class TestValidateEvents:
     def test_mixed_valid_invalid_raises(self) -> None:
         with pytest.raises(ValueError, match=r"Invalid event.*bad_event"):
             _validate_events(["annotation_content.initialize", "bad_event"])
+
+
+@pytest.mark.unit
+class TestTestHook:
+    """Tests for test_hook tool."""
+
+    @pytest.mark.asyncio
+    async def test_test_hook_success(self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
+        """Test successful hook test execution with auto-resolved annotation."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        register_hook_tools(mock_mcp, mock_client)
+
+        mock_hook = create_mock_hook(id=123, queues=["https://api.test.rossum.ai/v1/queues/100"])
+        mock_client.retrieve_hook.return_value = mock_hook
+
+        mock_annotation = Mock()
+        mock_annotation.url = "https://api.test.rossum.ai/v1/annotations/789"
+
+        async def mock_list_all(**kwargs):
+            yield mock_annotation
+
+        mock_client.list_annotations = mock_list_all
+
+        generated_payload = {"payload": {"annotation": {}}}
+        test_response = {"response": {"status_code": 200}}
+        mock_client._http_client.request_json.side_effect = [generated_payload, test_response]
+
+        test_hook = mock_mcp._tools["test_hook"]
+        result = await test_hook(hook_id=123, event="annotation_content", action="initialize")
+
+        assert result == {"response": {"status_code": 200}}
+        assert mock_client._http_client.request_json.call_count == 2
+        mock_client._http_client.request_json.assert_any_call(
+            "POST",
+            "hooks/123/generate_payload",
+            json={
+                "event": "annotation_content",
+                "action": "initialize",
+                "annotation": "https://api.test.rossum.ai/v1/annotations/789",
+                "status": "to_review",
+                "previous_status": "importing",
+            },
+        )
+        mock_client._http_client.request_json.assert_any_call(
+            "POST",
+            "hooks/123/test",
+            json={"payload": generated_payload},
+        )
+
+    @pytest.mark.asyncio
+    async def test_test_hook_with_config(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test hook test with optional config override."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        register_hook_tools(mock_mcp, mock_client)
+
+        generated_payload = {"payload": {"annotation": {"id": 456}}}
+        test_response = {"response": {"status_code": 200}}
+        mock_client._http_client.request_json.side_effect = [generated_payload, test_response]
+
+        test_hook = mock_mcp._tools["test_hook"]
+        result = await test_hook(
+            hook_id=123,
+            event="annotation_content",
+            action="initialize",
+            annotation="https://api.test.rossum.ai/v1/annotations/456",
+            status="confirmed",
+            previous_status="to_review",
+            config={"timeout_s": 30},
+        )
+
+        assert result == {"response": {"status_code": 200}}
+        mock_client._http_client.request_json.assert_any_call(
+            "POST",
+            "hooks/123/test",
+            json={
+                "payload": generated_payload,
+                "config": {"timeout_s": 30},
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_test_hook_read_only_mode(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test test_hook is blocked in read-only mode."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
+        importlib.reload(base)
+        register_hook_tools(mock_mcp, mock_client)
+
+        test_hook = mock_mcp._tools["test_hook"]
+        result = await test_hook(hook_id=123, event="annotation_content", action="initialize")
+
+        assert result["error"] == "test_hook requires read-write mode (hook execution has side effects)."
+        mock_client._http_client.request_json.assert_not_called()
+
+
+@pytest.mark.unit
+class TestGenerateHookPayload:
+    """Tests for _generate_hook_payload internal function."""
+
+    @pytest.mark.asyncio
+    async def test_generate_payload_auto_resolves_annotation(self, mock_client: AsyncMock) -> None:
+        """Test that annotation_content events auto-resolve annotation and status from hook's queues."""
+        mock_hook = create_mock_hook(id=123, queues=["https://api.test.rossum.ai/v1/queues/100"])
+        mock_client.retrieve_hook.return_value = mock_hook
+
+        mock_annotation = Mock()
+        mock_annotation.url = "https://api.test.rossum.ai/v1/annotations/789"
+
+        async def mock_list_all(**kwargs):
+            yield mock_annotation
+
+        mock_client.list_annotations = mock_list_all
+        mock_client._http_client.request_json.return_value = {"payload": {"annotation": {}}}
+
+        result = await _generate_hook_payload(
+            mock_client, hook_id=123, event="annotation_content", action="initialize"
+        )
+
+        assert "payload" in result
+        mock_client._http_client.request_json.assert_called_once_with(
+            "POST",
+            "hooks/123/generate_payload",
+            json={
+                "event": "annotation_content",
+                "action": "initialize",
+                "annotation": "https://api.test.rossum.ai/v1/annotations/789",
+                "status": "to_review",
+                "previous_status": "importing",
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_generate_payload_with_explicit_annotation(self, mock_client: AsyncMock) -> None:
+        """Test payload generation with explicitly provided annotation URL."""
+        mock_client._http_client.request_json.return_value = {"payload": {"annotation": {"id": 456}}}
+
+        result = await _generate_hook_payload(
+            mock_client,
+            hook_id=123,
+            event="annotation_content",
+            action="initialize",
+            annotation="https://api.test.rossum.ai/v1/annotations/456",
+            status="confirmed",
+            previous_status="to_review",
+        )
+
+        assert "payload" in result
+        mock_client._http_client.request_json.assert_called_once_with(
+            "POST",
+            "hooks/123/generate_payload",
+            json={
+                "event": "annotation_content",
+                "action": "initialize",
+                "annotation": "https://api.test.rossum.ai/v1/annotations/456",
+                "status": "confirmed",
+                "previous_status": "to_review",
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_generate_payload_no_annotations_found(self, mock_client: AsyncMock) -> None:
+        """Test error when no annotations found on hook's queues."""
+        mock_hook = create_mock_hook(id=123, queues=["https://api.test.rossum.ai/v1/queues/100"])
+        mock_client.retrieve_hook.return_value = mock_hook
+
+        async def mock_list_empty(**kwargs):
+            return
+            yield
+
+        mock_client.list_annotations = mock_list_empty
+
+        result = await _generate_hook_payload(
+            mock_client, hook_id=123, event="annotation_content", action="initialize"
+        )
+
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_generate_payload_non_annotation_event(self, mock_client: AsyncMock) -> None:
+        """Test that non-annotation events skip auto-resolution."""
+        mock_client._http_client.request_json.return_value = {"payload": {}}
+
+        result = await _generate_hook_payload(mock_client, hook_id=123, event="invocation", action="scheduled")
+
+        assert "payload" in result
+        mock_client._http_client.request_json.assert_called_once_with(
+            "POST",
+            "hooks/123/generate_payload",
+            json={"event": "invocation", "action": "scheduled"},
+        )

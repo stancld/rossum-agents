@@ -168,7 +168,7 @@ class StepEvent(BaseModel):
 
 
 class SubAgentProgressEvent(BaseModel):
-    """Event emitted during sub-agent (e.g., debug_hook Opus) execution via SSE."""
+    """Event emitted during sub-agent execution via SSE."""
 
     type: Literal["sub_agent_progress"] = "sub_agent_progress"
     tool_name: str

@@ -427,12 +427,12 @@ class TestTokenUsageCacheFields:
             main_output=300,
             sub_input=400,
             sub_output=200,
-            sub_by_tool={"debug_hook": (400, 200)},
+            sub_by_tool={"search_knowledge_base": (400, 200)},
             main_cache_creation=50,
             main_cache_read=400,
             sub_cache_creation=30,
             sub_cache_read=300,
-            sub_cache_by_tool={"debug_hook": (30, 300)},
+            sub_cache_by_tool={"search_knowledge_base": (30, 300)},
         )
 
         assert breakdown.total.cache_creation_input_tokens == 80
@@ -441,8 +441,8 @@ class TestTokenUsageCacheFields:
         assert breakdown.main_agent.cache_read_input_tokens == 400
         assert breakdown.sub_agents.cache_creation_input_tokens == 30
         assert breakdown.sub_agents.cache_read_input_tokens == 300
-        assert breakdown.sub_agents.by_tool["debug_hook"].cache_creation_input_tokens == 30
-        assert breakdown.sub_agents.by_tool["debug_hook"].cache_read_input_tokens == 300
+        assert breakdown.sub_agents.by_tool["search_knowledge_base"].cache_creation_input_tokens == 30
+        assert breakdown.sub_agents.by_tool["search_knowledge_base"].cache_read_input_tokens == 300
 
     def test_format_summary_lines_includes_cache_rows(self):
         """Test format_summary_lines shows cache metrics when present."""

@@ -21,7 +21,7 @@
 
 ## Architecture
 
-- **rossum-mcp**: FastMCP server in `rossum_mcp/server.py`; tools registered from `rossum_mcp/tools/` modules, 66 tools
+- **rossum-mcp**: FastMCP server in `rossum_mcp/server.py`; tools registered from `rossum_mcp/tools/` modules, 67 tools
 - **rossum-agent**: AI agent with prompts in `rossum_agent/prompts/`, skills in `rossum_agent/skills/`
 - **rossum-agent-tui**: Development test-bed TUI for rossum-agent. Not production code — no tests required.
 - **New skills**: Add to `rossum_agent/prompts/base_prompt.py` ROSSUM_EXPERT_INTRO section
@@ -161,7 +161,7 @@ The agent signals tool usage through two paired `StepEvent` types sharing the sa
 
 **Rendering** (`ToolCall.tsx`): Tool calls are expandable. Collapsed shows tool name, args summary, status icon (✓/✗), and result preview. Expanded shows full arguments and full result.
 
-**During streaming**: While a tool is executing, the TUI shows a `StreamingIndicator` with a spinner and tool name/progress. Sub-agent progress (for compound tools like `debug_hook`) is shown inline.
+**During streaming**: While a tool is executing, the TUI shows a `StreamingIndicator` with a spinner and tool name/progress. Sub-agent progress (for compound tools like `create_schema_with_subagent`) is shown inline.
 
 ### Field Serialization
 

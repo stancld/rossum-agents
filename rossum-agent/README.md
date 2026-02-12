@@ -26,8 +26,8 @@
 
 | Capability | Description |
 |------------|-------------|
-| **Rossum MCP Integration** | Full access to 63 MCP tools for document processing |
-| **Hook Debugging** | Sandboxed execution with Opus sub-agent analysis |
+| **Rossum MCP Integration** | Full access to 67 MCP tools for document processing |
+| **Hook Debugging** | Test hooks via native Rossum API endpoints |
 | **Deployment Tools** | Pull, push, diff, copy configs across environments |
 | **Knowledge Base Search** | AI-powered Rossum documentation search |
 | **Multi-Environment** | Spawn connections to different Rossum environments |
@@ -115,7 +115,7 @@ asyncio.run(main())
 
 ## Available Tools
 
-The agent provides internal tools and access to 66 MCP tools via dynamic loading.
+The agent provides internal tools and access to 67 MCP tools via dynamic loading.
 
 <details>
 <summary><strong>Internal Tools</strong></summary>
@@ -133,10 +133,6 @@ The agent provides internal tools and access to 66 MCP tools via dynamic loading
 
 **Formula:**
 - `suggest_formula_field` - Suggest formula field expressions via Rossum Local Copilot
-
-**Hook Analysis:**
-- `evaluate_python_hook` - Execute hooks in sandboxed environment
-- `debug_hook` - Expert debugging with Opus sub-agent
 
 **Schema:**
 - `create_schema_with_subagent` - Create new schemas via Opus sub-agent
@@ -157,7 +153,7 @@ The agent provides internal tools and access to 66 MCP tools via dynamic loading
 - `close_connection` - Close spawned connection
 
 **Skills:**
-- `load_skill` - Load domain-specific workflows (`rossum-deployment`, `hook-debugging`, `schema-patching`, `schema-pruning`, `organization-setup`, `schema-creation`, `ui-settings`, `rules-and-actions`, `formula-fields`, `reasoning-fields`)
+- `load_skill` - Load domain-specific workflows (`rossum-deployment`, `schema-patching`, `schema-pruning`, `organization-setup`, `schema-creation`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`)
 
 **Task Tracking:**
 - `create_task` - Create a task to track progress on multi-step operations
@@ -205,7 +201,7 @@ flowchart TB
     end
 
     subgraph MCP["Rossum MCP Server"]
-        Tools[63 MCP Tools]
+        Tools[67 MCP Tools]
     end
 
     API[Rossum API]

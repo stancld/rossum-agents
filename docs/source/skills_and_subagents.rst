@@ -40,8 +40,6 @@ Available Skills
      - Purpose
    * - ``rossum-deployment``
      - Deploy configuration changes safely via sandbox with before/after diff
-   * - ``hook-debugging``
-     - Identify and fix hook issues using knowledge base and Opus sub-agent
    * - ``schema-patching``
      - Add, update, or remove individual schema fields
    * - ``schema-pruning``
@@ -58,6 +56,17 @@ Available Skills
      - Create/configure formula fields with TxScript reference, messaging functions, and common patterns
    * - ``reasoning-fields``
      - Create AI-powered reasoning fields with prompt/context configuration and instruction-writing guidance
+   * - ``hooks``
+     - Hook templates, token_owner, testing, debugging
+   * - ``txscript``
+     - TxScript language reference for formula fields, serverless functions, and rule trigger conditions
+
+Hooks Skill
+""""""""""""
+
+**Goal**: Create, configure, and test hooks — prefer Rossum Store templates over custom code.
+
+Workflow: ``list_hook_templates()`` → ``create_hook_from_template()`` or ``create_hook()`` → ``test_hook()`` → ``list_hook_logs()``.
 
 Rossum Deployment Skill
 """""""""""""""""""""""
@@ -74,16 +83,6 @@ Key workflow:
 6. Deploy to production (``deploy_to_org``)
 
 **Critical rule**: Direct MCP calls modify production. Use ``call_on_connection("sandbox", ...)`` for sandbox modifications.
-
-Hook Debugging Skill
-""""""""""""""""""""
-
-**Goal**: Identify and fix hook issues.
-
-Tools:
-
-- ``search_knowledge_base`` - **Use first** to find Rossum docs, extension configs, known issues
-- ``debug_hook(hook_id, annotation_id)`` - Spawns Opus sub-agent for code analysis, returns verified fix
 
 Schema Patching Skill
 """""""""""""""""""""
@@ -134,7 +133,6 @@ UI Settings Skill
 **Goal**: Update queue UI settings (``settings.annotation_list_table.columns``) without corrupting structure.
 
 Workflow: Fetch current settings → Modify only ``columns`` array → Patch via ``update_queue``.
-
 
 Dynamic Tool Loading
 --------------------
@@ -276,40 +274,6 @@ The agent also exposes the underlying search tools directly for quick lookups wi
 
       elis_openapi_grep(pattern="pagination")
       elis_openapi_grep(pattern="annotation_status")
-
-Hook Debug Sub-Agent
-^^^^^^^^^^^^^^^^^^^^
-
-Invoked via the ``debug_hook`` tool. Provides iterative hook debugging with sandboxed code execution.
-
-**Capabilities:**
-
-- Fetches hook code and annotation data via MCP tools
-- Executes code in sandboxed environment with restricted builtins
-- Iteratively analyzes errors and fixes issues
-- Searches Rossum Knowledge Base for documentation
-- Returns verified, working code
-
-**Available in sandbox:**
-
-- Modules: ``collections``, ``datetime``, ``decimal``, ``functools``, ``itertools``, ``json``, ``math``, ``re``, ``string``
-- Safe builtins: ``abs``, ``all``, ``any``, ``bool``, ``dict``, ``enumerate``, ``filter``, ``float``, ``int``, ``len``, ``list``, ``map``, ``max``, ``min``, ``range``, ``set``, ``sorted``, ``str``, ``sum``, ``tuple``, ``zip``, and common exceptions
-
-**Usage:**
-
-.. code-block:: python
-
-   debug_hook(hook_id="12345", annotation_id="67890")
-
-Returns JSON with:
-
-- Hook ID and annotation ID
-- Detailed analysis including:
-  - What the hook does
-  - All issues found
-  - Root causes
-  - Fixed, verified code
-  - Successful execution result
 
 Knowledge Base Sub-Agent
 ^^^^^^^^^^^^^^^^^^^^^^^^

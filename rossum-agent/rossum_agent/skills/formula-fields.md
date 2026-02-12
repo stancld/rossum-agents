@@ -16,29 +16,13 @@
 | Aggregation across line items | Yes — `sum()`, `all_values` |
 | Ambiguous interpretation | No — use reasoning field instead |
 
-## TxScript Basics
+## TxScript
 
-| Concept | Syntax |
-|---------|--------|
-| Reference field | `field.invoice_id` |
-| Empty check | `is_empty(field.amount_due)` |
-| Set check | `is_set(field.amount_total_base)` |
-| Default fallback | `default_to(field.discount_rate, 0)` |
-| No return statements | Last expression = output |
-| Line item per-row | `field.item_quantity * field.item_price` |
-| All row values | `field.item_amount_total.all_values` |
-| Regex substitution | `substitute(r'[^a-z0-9]', '', field.sender_vat_id, flags=re.IGNORECASE)` |
-| Pre-imported | `timedelta`, `datetime`, `date`, `re` |
-
-## Messaging Functions
-
-| Function | Effect |
-|----------|--------|
-| `show_info("msg", field.x)` | Informational, field-level |
-| `show_warning("msg", field.x)` | Warning, field-level |
-| `show_error("msg", field.x)` | Error — blocks export |
-| `show_info("msg")` | Document-level info |
-| `automation_blocker("reason", field.x)` | Blocks automation |
+Full language reference: load `txscript` skill. Key formula-field specifics:
+- No imports needed — all helpers are globals
+- No `return` — last expression is the output
+- 2000 character limit
+- Can only write to own value
 
 ## Common Patterns
 
