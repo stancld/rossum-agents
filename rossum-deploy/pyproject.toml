@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0.0",
-    "rossum-api>=3.9.0",
+    "rossum-api>=3.9.1",
 ]
 
 [project.optional-dependencies]
