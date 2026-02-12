@@ -663,8 +663,15 @@ class TestListHookTemplates:
         assert result[0].id == 1
         assert result[0].name == "Validation Template"
         assert result[0].description == "Validates data"
-        assert result[0].settings_schema == {"type": "object"}
-        assert result[0].guide == "<omitted>"  # guide is truncated to save context
+        # Verbose fields are cleared to save context
+        assert result[0].guide is None
+        assert result[0].store_description is None
+        assert result[0].config == {}
+        assert result[0].test == {}
+        assert result[0].settings == {}
+        assert result[0].settings_schema is None
+        assert result[0].secrets_schema is None
+        assert result[0].settings_description == []
         assert result[1].id == 2
         assert result[1].name == "Webhook Template"
         assert result[1].description is None

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
@@ -8,7 +9,6 @@ from rossum_api.models.hook import Hook, HookEventAndAction, HookRunData, HookTy
 from rossum_api.models.hook_template import HookTemplate
 
 from rossum_mcp.tools.base import (
-    TRUNCATED_MARKER,
     delete_resource,
     graceful_list,
     is_read_write_mode,
@@ -174,11 +174,29 @@ async def _list_hook_logs(
     return result.items
 
 
+def _truncate_hook_template_for_list(template: HookTemplate) -> HookTemplate:
+    """Keep only fields useful for browsing: id, name, url, type, events, description, use_token_owner."""
+    return dataclasses.replace(
+        template,
+        sideload=[],
+        metadata={},
+        config={},
+        test={},
+        settings={},
+        settings_schema=None,
+        secrets_schema=None,
+        guide=None,
+        read_more_url=None,
+        extension_image_url=None,
+        settings_description=[],
+        store_description=None,
+        external_url=None,
+    )
+
+
 async def _list_hook_templates(client: AsyncRossumAPIClient) -> list[HookTemplate]:
     result = await graceful_list(client, Resource.HookTemplate, "hook_template")
-    for template in result.items:
-        template.guide = TRUNCATED_MARKER
-    return result.items
+    return [_truncate_hook_template_for_list(t) for t in result.items]
 
 
 async def _create_hook_from_template(
