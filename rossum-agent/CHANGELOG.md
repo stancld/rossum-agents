@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.1.3] - 2026-02-12
+## [1.1.4] - 2026-02-12
 
 ### Added
 - Added `txscript` skill — standalone TxScript language reference for formula fields, serverless functions, and rule trigger conditions [#176](https://github.com/stancld/rossum-agents/pull/176)
@@ -28,7 +28,6 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Upgraded `rossum-api` dependency to fix hook-template deserialization
-
 
 
 ## [1.1.2] - 2026-02-11
