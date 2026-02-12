@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+
+## [1.1.4] - 2026-02-12
+
 ### Added
 - Added `txscript` skill — standalone TxScript language reference for formula fields, serverless functions, and rule trigger conditions [#176](https://github.com/stancld/rossum-agents/pull/176)
 - Added `fields_to_update` support to schema patching sub-agent for updating existing field properties (formula, label, type, ui_configuration) without removing and re-adding fields [#181](https://github.com/stancld/rossum-agents/pull/181)
