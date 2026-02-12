@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [1.2.2] - 2026-02-12
 
 ### Added
 - Added `test_hook` tool for testing hooks — auto-generates a realistic payload via `/generate_payload` and executes it via `POST /v1/hooks/{hook_id}/test`
