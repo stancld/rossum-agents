@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Fixed
+- Upgraded `rossum-api` dependency to fix hook-template deserialization
 
 ## [1.1.2] - 2026-02-11
 
