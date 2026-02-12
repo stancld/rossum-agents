@@ -109,6 +109,11 @@ all = [
     "uvicorn[standard]>=0.32.0",
 ]
 
+[tool.uv]
+# diskcache uses pickle.load (CVE-2025-69872, SNYK-PYTHON-DISKCACHE-15268422).
+# It's an unused transitive dep (fastmcp -> py-key-value-aio[disk]).
+exclude-dependencies = ["diskcache"]
+
 [tool.setuptools.packages.find]
 where = ["rossum-mcp", "rossum-deploy", "rossum-agent", "rossum-agent-client"]
 include = ["rossum_mcp*", "rossum_deploy*", "rossum_agent*", "rossum_agent_client*"]
