@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pytest
 from pytest_httpx import HTTPXMock
 
+from rossum_agent_client import RossumAgentClient
 from rossum_agent_client.cli import (
     _handle_final_answer,
     _handle_step_event,
@@ -372,8 +373,9 @@ class TestRunChat:
         )
 
         with RossumAgentClient(agent_api_url, rossum_api_base_url, token) as client:
-            run_chat(client, "Test prompt", "read-only", show_thinking=False)
+            chat_id = run_chat(client, "Test prompt", "read-only", show_thinking=False)
 
+        assert chat_id == "chat-test"
         captured = capsys.readouterr()
         assert "Chat: chat-test" in captured.err
         assert "Done" in captured.out
@@ -465,6 +467,57 @@ class TestRunChat:
         # File should be saved with just the filename, not the traversal path
         assert (tmp_path / "passwd").exists()
         assert not (tmp_path / ".." / ".." / ".." / "etc" / "passwd").exists()
+
+    def test_run_chat_with_custom_output_files(
+        self,
+        httpx_mock: HTTPXMock,
+        agent_api_url: str,
+        rossum_api_base_url: str,
+        token: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        test_chat_id = "chat-to-test-custom-output-files"
+        remote_filename = "report.csv"
+        custom_filename = "my_custom_report.csv"
+
+        monkeypatch.chdir(tmp_path)
+
+        httpx_mock.add_response(
+            url=f"{agent_api_url}/api/v1/chats",
+            status_code=201,
+            json={"chat_id": test_chat_id, "created_at": "2024-01-15T10:00:00Z"},
+        )
+
+        sse_response = (
+            "event: file_created\n"
+            f'data: {{"type": "file_created", "filename": "{remote_filename}", "url": "/files/{remote_filename}"}}\n\n'
+            'event: done\ndata: {"total_steps": 1, "input_tokens": 10, "output_tokens": 5}\n\n'
+        )
+
+        httpx_mock.add_response(
+            url=f"{agent_api_url}/api/v1/chats/{test_chat_id}/messages",
+            method="POST",
+            content=sse_response.encode(),
+        )
+
+        httpx_mock.add_response(
+            url=f"{agent_api_url}/api/v1/chats/{test_chat_id}/files/report.csv",
+            content=b"name,value\ntest,123",
+        )
+
+        with RossumAgentClient(agent_api_url, rossum_api_base_url, token) as client:
+            chat_id = run_chat(client, "Create file", "read-only", output_files={remote_filename: custom_filename})
+
+        assert chat_id == test_chat_id
+        # File should be saved with custom name
+        assert (tmp_path / custom_filename).exists()
+        assert not (tmp_path / remote_filename).exists()
+        assert (tmp_path / custom_filename).read_text() == "name,value\ntest,123"
+
+        captured = capsys.readouterr()
+        assert f"Saved: {custom_filename} (content of generated {remote_filename})" in captured.err
 
 
 class TestMain:

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added `TaskSnapshotEvent` model for consuming task tracker SSE events [#157](https://github.com/stancld/rossum-agents/pull/157)
+- Added `output_files` parameter to `run_chat()` for remapping generated filenames on download [#180](https://github.com/stancld/rossum-agents/pull/180)
+
+### Changed
+- `run_chat()` now returns the chat ID (`str`) instead of `None` [#180](https://github.com/stancld/rossum-agents/pull/180)
 
 ## [1.1.0] - 2026-01-28
 
