@@ -67,7 +67,7 @@ from rossum_agent.tools.dynamic_tools import (
 from rossum_agent.tools.elis_backend_openapi_search import elis_openapi_grep, elis_openapi_jq, refresh_openapi_spec
 from rossum_agent.tools.file_tools import write_file
 from rossum_agent.tools.formula import suggest_formula_field
-from rossum_agent.tools.knowledge_base_search import kb_get_article, kb_grep, refresh_knowledge_base
+from rossum_agent.tools.knowledge_base_search import kb_get_article, kb_grep
 from rossum_agent.tools.skills import load_skill
 from rossum_agent.tools.spawn_mcp import (
     SpawnedConnection,
@@ -238,7 +238,6 @@ __all__ = [
     "load_tool_category",
     "patch_schema_with_subagent",
     "preload_categories_for_request",
-    "refresh_knowledge_base",
     "refresh_openapi_spec",
     "report_progress",
     "report_text",

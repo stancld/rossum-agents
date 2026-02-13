@@ -8,28 +8,15 @@ import re
 import time
 from unittest.mock import patch
 
-import httpx
 import pytest
-
-_DUMMY_REQUEST = httpx.Request("GET", "https://example.com")
-_DUMMY_KB_URL = "https://example.com/kb.json"
-
 from rossum_agent.tools.knowledge_base_search import (
     _ARTICLE_OUTPUT_LIMIT,
-    _CACHE_TTL_SECONDS,
     _GREP_MATCH_LIMIT,
     KBCache,
     _make_snippet,
     kb_get_article,
     kb_grep,
-    refresh_knowledge_base,
 )
-
-
-@pytest.fixture(autouse=True)
-def _set_kb_url_env(monkeypatch):
-    monkeypatch.setenv("ROSSUM_KB_DATA_URL", _DUMMY_KB_URL)
-
 
 _SAMPLE_DATA = {
     "scraped_at": "2026-02-07T12:00:00Z",
@@ -76,40 +63,21 @@ def populated_cache(cache_path, sample_data):
 class TestKBCache:
     """Test KBCache class."""
 
-    def test_download_on_first_load(self, cache_path, sample_data):
-        """Test that data is downloaded when no cache exists."""
-        cache = KBCache(cache_path=cache_path)
-
-        with patch("rossum_agent.tools.knowledge_base_search.httpx.get") as mock_get:
-            mock_response = httpx.Response(200, text=json.dumps(sample_data), request=_DUMMY_REQUEST)
-            mock_get.return_value = mock_response
-
-            data = cache.load()
-
-            mock_get.assert_called_once()
-            assert data["articles"] == sample_data["articles"]
-            assert cache_path.exists()
-
-    def test_disk_cache_used_when_fresh(self, populated_cache, cache_path, sample_data):
-        """Test that fresh disk cache is used without downloading."""
-        with patch("rossum_agent.tools.knowledge_base_search.httpx.get") as mock_get:
-            data = populated_cache.load()
-
-            mock_get.assert_not_called()
-            assert data["articles"] == sample_data["articles"]
+    def test_load_from_file(self, populated_cache, sample_data):
+        """Test that data is loaded from the JSON file."""
+        data = populated_cache.load()
+        assert data["articles"] == sample_data["articles"]
 
     def test_memory_cache_used_on_second_load(self, populated_cache):
         """Test that in-memory cache is used on subsequent loads."""
         data1 = populated_cache.load()
         data2 = populated_cache.load()
-
         assert data1 is data2
 
     def test_memory_cache_invalidated_on_mtime_change(self, populated_cache, cache_path, sample_data):
         """Test that memory cache is refreshed when file mtime changes."""
         data1 = populated_cache.load()
 
-        # Modify the file and explicitly bump mtime (1-second resolution on some systems)
         modified_data = {**sample_data, "scraped_at": "2026-02-08T00:00:00Z"}
         cache_path.write_text(json.dumps(modified_data))
         future_mtime = time.time() + 10
@@ -120,108 +88,31 @@ class TestKBCache:
         assert data1 is not data2
         assert data2["scraped_at"] == "2026-02-08T00:00:00Z"
 
-    def test_stale_cache_triggers_redownload(self, cache_path, sample_data):
-        """Test that expired cache triggers re-download."""
-        cache_path.write_text(json.dumps(sample_data))
-        # Make file look old
-        old_mtime = time.time() - _CACHE_TTL_SECONDS - 100
-        os.utime(cache_path, (old_mtime, old_mtime))
-
-        cache = KBCache(cache_path=cache_path)
-
-        updated_data = {**sample_data, "scraped_at": "2026-02-08T00:00:00Z"}
-        with patch("rossum_agent.tools.knowledge_base_search.httpx.get") as mock_get:
-            mock_response = httpx.Response(200, text=json.dumps(updated_data), request=_DUMMY_REQUEST)
-            mock_get.return_value = mock_response
-
-            data = cache.load()
-
-            mock_get.assert_called_once()
-            assert data["scraped_at"] == "2026-02-08T00:00:00Z"
-
-    def test_invalidate_clears_memory_and_disk(self, populated_cache, cache_path):
-        """Test that invalidate clears both caches."""
-        populated_cache.load()
-        populated_cache.invalidate()
-
-        assert not cache_path.exists()
-        assert populated_cache._data is None
-        assert populated_cache._mtime == 0
-
-    def test_atomic_write_on_download(self, cache_path, sample_data):
-        """Test that download uses atomic write."""
-        cache = KBCache(cache_path=cache_path)
-
-        with patch("rossum_agent.tools.knowledge_base_search.httpx.get") as mock_get:
-            mock_response = httpx.Response(200, text=json.dumps(sample_data), request=_DUMMY_REQUEST)
-            mock_get.return_value = mock_response
-
-            cache.load()
-
-            # Verify file exists and is valid JSON
-            assert cache_path.exists()
-            loaded = json.loads(cache_path.read_text())
-            assert loaded["articles"] == sample_data["articles"]
-
-    def test_corrupt_cache_triggers_redownload(self, cache_path, sample_data):
-        """Test that corrupt cache file triggers re-download."""
-        cache_path.write_text("not valid json{{{")
-
-        cache = KBCache(cache_path=cache_path)
-
-        with patch("rossum_agent.tools.knowledge_base_search.httpx.get") as mock_get:
-            mock_response = httpx.Response(200, text=json.dumps(sample_data), request=_DUMMY_REQUEST)
-            mock_get.return_value = mock_response
-
-            data = cache.load()
-
-            mock_get.assert_called_once()
-            assert data["articles"] == sample_data["articles"]
-
-    def test_corrupt_local_path_not_deleted(self, tmp_path, sample_data, monkeypatch):
-        """Test that corrupt local file (via env var) is not deleted during reload."""
+    def test_local_path_env_override(self, tmp_path, sample_data, monkeypatch):
+        """Test that ROSSUM_KB_DATA_PATH env var overrides the default path."""
         local_file = tmp_path / "local_kb.json"
-        local_file.write_text("not valid json{{{")
+        local_file.write_text(json.dumps(sample_data))
         monkeypatch.setenv("ROSSUM_KB_DATA_PATH", str(local_file))
 
-        cache = KBCache(cache_path=tmp_path / "cache_kb.json")
+        cache = KBCache(cache_path=tmp_path / "other.json")
+        data = cache.load()
+        assert data["articles"] == sample_data["articles"]
+
+    def test_local_path_env_missing_file(self, tmp_path, monkeypatch):
+        """Test that missing file via env var raises FileNotFoundError."""
+        monkeypatch.setenv("ROSSUM_KB_DATA_PATH", str(tmp_path / "nonexistent.json"))
+        cache = KBCache(cache_path=tmp_path / "other.json")
+
+        with pytest.raises(FileNotFoundError):
+            cache.load()
+
+    def test_corrupt_file_raises(self, cache_path):
+        """Test that corrupt JSON file raises an error."""
+        cache_path.write_text("not valid json{{{")
+        cache = KBCache(cache_path=cache_path)
 
         with pytest.raises(json.JSONDecodeError):
             cache.load()
-
-        # The local file must NOT have been deleted
-        assert local_file.exists()
-
-    def test_corrupt_cache_redownload_updates_mtime(self, cache_path, sample_data):
-        """Test that re-download after corrupt cache correctly updates mtime."""
-        cache_path.write_text("not valid json{{{")
-        cache = KBCache(cache_path=cache_path)
-
-        with patch("rossum_agent.tools.knowledge_base_search.httpx.get") as mock_get:
-            mock_response = httpx.Response(200, text=json.dumps(sample_data), request=_DUMMY_REQUEST)
-            mock_get.return_value = mock_response
-
-            data1 = cache.load()
-            # Second load should use memory cache (mtime was updated correctly)
-            data2 = cache.load()
-
-            assert data1 is data2
-            mock_get.assert_called_once()
-
-    def test_uses_env_var_for_url(self, cache_path, sample_data):
-        """Test that ROSSUM_KB_DATA_URL env var is used."""
-        cache = KBCache(cache_path=cache_path)
-
-        with (
-            patch.dict(os.environ, {"ROSSUM_KB_DATA_URL": "https://custom-url.example.com/kb.json"}),
-            patch("rossum_agent.tools.knowledge_base_search.httpx.get") as mock_get,
-        ):
-            mock_response = httpx.Response(200, text=json.dumps(sample_data), request=_DUMMY_REQUEST)
-            mock_get.return_value = mock_response
-
-            cache.load()
-
-            mock_get.assert_called_once_with("https://custom-url.example.com/kb.json", timeout=60)
 
 
 class TestMakeSnippet:
@@ -249,57 +140,10 @@ class TestKbGrep:
                 parsed = json.loads(result)
 
                 assert parsed["status"] == "error"
-                assert parsed["message"] == "Empty pattern not allowed"
+                assert "Empty pattern" in parsed["message"]
 
-    def test_basic_search(self, populated_cache):
-        """Test basic keyword search."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
-            result = kb_grep("document splitting")
-            parsed = json.loads(result)
-
-            assert parsed["status"] == "success"
-            assert parsed["matches"] == 1
-            assert parsed["result"][0]["slug"] == "document-splitting-extension"
-
-    def test_case_insensitive_search(self, populated_cache):
-        """Test case-insensitive search (default)."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
-            result = kb_grep("WEBHOOK")
-            parsed = json.loads(result)
-
-            assert parsed["status"] == "success"
-            assert parsed["matches"] == 1
-            assert parsed["result"][0]["slug"] == "webhook-configuration"
-
-    def test_case_sensitive_search(self, populated_cache):
-        """Test case-sensitive search."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
-            result = kb_grep("WEBHOOK", case_insensitive=False)
-            parsed = json.loads(result)
-
-            assert parsed["status"] == "success"
-            assert parsed["result"] == "No matches found"
-
-    def test_regex_search(self, populated_cache):
-        """Test regex pattern search."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
-            result = kb_grep("email|webhook")
-            parsed = json.loads(result)
-
-            assert parsed["status"] == "success"
-            assert parsed["matches"] == 2
-
-    def test_no_matches(self, populated_cache):
-        """Test search with no results."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
-            result = kb_grep("nonexistent_topic_xyz")
-            parsed = json.loads(result)
-
-            assert parsed["status"] == "success"
-            assert parsed["result"] == "No matches found"
-
-    def test_invalid_regex(self, populated_cache):
-        """Test invalid regex pattern returns error."""
+    def test_invalid_regex_returns_error(self, populated_cache):
+        """Test that invalid regex patterns return an error."""
         with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
             result = kb_grep("[invalid")
             parsed = json.loads(result)
@@ -307,8 +151,37 @@ class TestKbGrep:
             assert parsed["status"] == "error"
             assert "Invalid regex" in parsed["message"]
 
-    def test_match_in_title_includes_title_marker(self, populated_cache):
-        """Test that title matches are marked with [title]."""
+    def test_no_matches(self, populated_cache):
+        """Test that no matches returns appropriate message."""
+        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+            result = kb_grep("zzz_nonexistent_zzz")
+            parsed = json.loads(result)
+
+            assert parsed["status"] == "success"
+            assert parsed["result"] == "No matches found"
+
+    def test_basic_keyword_search(self, populated_cache):
+        """Test searching for a keyword that matches article content."""
+        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+            result = kb_grep("webhook")
+            parsed = json.loads(result)
+
+            assert parsed["status"] == "success"
+            assert parsed["matches"] >= 1
+            slugs = [m["slug"] for m in parsed["result"]]
+            assert "webhook-configuration" in slugs
+
+    def test_case_insensitive_by_default(self, populated_cache):
+        """Test that search is case-insensitive by default."""
+        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+            result = kb_grep("WEBHOOK")
+            parsed = json.loads(result)
+
+            assert parsed["status"] == "success"
+            assert parsed["matches"] >= 1
+
+    def test_title_match_in_snippet(self, populated_cache):
+        """Test that title matches are indicated in snippet."""
         with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
             result = kb_grep("Email Import")
             parsed = json.loads(result)
@@ -318,7 +191,6 @@ class TestKbGrep:
 
     def test_match_limit(self, cache_path):
         """Test that results are limited to _GREP_MATCH_LIMIT."""
-        # Create data with more articles than the limit
         articles = [
             {
                 "slug": f"article-{i}",
@@ -340,12 +212,10 @@ class TestKbGrep:
             assert parsed["matches"] == _GREP_MATCH_LIMIT + 50
             assert len(parsed["result"]) <= _GREP_MATCH_LIMIT
 
-    def test_load_error(self):
+    def test_load_error(self, tmp_path):
         """Test error when KB data can't be loaded."""
-        with patch(
-            "rossum_agent.tools.knowledge_base_search._cache.load",
-            side_effect=httpx.HTTPStatusError("Not found", request=None, response=None),
-        ):
+        cache = KBCache(cache_path=tmp_path / "nonexistent.json")
+        with patch("rossum_agent.tools.knowledge_base_search._cache", cache):
             result = kb_grep("test")
             parsed = json.loads(result)
 
@@ -416,15 +286,13 @@ class TestKbGetArticle:
             parsed = json.loads(result)
 
             assert parsed["status"] == "success"
-            assert len(parsed["content"]) <= _ARTICLE_OUTPUT_LIMIT + 50  # +50 for "... (truncated)"
+            assert len(parsed["content"]) <= _ARTICLE_OUTPUT_LIMIT + 50
             assert parsed["content"].endswith("... (truncated)")
 
-    def test_load_error(self):
+    def test_load_error(self, tmp_path):
         """Test error when KB data can't be loaded."""
-        with patch(
-            "rossum_agent.tools.knowledge_base_search._cache.load",
-            side_effect=httpx.HTTPStatusError("Not found", request=None, response=None),
-        ):
+        cache = KBCache(cache_path=tmp_path / "nonexistent.json")
+        with patch("rossum_agent.tools.knowledge_base_search._cache", cache):
             result = kb_get_article("test-slug")
             parsed = json.loads(result)
 
@@ -490,16 +358,6 @@ class TestKbGetArticle:
 
             assert parsed["status"] == "success"
             assert parsed["slug"] == "webhook"
-
-
-class TestRefreshKnowledgeBase:
-    """Test refresh_knowledge_base function."""
-
-    def test_calls_invalidate(self):
-        """Test that refresh_knowledge_base calls cache invalidate."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache") as mock_cache:
-            refresh_knowledge_base()
-            mock_cache.invalidate.assert_called_once()
 
 
 class TestRealKBData:

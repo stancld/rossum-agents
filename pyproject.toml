@@ -136,7 +136,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 
 [tool.setuptools.package-data]
-rossum_agent = ["assets/*.png"]
+rossum_agent = ["assets/*.png", "data/*.json"]
 
 
 

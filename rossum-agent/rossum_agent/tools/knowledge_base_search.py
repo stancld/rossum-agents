@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import os
 import re
-import tempfile
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import httpx
 from anthropic import beta_tool
 
 if TYPE_CHECKING:
@@ -21,9 +17,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _KB_DATA_PATH_ENV = "ROSSUM_KB_DATA_PATH"
-_KB_DATA_URL_ENV = "ROSSUM_KB_DATA_URL"
-_CACHE_PATH = Path(tempfile.gettempdir()) / "rossum_knowledge_base.json"
-_CACHE_TTL_SECONDS = 24 * 60 * 60  # 24 hours
+_BUNDLED_KB_PATH = Path(__file__).resolve().parent.parent / "data" / "rossum-kb.json"
 
 # Output limits
 _GREP_MATCH_LIMIT = 200
@@ -33,87 +27,39 @@ _SNIPPET_CONTEXT = 150  # chars before/after match to include in snippet
 
 
 class KBCache:
-    """In-memory + disk cache for pre-scraped Knowledge Base articles."""
+    """In-memory cache for pre-scraped Knowledge Base articles."""
 
-    def __init__(self, cache_path: Path = _CACHE_PATH) -> None:
+    def __init__(self, cache_path: Path = _BUNDLED_KB_PATH) -> None:
         self._cache_path = cache_path
         self._data: dict[str, Any] | None = None
         self._mtime: float = 0
 
-    def invalidate(self) -> None:
-        """Clear in-memory and disk cache."""
-        self._data = None
-        self._mtime = 0
-        with contextlib.suppress(OSError):
-            self._cache_path.unlink(missing_ok=True)
-            logger.info(f"Deleted cached KB data at {self._cache_path}")
-
     def load(self) -> dict[str, Any]:
         """Load KB data with in-memory caching keyed on file mtime."""
-        path = self._ensure_downloaded()
+        path = self._resolve_path()
         current_mtime = path.stat().st_mtime
 
         if self._data is not None and current_mtime == self._mtime:
             return self._data
 
-        try:
-            data = json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError) as e:
-            logger.warning(f"Cached KB data invalid, re-downloading: {e}")
-            if path == self._cache_path:
-                path.unlink(missing_ok=True)
-            path = self._ensure_downloaded()
-            current_mtime = path.stat().st_mtime
-            data = json.loads(path.read_text())
-
+        data = json.loads(path.read_text())
         self._data = data
         self._mtime = current_mtime
         return data
 
-    def _ensure_downloaded(self) -> Path:
-        """Download KB data if not cached or cache is stale (>24h)."""
+    def _resolve_path(self) -> Path:
+        """Return the KB data file path (env override or bundled)."""
         local_path = os.environ.get(_KB_DATA_PATH_ENV)
         if local_path:
             p = Path(local_path)
             if p.exists():
                 return p
             raise FileNotFoundError(f"{_KB_DATA_PATH_ENV} points to non-existent file: {local_path}")
-
-        if self._cache_path.exists():
-            cache_age = time.time() - self._cache_path.stat().st_mtime
-            if cache_age <= _CACHE_TTL_SECONDS:
-                return self._cache_path
-            logger.info(f"Cache expired ({cache_age / 3600:.1f}h old), re-downloading")
-
-        url = os.environ[_KB_DATA_URL_ENV]
-        logger.info(f"Downloading KB data from {url}")
-        resp = httpx.get(url, timeout=60)
-        resp.raise_for_status()
-
-        data = json.loads(resp.text)
-
-        # Atomic write
-        raw = json.dumps(data, indent=2)
-        fd, tmp_path = tempfile.mkstemp(dir=self._cache_path.parent, prefix=".kb_", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                f.write(raw)
-            os.replace(tmp_path, self._cache_path)
-        except BaseException:
-            Path(tmp_path).unlink(missing_ok=True)
-            raise
-
-        logger.info(f"KB data cached at {self._cache_path} ({len(raw)} bytes)")
         return self._cache_path
 
 
 # Module-level singleton
 _cache = KBCache()
-
-
-def refresh_knowledge_base() -> None:
-    """Delete cached KB data to force fresh download on next use."""
-    _cache.invalidate()
 
 
 def _make_snippet(text: str, match: re.Match[str]) -> str:
@@ -149,7 +95,7 @@ def kb_grep(pattern: str, case_insensitive: bool = True) -> str:
 
     try:
         data = _cache.load()
-    except (KeyError, httpx.HTTPStatusError, ValueError, OSError) as e:
+    except (ValueError, OSError) as e:
         logger.exception("Error loading KB data")
         return json.dumps({"status": "error", "message": f"Error loading KB data: {e}"})
 
@@ -214,7 +160,7 @@ def kb_get_article(slug: str) -> str:
     logger.debug(f"kb_get_article called with slug: {slug!r}")
     try:
         data = _cache.load()
-    except (KeyError, httpx.HTTPStatusError, ValueError, OSError) as e:
+    except (ValueError, OSError) as e:
         logger.exception("Error loading KB data")
         return json.dumps({"status": "error", "message": f"Error loading KB data: {e}"})
 

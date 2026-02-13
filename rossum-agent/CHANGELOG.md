@@ -8,6 +8,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Added tool call and result persistence in conversation history for full replay in multi-turn conversations [#184](https://github.com/stancld/rossum-agents/pull/184)
+- Moved `rossum-kb.json` into the `rossum_agent` package so it is included in installed distributions
+
+### Changed
+- Simplified Knowledge Base cache — use bundled `data/rossum-kb.json` instead of downloading from a remote URL with disk caching [#187](https://github.com/stancld/rossum-agents/pull/187)
+
+### Removed
+- Removed `refresh_knowledge_base` function and `ROSSUM_KB_DATA_URL` env var (no longer needed with bundled data) [#187](https://github.com/stancld/rossum-agents/pull/187)
+- Removed `httpx` dependency from `knowledge_base_search` module [#187](https://github.com/stancld/rossum-agents/pull/187)
 
 
 ## [1.1.4] - 2026-02-12

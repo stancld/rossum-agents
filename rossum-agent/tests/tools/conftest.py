@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from rossum_agent.tools.knowledge_base_search import KBCache
 
-_KB_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "rossum-kb.json"
+_KB_DATA_PATH = Path(__file__).resolve().parents[2] / "rossum_agent" / "data" / "rossum-kb.json"
 
 
 @pytest.fixture

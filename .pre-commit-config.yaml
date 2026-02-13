@@ -28,6 +28,7 @@ repos:
           (?x)^(
             .*\.html|
             rossum-agent/data/rossum-kb\.json|
+            rossum-agent/rossum_agent/data/rossum-kb\.json|
           )$
 
   - repo: local
