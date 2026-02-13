@@ -19,7 +19,9 @@ from rossum_agent.tools.subagents.schema_patching import (
     _collect_field_ids,
     _execute_opus_tool,
     _filter_content,
+    _find_or_create_section,
     _schema_content_cache,
+    _section_label_from_id,
     _update_fields_in_content,
     patch_schema_with_subagent,
 )
@@ -275,6 +277,54 @@ class TestFilterContent:
         assert "line_items" not in removed
 
 
+class TestSectionLabelFromId:
+    """Test _section_label_from_id function."""
+
+    def test_basic_info_section(self):
+        assert _section_label_from_id("basic_info_section") == "Basic Info"
+
+    def test_amounts_section(self):
+        assert _section_label_from_id("amounts_section") == "Amounts"
+
+    def test_no_section_suffix(self):
+        assert _section_label_from_id("line_items") == "Line Items"
+
+    def test_single_word(self):
+        assert _section_label_from_id("header") == "Header"
+
+
+class TestFindOrCreateSection:
+    """Test _find_or_create_section function."""
+
+    def test_finds_existing_section(self):
+        content = [{"id": "header", "category": "section", "children": [], "label": "Header"}]
+        section = _find_or_create_section(content, "header")
+        assert section is content[0]
+        assert len(content) == 1
+
+    def test_creates_missing_section(self):
+        content = []
+        section = _find_or_create_section(content, "basic_info_section")
+        assert len(content) == 1
+        assert section["id"] == "basic_info_section"
+        assert section["category"] == "section"
+        assert section["label"] == "Basic Info"
+        assert section["children"] == []
+        assert "icon" not in section
+
+    def test_does_not_duplicate_existing(self):
+        content = [{"id": "foo_section", "category": "section", "children": [], "label": "Foo"}]
+        _find_or_create_section(content, "foo_section")
+        _find_or_create_section(content, "foo_section")
+        assert len(content) == 1
+
+    def test_returns_none_for_empty_section_id(self):
+        content = []
+        assert _find_or_create_section(content, "") is None
+        assert _find_or_create_section(content, None) is None
+        assert len(content) == 0
+
+
 class TestBuildFieldNode:
     """Test _build_field_node function."""
 
@@ -352,15 +402,74 @@ class TestAddFieldsToContent:
         assert modified[0]["children"][0]["id"] == "new_field"
         assert "new_field" in added
 
-    def test_add_field_to_nonexistent_section(self):
-        """Test adding field to nonexistent section."""
+    def test_add_field_to_nonexistent_section_creates_it(self):
+        """Test adding field to nonexistent section auto-creates the section."""
         content = [{"id": "header", "category": "section", "children": []}]
-        fields_to_add = [{"id": "new_field", "label": "New Field", "parent_section": "footer", "type": "string"}]
+        fields_to_add = [
+            {"id": "new_field", "label": "New Field", "parent_section": "footer_section", "type": "string"}
+        ]
 
         modified, added = _add_fields_to_content(content, fields_to_add)
 
-        assert len(modified[0]["children"]) == 0
-        assert added == []
+        assert len(modified) == 2
+        assert modified[1]["id"] == "footer_section"
+        assert modified[1]["category"] == "section"
+        assert modified[1]["children"][0]["id"] == "new_field"
+        assert "new_field" in added
+
+    def test_add_field_to_empty_schema(self):
+        """Test adding field to completely empty schema creates section and field."""
+        content = []
+        fields_to_add = [
+            {
+                "id": "we_love_rossum",
+                "label": "We Love Rossum",
+                "parent_section": "basic_info_section",
+                "type": "string",
+                "ui_configuration": {"type": "formula"},
+                "formula": '"We love Rossum"',
+            }
+        ]
+
+        modified, added = _add_fields_to_content(content, fields_to_add)
+
+        assert len(modified) == 1
+        section = modified[0]
+        assert section["id"] == "basic_info_section"
+        assert section["category"] == "section"
+        assert section["label"] == "Basic Info"
+        assert len(section["children"]) == 1
+        assert section["children"][0]["id"] == "we_love_rossum"
+        assert section["children"][0]["formula"] == '"We love Rossum"'
+        assert "we_love_rossum" in added
+
+    def test_add_multiple_fields_to_empty_schema_same_section(self):
+        """Test adding multiple fields to the same auto-created section."""
+        content = []
+        fields_to_add = [
+            {"id": "field1", "label": "Field 1", "parent_section": "header_section", "type": "string"},
+            {"id": "field2", "label": "Field 2", "parent_section": "header_section", "type": "number"},
+        ]
+
+        modified, added = _add_fields_to_content(content, fields_to_add)
+
+        assert len(modified) == 1
+        assert len(modified[0]["children"]) == 2
+        assert set(added) == {"field1", "field2"}
+
+    def test_add_field_with_no_parent_section_is_skipped(self):
+        """Test that fields with empty/None parent_section are skipped."""
+        content = [{"id": "header", "category": "section", "children": []}]
+        fields_to_add = [
+            {"id": "orphan", "label": "Orphan", "parent_section": "", "type": "string"},
+            {"id": "valid", "label": "Valid", "parent_section": "header", "type": "string"},
+        ]
+
+        modified, added = _add_fields_to_content(content, fields_to_add)
+
+        assert len(modified) == 1
+        assert added == ["valid"]
+        assert len(modified[0]["children"]) == 1
 
     def test_add_field_to_table(self):
         """Test adding column to a table."""

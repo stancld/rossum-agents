@@ -38,6 +38,9 @@ from regression_tests.custom_checks.queue_ui_settings import (
 from regression_tests.custom_checks.reasoning_field import (
     check_reasoning_field_configured,
 )
+from regression_tests.custom_checks.replace_schema_with_formula import (
+    check_schema_replaced_with_formula,
+)
 from regression_tests.custom_checks.serverless_hook_txscript import (
     check_serverless_hook_uses_txscript,
 )
@@ -54,5 +57,6 @@ __all__ = [
     "check_queue_deleted",
     "check_queue_ui_settings",
     "check_reasoning_field_configured",
+    "check_schema_replaced_with_formula",
     "check_serverless_hook_uses_txscript",
 ]

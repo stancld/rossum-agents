@@ -103,7 +103,9 @@ def _evaluate_criteria(
         )
 
     used_subagent = any(s.sub_agent_progress is not None for s in run.steps)
-    if criteria.require_subagent:
+    if criteria.require_subagent is None:
+        print(f"  - Sub-agent usage: optional (used={used_subagent})")
+    elif criteria.require_subagent:
         all_passed &= _check("Sub-agent used", used_subagent, "No sub-agent detected", failures)
     else:
         all_passed &= _check("Sub-agent not used", not used_subagent, "Sub-agent detected", failures)

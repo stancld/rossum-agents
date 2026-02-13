@@ -328,6 +328,35 @@ def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
     return node
 
 
+def _section_label_from_id(section_id: str) -> str:
+    """Derive a human-readable label from a section ID (e.g. 'basic_info_section' → 'Basic Info')."""
+    label = section_id.removesuffix("_section").replace("_", " ").strip()
+    return label.title() if label else section_id
+
+
+def _find_or_create_section(
+    content: list[dict[str, Any]],
+    section_id: str | None,
+) -> dict[str, Any] | None:
+    """Find existing section by ID, or create it and append to content.
+
+    Returns None if section_id is empty/None.
+    """
+    if not section_id:
+        return None
+    for node in content:
+        if node.get("category") == "section" and node.get("id") == section_id:
+            return node
+    section: dict[str, Any] = {
+        "category": "section",
+        "id": section_id,
+        "label": _section_label_from_id(section_id),
+        "children": [],
+    }
+    content.append(section)
+    return section
+
+
 def _add_fields_to_content(
     content: list[dict[str, Any]],
     fields_to_add: list[dict[str, Any]],
@@ -341,24 +370,24 @@ def _add_fields_to_content(
         table_id = spec.get("table_id")
         field_node = _build_field_node(spec)
 
-        for section in modified:
-            if section.get("category") != "section" or section.get("id") != parent_section:
-                continue
+        section = _find_or_create_section(modified, parent_section)
+        if section is None:
+            logger.warning("Skipping field %r: no parent_section specified", spec.get("id"))
+            continue
 
-            if table_id:
-                for child in section.get("children", []):
-                    if child.get("category") == "multivalue" and child.get("id") == table_id:
-                        tuple_node = child.get("children", {})
-                        if isinstance(tuple_node, dict) and "children" in tuple_node:
-                            tuple_node["children"].append(field_node)
-                            added.append(spec["id"])
-                            break
-            else:
-                if "children" not in section:
-                    section["children"] = []
-                section["children"].append(field_node)
-                added.append(spec["id"])
-            break
+        if table_id:
+            for child in section.get("children", []):
+                if child.get("category") == "multivalue" and child.get("id") == table_id:
+                    tuple_node = child.get("children", {})
+                    if isinstance(tuple_node, dict) and "children" in tuple_node:
+                        tuple_node["children"].append(field_node)
+                        added.append(spec["id"])
+                        break
+        else:
+            if "children" not in section:
+                section["children"] = []
+            section["children"].append(field_node)
+            added.append(spec["id"])
 
     return modified, added
 
@@ -461,7 +490,7 @@ def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
         if mcp_result and schema_id:
             content = _extract_schema_content(mcp_result)
             if not content:
-                logger.warning("get_full_schema: empty content extracted; result type=%s", type(mcp_result).__name__)
+                logger.info("get_full_schema: schema %s has empty content", schema_id)
             _schema_content_cache[schema_id] = content
         plain_result = _to_plain(mcp_result) if mcp_result else None
         return json.dumps(plain_result, indent=2, default=str) if plain_result else "No data returned"
