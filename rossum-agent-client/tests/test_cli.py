@@ -373,8 +373,9 @@ class TestRunChat:
         )
 
         with RossumAgentClient(agent_api_url, rossum_api_base_url, token) as client:
-            run_chat(client, "Test prompt", "read-only", show_thinking=False)
+            chat_id = run_chat(client, "Test prompt", "read-only", show_thinking=False)
 
+        assert chat_id == "chat-test"
         captured = capsys.readouterr()
         assert "Chat: chat-test" in captured.err
         assert "Done" in captured.out
@@ -507,8 +508,9 @@ class TestRunChat:
         )
 
         with RossumAgentClient(agent_api_url, rossum_api_base_url, token) as client:
-            run_chat(client, "Create file", "read-only", output_files={remote_filename: custom_filename})
+            chat_id = run_chat(client, "Create file", "read-only", output_files={remote_filename: custom_filename})
 
+        assert chat_id == test_chat_id
         # File should be saved with custom name
         assert (tmp_path / custom_filename).exists()
         assert not (tmp_path / remote_filename).exists()
