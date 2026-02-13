@@ -260,6 +260,7 @@ class AgentService:
         """
         state = self._get_chat_run_state(chat_id)
         async with state.lock:
+            state.last_memory = None
             if state.active_task is not None and not state.active_task.done():
                 logger.info(f"Cancelling existing run for chat {chat_id} (run_id={state.run_id})")
                 state.active_task.cancel()
@@ -276,7 +277,6 @@ class AgentService:
         async with state.lock:
             if state.run_id == run_id:
                 state.active_task = None
-                state.last_memory = None
 
     def cancel_run(self, chat_id: str) -> bool:
         """Cancel the active run for a chat.
@@ -615,8 +615,8 @@ class AgentService:
     ) -> list[dict[str, Any]]:
         """Build updated conversation history after agent execution.
 
-        Stores task steps and assistant text responses, but strips out tool calls
-        and tool results to keep context lean for multi-turn conversations.
+        Stores task steps and assistant responses including tool calls and results
+        for full conversation replay in multi-turn conversations.
 
         Args:
             existing_history: Previous conversation history (ignored if memory available).
@@ -634,14 +634,16 @@ class AgentService:
                 elif step_dict.get("type") == "memory_step":
                     text = step_dict.get("text")
                     thinking_blocks = step_dict.get("thinking_blocks", [])
-                    if text or thinking_blocks:
+                    tool_calls = step_dict.get("tool_calls", [])
+                    tool_results = step_dict.get("tool_results", [])
+                    if text or thinking_blocks or tool_calls or tool_results:
                         lean_history.append(
                             {
                                 "type": "memory_step",
                                 "step_number": step_dict.get("step_number", 0),
                                 "text": text,
-                                "tool_calls": [],
-                                "tool_results": [],
+                                "tool_calls": tool_calls,
+                                "tool_results": tool_results,
                                 "thinking_blocks": thinking_blocks,
                             }
                         )
