@@ -7,8 +7,6 @@ import datetime as dt
 import json
 import logging
 import os
-import shutil
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -29,24 +27,6 @@ def extract_text_from_content(content: str | list[dict[str, Any]] | None) -> str
             block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text"
         )
     return ""
-
-
-def get_commit_sha() -> str | None:
-    """Get short commit SHA or None if not in a git repository."""
-    try:
-        if not (git_executable := shutil.which("git")):
-            return None
-        result = subprocess.run(
-            [git_executable, "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-        return result.stdout.strip() if result.returncode == 0 else None
-    except (subprocess.SubprocessError, FileNotFoundError, OSError):
-        logger.debug("Failed to get git commit SHA")
-        return None
 
 
 @dataclass
