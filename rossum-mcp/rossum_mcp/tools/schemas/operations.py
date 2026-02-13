@@ -62,9 +62,6 @@ async def _update_schema_with_retry(
         if new_content is None:
             return content, None
 
-        if not new_content:
-            raise ValueError("Cannot update schema with empty content — this would remove all fields")
-
         sanitized = sanitize_schema_content(new_content)
         try:
             await client._http_client.update(Resource.Schema, schema_id, {"content": sanitized})
@@ -118,8 +115,6 @@ async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_dat
 
     logger.debug(f"Updating schema: schema_id={schema_id}")
     if "content" in schema_data and isinstance(schema_data["content"], list):
-        if not schema_data["content"]:
-            return {"error": "Cannot update schema with empty content — this would remove all fields"}
         schema_data = {**schema_data, "content": sanitize_schema_content(schema_data["content"])}
     await client._http_client.update(Resource.Schema, schema_id, schema_data)
     updated_schema: Schema = await client.retrieve_schema(schema_id)
