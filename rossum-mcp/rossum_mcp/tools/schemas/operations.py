@@ -208,16 +208,16 @@ async def prune_schema_fields(
     if not is_read_write_mode():
         return {"error": "prune_schema_fields is not available in read-only mode"}
 
-    if fields_to_keep and fields_to_remove:
+    if fields_to_keep is not None and fields_to_remove is not None:
         return {"error": "Specify fields_to_keep OR fields_to_remove, not both"}
-    if not fields_to_keep and not fields_to_remove:
+    if fields_to_keep is None and fields_to_remove is None:
         return {"error": "Must specify fields_to_keep or fields_to_remove"}
 
     def prepare(content: list) -> list | None:
         all_ids = _collect_all_field_ids(content)
         section_ids = {s.get("id") for s in content if s.get("category") == "section"}
 
-        if fields_to_keep:
+        if fields_to_keep is not None:
             fields_to_keep_set = set(fields_to_keep) | section_ids
             ancestor_ids = _collect_ancestor_ids(content, fields_to_keep_set)
             fields_to_keep_set |= ancestor_ids
