@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
 - Added tool call and result persistence in conversation history for full replay in multi-turn conversations [#184](https://github.com/stancld/rossum-agents/pull/184)
 - Moved `rossum-kb.json` into the `rossum_agent` package so it is included in installed distributions
 
+### Fixed
+- Fixed schema patching sub-agent silently dropping fields when `parent_section` doesn't exist — now auto-creates the missing section [#189](https://github.com/stancld/rossum-agents/pull/189)
+
 ### Changed
 - Simplified Knowledge Base cache — use bundled `data/rossum-kb.json` instead of downloading from a remote URL with disk caching [#187](https://github.com/stancld/rossum-agents/pull/187)
 

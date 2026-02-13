@@ -24,6 +24,7 @@ from regression_tests.custom_checks import (
     check_queue_deleted,
     check_queue_ui_settings,
     check_reasoning_field_configured,
+    check_schema_replaced_with_formula,
     check_serverless_hook_uses_txscript,
 )
 from regression_tests.framework.models import (
@@ -90,6 +91,11 @@ HOOK_TEST_RESULTS_CHECK = CustomCheck(
 FORMULA_FIELD_UPDATED_CHECK = CustomCheck(
     name="Formula field was updated with a new formula",
     check_fn=check_formula_field_updated,
+)
+
+SCHEMA_REPLACED_WITH_FORMULA_CHECK = CustomCheck(
+    name="Schema replaced with single formula field returning constant",
+    check_fn=check_schema_replaced_with_formula,
 )
 
 SERVERLESS_HOOK_TXSCRIPT_CHECK = CustomCheck(
@@ -476,6 +482,41 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             max_steps=12,
             file_expectation=FileExpectation(expected_files=["schema_v1.json", "schema_v2.json"]),
             custom_checks=[FORMULA_FIELD_UPDATED_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="replace_schema_with_single_formula_field",
+        description="Create queue, clear schema, add single formula field returning a constant",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        rossum_url=None,
+        prompt=(
+            "# Create queue and replace schema with a single formula field\n\n"
+            "Workspace: 785638\n"
+            "Region: EU\n\n"
+            "## Tasks:\n\n"
+            '1. Create a new queue from EU Invoice template: "We Love Rossum Queue"\n'
+            "2. Remove ALL existing fields from the schema\n"
+            "3. Add a single formula field to the schema:\n"
+            "    - Field name: we_love_rossum\n"
+            "    - Section: basic_info_section\n"
+            '    - Logic: Return the constant string "We love Rossum"\n\n'
+            "Return only the schema_id as a one-word answer."
+        ),
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "prune_schema_fields",
+                ("patch_schema", "patch_schema_with_subagent"),
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=120000),
+        success_criteria=SuccessCriteria(
+            require_subagent=None,
+            required_keywords=[],
+            max_steps=8,
+            file_expectation=FileExpectation(),
+            custom_checks=[SCHEMA_REPLACED_WITH_FORMULA_CHECK],
         ),
     ),
 ]
