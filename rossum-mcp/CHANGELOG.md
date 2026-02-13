@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - `update_schema`, `patch_schema`, and `prune_schema_fields` now allow empty content — previously these operations rejected empty schema content, preventing intentional clearing of all fields
 
+### Fixed
+- Fixed `prune_schema_fields` treating `fields_to_keep=[]` and `fields_to_remove=[]` as unset — empty lists were evaluated as falsy, causing "Must specify fields_to_keep or fields_to_remove" errors instead of pruning all/no fields ([#188](https://github.com/stancld/rossum-agents/pull/188))
+
 ## [1.2.2] - 2026-02-12
 
 ### Added
