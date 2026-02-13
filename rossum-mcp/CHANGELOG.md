@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Changed
+- `update_schema`, `patch_schema`, and `prune_schema_fields` now allow empty content — previously these operations rejected empty schema content, preventing intentional clearing of all fields
+
 ## [1.2.2] - 2026-02-12
 
 ### Added

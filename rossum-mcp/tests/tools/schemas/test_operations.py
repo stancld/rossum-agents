@@ -260,7 +260,7 @@ class TestUpdateSchema:
         assert result.name == "Updated Schema"
 
     @pytest.mark.asyncio
-    async def test_update_schema_rejects_empty_content(
+    async def test_update_schema_allows_empty_content(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
@@ -268,12 +268,15 @@ class TestUpdateSchema:
 
         register_schema_tools(mock_mcp, mock_client)
 
+        updated_schema = create_mock_schema(id=50, name="Empty Schema", content=[])
+        mock_client._http_client.update.return_value = {"id": 50}
+        mock_client.retrieve_schema.return_value = updated_schema
+
         update_schema = mock_mcp._tools["update_schema"]
         result = await update_schema(schema_id=50, schema_data={"content": []})
 
-        assert isinstance(result, dict)
-        assert "empty content" in result["error"]
-        mock_client._http_client.update.assert_not_called()
+        assert result.id == 50
+        mock_client._http_client.update.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_update_schema_read_only_mode(
