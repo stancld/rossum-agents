@@ -213,11 +213,6 @@ def _filter_mcp_tools_by_names(mcp_tools: list[MCPTool], tool_names: set[str]) -
     return [tool for tool in mcp_tools if tool.name in tool_names]
 
 
-def _filter_discovery_tools(mcp_tools: list[MCPTool]) -> list[MCPTool]:
-    """Filter MCP tools to only discovery tools."""
-    return [tool for tool in mcp_tools if tool.name == DISCOVERY_TOOL_NAME]
-
-
 def _load_categories_impl(
     categories: list[str],
     state: DynamicToolsState | None = None,

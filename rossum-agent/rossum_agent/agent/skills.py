@@ -111,22 +111,3 @@ def get_skill(slug: str) -> Skill | None:
 
 def get_all_skills() -> list[Skill]:
     return get_skill_registry().get_all_skills()
-
-
-def format_skills_for_prompt(skills: list[Skill] | None = None) -> str:
-    if skills is None:
-        skills = get_all_skills()
-
-    if not skills:
-        return ""
-
-    sections = []
-    for skill in skills:
-        sections.append(f"\n{'=' * 60}\n{skill.content}\n{'=' * 60}")
-
-    return "\n\n## Available Skills\n" + "\n".join(sections)
-
-
-def get_skill_content(slug: str) -> str | None:
-    skill = get_skill(slug)
-    return skill.content if skill else None

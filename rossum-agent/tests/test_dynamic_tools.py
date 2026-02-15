@@ -10,7 +10,6 @@ from rossum_agent.tools.dynamic_tools import (
     CatalogData,
     DynamicToolsState,
     _fetch_catalog_from_mcp,
-    _filter_discovery_tools,
     _filter_mcp_tools_by_names,
     _load_categories_impl,
     get_dynamic_tools,
@@ -124,29 +123,6 @@ class TestFilterMcpToolsByNames:
     def test_returns_empty_for_no_matching_tools(self) -> None:
         tools = [self._create_mock_tool("unrelated_tool")]
         result = _filter_mcp_tools_by_names(tools, {"get_queue"})
-        assert result == []
-
-
-class TestFilterDiscoveryTools:
-    """Tests for _filter_discovery_tools function."""
-
-    def _create_mock_tool(self, name: str) -> MagicMock:
-        tool = MagicMock()
-        tool.name = name
-        return tool
-
-    def test_filters_to_discovery_tools(self) -> None:
-        tools = [
-            self._create_mock_tool("list_tool_categories"),
-            self._create_mock_tool("get_queue"),
-        ]
-        result = _filter_discovery_tools(tools)
-        assert len(result) == 1
-        assert result[0].name == "list_tool_categories"
-
-    def test_returns_empty_when_no_discovery_tools(self) -> None:
-        tools = [self._create_mock_tool("get_queue")]
-        result = _filter_discovery_tools(tools)
         assert result == []
 
 

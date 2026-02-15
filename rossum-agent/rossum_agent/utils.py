@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import datetime as dt
-import shutil
 import tempfile
 import uuid
 from pathlib import Path
@@ -24,76 +22,6 @@ def create_session_output_dir() -> Path:
     session_dir = BASE_OUTPUT_DIR / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
     return session_dir
-
-
-def get_generated_files(output_dir: Path) -> list[str]:
-    """Get list of files in the outputs directory (recursively).
-
-    Args:
-        output_dir: The output directory to list files from.
-    """
-    if not output_dir.exists():
-        return []
-
-    return [str(f.resolve()) for f in output_dir.rglob("*") if f.is_file()]
-
-
-def get_generated_files_with_metadata(output_dir: Path) -> dict[str, float]:
-    """Get files in the outputs directory with their modification times (recursively).
-
-    Args:
-        output_dir: The output directory to list files from.
-    """
-    if not output_dir.exists():
-        return {}
-
-    return {str(f.resolve()): f.stat().st_mtime for f in output_dir.rglob("*") if f.is_file()}
-
-
-def cleanup_session_output_dir(output_dir: Path) -> None:
-    """Remove the entire session output directory.
-
-    Args:
-        output_dir: Path to the session output directory to remove
-    """
-    if output_dir.exists() and output_dir.is_dir():
-        shutil.rmtree(output_dir, ignore_errors=True)
-
-
-def generate_chat_id() -> str:
-    unique_id = uuid.uuid4().hex[:12]
-    timestamp = dt.datetime.now(tz=dt.UTC).strftime("%Y%m%d%H%M%S")
-    return f"chat_{timestamp}_{unique_id}"
-
-
-def is_valid_chat_id(chat_id: str) -> bool:
-    """Validate chat ID format.
-
-    Args:
-        chat_id: Chat identifier to validate
-
-    Returns:
-        bool: True if chat_id matches expected format
-    """
-    if not isinstance(chat_id, str):
-        return False
-
-    parts = chat_id.split("_")
-    if len(parts) != 3:
-        return False
-
-    if parts[0] != "chat":
-        return False
-
-    # Validate timestamp (14 digits: YYYYMMDDHHMMSS)
-    if not (parts[1].isdigit() and len(parts[1]) == 14):
-        return False
-
-    # Validate hex ID (12 hex characters)
-    if not (len(parts[2]) == 12 and all(c in "0123456789abcdef" for c in parts[2])):
-        return False
-
-    return True
 
 
 def add_message_cache_breakpoint(messages: list[dict[str, Any]]) -> None:

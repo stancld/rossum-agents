@@ -57,8 +57,3 @@ def create_bedrock_client(
 def get_model_id() -> str:
     """Return AWS_BEDROCK_MODEL_ARN if set, otherwise default Opus model."""
     return os.environ.get("AWS_BEDROCK_MODEL_ARN", OPUS_MODEL_ID)
-
-
-def get_small_model_id() -> str:
-    """Return AWS_BEDROCK_MODEL_ARN_SMALL if set, otherwise default Haiku model."""
-    return os.environ.get("AWS_BEDROCK_MODEL_ARN_SMALL", HAIKU_MODEL_ID)
