@@ -108,7 +108,7 @@ def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await ops.get_schema_tree_structure(client, schema_id=schema_id, queue_id=queue_id)
 
     @mcp.tool(
-        description="Remove many fields at once. Provide exactly one of: fields_to_keep (keep only these IDs + sections) or fields_to_remove (remove these IDs). Returns {removed_fields, remaining_fields}; sections are retained."
+        description="Remove many fields at once. Provide fields_to_keep (keep only these leaf IDs; parent containers preserved automatically; list section IDs to preserve them as empty containers) or fields_to_remove (remove these leaf IDs). Returns {removed_fields, remaining_fields}."
     )
     async def prune_schema_fields(
         schema_id: int,

@@ -218,17 +218,31 @@ async def prune_schema_fields(
         section_ids = {s.get("id") for s in content if s.get("category") == "section"}
 
         if fields_to_keep is not None:
-            fields_to_keep_set = set(fields_to_keep) | section_ids
+            fields_to_keep_set = set(fields_to_keep)
             ancestor_ids = _collect_ancestor_ids(content, fields_to_keep_set)
             fields_to_keep_set |= ancestor_ids
             remove_set = all_ids - fields_to_keep_set
+            # Sections explicitly listed in fields_to_keep are preserved as empty containers
+            keep_empty_sections = set(fields_to_keep) & section_ids
         else:
             remove_set = set(fields_to_remove) - section_ids  # type: ignore[arg-type]
+            keep_empty_sections = set()
 
         if not remove_set:
             return None
 
         pruned_content, _ = _remove_fields_from_content(content, remove_set)
+
+        # Re-add sections that were auto-removed (empty) but explicitly requested
+        if keep_empty_sections:
+            kept_ids = {s.get("id") for s in pruned_content}
+            for section in content:
+                sid = section.get("id")
+                if sid in keep_empty_sections and sid not in kept_ids:
+                    pruned_content.append(
+                        {"id": sid, "label": section.get("label", ""), "category": "section", "children": []}
+                    )
+
         return pruned_content
 
     try:
