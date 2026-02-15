@@ -16,6 +16,7 @@ from rossum_agent.tools.subagents.schema_patching import (
     _apply_schema_changes,
     _build_field_node,
     _call_opus_for_patching,
+    _coerce_type_to_string,
     _collect_field_ids,
     _execute_opus_tool,
     _filter_content,
@@ -386,6 +387,40 @@ class TestBuildFieldNode:
         node = _build_field_node(spec)
 
         assert node["formula"] == "field.a + field.b"
+
+
+class TestCoerceTypeToString:
+    """Test _coerce_type_to_string function."""
+
+    def test_string_passes_through(self):
+        assert _coerce_type_to_string("number") == "number"
+
+    def test_dict_with_type_key_extracts_value(self):
+        assert _coerce_type_to_string({"type": "number"}) == "number"
+
+    def test_dict_without_type_key_falls_back_to_string(self):
+        assert _coerce_type_to_string({"foo": "bar"}) == "string"
+
+    def test_none_falls_back_to_string(self):
+        assert _coerce_type_to_string(None) == "string"
+
+    def test_build_field_node_coerces_dict_type(self):
+        spec = {"id": "amount", "label": "Amount", "type": {"type": "number"}}
+        node = _build_field_node(spec)
+        assert node["type"] == "number"
+
+    def test_update_fields_coerces_dict_type(self):
+        content = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [{"id": "field1", "category": "datapoint", "type": "string"}],
+            }
+        ]
+        updates = [{"id": "field1", "type": {"type": "number"}}]
+        modified, updated_ids = _update_fields_in_content(content, updates)
+        assert "field1" in updated_ids
+        assert modified[0]["children"][0]["type"] == "number"
 
 
 class TestAddFieldsToContent:

@@ -33,6 +33,7 @@
 | **Multi-Environment** | Spawn connections to different Rossum environments |
 | **Skills System** | Load domain-specific workflows on demand |
 | **Prompt Caching** | Automatic `cache_control` on system prompt, tools, and conversation history for up to 90% input token cost reduction |
+| **Change Tracking** | Git-like config commit history with diffs, logs, and revert |
 
 **Interfaces:** REST API, Python SDK
 

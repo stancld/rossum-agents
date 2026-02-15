@@ -17,6 +17,7 @@ from regression_tests.custom_checks import (
     check_business_validation_rules,
     check_formula_field_for_table,
     check_formula_field_updated,
+    check_hook_deleted_and_reverted,
     check_hook_test_results_reported,
     check_knowledge_base_hidden_multivalue_warning,
     check_net_terms_formula_field_added,
@@ -24,7 +25,9 @@ from regression_tests.custom_checks import (
     check_queue_deleted,
     check_queue_ui_settings,
     check_reasoning_field_configured,
+    check_schema_replaced_and_reverted,
     check_schema_replaced_with_formula,
+    check_schema_reverted_with_valid_types,
     check_serverless_hook_uses_txscript,
 )
 from regression_tests.framework.models import (
@@ -37,6 +40,7 @@ from regression_tests.framework.models import (
     ToolExpectation,
     ToolMatchMode,
 )
+from regression_tests.setup.schema_revert import create_queue_with_schema
 
 HIDDEN_MULTIVALUE_CHECK = CustomCheck(
     name="Knowledge base warns about hidden/multivalue datapoints",
@@ -98,9 +102,24 @@ SCHEMA_REPLACED_WITH_FORMULA_CHECK = CustomCheck(
     check_fn=check_schema_replaced_with_formula,
 )
 
+SCHEMA_REPLACED_AND_REVERTED_CHECK = CustomCheck(
+    name="Schema replaced with formula field and then reverted to original",
+    check_fn=check_schema_replaced_and_reverted,
+)
+
 SERVERLESS_HOOK_TXSCRIPT_CHECK = CustomCheck(
     name="Serverless hook code follows TxScript conventions",
     check_fn=check_serverless_hook_uses_txscript,
+)
+
+HOOK_DELETED_AND_REVERTED_CHECK = CustomCheck(
+    name="Hook was deleted and deletion was reverted",
+    check_fn=check_hook_deleted_and_reverted,
+)
+
+SCHEMA_REVERT_TYPE_VALIDATION_CHECK = CustomCheck(
+    name="Reverted schema has valid field types (not dicts) and expected fields",
+    check_fn=check_schema_reverted_with_valid_types,
 )
 
 
@@ -518,6 +537,118 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             max_steps=6,
             file_expectation=FileExpectation(),
             custom_checks=[SCHEMA_REPLACED_WITH_FORMULA_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="replace_schema_and_revert",
+        description="Create queue, replace schema with a formula field, then revert to original",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        rossum_url=None,
+        requires_redis=True,
+        prompt=(
+            "# Create queue, replace schema with a formula field, then revert\n\n"
+            "Workspace: 785638\n"
+            "Region: EU\n\n"
+            "## Tasks:\n\n"
+            '1. Create a new queue from EU Invoice template: "We Love Rossum Queue"\n'
+            "2. Remove ALL existing fields from the schema\n"
+            "3. Add a single formula field to the schema:\n"
+            "    - Field name: we_love_rossum\n"
+            "    - Section: basic_info_section\n"
+            '    - Logic: Return the constant string "We love Rossum"\n'
+            "4. Revert the last commit to restore the original schema\n\n"
+            "Return only the schema_id as a one-word answer."
+        ),
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "get_schema_tree_structure",
+                "prune_schema_fields",
+                ("patch_schema", "patch_schema_with_subagent"),
+                "show_change_history",
+                "revert_commit",
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=100000, max_total_tokens=200000),
+        success_criteria=SuccessCriteria(
+            require_subagent=None,
+            required_keywords=[],
+            max_steps=12,
+            file_expectation=FileExpectation(),
+            custom_checks=[SCHEMA_REPLACED_AND_REVERTED_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="create_hook_delete_and_revert",
+        description="Create queue with hook, delete hook, then revert the deletion",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        rossum_url=None,
+        requires_redis=True,
+        prompt=(
+            "# Create queue with hook, delete hook, then revert\n\n"
+            "Workspace: 785638\n"
+            "Region: EU\n\n"
+            "## Tasks:\n\n"
+            "1. Create a new queue from EU Invoice template: Hook Revert Queue\n"
+            "2. Create a webhook hook on this queue:\n"
+            "    - Name: Test Webhook\n"
+            "    - Events: annotation_content.initialize\n"
+            "    - URL: https://example.com/webhook\n"
+            "3. Delete the hook you just created\n"
+            "4. Revert the last commit to restore the deleted hook\n\n"
+            "Return only the new hook_id as a one-word answer."
+        ),
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "create_hook",
+                "delete_hook",
+                "show_change_history",
+                "revert_commit",
+                ("create_hook", "create_hook_from_template"),  # recreation after revert
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=80000, max_total_tokens=120000),
+        success_criteria=SuccessCriteria(
+            require_subagent=None,
+            required_keywords=[],
+            max_steps=12,
+            file_expectation=FileExpectation(),
+            custom_checks=[HOOK_DELETED_AND_REVERTED_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="revert_schema_with_formula_and_mixed_types",
+        description="Empty a pre-loaded schema (with formula + mixed types) and revert — validates type safety",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        rossum_url=None,
+        requires_redis=True,
+        setup_fn=create_queue_with_schema,
+        prompt=(
+            "# Empty schema and revert\n\n"
+            "Schema ID: {schema_id}\n\n"
+            "## Tasks:\n\n"
+            "1. Remove ALL existing fields from schema {schema_id}\n"
+            "2. Revert the last commit to restore the original schema\n\n"
+            "Return only the schema_id as a one-word answer."
+        ),
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "prune_schema_fields",
+                "show_change_history",
+                "revert_commit",
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=100000),
+        success_criteria=SuccessCriteria(
+            require_subagent=None,
+            required_keywords=[],
+            max_steps=8,
+            file_expectation=FileExpectation(),
+            custom_checks=[SCHEMA_REVERT_TYPE_VALIDATION_CHECK],
         ),
     ),
 ]
