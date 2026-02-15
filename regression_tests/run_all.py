@@ -23,11 +23,22 @@ from dotenv import dotenv_values
 from rossum_agent.agent.core import RossumAgent
 from rossum_agent.agent.models import AgentConfig
 from rossum_agent.bedrock_client import create_bedrock_client
+from rossum_agent.change_tracking.store import CommitStore
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.rossum_mcp_integration import connect_mcp_server
-from rossum_agent.tools.core import set_mcp_connection, set_output_dir, set_rossum_credentials
+from rossum_agent.tools.core import (
+    set_commit_store,
+    set_mcp_connection,
+    set_output_dir,
+    set_rossum_credentials,
+    set_rossum_environment,
+    set_task_tracker,
+)
+from rossum_agent.tools.dynamic_tools import get_write_tools_async
+from rossum_agent.tools.task_tracker import TaskTracker
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
 
+from regression_tests.conftest import try_connect_redis
 from regression_tests.framework.runner import run_regression_test
 from regression_tests.test_cases import REGRESSION_TEST_CASES
 from regression_tests.test_regressions import _evaluate_criteria
@@ -77,6 +88,12 @@ def _load_env_tokens() -> dict[str, str]:
     return {}
 
 
+def _create_commit_store() -> CommitStore | None:
+    """Create a CommitStore if Redis is reachable."""
+    client = try_connect_redis()
+    return CommitStore(client) if client else None
+
+
 def _get_token(case: RegressionTestCase, env_tokens: dict[str, str], cli_token: str | None) -> str:
     if cli_token:
         return cli_token
@@ -106,6 +123,19 @@ async def create_agent(case: RegressionTestCase, api_token: str, output_dir: Pat
         set_rossum_credentials(case.api_base_url, api_token)
         set_mcp_connection(mcp_connection, asyncio.get_event_loop(), case.mode)
 
+        commit_store = None
+        if case.requires_redis:
+            commit_store = _create_commit_store()
+            if commit_store:
+                write_tools = await get_write_tools_async(mcp_connection)
+                chat_id = f"regression-test-{case.name}"
+                environment = case.api_base_url.rstrip("/")
+                mcp_connection.setup_change_tracking(write_tools, chat_id, environment, commit_store)
+                set_commit_store(commit_store)
+                set_rossum_environment(environment)
+
+        set_task_tracker(TaskTracker())
+
         client = create_bedrock_client()
         system_prompt = get_system_prompt()
 
@@ -123,12 +153,22 @@ async def create_agent(case: RegressionTestCase, api_token: str, output_dir: Pat
             set_output_dir(None)
             set_rossum_credentials(None, None)
             set_mcp_connection(None, None)  # type: ignore[arg-type]
+            set_task_tracker(None)
+            if commit_store:
+                set_commit_store(None)
+                set_rossum_environment(None)
 
 
 async def run_single_attempt(case: RegressionTestCase, api_token: str, output_dir: Path) -> AttemptResult:
     try:
         async with create_agent(case, api_token, output_dir) as agent:
-            run = await run_regression_test(agent, case.prompt)
+            prompt = case.prompt
+            if case.setup_fn:
+                placeholders = case.setup_fn(case.api_base_url, api_token)
+                for key, value in placeholders.items():
+                    prompt = prompt.replace(f"{{{key}}}", value)
+
+            run = await run_regression_test(agent, prompt)
 
             print(f"  Steps: {run.step_count} | Tools: {run.all_tools}")
             print(f"  Tokens: {run.total_tokens} (in={run.total_input_tokens}, out={run.total_output_tokens})")
@@ -142,6 +182,7 @@ async def run_single_attempt(case: RegressionTestCase, api_token: str, output_di
 
 async def run_all(cli_token: str | None = None) -> list[TestResult]:
     env_tokens = _load_env_tokens()
+    redis_available = try_connect_redis() is not None
     results: list[TestResult] = []
 
     for i, case in enumerate(REGRESSION_TEST_CASES):
@@ -150,6 +191,16 @@ async def run_all(cli_token: str | None = None) -> list[TestResult]:
         if case.description:
             print(f"  {case.description}")
         print(f"{'=' * 70}")
+
+        if case.requires_redis and not redis_available:
+            print("  SKIPPED (Redis not available)")
+            results.append(
+                TestResult(
+                    name=case.name,
+                    attempts=[AttemptResult(passed=False, failures=[], error="Redis not available")],
+                )
+            )
+            continue
 
         try:
             api_token = _get_token(case, env_tokens, cli_token)

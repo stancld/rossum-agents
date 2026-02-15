@@ -8,8 +8,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Added tool call and result persistence in conversation history for full replay in multi-turn conversations [#184](https://github.com/stancld/rossum-agents/pull/184)
-- Moved `rossum-kb.json` into the `rossum_agent` package so it is included in installed distributions
+- Moved `rossum-kb.json` into the `rossum_agent` package so it is included in installed distributions [#185](https://github.com/stancld/rossum-agents/pull/185)
 - Added tool call argument logging in `_execute_tool_with_progress` for debugging agent behavior [#192](https://github.com/stancld/rossum-agents/pull/192)
+- Added configuration change tracking system that records every mutation as a `ConfigCommit` with before/after snapshots, LLM-generated commit messages, and Redis persistence [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Added `show_change_history`, `show_commit_details`, and `revert_commit` agent tools for querying and managing configuration changes [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Extended `MCPConnection` with transparent read caching and write interception for change tracking [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Added config commit info (`config_commit_hash`, `config_commit_message`, `config_changes_count`) to `StreamDoneEvent` for TUI integration [#185](https://github.com/stancld/rossum-agents/pull/185)
 
 ### Changed
 - Collapse repeated collapsible tool results (e.g. `patch_schema`) in `AgentMemory.write_to_messages()` — only the last result is sent in full to the LLM, earlier results are replaced with a short summary to reduce context bloat [#192](https://github.com/stancld/rossum-agents/pull/192)

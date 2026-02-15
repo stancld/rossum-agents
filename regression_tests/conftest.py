@@ -10,13 +10,24 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+import redis
 from dotenv import dotenv_values
 from rossum_agent.agent.core import RossumAgent
 from rossum_agent.agent.models import AgentConfig
 from rossum_agent.bedrock_client import create_bedrock_client
+from rossum_agent.change_tracking.store import CommitStore
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.rossum_mcp_integration import connect_mcp_server
-from rossum_agent.tools.core import set_mcp_connection, set_output_dir, set_rossum_credentials
+from rossum_agent.tools.core import (
+    set_commit_store,
+    set_mcp_connection,
+    set_output_dir,
+    set_rossum_credentials,
+    set_rossum_environment,
+    set_task_tracker,
+)
+from rossum_agent.tools.dynamic_tools import get_write_tools_async
+from rossum_agent.tools.task_tracker import TaskTracker
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
 
 if TYPE_CHECKING:
@@ -26,6 +37,26 @@ if TYPE_CHECKING:
 
 ENV_FILE = Path(__file__).parent / ".env"
 _KB_DATA_PATH = Path(__file__).resolve().parent.parent / "rossum-agent" / "data" / "rossum-kb.json"
+
+
+def try_connect_redis() -> redis.Redis | None:
+    """Return a connected Redis client, or None if Redis is unreachable."""
+    try:
+        host = os.getenv("REDIS_HOST")
+        port = os.getenv("REDIS_PORT")
+        if not host or not port:
+            return None
+        client = redis.Redis(host=host, port=int(port), socket_connect_timeout=1)
+        client.ping()
+        return client
+    except Exception:
+        return None
+
+
+def _create_commit_store() -> CommitStore | None:
+    """Create a CommitStore if Redis is reachable."""
+    client = try_connect_redis()
+    return CommitStore(client) if client else None
 
 
 def _load_env_tokens() -> dict[str, str]:
@@ -181,6 +212,20 @@ def create_live_agent(
             set_output_dir(temp_output_dir)
             set_rossum_credentials(case.api_base_url, token)
             set_mcp_connection(mcp_connection, asyncio.get_event_loop(), case.mode)
+
+            commit_store = None
+            if case.requires_redis:
+                commit_store = _create_commit_store()
+                if commit_store:
+                    write_tools = await get_write_tools_async(mcp_connection)
+                    chat_id = f"regression-test-{case.name}"
+                    environment = case.api_base_url.rstrip("/")
+                    mcp_connection.setup_change_tracking(write_tools, chat_id, environment, commit_store)
+                    set_commit_store(commit_store)
+                    set_rossum_environment(environment)
+
+            set_task_tracker(TaskTracker())
+
             client = create_bedrock_client()
             system_prompt = get_system_prompt()
 
@@ -200,5 +245,9 @@ def create_live_agent(
                 set_output_dir(None)
                 set_rossum_credentials(None, None)
                 set_mcp_connection(None, None)  # type: ignore[arg-type]
+                set_task_tracker(None)
+                if commit_store:
+                    set_commit_store(None)
+                    set_rossum_environment(None)
 
     return _create_agent

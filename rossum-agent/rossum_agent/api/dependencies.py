@@ -40,19 +40,7 @@ ALLOWED_ROSSUM_HOST_PATTERN = _build_allowed_hosts_pattern()
 
 
 def validate_rossum_api_url(url: str) -> str:
-    """Validate that the Rossum API URL is a trusted Rossum domain.
-
-    This prevents SSRF attacks by ensuring we only make requests to known Rossum endpoints.
-
-    Args:
-        url: The API URL to validate.
-
-    Returns:
-        The validated and normalized API base URL.
-
-    Raises:
-        HTTPException: If the URL is not a valid Rossum API endpoint.
-    """
+    """Validate and normalize the Rossum API URL to prevent SSRF."""
     try:
         parsed = urlparse(url)
     except ValueError as e:
@@ -105,18 +93,6 @@ async def get_rossum_credentials(
     x_rossum_token: Annotated[str, Header(alias="X-Rossum-Token")],
     x_rossum_api_url: Annotated[str, Header(alias="X-Rossum-Api-Url")],
 ) -> RossumCredentials:
-    """Extract and validate Rossum credentials from request headers.
-
-    Args:
-        x_rossum_token: Rossum API token from X-Rossum-Token header.
-        x_rossum_api_url: Rossum API URL from X-Rossum-Api-Url header.
-
-    Returns:
-        RossumCredentials with token and API URL.
-
-    Raises:
-        HTTPException: If credentials are missing or invalid.
-    """
     if not x_rossum_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing X-Rossum-Token header")
     if not x_rossum_api_url:
@@ -129,21 +105,7 @@ async def get_validated_credentials(
     x_rossum_token: Annotated[str, Header(alias="X-Rossum-Token")],
     x_rossum_api_url: Annotated[str, Header(alias="X-Rossum-Api-Url")],
 ) -> RossumCredentials:
-    """Extract credentials and validate against Rossum API.
-
-    Validates the token by calling the Rossum API /v1/auth/user endpoint.
-    Extracts user ID from the response for user isolation.
-
-    Args:
-        x_rossum_token: Rossum API token from X-Rossum-Token header.
-        x_rossum_api_url: Rossum API URL from X-Rossum-Api-Url header.
-
-    Returns:
-        RossumCredentials with token, API URL, and user_id.
-
-    Raises:
-        HTTPException: If credentials are missing or invalid.
-    """
+    """Validate token against Rossum API /v1/auth/user and extract user_id."""
     credentials = await get_rossum_credentials(x_rossum_token, x_rossum_api_url)
 
     # Validate and normalize API URL to prevent SSRF

@@ -16,6 +16,7 @@ from rossum_agent.tools.subagents.schema_patching import (
     _apply_schema_changes,
     _build_field_node,
     _call_opus_for_patching,
+    _coerce_type_to_string,
     _collect_field_ids,
     _execute_opus_tool,
     _extract_schema_content,
@@ -66,6 +67,37 @@ class TestConstants:
         assert "fields_to_keep" in props
         assert "fields_to_add" in props
         assert "fields_to_update" in props
+
+
+class TestExtractSchemaContent:
+    """Test _extract_schema_content function."""
+
+    def test_returns_empty_for_none(self):
+        assert _extract_schema_content(None) == []
+
+    def test_extracts_from_dict_with_result_wrapper(self):
+        """Regression: FastMCP structured_content wraps data in {"result": {...}}."""
+        schema_content = [{"id": "invoice_id", "category": "datapoint", "type": "string"}]
+        mcp_result = {"result": {"id": 123, "name": "Test", "content": schema_content}}
+        assert _extract_schema_content(mcp_result) == schema_content
+
+    def test_extracts_from_dict_without_wrapper(self):
+        schema_content = [{"id": "invoice_id", "category": "datapoint", "type": "string"}]
+        mcp_result = {"id": 123, "name": "Test", "content": schema_content}
+        assert _extract_schema_content(mcp_result) == schema_content
+
+    def test_returns_empty_when_content_missing(self):
+        mcp_result = {"result": {"id": 123, "name": "Test"}}
+        assert _extract_schema_content(mcp_result) == []
+
+    def test_extracts_from_object_with_result_attr(self):
+        inner = MagicMock()
+        inner.content = [{"id": "field_1", "category": "datapoint"}]
+        outer = MagicMock(spec=["result"])
+        outer.result = inner
+        # Ensure outer doesn't have 'content' attr to avoid ambiguity
+        del outer.content
+        assert _extract_schema_content(outer) == [{"id": "field_1", "category": "datapoint"}]
 
 
 class TestCollectFieldIds:
@@ -389,6 +421,40 @@ class TestBuildFieldNode:
         assert node["formula"] == "field.a + field.b"
 
 
+class TestCoerceTypeToString:
+    """Test _coerce_type_to_string function."""
+
+    def test_string_passes_through(self):
+        assert _coerce_type_to_string("number") == "number"
+
+    def test_dict_with_type_key_extracts_value(self):
+        assert _coerce_type_to_string({"type": "number"}) == "number"
+
+    def test_dict_without_type_key_falls_back_to_string(self):
+        assert _coerce_type_to_string({"foo": "bar"}) == "string"
+
+    def test_none_falls_back_to_string(self):
+        assert _coerce_type_to_string(None) == "string"
+
+    def test_build_field_node_coerces_dict_type(self):
+        spec = {"id": "amount", "label": "Amount", "type": {"type": "number"}}
+        node = _build_field_node(spec)
+        assert node["type"] == "number"
+
+    def test_update_fields_coerces_dict_type(self):
+        content = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [{"id": "field1", "category": "datapoint", "type": "string"}],
+            }
+        ]
+        updates = [{"id": "field1", "type": {"type": "number"}}]
+        modified, updated_ids = _update_fields_in_content(content, updates)
+        assert "field1" in updated_ids
+        assert modified[0]["children"][0]["type"] == "number"
+
+
 class TestAddFieldsToContent:
     """Test _add_fields_to_content function."""
 
@@ -636,39 +702,6 @@ class TestUpdateFieldsInContent:
         _update_fields_in_content(content, updates)
 
         assert content[0]["children"][0]["formula"] == "old"
-
-
-class TestExtractSchemaContent:
-    """Test _extract_schema_content handles various MCP result formats."""
-
-    def test_direct_dict_with_content(self):
-        result = _extract_schema_content({"content": [{"id": "s1", "category": "section"}]})
-        assert len(result) == 1
-        assert result[0]["id"] == "s1"
-
-    def test_wrapped_result_with_content(self):
-        """MCP structured_content wraps the schema in {"result": {...}}."""
-        result = _extract_schema_content(
-            {"result": {"id": 123, "name": "Schema", "content": [{"id": "s1", "category": "section"}]}}
-        )
-        assert len(result) == 1
-        assert result[0]["id"] == "s1"
-
-    def test_wrapped_result_empty_content(self):
-        result = _extract_schema_content({"result": {"id": 123, "content": []}})
-        assert result == []
-
-    def test_none_returns_empty(self):
-        assert _extract_schema_content(None) == []
-
-    def test_pydantic_model_with_content(self):
-        model = MagicMock()
-        model.content = [{"id": "s1", "category": "section"}]
-        result = _extract_schema_content(model)
-        assert len(result) == 1
-
-    def test_no_content_returns_empty(self):
-        assert _extract_schema_content({"result": {"id": 123}}) == []
 
 
 class TestExecuteOpusTool:

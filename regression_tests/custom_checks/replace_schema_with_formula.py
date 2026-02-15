@@ -5,9 +5,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from rossum_api import SyncRossumAPIClient
-from rossum_api.dtos import Token
-from rossum_api.models.schema import Datapoint
+from regression_tests.custom_checks._utils import create_api_client, extract_datapoints, get_final_answer
 
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
@@ -25,8 +23,7 @@ def _extract_schema_id_from_steps(steps: list[AgentStep]) -> int | None:
                             return int(match.group(1))
 
     # Fallback: extract from final answer
-    final_answer = next((s.final_answer for s in reversed(steps) if s.final_answer), None)
-    if final_answer:
+    if final_answer := get_final_answer(steps):
         match = re.search(r"\b(\d{5,})\b", final_answer)
         if match:
             return int(match.group(1))
@@ -40,11 +37,9 @@ def check_schema_replaced_with_formula(steps: list[AgentStep], api_base_url: str
     if not schema_id:
         return False, "Could not find schema_id in agent steps"
 
-    client = SyncRossumAPIClient(base_url=api_base_url, credentials=Token(api_token))
+    client = create_api_client(api_base_url, api_token)
     schema = client.retrieve_schema(schema_id)
-
-    # Collect all leaf datapoints across all sections using traverse()
-    datapoints = [node for section in schema.content for node in section.traverse() if isinstance(node, Datapoint)]
+    datapoints = extract_datapoints(schema.content)
 
     if len(datapoints) != 1:
         ids = [dp.id for dp in datapoints]

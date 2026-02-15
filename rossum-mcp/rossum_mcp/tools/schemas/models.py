@@ -149,3 +149,17 @@ class SchemaTreeNode:
 
 
 SchemaNode = SchemaDatapoint | SchemaMultivalue | SchemaTuple
+
+
+@dataclass
+class SchemaListItem:
+    """Schema summary for list responses (content omitted to save context)."""
+
+    id: int
+    name: str | None = None
+    queues: list[str] | None = None
+    url: str | None = None
+    content: str = "<omitted>"
+    metadata: dict | None = None
+    modified_by: str | None = None
+    modified_at: str | None = None

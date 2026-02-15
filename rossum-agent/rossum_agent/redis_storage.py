@@ -39,6 +39,7 @@ class ChatMetadata:
     total_tool_calls: int = 0
     total_steps: int = 0
     mcp_mode: str = "read-only"
+    config_commits: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -49,6 +50,7 @@ class ChatMetadata:
             "total_tool_calls": self.total_tool_calls,
             "total_steps": self.total_steps,
             "mcp_mode": self.mcp_mode,
+            "config_commits": self.config_commits,
         }
 
     @classmethod
@@ -61,6 +63,7 @@ class ChatMetadata:
             total_tool_calls=data.get("total_tool_calls", 0),
             total_steps=data.get("total_steps", 0),
             mcp_mode=data.get("mcp_mode", "read-only"),
+            config_commits=data.get("config_commits", []),
         )
 
 

@@ -13,13 +13,16 @@ from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.schema import Schema
 
 from rossum_mcp.tools.base import (
-    TRUNCATED_MARKER,
     delete_resource,
     extract_id_from_url,
     graceful_list,
     is_read_write_mode,
 )
-from rossum_mcp.tools.schemas.models import SchemaNode, SchemaNodeUpdate  # noqa: TC001 - needed at runtime for FastMCP
+from rossum_mcp.tools.schemas.models import (
+    SchemaListItem,
+    SchemaNode,
+    SchemaNodeUpdate,
+)
 from rossum_mcp.tools.schemas.patching import PatchOperation, _find_node_anywhere, apply_schema_patch
 from rossum_mcp.tools.schemas.pruning import (
     _collect_all_field_ids,
@@ -78,11 +81,17 @@ async def _update_schema_with_retry(
     raise RuntimeError("Unreachable")
 
 
-def _truncate_schema_for_list(schema: Schema) -> Schema:
-    """Truncate content field in schema to save context in list responses."""
-    from dataclasses import replace  # noqa: PLC0415 - avoid circular import with models
-
-    return replace(schema, content=TRUNCATED_MARKER)
+def _truncate_schema_for_list(schema: Schema) -> SchemaListItem:
+    """Convert to SchemaListItem with content omitted."""
+    return SchemaListItem(
+        id=schema.id,
+        name=schema.name,
+        queues=schema.queues,
+        url=schema.url,
+        metadata=schema.metadata,
+        modified_by=schema.modified_by,
+        modified_at=schema.modified_at,
+    )
 
 
 async def get_schema(client: AsyncRossumAPIClient, schema_id: int) -> Schema | dict:
@@ -97,7 +106,7 @@ async def get_schema(client: AsyncRossumAPIClient, schema_id: int) -> Schema | d
 
 async def list_schemas(
     client: AsyncRossumAPIClient, name: str | None = None, queue_id: int | None = None
-) -> list[Schema]:
+) -> list[SchemaListItem]:
     logger.debug(f"Listing schemas: name={name}, queue_id={queue_id}")
     filters: dict = {}
     if name is not None:

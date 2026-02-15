@@ -77,7 +77,7 @@ from rossum_agent.agent.models import (
 )
 from rossum_agent.api.models.schemas import TokenUsageBreakdown
 from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
-from rossum_agent.rossum_mcp_integration import MCPConnection, mcp_tools_to_anthropic_format
+from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
 from rossum_agent.tools import (
     DEPLOY_TOOLS,
     DISCOVERY_TOOL_NAME,
@@ -108,6 +108,7 @@ if TYPE_CHECKING:
     from anthropic import AnthropicBedrock
 
     from rossum_agent.agent.types import UserContent
+    from rossum_agent.rossum_mcp_integration import MCPConnection
 
 logger = logging.getLogger(__name__)
 
@@ -790,6 +791,7 @@ class RossumAgent:
 
         try:
             if tool_call.name in get_internal_tool_names():
+                logger.info(f"Calling internal tool {tool_call.name}")
                 set_progress_callback(progress_callback)
                 set_token_callback(token_callback)
 
@@ -821,9 +823,11 @@ class RossumAgent:
 
                 result = future.result()
                 content = str(result)
+                logger.info(f"Internal tool {tool_call.name} result: {content}")
                 set_progress_callback(None)
                 set_token_callback(None)
             elif tool_call.name in get_deploy_tool_names():
+                logger.info(f"Calling deploy tool {tool_call.name}")
                 loop = asyncio.get_event_loop()
                 ctx = copy_context()
                 future = loop.run_in_executor(

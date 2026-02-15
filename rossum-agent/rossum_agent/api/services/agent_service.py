@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import contextvars
 import dataclasses
@@ -22,16 +23,22 @@ from rossum_agent.api.models.schemas import (
     SubAgentTextEvent,
     TaskSnapshotEvent,
 )
+from rossum_agent.change_tracking.commit_service import CommitService
+from rossum_agent.change_tracking.store import CommitStore
 from rossum_agent.prompts import get_system_prompt
-from rossum_agent.rossum_mcp_integration import connect_mcp_server
+from rossum_agent.redis_storage import RedisStorage
+from rossum_agent.rossum_mcp_integration import MCPConnection, connect_mcp_server
 from rossum_agent.tools import (
     SubAgentProgress,
     SubAgentText,
     TaskTracker,
+    get_write_tools_async,
+    set_commit_store,
     set_mcp_connection,
     set_output_dir,
     set_progress_callback,
     set_rossum_credentials,
+    set_rossum_environment,
     set_task_snapshot_callback,
     set_task_tracker,
     set_text_callback,
@@ -46,6 +53,7 @@ if TYPE_CHECKING:
     from anthropic.types import ImageBlockParam, TextBlockParam
 
     from rossum_agent.agent.types import UserContent
+    from rossum_agent.change_tracking.models import ConfigCommit
 
 logger = logging.getLogger(__name__)
 
@@ -73,14 +81,6 @@ _request_context: contextvars.ContextVar[_RequestContext] = contextvars.ContextV
 
 
 def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentProgressEvent:
-    """Convert a SubAgentProgress to a SubAgentProgressEvent for SSE streaming.
-
-    Args:
-        progress: The SubAgentProgress from the internal tool.
-
-    Returns:
-        SubAgentProgressEvent suitable for SSE transmission.
-    """
     return SubAgentProgressEvent(
         tool_name=progress.tool_name,
         iteration=progress.iteration,
@@ -237,6 +237,27 @@ class AgentService:
     def __init__(self) -> None:
         """Initialize agent service."""
         self._chat_runs: dict[str, _ChatRunState] = {}
+
+    def _get_or_create_commit_store(self) -> CommitStore | None:
+        storage = RedisStorage()
+        if storage.is_connected():
+            return CommitStore(storage.client)
+        logger.warning("Redis unavailable — change tracking disabled for this run")
+        return None
+
+    async def _setup_change_tracking(
+        self, mcp_connection: MCPConnection, chat_id: str, rossum_api_base_url: str
+    ) -> tuple[CommitStore | None, str]:
+        """Configure change tracking on the MCP connection. Returns (store, environment)."""
+        commit_store = self._get_or_create_commit_store()
+        write_tools = await get_write_tools_async(mcp_connection)
+        environment = rossum_api_base_url.rstrip("/")
+        if commit_store is not None:
+            mcp_connection.setup_change_tracking(write_tools, chat_id, environment, commit_store)
+        else:
+            mcp_connection.write_tools = write_tools
+            mcp_connection.chat_id = chat_id
+        return commit_store, environment
 
     def _get_context(self) -> _RequestContext:
         """Get the current request context, creating if needed."""
@@ -426,11 +447,17 @@ class AgentService:
                     rossum_api_base_url=rossum_api_base_url,
                     mcp_mode=mcp_mode,
                 ) as mcp_connection:
+                    commit_store, environment = await self._setup_change_tracking(
+                        mcp_connection, chat_id, rossum_api_base_url
+                    )
+
                     agent = await create_agent(
                         mcp_connection=mcp_connection, system_prompt=system_prompt, config=AgentConfig()
                     )
 
                     set_mcp_connection(mcp_connection, asyncio.get_event_loop(), mcp_mode)
+                    set_commit_store(commit_store)
+                    set_rossum_environment(environment)
 
                     self._restore_conversation_history(agent, conversation_history)
 
@@ -458,6 +485,10 @@ class AgentService:
 
                         self._get_chat_run_state(chat_id).last_memory = agent.memory
 
+                        commit = self._try_create_config_commit(
+                            commit_store, mcp_connection, chat_id, prompt, rossum_api_base_url
+                        )
+
                         yield StreamDoneEvent(
                             total_steps=total_steps,
                             input_tokens=total_input_tokens,
@@ -465,6 +496,9 @@ class AgentService:
                             cache_creation_input_tokens=agent._total_cache_creation_tokens,
                             cache_read_input_tokens=agent._total_cache_read_tokens,
                             token_usage_breakdown=agent.get_token_usage_breakdown(),
+                            config_commit_hash=commit.hash if commit else None,
+                            config_commit_message=commit.message if commit else None,
+                            config_changes_count=len(commit.changes) if commit else 0,
                         )
                         agent.log_token_usage_summary()
 
@@ -483,21 +517,29 @@ class AgentService:
                 set_task_tracker(None)
                 set_output_dir(None)
                 set_rossum_credentials(None, None)
+                set_commit_store(None)
+                set_rossum_environment(None)
         except asyncio.CancelledError:
             logger.info(f"Run cancelled for chat {chat_id} (run_id={run_id})")
             raise
         finally:
             await self._clear_run(chat_id, run_id)
 
+    @staticmethod
+    def _try_create_config_commit(
+        commit_store: CommitStore | None,
+        mcp_connection: MCPConnection,
+        chat_id: str,
+        prompt: str,
+        rossum_api_base_url: str,
+    ) -> ConfigCommit | None:
+        """Create a config commit if there are tracked changes."""
+        if not commit_store or not mcp_connection.has_changes():
+            return None
+        commit_service = CommitService(commit_store)
+        return commit_service.create_commit(mcp_connection, chat_id, prompt, rossum_api_base_url.rstrip("/"))
+
     def _save_documents_to_output_dir(self, documents: list[DocumentContent], output_dir: Path) -> None:
-        """Save uploaded documents to the output directory.
-
-        Args:
-            documents: List of documents to save.
-            output_dir: Path to the session output directory.
-        """
-        import base64  # noqa: PLC0415 - import here to avoid circular import at module level
-
         for doc in documents:
             file_path = output_dir / doc.filename
             try:
@@ -514,17 +556,6 @@ class AgentService:
         documents: list[DocumentContent] | None = None,
         output_dir: Path | None = None,
     ) -> UserContent:
-        """Build user content for the agent, optionally including images and documents.
-
-        Args:
-            prompt: The user's text prompt.
-            images: Optional list of images to include.
-            documents: Optional list of documents (paths are included in prompt).
-            output_dir: Path to the session output directory for resolving document paths.
-
-        Returns:
-            Either a plain string (text-only) or a list of content blocks (multimodal).
-        """
         if not images and not documents:
             return prompt
 
@@ -549,13 +580,6 @@ class AgentService:
         return content
 
     def _restore_conversation_history(self, agent: RossumAgent, history: list[dict[str, Any]]) -> None:
-        """Restore conversation history to the agent.
-
-        Args:
-            agent: The RossumAgent instance.
-            history: List of step dicts with 'type' key indicating step type.
-                     Supports both new format (with 'type') and legacy format (with 'role').
-        """
         if not history:
             return
 
@@ -573,14 +597,6 @@ class AgentService:
                     agent.add_assistant_message(content)
 
     def _parse_stored_content(self, content: str | list[dict[str, Any]]) -> UserContent:
-        """Parse stored content back into UserContent format.
-
-        Args:
-            content: Either a string or a list of content block dicts.
-
-        Returns:
-            UserContent suitable for the agent.
-        """
         if isinstance(content, str):
             return content
 
@@ -613,19 +629,6 @@ class AgentService:
         documents: list[DocumentContent] | None = None,
         memory: AgentMemory | None = None,
     ) -> list[dict[str, Any]]:
-        """Build updated conversation history after agent execution.
-
-        Stores task steps and assistant responses including tool calls and results
-        for full conversation replay in multi-turn conversations.
-
-        Args:
-            existing_history: Previous conversation history (ignored if memory available).
-            user_prompt: The user's prompt that was just processed.
-            final_response: The agent's final response, if any.
-            images: Optional list of images included with the user prompt.
-            documents: Optional list of documents included with the user prompt.
-            memory: Optional agent memory from the completed run.
-        """
         if memory is not None:
             lean_history: list[dict[str, Any]] = []
             for step_dict in memory.to_dict():
