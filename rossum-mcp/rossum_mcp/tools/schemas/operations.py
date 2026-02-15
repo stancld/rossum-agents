@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, is_dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from rossum_api import APIClientError
@@ -80,8 +80,6 @@ async def _update_schema_with_retry(
 
 def _truncate_schema_for_list(schema: Schema) -> Schema:
     """Truncate content field in schema to save context in list responses."""
-    from dataclasses import replace  # noqa: PLC0415 - avoid circular import with models
-
     return replace(schema, content=TRUNCATED_MARKER)
 
 

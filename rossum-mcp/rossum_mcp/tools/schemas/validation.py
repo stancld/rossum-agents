@@ -41,6 +41,20 @@ def sanitize_schema_content(content: list[dict]) -> list[dict]:
     """
 
     def _traverse(node: dict, *, in_multivalue_tuple: bool = False, parent_is_multivalue: bool = False) -> None:
+        # Strip None values — the API rejects explicit nulls for optional fields
+        # like score_threshold, description, formula, prompt, context, grid
+        none_keys = [k for k, v in node.items() if v is None]
+        for k in none_keys:
+            del node[k]
+
+        # Coerce type to string — LLM may produce {"type": {"type": "number"}}
+        if "type" in node and not isinstance(node["type"], str):
+            raw = node["type"]
+            if isinstance(raw, dict) and isinstance(raw.get("type"), str):
+                node["type"] = raw["type"]
+            else:
+                del node["type"]
+
         _sanitize_ui_configuration(node)
         if not in_multivalue_tuple:
             _strip_tuple_only_fields(node)

@@ -11,7 +11,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
 from rossum_agent.tools.core import get_mcp_connection, get_mcp_event_loop, is_read_only_mode
@@ -19,6 +19,8 @@ from rossum_agent.tools.core import get_mcp_connection, get_mcp_event_loop, is_r
 if TYPE_CHECKING:
     from anthropic.types import ToolParam
     from mcp.types import Tool as MCPTool
+
+    from rossum_agent.rossum_mcp_integration import MCPConnection
 
 logger = logging.getLogger(__name__)
 
@@ -115,8 +117,39 @@ def get_tools_version() -> int:
     return get_global_state().version
 
 
+def _parse_catalog_result(result: object) -> CatalogData:
+    """Parse raw MCP catalog result into CatalogData."""
+    # Handle various result formats from MCP
+    if isinstance(result, str):
+        result = json.loads(result)
+    if isinstance(result, dict) and "result" in result:
+        result = result["result"]  # type: ignore[assignment] - unwrapping FastMCP wrapper
+    if isinstance(result, str):
+        result = json.loads(result)
+    if not isinstance(result, list):
+        logger.warning("Unexpected catalog result type: %s", type(result).__name__)
+        return CatalogData()
+
+    categories = cast("list[dict]", result)
+    catalog: dict[str, set[str]] = {}
+    keywords: dict[str, list[str]] = {}
+    write_tools: set[str] = set()
+
+    for category in categories:
+        name = category["name"]
+        catalog[name] = {tool["name"] for tool in category["tools"] if tool["name"] not in HIDDEN_TOOLS}
+        keywords[name] = category.get("keywords", [])
+        for tool in category["tools"]:
+            if tool["name"] in HIDDEN_TOOLS:
+                continue
+            if not tool.get("read_only", True):
+                write_tools.add(tool["name"])
+
+    return CatalogData(catalog=catalog, keywords=keywords, write_tools=write_tools)
+
+
 def _fetch_catalog_from_mcp() -> CatalogData:
-    """Fetch tool catalog from MCP server."""
+    """Fetch tool catalog from MCP server (sync, uses global connection)."""
     global _catalog_cache
 
     if _catalog_cache is not None:
@@ -129,43 +162,31 @@ def _fetch_catalog_from_mcp() -> CatalogData:
         logger.warning("MCP connection not available, returning empty catalog")
         return CatalogData()
 
-    # Call list_tool_categories MCP tool to get catalog
     try:
         result = asyncio.run_coroutine_threadsafe(mcp_connection.call_tool("list_tool_categories", {}), loop).result(
             timeout=10
         )
-
-        # Handle various result formats from MCP
-        # 1. String (JSON) - parse it
-        if isinstance(result, str):
-            result = json.loads(result)
-
-        # 2. FastMCP wraps list returns in {"result": [...]}
-        if isinstance(result, dict) and "result" in result:
-            result = result["result"]
-
-        # 3. The unwrapped result might also be a JSON string
-        if isinstance(result, str):
-            result = json.loads(result)
-
-        catalog: dict[str, set[str]] = {}
-        keywords: dict[str, list[str]] = {}
-        write_tools: set[str] = set()
-
-        for category in result:
-            name = category["name"]
-            catalog[name] = {tool["name"] for tool in category["tools"] if tool["name"] not in HIDDEN_TOOLS}
-            keywords[name] = category.get("keywords", [])
-            for tool in category["tools"]:
-                if tool["name"] in HIDDEN_TOOLS:
-                    continue
-                if not tool.get("read_only", True):
-                    write_tools.add(tool["name"])
-
-        _catalog_cache = CatalogData(catalog=catalog, keywords=keywords, write_tools=write_tools)
-        logger.info(f"Fetched catalog with {len(catalog)} categories from MCP")
+        _catalog_cache = _parse_catalog_result(result)
+        logger.info(f"Fetched catalog with {len(_catalog_cache.catalog)} categories from MCP")
         return _catalog_cache
 
+    except Exception as e:
+        logger.error(f"Failed to fetch catalog from MCP: {e}")
+        return CatalogData()
+
+
+async def _fetch_catalog_async(mcp_connection: MCPConnection) -> CatalogData:
+    """Fetch tool catalog from MCP server (async, accepts connection directly)."""
+    global _catalog_cache
+
+    if _catalog_cache is not None:
+        return _catalog_cache
+
+    try:
+        result = await mcp_connection.call_tool("list_tool_categories", {})
+        _catalog_cache = _parse_catalog_result(result)
+        logger.info(f"Fetched catalog with {len(_catalog_cache.catalog)} categories from MCP")
+        return _catalog_cache
     except Exception as e:
         logger.error(f"Failed to fetch catalog from MCP: {e}")
         return CatalogData()
@@ -182,8 +203,11 @@ def get_category_keywords() -> dict[str, list[str]]:
 
 
 def get_write_tools() -> set[str]:
-    """Get set of write tool names (read_only=False) from MCP catalog."""
     return _fetch_catalog_from_mcp().write_tools
+
+
+async def get_write_tools_async(mcp_connection: MCPConnection) -> set[str]:
+    return (await _fetch_catalog_async(mcp_connection)).write_tools
 
 
 def suggest_categories_for_request(request_text: str) -> list[str]:

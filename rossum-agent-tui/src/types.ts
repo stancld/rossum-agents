@@ -111,6 +111,15 @@ export interface StreamDoneEvent {
   input_tokens: number;
   output_tokens: number;
   token_usage_breakdown: TokenUsageBreakdown | null;
+  config_commit_hash: string | null;
+  config_commit_message: string | null;
+  config_changes_count: number;
+}
+
+export interface ConfigCommitInfo {
+  hash: string;
+  message: string;
+  changesCount: number;
 }
 
 export interface FileCreatedEvent {
@@ -152,6 +161,7 @@ export type ChatItem =
   | { kind: "final_answer"; content: string }
   | { kind: "error"; content: string }
   | { kind: "file_created"; filename: string; url: string }
+  | { kind: "config_commit"; commit: ConfigCommitInfo }
   | {
       kind: "streaming";
       streaming: StepEvent;
@@ -195,6 +205,7 @@ export interface ChatState {
   subAgentProgress: SubAgentProgressEvent | null;
   finalAnswer: string | null;
   tokenUsage: TokenUsageBreakdown | null;
+  configCommit: ConfigCommitInfo | null;
   files: FileCreatedEvent[];
   error: string | null;
   userMessages: UserMessage[];

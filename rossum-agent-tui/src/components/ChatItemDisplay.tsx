@@ -123,6 +123,19 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
         </Text>
       );
 
+    case "config_commit":
+      return (
+        <Text color="cyan">
+          {"  ✓ "}
+          <Text bold>Committed</Text> <Text dimColor>[{item.commit.hash}]</Text>{" "}
+          {item.commit.message}{" "}
+          <Text dimColor>
+            ({item.commit.changesCount} change
+            {item.commit.changesCount !== 1 ? "s" : ""})
+          </Text>
+        </Text>
+      );
+
     case "streaming":
       return (
         <StreamingIndicator

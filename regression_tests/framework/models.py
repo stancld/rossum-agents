@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     type Reasoning = str
     type CustomCheckResult = tuple[Passed, Reasoning]
     type CustomCheckFn = Callable[[list[AgentStep], str, str], CustomCheckResult]
+    type SetupFn = Callable[[str, str], dict[str, str]]
 
 
 class ToolMatchMode(Enum):
@@ -143,6 +144,8 @@ class RegressionTestCase:
     api_token: str | None = None
     rossum_url: str | None = None
     sandbox_api_token: str | None = None
+    requires_redis: bool = False
+    setup_fn: SetupFn | None = None
     tool_expectation: ToolExpectation = field(default_factory=ToolExpectation)
     token_budget: TokenBudget = field(default_factory=TokenBudget)
     success_criteria: SuccessCriteria = field(default_factory=SuccessCriteria)

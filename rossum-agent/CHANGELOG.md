@@ -8,7 +8,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Added tool call and result persistence in conversation history for full replay in multi-turn conversations [#184](https://github.com/stancld/rossum-agents/pull/184)
-- Moved `rossum-kb.json` into the `rossum_agent` package so it is included in installed distributions
+- Moved `rossum-kb.json` into the `rossum_agent` package so it is included in installed distributions [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Added configuration change tracking system that records every mutation as a `ConfigCommit` with before/after snapshots, LLM-generated commit messages, and Redis persistence [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Added `show_change_history`, `show_commit_details`, and `revert_commit` agent tools for querying and managing configuration changes [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Added `ChangeTrackingMCPConnection` wrapper that transparently caches reads and intercepts writes for change tracking [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Added `MCPConnectionProtocol` for type-safe MCP connection wrapping [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Added config commit info (`config_commit_hash`, `config_commit_message`, `config_changes_count`) to `StreamDoneEvent` for TUI integration [#185](https://github.com/stancld/rossum-agents/pull/185)
 
 ### Fixed
 - Fixed schema patching sub-agent silently dropping fields when `parent_section` doesn't exist — now auto-creates the missing section [#189](https://github.com/stancld/rossum-agents/pull/189)
