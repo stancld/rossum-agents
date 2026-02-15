@@ -53,3 +53,10 @@ repos:
         language: system
         files: ^rossum-agent-tui/src/.*\.(ts|tsx)$
         pass_filenames: false
+
+      - id: dead-functions
+        name: dead-functions
+        entry: python scripts/check_dead_functions.py
+        language: system
+        pass_filenames: false
+        types: [python]

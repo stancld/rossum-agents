@@ -30,7 +30,7 @@ from rossum_agent.tools.core import (
     set_text_callback,
     set_token_callback,
 )
-from rossum_agent.tools.spawn_mcp import SpawnedConnection, get_spawned_connections, get_spawned_connections_lock
+from rossum_agent.tools.spawn_mcp import SpawnedConnection
 from rossum_agent.tools.task_tracker import TaskTracker
 
 if TYPE_CHECKING:
@@ -391,14 +391,6 @@ class TestMCPConnection:
         finally:
             loop.close()
             set_mcp_connection(None, None)  # type: ignore[arg-type]
-
-    def test_get_spawned_connections(self) -> None:
-        spawned = get_spawned_connections()
-        assert isinstance(spawned, dict)
-
-    def test_get_spawned_connections_lock(self) -> None:
-        lock = get_spawned_connections_lock()
-        assert isinstance(lock, type(threading.Lock()))
 
 
 class TestSpawnedConnection:

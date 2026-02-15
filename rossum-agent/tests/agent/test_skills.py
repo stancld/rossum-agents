@@ -6,14 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from rossum_agent.agent.skills import (
-    Skill,
-    SkillRegistry,
-    format_skills_for_prompt,
-    get_skill,
-    get_skill_content,
-    get_skill_registry,
-)
+from rossum_agent.agent.skills import Skill, SkillRegistry, get_skill, get_skill_registry
 from rossum_agent.tools import INTERNAL_TOOLS, execute_tool, get_internal_tool_names, load_skill
 
 
@@ -125,29 +118,6 @@ class TestSkillRegistry:
             assert len(registry.get_all_skills()) == 1
 
 
-class TestFormatSkillsForPrompt:
-    """Test format_skills_for_prompt function."""
-
-    def test_formats_skills_with_separators(self):
-        """Test that skills are formatted with separators."""
-        skills = [
-            Skill(name="Skill A", content="Content A", file_path=Path("a.md")),
-            Skill(name="Skill B", content="Content B", file_path=Path("b.md")),
-        ]
-
-        result = format_skills_for_prompt(skills)
-
-        assert "Available Skills" in result
-        assert "Content A" in result
-        assert "Content B" in result
-        assert "=" in result
-
-    def test_returns_empty_string_for_no_skills(self):
-        """Test that empty list returns empty string."""
-        result = format_skills_for_prompt([])
-        assert result == ""
-
-
 class TestLoadSkillTool:
     """Test load_skill internal tool."""
 
@@ -231,37 +201,6 @@ class TestModuleLevelFunctions:
                     assert skill is not None
                     assert skill.content == "Content"
 
-    def test_get_skill_content_returns_content(self):
-        """Test get_skill_content module function."""
-        with TemporaryDirectory() as tmpdir:
-            skill_file = Path(tmpdir) / "my-skill.md"
-            skill_file.write_text("Skill Content Here")
-
-            with patch(
-                "rossum_agent.agent.skills._SKILLS_DIR",
-                Path(tmpdir),
-            ):
-                with patch(
-                    "rossum_agent.agent.skills._default_registry",
-                    None,
-                ):
-                    content = get_skill_content("my-skill")
-                    assert content == "Skill Content Here"
-
-    def test_get_skill_content_returns_none_for_unknown(self):
-        """Test get_skill_content returns None for unknown skill."""
-        with TemporaryDirectory() as tmpdir:
-            with patch(
-                "rossum_agent.agent.skills._SKILLS_DIR",
-                Path(tmpdir),
-            ):
-                with patch(
-                    "rossum_agent.agent.skills._default_registry",
-                    None,
-                ):
-                    content = get_skill_content("nonexistent")
-                    assert content is None
-
     def test_get_skill_registry_creates_default(self):
         """Test get_skill_registry creates default registry."""
         with patch(
@@ -293,22 +232,3 @@ class TestSkillRegistryErrorHandling:
             assert "Failed to load skill" in caplog.text
         finally:
             os.chmod(skill_file, 0o644)
-
-
-class TestFormatSkillsDefaults:
-    """Test format_skills_for_prompt with default behavior."""
-
-    def test_format_skills_loads_default_skills_when_none(self):
-        """Test format_skills_for_prompt loads skills when None is passed."""
-
-        with TemporaryDirectory() as tmpdir:
-            skill_file = Path(tmpdir) / "default-skill.md"
-            skill_file.write_text("# Default Skill Content")
-
-            with (
-                patch("rossum_agent.agent.skills._SKILLS_DIR", Path(tmpdir)),
-                patch("rossum_agent.agent.skills._default_registry", None),
-            ):
-                result = format_skills_for_prompt(None)
-
-                assert "Default Skill Content" in result

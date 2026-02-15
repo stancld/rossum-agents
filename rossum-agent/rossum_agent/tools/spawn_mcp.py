@@ -36,16 +36,6 @@ _spawned_connections: dict[str, SpawnedConnection] = {}
 _spawned_connections_lock = threading.Lock()
 
 
-def get_spawned_connections() -> dict[str, SpawnedConnection]:
-    """Get the spawned connections dict (for internal use only)."""
-    return _spawned_connections
-
-
-def get_spawned_connections_lock() -> threading.Lock:
-    """Get the spawned connections lock (for internal use only)."""
-    return _spawned_connections_lock
-
-
 def clear_spawned_connections() -> None:
     """Clear all spawned connections. Called when MCP connection is reset."""
     with _spawned_connections_lock:
