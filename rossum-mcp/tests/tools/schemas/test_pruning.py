@@ -587,6 +587,50 @@ class TestPruneSchemaFields:
         mock_client._http_client.update.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_prune_schema_fields_keep_section_as_empty_container(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that section IDs in fields_to_keep are preserved as empty containers."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        importlib.reload(schemas)
+
+        schemas.register_schema_tools(mock_mcp, mock_client)
+
+        mock_schema_dict = {
+            "id": 50,
+            "content": [
+                {
+                    "id": "header_section",
+                    "label": "Header",
+                    "category": "section",
+                    "children": [
+                        {"id": "invoice_number", "label": "Invoice Number", "category": "datapoint", "type": "string"}
+                    ],
+                },
+                {
+                    "id": "payment_section",
+                    "label": "Payment",
+                    "category": "section",
+                    "children": [
+                        {"id": "bank_account", "label": "Bank Account", "category": "datapoint", "type": "string"}
+                    ],
+                },
+            ],
+        }
+        mock_client._http_client.request_json.return_value = mock_schema_dict
+        mock_client._http_client.update.return_value = {}
+
+        prune_schema_fields = mock_mcp._tools["prune_schema_fields"]
+        result = await prune_schema_fields(schema_id=50, fields_to_keep=["header_section"])
+
+        assert "header_section" in result["remaining_fields"]
+        assert "invoice_number" in result["removed_fields"]
+        assert "bank_account" in result["removed_fields"]
+        assert "payment_section" in result["removed_fields"]
+        mock_client._http_client.update.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_prune_schema_fields_retries_on_412(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:

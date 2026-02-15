@@ -505,16 +505,17 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
+                "get_schema_tree_structure",
                 "prune_schema_fields",
                 ("patch_schema", "patch_schema_with_subagent"),
             ],
-            mode=ToolMatchMode.SUBSET,
+            mode=ToolMatchMode.EXACT_SEQUENCE,
         ),
-        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=120000),
+        token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=90000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
-            max_steps=8,
+            max_steps=6,
             file_expectation=FileExpectation(),
             custom_checks=[SCHEMA_REPLACED_WITH_FORMULA_CHECK],
         ),
