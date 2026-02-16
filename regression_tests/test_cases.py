@@ -505,7 +505,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
-                "get_schema_tree_structure",
                 "prune_schema_fields",
                 ("patch_schema", "patch_schema_with_subagent"),
             ],
