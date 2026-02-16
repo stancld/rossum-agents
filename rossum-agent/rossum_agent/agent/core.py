@@ -57,7 +57,7 @@ from anthropic.types import (
     TextBlockParam,
     TextDelta,
     ThinkingBlock,
-    ThinkingConfigEnabledParam,
+    ThinkingConfigAdaptiveParam,
     ThinkingDelta,
     ToolParam,
     ToolUseBlock,
@@ -415,10 +415,7 @@ class RossumAgent:
         Yields:
             Tuples of (event, None) for each stream event, then (None, final_message) at the end.
         """
-        thinking_config: ThinkingConfigEnabledParam = {
-            "type": "enabled",
-            "budget_tokens": self.config.thinking_budget_tokens,
-        }
+        thinking_config: ThinkingConfigAdaptiveParam = {"type": "adaptive"}
 
         # Cache breakpoints: system prompt
         system: list[TextBlockParam] = [
@@ -441,6 +438,7 @@ class RossumAgent:
             tools=tools if tools else Omit(),
             thinking=thinking_config,
             temperature=self.config.temperature,
+            output_config={"effort": self.config.effort},
         ) as stream:
             for event in stream:
                 yield (event, None)

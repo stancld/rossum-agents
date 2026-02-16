@@ -143,7 +143,7 @@ class TestAgentConfig:
     def test_default_values(self):
         """Test default configuration values."""
         config = AgentConfig()
-        assert config.max_output_tokens == 64000
+        assert config.max_output_tokens == 128000
         assert config.max_steps == 50
         assert config.temperature == 1.0  # Required for extended thinking
 

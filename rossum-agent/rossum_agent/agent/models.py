@@ -134,18 +134,15 @@ class AgentStep:
 class AgentConfig:
     """Configuration for the RossumAgent."""
 
-    max_output_tokens: int = 64000  # Opus 4.6 limit
+    max_output_tokens: int = 128000  # Opus 4.6 limit
     max_steps: int = 50
     temperature: float = 1.0  # Required for extended thinking
     request_delay: float = 3.0  # Delay in seconds between API calls to avoid rate limiting
-    thinking_budget_tokens: int = 10000  # Budget for extended thinking (min 1024)
+    effort: Literal["max", "high", "medium", "low"] = "high"
 
     def __post_init__(self) -> None:
         if self.temperature != 1.0:
             msg = "temperature must be 1.0 when extended thinking is enabled"
-            raise ValueError(msg)
-        if self.thinking_budget_tokens < 1024:
-            msg = "thinking_budget_tokens must be at least 1024"
             raise ValueError(msg)
 
 
