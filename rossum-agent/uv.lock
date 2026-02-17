@@ -2403,16 +2403,16 @@ wheels = [
 
 [[package]]
 name = "rossum-mcp"
-version = "1.2.2"
+version = "1.2.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastmcp" },
     { name = "pydantic" },
     { name = "rossum-api" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f8/f3/bc7033e6d7496f83eeae064bf98584913c00cc602eceec9627b48ec6c35d/rossum_mcp-1.2.2.tar.gz", hash = "sha256:5f06435aa29032f740a711b4886c8eab9d02619873fb55b90cf164bc1cba93dc", size = 37373, upload-time = "2026-02-12T16:16:09.702Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/49/aeb6c92318b80cb1701719440744a6a9aabe2f525a72b62fc7d5dc824ec8/rossum_mcp-1.2.3.tar.gz", hash = "sha256:dcae94f2311da36d529ee599a349b5ebd42d4bb4b57d440586942cd4028f91ab", size = 37912, upload-time = "2026-02-17T13:10:07.235Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/92/7e2fc9c8584b26d84780a7e63b11ce63bc513cfc93a11e14805c4c2c3857/rossum_mcp-1.2.2-py3-none-any.whl", hash = "sha256:7f04c223c941ae2447da32c53a3255e635dcd0e99f243855e98561f23c03c12e", size = 44382, upload-time = "2026-02-12T16:16:08.841Z" },
+    { url = "https://files.pythonhosted.org/packages/04/c8/a9a8cd949a7a9612f1349a304bb185c614cf7b41a7d7956c30938cb7dc7c/rossum_mcp-1.2.3-py3-none-any.whl", hash = "sha256:8f5dc2c4997530325e4c51828208b2a8e99680fa8cc158ee26c198a07d1f3b0e", size = 44988, upload-time = "2026-02-17T13:10:04.437Z" },
 ]
 
 [[package]]
