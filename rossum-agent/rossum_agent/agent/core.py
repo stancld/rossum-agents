@@ -229,6 +229,73 @@ class _StreamState:
         return bool(self.thinking_text)
 
 
+@dataclasses.dataclass
+class TokenTracker:
+    """Tracks all token usage (main agent + sub-agents) in one place."""
+
+    main_input: int = 0
+    main_output: int = 0
+    sub_input: int = 0
+    sub_output: int = 0
+    main_cache_creation: int = 0
+    main_cache_read: int = 0
+    sub_cache_creation: int = 0
+    sub_cache_read: int = 0
+    sub_by_tool: dict[str, tuple[int, int]] = dataclasses.field(default_factory=dict)
+    sub_cache_by_tool: dict[str, tuple[int, int]] = dataclasses.field(default_factory=dict)
+
+    @property
+    def total_input(self) -> int:
+        return self.main_input + self.sub_input
+
+    @property
+    def total_output(self) -> int:
+        return self.main_output + self.sub_output
+
+    @property
+    def total_cache_creation(self) -> int:
+        return self.main_cache_creation + self.sub_cache_creation
+
+    @property
+    def total_cache_read(self) -> int:
+        return self.main_cache_read + self.sub_cache_read
+
+    def accumulate_main(self, input_tokens: int, output_tokens: int, cache_creation: int, cache_read: int) -> None:
+        self.main_input += input_tokens
+        self.main_output += output_tokens
+        self.main_cache_creation += cache_creation
+        self.main_cache_read += cache_read
+
+    def accumulate_sub(self, usage: SubAgentTokenUsage) -> None:
+        self.sub_input += usage.input_tokens
+        self.sub_output += usage.output_tokens
+        prev_in, prev_out = self.sub_by_tool.get(usage.tool_name, (0, 0))
+        self.sub_by_tool[usage.tool_name] = (prev_in + usage.input_tokens, prev_out + usage.output_tokens)
+        self.sub_cache_creation += usage.cache_creation_input_tokens
+        self.sub_cache_read += usage.cache_read_input_tokens
+        prev_cc, prev_cr = self.sub_cache_by_tool.get(usage.tool_name, (0, 0))
+        self.sub_cache_by_tool[usage.tool_name] = (
+            prev_cc + usage.cache_creation_input_tokens,
+            prev_cr + usage.cache_read_input_tokens,
+        )
+
+    def to_breakdown(self) -> TokenUsageBreakdown:
+        return TokenUsageBreakdown.from_raw_counts(
+            total_input=self.total_input,
+            total_output=self.total_output,
+            main_input=self.main_input,
+            main_output=self.main_output,
+            sub_input=self.sub_input,
+            sub_output=self.sub_output,
+            sub_by_tool=self.sub_by_tool,
+            main_cache_creation=self.main_cache_creation,
+            main_cache_read=self.main_cache_read,
+            sub_cache_creation=self.sub_cache_creation,
+            sub_cache_read=self.sub_cache_read,
+            sub_cache_by_tool=self.sub_cache_by_tool,
+        )
+
+
 class RossumAgent:
     """Claude-powered agent for Rossum document processing.
 
@@ -257,22 +324,7 @@ class RossumAgent:
         self.memory = AgentMemory()
         self._tools_cache: list[ToolParam] | None = None
         self._tools_cache_version: int = -1
-        self._total_input_tokens: int = 0
-        self._total_output_tokens: int = 0
-        # Token breakdown tracking
-        self._main_agent_input_tokens: int = 0
-        self._main_agent_output_tokens: int = 0
-        self._sub_agent_input_tokens: int = 0
-        self._sub_agent_output_tokens: int = 0
-        self._sub_agent_usage: dict[str, tuple[int, int]] = {}  # tool_name -> (input, output)
-        # Cache token tracking
-        self._total_cache_creation_tokens: int = 0
-        self._total_cache_read_tokens: int = 0
-        self._main_agent_cache_creation_tokens: int = 0
-        self._main_agent_cache_read_tokens: int = 0
-        self._sub_agent_cache_creation_tokens: int = 0
-        self._sub_agent_cache_read_tokens: int = 0
-        self._sub_agent_cache_usage: dict[str, tuple[int, int]] = {}  # tool_name -> (creation, read)
+        self.tokens = TokenTracker()
 
     @property
     def messages(self) -> list[MessageParam]:
@@ -282,63 +334,12 @@ class RossumAgent:
     def reset(self) -> None:
         """Reset the agent's conversation state."""
         self.memory.reset()
-        self._total_input_tokens = 0
-        self._total_output_tokens = 0
-        self._main_agent_input_tokens = 0
-        self._main_agent_output_tokens = 0
-        self._sub_agent_input_tokens = 0
-        self._sub_agent_output_tokens = 0
-        self._sub_agent_usage = {}
-        self._total_cache_creation_tokens = 0
-        self._total_cache_read_tokens = 0
-        self._main_agent_cache_creation_tokens = 0
-        self._main_agent_cache_read_tokens = 0
-        self._sub_agent_cache_creation_tokens = 0
-        self._sub_agent_cache_read_tokens = 0
-        self._sub_agent_cache_usage = {}
+        self.tokens = TokenTracker()
         reset_dynamic_tools()
-
-    def _accumulate_sub_agent_tokens(self, usage: SubAgentTokenUsage) -> None:
-        """Accumulate token usage from a sub-agent call."""
-        self._total_input_tokens += usage.input_tokens
-        self._total_output_tokens += usage.output_tokens
-        self._sub_agent_input_tokens += usage.input_tokens
-        self._sub_agent_output_tokens += usage.output_tokens
-        # Track per sub-agent
-        prev_in, prev_out = self._sub_agent_usage.get(usage.tool_name, (0, 0))
-        self._sub_agent_usage[usage.tool_name] = (prev_in + usage.input_tokens, prev_out + usage.output_tokens)
-        # Cache tokens
-        self._total_cache_creation_tokens += usage.cache_creation_input_tokens
-        self._total_cache_read_tokens += usage.cache_read_input_tokens
-        self._sub_agent_cache_creation_tokens += usage.cache_creation_input_tokens
-        self._sub_agent_cache_read_tokens += usage.cache_read_input_tokens
-        prev_cc, prev_cr = self._sub_agent_cache_usage.get(usage.tool_name, (0, 0))
-        self._sub_agent_cache_usage[usage.tool_name] = (
-            prev_cc + usage.cache_creation_input_tokens,
-            prev_cr + usage.cache_read_input_tokens,
-        )
-        logger.info(
-            f"Sub-agent '{usage.tool_name}' token usage (iter {usage.iteration}): "
-            f"in={usage.input_tokens}, out={usage.output_tokens}, "
-            f"cumulative total: in={self._total_input_tokens}, out={self._total_output_tokens}"
-        )
 
     def get_token_usage_breakdown(self) -> TokenUsageBreakdown:
         """Get token usage breakdown by agent vs sub-agents."""
-        return TokenUsageBreakdown.from_raw_counts(
-            total_input=self._total_input_tokens,
-            total_output=self._total_output_tokens,
-            main_input=self._main_agent_input_tokens,
-            main_output=self._main_agent_output_tokens,
-            sub_input=self._sub_agent_input_tokens,
-            sub_output=self._sub_agent_output_tokens,
-            sub_by_tool=self._sub_agent_usage,
-            main_cache_creation=self._main_agent_cache_creation_tokens,
-            main_cache_read=self._main_agent_cache_read_tokens,
-            sub_cache_creation=self._sub_agent_cache_creation_tokens,
-            sub_cache_read=self._sub_agent_cache_read_tokens,
-            sub_cache_by_tool=self._sub_agent_cache_usage,
-        )
+        return self.tokens.to_breakdown()
 
     def log_token_usage_summary(self) -> None:
         """Log a human-readable token usage summary."""
@@ -637,18 +638,11 @@ class RossumAgent:
         cache_creation = getattr(state.final_message.usage, "cache_creation_input_tokens", 0) or 0
         cache_read = getattr(state.final_message.usage, "cache_read_input_tokens", 0) or 0
         input_tokens = raw_input_tokens + cache_creation + cache_read
-        self._total_input_tokens += input_tokens
-        self._total_output_tokens += output_tokens
-        self._main_agent_input_tokens += input_tokens
-        self._main_agent_output_tokens += output_tokens
-        self._total_cache_creation_tokens += cache_creation
-        self._total_cache_read_tokens += cache_read
-        self._main_agent_cache_creation_tokens += cache_creation
-        self._main_agent_cache_read_tokens += cache_read
+        self.tokens.accumulate_main(input_tokens, output_tokens, cache_creation, cache_read)
         logger.info(
             f"Step {step_num}: input_tokens={input_tokens}, output_tokens={output_tokens}, "
             f"cache_creation={cache_creation}, cache_read={cache_read}, "
-            f"total_input={self._total_input_tokens}, total_output={self._total_output_tokens}"
+            f"total_input={self.tokens.total_input}, total_output={self.tokens.total_output}"
         )
 
         step = AgentStep(
@@ -766,7 +760,12 @@ class RossumAgent:
         while True:
             try:
                 usage = token_queue.get_nowait()
-                self._accumulate_sub_agent_tokens(usage)
+                self.tokens.accumulate_sub(usage)
+                logger.info(
+                    f"Sub-agent '{usage.tool_name}' token usage (iter {usage.iteration}): "
+                    f"in={usage.input_tokens}, out={usage.output_tokens}, "
+                    f"cumulative total: in={self.tokens.total_input}, out={self.tokens.total_output}"
+                )
             except queue.Empty:
                 break
 

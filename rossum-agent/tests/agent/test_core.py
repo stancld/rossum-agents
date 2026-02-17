@@ -602,14 +602,14 @@ class TestRossumAgentMemoryIntegration:
         """Test that reset clears memory and token counts."""
         agent = self._create_agent()
         agent.memory.add_task("test")
-        agent._total_input_tokens = 1000
-        agent._total_output_tokens = 500
+        agent.tokens.main_input = 1000
+        agent.tokens.main_output = 500
 
         agent.reset()
 
         assert agent.memory.steps == []
-        assert agent._total_input_tokens == 0
-        assert agent._total_output_tokens == 0
+        assert agent.tokens.total_input == 0
+        assert agent.tokens.total_output == 0
 
     def test_add_user_message_adds_task(self):
         """Test that add_user_message adds a TaskStep."""
@@ -2368,13 +2368,13 @@ class TestRossumAgentProperties:
 
     def test_reset_clears_state(self, mock_agent):
         """Test reset clears agent state."""
-        mock_agent._total_input_tokens = 100
-        mock_agent._total_output_tokens = 50
+        mock_agent.tokens.main_input = 100
+        mock_agent.tokens.main_output = 50
 
         mock_agent.reset()
 
-        assert mock_agent._total_input_tokens == 0
-        assert mock_agent._total_output_tokens == 0
+        assert mock_agent.tokens.total_input == 0
+        assert mock_agent.tokens.total_output == 0
 
     def test_add_user_message(self, mock_agent):
         """Test add_user_message adds message to memory."""
@@ -2412,33 +2412,31 @@ class TestRossumAgentTokenTracking:
 
     def test_initial_token_counters_are_zero(self, mock_agent):
         """Test that all token counters start at zero."""
-        assert mock_agent._total_input_tokens == 0
-        assert mock_agent._total_output_tokens == 0
-        assert mock_agent._main_agent_input_tokens == 0
-        assert mock_agent._main_agent_output_tokens == 0
-        assert mock_agent._sub_agent_input_tokens == 0
-        assert mock_agent._sub_agent_output_tokens == 0
-        assert mock_agent._sub_agent_usage == {}
+        assert mock_agent.tokens.total_input == 0
+        assert mock_agent.tokens.total_output == 0
+        assert mock_agent.tokens.main_input == 0
+        assert mock_agent.tokens.main_output == 0
+        assert mock_agent.tokens.sub_input == 0
+        assert mock_agent.tokens.sub_output == 0
+        assert mock_agent.tokens.sub_by_tool == {}
 
     def test_reset_clears_all_token_counters(self, mock_agent):
         """Test reset clears all token tracking state."""
-        mock_agent._total_input_tokens = 1000
-        mock_agent._total_output_tokens = 500
-        mock_agent._main_agent_input_tokens = 600
-        mock_agent._main_agent_output_tokens = 300
-        mock_agent._sub_agent_input_tokens = 400
-        mock_agent._sub_agent_output_tokens = 200
-        mock_agent._sub_agent_usage = {"search_knowledge_base": (400, 200)}
+        mock_agent.tokens.main_input = 600
+        mock_agent.tokens.main_output = 300
+        mock_agent.tokens.sub_input = 400
+        mock_agent.tokens.sub_output = 200
+        mock_agent.tokens.sub_by_tool = {"search_knowledge_base": (400, 200)}
 
         mock_agent.reset()
 
-        assert mock_agent._total_input_tokens == 0
-        assert mock_agent._total_output_tokens == 0
-        assert mock_agent._main_agent_input_tokens == 0
-        assert mock_agent._main_agent_output_tokens == 0
-        assert mock_agent._sub_agent_input_tokens == 0
-        assert mock_agent._sub_agent_output_tokens == 0
-        assert mock_agent._sub_agent_usage == {}
+        assert mock_agent.tokens.total_input == 0
+        assert mock_agent.tokens.total_output == 0
+        assert mock_agent.tokens.main_input == 0
+        assert mock_agent.tokens.main_output == 0
+        assert mock_agent.tokens.sub_input == 0
+        assert mock_agent.tokens.sub_output == 0
+        assert mock_agent.tokens.sub_by_tool == {}
 
     def test_get_token_usage_breakdown_with_no_usage(self, mock_agent):
         """Test get_token_usage_breakdown returns zeros when no tokens used."""
@@ -2453,10 +2451,8 @@ class TestRossumAgentTokenTracking:
 
     def test_get_token_usage_breakdown_with_main_agent_only(self, mock_agent):
         """Test breakdown when only main agent has used tokens."""
-        mock_agent._total_input_tokens = 1000
-        mock_agent._total_output_tokens = 500
-        mock_agent._main_agent_input_tokens = 1000
-        mock_agent._main_agent_output_tokens = 500
+        mock_agent.tokens.main_input = 1000
+        mock_agent.tokens.main_output = 500
 
         breakdown = mock_agent.get_token_usage_breakdown()
 
@@ -2470,13 +2466,11 @@ class TestRossumAgentTokenTracking:
 
     def test_get_token_usage_breakdown_with_sub_agents(self, mock_agent):
         """Test breakdown when sub-agents have been used."""
-        mock_agent._total_input_tokens = 3000
-        mock_agent._total_output_tokens = 1500
-        mock_agent._main_agent_input_tokens = 1000
-        mock_agent._main_agent_output_tokens = 500
-        mock_agent._sub_agent_input_tokens = 2000
-        mock_agent._sub_agent_output_tokens = 1000
-        mock_agent._sub_agent_usage = {
+        mock_agent.tokens.main_input = 1000
+        mock_agent.tokens.main_output = 500
+        mock_agent.tokens.sub_input = 2000
+        mock_agent.tokens.sub_output = 1000
+        mock_agent.tokens.sub_by_tool = {
             "search_knowledge_base": (1500, 700),
             "patch_schema_with_subagent": (500, 300),
         }
@@ -2491,28 +2485,28 @@ class TestRossumAgentTokenTracking:
         assert breakdown.sub_agents.by_tool["patch_schema_with_subagent"].total_tokens == 800
 
     def test_accumulate_sub_agent_tokens(self, mock_agent):
-        """Test _accumulate_sub_agent_tokens accumulates properly."""
+        """Test tokens.accumulate_sub accumulates properly."""
         from rossum_agent.tools import SubAgentTokenUsage
 
         usage1 = SubAgentTokenUsage(tool_name="search_knowledge_base", input_tokens=100, output_tokens=50, iteration=1)
-        mock_agent._accumulate_sub_agent_tokens(usage1)
+        mock_agent.tokens.accumulate_sub(usage1)
 
-        assert mock_agent._total_input_tokens == 100
-        assert mock_agent._total_output_tokens == 50
-        assert mock_agent._sub_agent_input_tokens == 100
-        assert mock_agent._sub_agent_output_tokens == 50
-        assert mock_agent._sub_agent_usage["search_knowledge_base"] == (100, 50)
+        assert mock_agent.tokens.total_input == 100
+        assert mock_agent.tokens.total_output == 50
+        assert mock_agent.tokens.sub_input == 100
+        assert mock_agent.tokens.sub_output == 50
+        assert mock_agent.tokens.sub_by_tool["search_knowledge_base"] == (100, 50)
 
         usage2 = SubAgentTokenUsage(
             tool_name="search_knowledge_base", input_tokens=200, output_tokens=100, iteration=2
         )
-        mock_agent._accumulate_sub_agent_tokens(usage2)
+        mock_agent.tokens.accumulate_sub(usage2)
 
-        assert mock_agent._total_input_tokens == 300
-        assert mock_agent._total_output_tokens == 150
-        assert mock_agent._sub_agent_input_tokens == 300
-        assert mock_agent._sub_agent_output_tokens == 150
-        assert mock_agent._sub_agent_usage["search_knowledge_base"] == (300, 150)
+        assert mock_agent.tokens.total_input == 300
+        assert mock_agent.tokens.total_output == 150
+        assert mock_agent.tokens.sub_input == 300
+        assert mock_agent.tokens.sub_output == 150
+        assert mock_agent.tokens.sub_by_tool["search_knowledge_base"] == (300, 150)
 
     def test_accumulate_sub_agent_tokens_multiple_tools(self, mock_agent):
         """Test accumulating tokens from multiple sub-agent tools."""
@@ -2522,23 +2516,21 @@ class TestRossumAgentTokenTracking:
         usage2 = SubAgentTokenUsage(
             tool_name="patch_schema_with_subagent", input_tokens=200, output_tokens=100, iteration=1
         )
-        mock_agent._accumulate_sub_agent_tokens(usage1)
-        mock_agent._accumulate_sub_agent_tokens(usage2)
+        mock_agent.tokens.accumulate_sub(usage1)
+        mock_agent.tokens.accumulate_sub(usage2)
 
-        assert mock_agent._sub_agent_usage["search_knowledge_base"] == (100, 50)
-        assert mock_agent._sub_agent_usage["patch_schema_with_subagent"] == (200, 100)
-        assert mock_agent._sub_agent_input_tokens == 300
-        assert mock_agent._sub_agent_output_tokens == 150
+        assert mock_agent.tokens.sub_by_tool["search_knowledge_base"] == (100, 50)
+        assert mock_agent.tokens.sub_by_tool["patch_schema_with_subagent"] == (200, 100)
+        assert mock_agent.tokens.sub_input == 300
+        assert mock_agent.tokens.sub_output == 150
 
     def test_log_token_usage_summary(self, mock_agent, caplog):
         """Test log_token_usage_summary logs formatted summary."""
-        mock_agent._total_input_tokens = 3000
-        mock_agent._total_output_tokens = 1500
-        mock_agent._main_agent_input_tokens = 1000
-        mock_agent._main_agent_output_tokens = 500
-        mock_agent._sub_agent_input_tokens = 2000
-        mock_agent._sub_agent_output_tokens = 1000
-        mock_agent._sub_agent_usage = {"search_knowledge_base": (2000, 1000)}
+        mock_agent.tokens.main_input = 1000
+        mock_agent.tokens.main_output = 500
+        mock_agent.tokens.sub_input = 2000
+        mock_agent.tokens.sub_output = 1000
+        mock_agent.tokens.sub_by_tool = {"search_knowledge_base": (2000, 1000)}
 
         with caplog.at_level(logging.INFO):
             mock_agent.log_token_usage_summary()
@@ -2554,36 +2546,34 @@ class TestRossumAgentTokenTracking:
 
     def test_initial_cache_counters_are_zero(self, mock_agent):
         """Test that all cache token counters start at zero."""
-        assert mock_agent._total_cache_creation_tokens == 0
-        assert mock_agent._total_cache_read_tokens == 0
-        assert mock_agent._main_agent_cache_creation_tokens == 0
-        assert mock_agent._main_agent_cache_read_tokens == 0
-        assert mock_agent._sub_agent_cache_creation_tokens == 0
-        assert mock_agent._sub_agent_cache_read_tokens == 0
-        assert mock_agent._sub_agent_cache_usage == {}
+        assert mock_agent.tokens.total_cache_creation == 0
+        assert mock_agent.tokens.total_cache_read == 0
+        assert mock_agent.tokens.main_cache_creation == 0
+        assert mock_agent.tokens.main_cache_read == 0
+        assert mock_agent.tokens.sub_cache_creation == 0
+        assert mock_agent.tokens.sub_cache_read == 0
+        assert mock_agent.tokens.sub_cache_by_tool == {}
 
     def test_reset_clears_cache_counters(self, mock_agent):
         """Test reset clears all cache token tracking state."""
-        mock_agent._total_cache_creation_tokens = 500
-        mock_agent._total_cache_read_tokens = 1000
-        mock_agent._main_agent_cache_creation_tokens = 300
-        mock_agent._main_agent_cache_read_tokens = 600
-        mock_agent._sub_agent_cache_creation_tokens = 200
-        mock_agent._sub_agent_cache_read_tokens = 400
-        mock_agent._sub_agent_cache_usage = {"search_knowledge_base": (200, 400)}
+        mock_agent.tokens.main_cache_creation = 300
+        mock_agent.tokens.main_cache_read = 600
+        mock_agent.tokens.sub_cache_creation = 200
+        mock_agent.tokens.sub_cache_read = 400
+        mock_agent.tokens.sub_cache_by_tool = {"search_knowledge_base": (200, 400)}
 
         mock_agent.reset()
 
-        assert mock_agent._total_cache_creation_tokens == 0
-        assert mock_agent._total_cache_read_tokens == 0
-        assert mock_agent._main_agent_cache_creation_tokens == 0
-        assert mock_agent._main_agent_cache_read_tokens == 0
-        assert mock_agent._sub_agent_cache_creation_tokens == 0
-        assert mock_agent._sub_agent_cache_read_tokens == 0
-        assert mock_agent._sub_agent_cache_usage == {}
+        assert mock_agent.tokens.total_cache_creation == 0
+        assert mock_agent.tokens.total_cache_read == 0
+        assert mock_agent.tokens.main_cache_creation == 0
+        assert mock_agent.tokens.main_cache_read == 0
+        assert mock_agent.tokens.sub_cache_creation == 0
+        assert mock_agent.tokens.sub_cache_read == 0
+        assert mock_agent.tokens.sub_cache_by_tool == {}
 
     def test_accumulate_sub_agent_cache_tokens(self, mock_agent):
-        """Test _accumulate_sub_agent_tokens accumulates cache metrics."""
+        """Test tokens.accumulate_sub accumulates cache metrics."""
         from rossum_agent.tools import SubAgentTokenUsage
 
         usage = SubAgentTokenUsage(
@@ -2594,22 +2584,20 @@ class TestRossumAgentTokenTracking:
             cache_creation_input_tokens=30,
             cache_read_input_tokens=60,
         )
-        mock_agent._accumulate_sub_agent_tokens(usage)
+        mock_agent.tokens.accumulate_sub(usage)
 
-        assert mock_agent._total_cache_creation_tokens == 30
-        assert mock_agent._total_cache_read_tokens == 60
-        assert mock_agent._sub_agent_cache_creation_tokens == 30
-        assert mock_agent._sub_agent_cache_read_tokens == 60
-        assert mock_agent._sub_agent_cache_usage["search_knowledge_base"] == (30, 60)
+        assert mock_agent.tokens.total_cache_creation == 30
+        assert mock_agent.tokens.total_cache_read == 60
+        assert mock_agent.tokens.sub_cache_creation == 30
+        assert mock_agent.tokens.sub_cache_read == 60
+        assert mock_agent.tokens.sub_cache_by_tool["search_knowledge_base"] == (30, 60)
 
     def test_get_token_usage_breakdown_includes_cache(self, mock_agent):
         """Test that breakdown includes cache metrics."""
-        mock_agent._total_input_tokens = 1000
-        mock_agent._total_output_tokens = 500
-        mock_agent._main_agent_input_tokens = 1000
-        mock_agent._main_agent_output_tokens = 500
-        mock_agent._main_agent_cache_creation_tokens = 100
-        mock_agent._main_agent_cache_read_tokens = 800
+        mock_agent.tokens.main_input = 1000
+        mock_agent.tokens.main_output = 500
+        mock_agent.tokens.main_cache_creation = 100
+        mock_agent.tokens.main_cache_read = 800
 
         breakdown = mock_agent.get_token_usage_breakdown()
 
