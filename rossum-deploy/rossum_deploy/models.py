@@ -4,7 +4,7 @@ import difflib
 import json
 import sys
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -73,7 +73,7 @@ def _is_tty() -> bool:
     return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
 
-class ObjectType(str, Enum):
+class ObjectType(StrEnum):
     """Supported Rossum object types."""
 
     WORKSPACE = "workspace"
@@ -101,7 +101,7 @@ class LocalObject(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class DiffStatus(str, Enum):
+class DiffStatus(StrEnum):
     """Status of an object when comparing local vs remote."""
 
     UNCHANGED = "unchanged"
