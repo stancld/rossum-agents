@@ -11,7 +11,7 @@ import json
 import re
 import threading
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 _NUMBERED_PREFIX = re.compile(r"^(\d+)\.\s")
 
@@ -20,7 +20,7 @@ from anthropic import beta_tool
 from rossum_agent.tools.core import get_task_tracker, report_task_snapshot
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     pending = "pending"
     in_progress = "in_progress"
     completed = "completed"
