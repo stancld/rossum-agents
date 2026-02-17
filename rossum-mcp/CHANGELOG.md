@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [1.2.3] - 2026-02-17
 
 ### Changed
 - `patch_schema` now returns a concise confirmation dict (`status`, `schema_id`, `operation`, `node_id`, `node`) instead of the full schema object to reduce context bloat [#192](https://github.com/stancld/rossum-agents/pull/192)
