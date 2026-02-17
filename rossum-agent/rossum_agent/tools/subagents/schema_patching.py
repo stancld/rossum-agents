@@ -48,13 +48,19 @@ def _to_plain(obj: Any) -> Any:
 
 
 def _extract_schema_content(mcp_result: Any) -> list[dict[str, Any]]:
-    """Extract schema content list from MCP result, handling dict, dataclass, or Pydantic."""
+    """Extract schema content list from MCP result, handling dict, dataclass, or Pydantic.
+
+    Handles both direct schema dicts and wrapped results like {"result": {...}}.
+    """
     if mcp_result is None:
         return []
     if isinstance(mcp_result, dict):
-        content = mcp_result.get("content", [])
-        if isinstance(content, list):
-            return _to_plain(content)
+        # Handle wrapped results from structured_content (e.g. {"result": {"content": [...]}})
+        inner = mcp_result.get("result", mcp_result)
+        if isinstance(inner, dict):
+            content = inner.get("content", [])
+            if isinstance(content, list):
+                return _to_plain(content)
         return []
     if hasattr(mcp_result, "content"):
         content = mcp_result.content

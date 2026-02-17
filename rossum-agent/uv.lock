@@ -2311,7 +2311,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=0.75.0" },
+    { name = "anthropic", specifier = ">=0.79.0" },
     { name = "boto3", specifier = ">=1.0" },
     { name = "coverage", marker = "extra == 'all'", specifier = ">=7.0.0" },
     { name = "coverage", marker = "extra == 'tests'", specifier = ">=7.0.0" },

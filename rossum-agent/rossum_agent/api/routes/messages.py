@@ -176,7 +176,7 @@ async def _with_sse_keepalive(
     propagate across iterations.
     """
     ctx: contextvars.Context | None = None
-    pending: asyncio.Task = asyncio.create_task(anext(events))  # type: ignore[arg-type]
+    pending: asyncio.Task = asyncio.create_task(anext(events))
     try:
         while True:
             done, _ = await asyncio.wait({pending}, timeout=interval)
@@ -189,7 +189,7 @@ async def _with_sse_keepalive(
             except StopAsyncIteration:
                 break
             yield event, False
-            pending = asyncio.create_task(anext(events), context=ctx)  # type: ignore[arg-type]
+            pending = asyncio.create_task(anext(events), context=ctx)
     finally:
         if not pending.done():
             pending.cancel()

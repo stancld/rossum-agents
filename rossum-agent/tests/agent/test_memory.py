@@ -494,3 +494,121 @@ class TestAgentMemorySerialization:
         assert isinstance(restored.steps[0], TaskStep)
         assert isinstance(restored.steps[0].task, list)
         assert len(restored.steps[0].task) == 2
+
+
+class TestCollapseToolResults:
+    """Test collapsing of repeated collapsible tool results in write_to_messages."""
+
+    def _make_tool_step(self, step_number: int, tool_id: str, tool_name: str, content: str) -> MemoryStep:
+        return MemoryStep(
+            step_number=step_number,
+            tool_calls=[ToolCall(id=tool_id, name=tool_name, arguments={"schema_id": 1})],
+            tool_results=[ToolResult(tool_call_id=tool_id, name=tool_name, content=content)],
+        )
+
+    def test_multiple_patch_schema_collapses_earlier_results(self):
+        memory = AgentMemory()
+        memory.add_task("Update schema")
+        memory.add_step(self._make_tool_step(1, "tc1", "patch_schema", "big result 1"))
+        memory.add_step(self._make_tool_step(2, "tc2", "patch_schema", "big result 2"))
+        memory.add_step(self._make_tool_step(3, "tc3", "patch_schema", "big result 3"))
+
+        messages = memory.write_to_messages()
+
+        # Find all user messages with tool_result blocks
+        tool_results = [
+            block
+            for msg in messages
+            if msg["role"] == "user" and isinstance(msg["content"], list)
+            for block in msg["content"]
+            if isinstance(block, dict) and block.get("type") == "tool_result"
+        ]
+        assert len(tool_results) == 3
+        assert tool_results[0]["content"] == "[Result collapsed — superseded by later patch_schema call]"
+        assert tool_results[1]["content"] == "[Result collapsed — superseded by later patch_schema call]"
+        assert tool_results[2]["content"] == "big result 3"
+
+    def test_single_collapsible_tool_not_collapsed(self):
+        memory = AgentMemory()
+        memory.add_task("Update schema")
+        memory.add_step(self._make_tool_step(1, "tc1", "patch_schema", "only result"))
+
+        messages = memory.write_to_messages()
+
+        tool_results = [
+            block
+            for msg in messages
+            if msg["role"] == "user" and isinstance(msg["content"], list)
+            for block in msg["content"]
+            if isinstance(block, dict) and block.get("type") == "tool_result"
+        ]
+        assert len(tool_results) == 1
+        assert tool_results[0]["content"] == "only result"
+
+    def test_non_collapsible_tools_not_affected(self):
+        memory = AgentMemory()
+        memory.add_task("Do stuff")
+        memory.add_step(self._make_tool_step(1, "tc1", "get_schema", "schema 1"))
+        memory.add_step(self._make_tool_step(2, "tc2", "get_schema", "schema 2"))
+
+        messages = memory.write_to_messages()
+
+        tool_results = [
+            block
+            for msg in messages
+            if msg["role"] == "user" and isinstance(msg["content"], list)
+            for block in msg["content"]
+            if isinstance(block, dict) and block.get("type") == "tool_result"
+        ]
+        assert tool_results[0]["content"] == "schema 1"
+        assert tool_results[1]["content"] == "schema 2"
+
+    def test_mixed_collapsible_and_non_collapsible(self):
+        memory = AgentMemory()
+        memory.add_task("Work")
+        memory.add_step(self._make_tool_step(1, "tc1", "patch_schema", "patch 1"))
+        memory.add_step(self._make_tool_step(2, "tc2", "get_schema", "get result"))
+        memory.add_step(self._make_tool_step(3, "tc3", "patch_schema", "patch 2"))
+
+        messages = memory.write_to_messages()
+
+        tool_results = [
+            block
+            for msg in messages
+            if msg["role"] == "user" and isinstance(msg["content"], list)
+            for block in msg["content"]
+            if isinstance(block, dict) and block.get("type") == "tool_result"
+        ]
+        assert tool_results[0]["content"] == "[Result collapsed — superseded by later patch_schema call]"
+        assert tool_results[1]["content"] == "get result"
+        assert tool_results[2]["content"] == "patch 2"
+
+    def test_collapsing_does_not_mutate_stored_steps(self):
+        memory = AgentMemory()
+        memory.add_task("Update")
+        memory.add_step(self._make_tool_step(1, "tc1", "patch_schema", "original content"))
+        memory.add_step(self._make_tool_step(2, "tc2", "patch_schema", "final content"))
+
+        memory.write_to_messages()
+
+        # Stored data should be untouched
+        assert memory.steps[1].tool_results[0].content == "original content"
+        assert memory.steps[2].tool_results[0].content == "final content"
+
+    def test_empty_collapsible_tools_set_skips_collapsing(self):
+        memory = AgentMemory(COLLAPSIBLE_TOOLS=set())
+        memory.add_task("Update")
+        memory.add_step(self._make_tool_step(1, "tc1", "patch_schema", "result 1"))
+        memory.add_step(self._make_tool_step(2, "tc2", "patch_schema", "result 2"))
+
+        messages = memory.write_to_messages()
+
+        tool_results = [
+            block
+            for msg in messages
+            if msg["role"] == "user" and isinstance(msg["content"], list)
+            for block in msg["content"]
+            if isinstance(block, dict) and block.get("type") == "tool_result"
+        ]
+        assert tool_results[0]["content"] == "result 1"
+        assert tool_results[1]["content"] == "result 2"

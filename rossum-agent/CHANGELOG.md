@@ -9,9 +9,14 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Added tool call and result persistence in conversation history for full replay in multi-turn conversations [#184](https://github.com/stancld/rossum-agents/pull/184)
 - Moved `rossum-kb.json` into the `rossum_agent` package so it is included in installed distributions
+- Added tool call argument logging in `_execute_tool_with_progress` for debugging agent behavior [#192](https://github.com/stancld/rossum-agents/pull/192)
+
+### Changed
+- Collapse repeated collapsible tool results (e.g. `patch_schema`) in `AgentMemory.write_to_messages()` — only the last result is sent in full to the LLM, earlier results are replaced with a short summary to reduce context bloat [#192](https://github.com/stancld/rossum-agents/pull/192)
 
 ### Fixed
 - Fixed schema patching sub-agent silently dropping fields when `parent_section` doesn't exist — now auto-creates the missing section [#189](https://github.com/stancld/rossum-agents/pull/189)
+- Stagger concurrent `patch_schema` tool calls (0.5s delay between each) to avoid HTTP 412 conflicts from simultaneous schema writes [#192](https://github.com/stancld/rossum-agents/pull/192)
 
 ### Changed
 - Changed `prune_schema_fields` `fields_to_keep` behavior — sections are no longer auto-included; list section IDs explicitly to preserve them as empty containers for `patch_schema` [#191](https://github.com/stancld/rossum-agents/pull/191)
