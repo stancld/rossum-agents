@@ -160,8 +160,8 @@ def _run_gunicorn(args: argparse.Namespace) -> None:
 
         def load_config(self) -> None:
             for key, value in self.options.items():
-                if key in self.cfg.settings and value is not None:  # ty: ignore[unresolved-attribute]
-                    self.cfg.set(key.lower(), value)  # ty: ignore[unresolved-attribute]
+                if key in self.cfg.settings and value is not None:  # ty: ignore[possibly-missing-attribute]
+                    self.cfg.set(key.lower(), value)  # ty: ignore[possibly-missing-attribute]
 
         def load(self):
             return self.app_uri

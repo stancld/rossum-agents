@@ -420,6 +420,66 @@ class TestBuildFieldNode:
 
         assert node["formula"] == "field.a + field.b"
 
+    def test_lookup_field_strips_rir_field_names(self):
+        """Lookup fields must never have rir_field_names — it causes engine restriction errors."""
+        spec = {
+            "id": "vendor_match",
+            "label": "Vendor Match",
+            "type": "enum",
+            "ui_configuration": {"type": "lookup", "edit": "disabled"},
+            "matching": {"type": "master_data_hub", "configuration": {}},
+            "rir_field_names": ["vendor_match"],
+        }
+        node = _build_field_node(spec)
+
+        assert "rir_field_names" not in node
+
+    def test_lookup_field_with_matching(self):
+        """Test that matching config is included in built node for lookup fields."""
+        matching = {
+            "type": "master_data_hub",
+            "configuration": {
+                "dataset": "Vendors",
+                "queries": '[{"//": "Exact match", "aggregate": []}]',
+                "placeholders": {"vat": {"__formula": "field.sender_vat_id"}},
+            },
+        }
+        spec = {
+            "id": "vendor_match",
+            "label": "Vendor Match",
+            "type": "enum",
+            "ui_configuration": {"type": "lookup", "edit": "disabled"},
+            "matching": matching,
+        }
+        node = _build_field_node(spec)
+
+        assert node["matching"] == matching
+        assert node["ui_configuration"] == {"type": "lookup", "edit": "disabled"}
+        assert node["type"] == "enum"
+
+    def test_lookup_field_gets_empty_options(self):
+        """Regression: lookup fields are type=enum but have no static options.
+
+        The API requires `options` to be present for enum fields, so it must default to [].
+        """
+        spec = {
+            "id": "vendor_match",
+            "label": "Vendor Match",
+            "type": "enum",
+            "ui_configuration": {"type": "lookup", "edit": "disabled"},
+            "matching": {"type": "master_data_hub", "configuration": {}},
+        }
+        node = _build_field_node(spec)
+
+        assert node["options"] == []
+
+    def test_matching_not_included_when_absent(self):
+        """Test that matching key is not set when not provided."""
+        spec = {"id": "plain_field", "label": "Plain", "type": "string"}
+        node = _build_field_node(spec)
+
+        assert "matching" not in node
+
 
 class TestCoerceTypeToString:
     """Test _coerce_type_to_string function."""
@@ -569,6 +629,36 @@ class TestAddFieldsToContent:
         assert len(tuple_children) == 1
         assert tuple_children[0]["id"] == "new_col"
         assert "new_col" in added
+
+    def test_add_lookup_field_preserves_matching(self):
+        """Test that adding a lookup field preserves the matching config."""
+        content = [{"id": "vendor_section", "category": "section", "children": []}]
+        matching = {
+            "type": "master_data_hub",
+            "configuration": {
+                "dataset": "Vendors",
+                "queries": '[{"//": "Exact match", "aggregate": []}]',
+                "placeholders": {"vat": {"__formula": "field.sender_vat_id"}},
+            },
+        }
+        fields_to_add = [
+            {
+                "id": "vendor_match",
+                "label": "Vendor Match",
+                "parent_section": "vendor_section",
+                "type": "enum",
+                "ui_configuration": {"type": "lookup", "edit": "disabled"},
+                "matching": matching,
+            }
+        ]
+
+        modified, added = _add_fields_to_content(content, fields_to_add)
+
+        assert "vendor_match" in added
+        field = modified[0]["children"][0]
+        assert field["matching"] == matching
+        assert field["ui_configuration"] == {"type": "lookup", "edit": "disabled"}
+        assert field["type"] == "enum"
 
     def test_add_multiple_fields(self):
         """Test adding multiple fields."""
@@ -1058,6 +1148,72 @@ class TestCallOpusForPatching:
             user_content = call_args[1]["messages"][0]["content"]
             user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
             assert "EXACTLY" in user_text
+
+    def test_lookup_matching_included_in_user_prompt(self):
+        """Test that lookup field matching config is included in the user prompt."""
+        mock_response = MagicMock()
+        mock_response.stop_reason = "end_of_turn"
+        mock_response.content = [MagicMock(text="Done", type="text")]
+        mock_response.content[0].text = "Done"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+
+        with (
+            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage"),
+            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+        ):
+            mock_client.return_value.messages.create.return_value = mock_response
+
+            matching = {
+                "type": "master_data_hub",
+                "configuration": {"dataset": "Vendors", "queries": "[]", "placeholders": {}},
+            }
+            changes = [
+                {
+                    "action": "add",
+                    "id": "vendor_match",
+                    "type": "enum",
+                    "parent_section": "vendor_section",
+                    "ui_configuration": {"type": "lookup", "edit": "disabled"},
+                    "matching": matching,
+                }
+            ]
+            _call_opus_for_patching("123", changes)
+
+            call_args = mock_client.return_value.messages.create.call_args
+            user_content = call_args[1]["messages"][0]["content"]
+            user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
+            assert "[LOOKUP]" in user_text
+            assert "Lookup Field Specs" in user_text
+            assert "master_data_hub" in user_text
+            assert "matching" in user_text
+
+    def test_no_lookup_section_without_matching(self):
+        """Test that no lookup section is added for non-lookup fields."""
+        mock_response = MagicMock()
+        mock_response.stop_reason = "end_of_turn"
+        mock_response.content = [MagicMock(text="Done", type="text")]
+        mock_response.content[0].text = "Done"
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+
+        with (
+            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+            patch("rossum_agent.tools.subagents.base.report_progress"),
+            patch("rossum_agent.tools.subagents.base.report_token_usage"),
+            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+        ):
+            mock_client.return_value.messages.create.return_value = mock_response
+
+            changes = [{"action": "add", "id": "plain", "type": "string", "parent_section": "s1"}]
+            _call_opus_for_patching("123", changes)
+
+            call_args = mock_client.return_value.messages.create.call_args
+            user_content = call_args[1]["messages"][0]["content"]
+            user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
+            assert "Lookup Field Specs" not in user_text
 
     def test_formula_included_in_changes_text(self):
         """Test that formula code appears in the user prompt sent to the sub-agent."""

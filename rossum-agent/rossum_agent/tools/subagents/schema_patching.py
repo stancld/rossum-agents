@@ -100,15 +100,23 @@ Use get_schema_tree_structure / get_full_schema only if you need to verify or re
 | type | Yes | string, number, date, enum |
 | table_id | If table | Multivalue ID for table columns |
 
-Optional: format, options (for enum), rir_field_names, hidden, can_export, ui_configuration, prompt, context
+Optional: format, options (for enum), rir_field_names, hidden, can_export, ui_configuration, prompt, context, matching
 
 ## Constraints
 
 - Field `id` must be valid identifier (lowercase, underscores, no spaces)
 - Do NOT set `rir_field_names` unless user explicitly provides engine field names
 - If user mentions extraction/AI capture, check existing schema for rir_field_names patterns first
-- `ui_configuration.type` must be one of: captured, data, manual, formula, reasoning
+- `ui_configuration.type` must be one of: captured, data, manual, formula, reasoning, lookup
 - `ui_configuration.edit` must be one of: enabled, enabled_without_warning, disabled
+
+## Lookup Fields
+
+Lookup fields require ALL of these attributes — omitting any causes API errors:
+- `type`: "enum"
+- `ui_configuration`: {"type": "lookup", "edit": "disabled"}
+- `matching`: the full matching config object (type, configuration with dataset/queries/placeholders)
+- Do NOT set `rir_field_names` on lookup fields
 
 ## Type Mappings
 
@@ -176,7 +184,7 @@ _APPLY_SCHEMA_CHANGES_TOOL: dict[str, Any] = {
                             "properties": {
                                 "type": {
                                     "type": "string",
-                                    "enum": ["captured", "data", "manual", "formula", "reasoning"],
+                                    "enum": ["captured", "data", "manual", "formula", "reasoning", "lookup"],
                                     "description": "Field value source type",
                                 },
                                 "edit": {
@@ -194,6 +202,10 @@ _APPLY_SCHEMA_CHANGES_TOOL: dict[str, Any] = {
                             "type": "array",
                             "items": {"type": "string"},
                             "description": "Context field IDs for reasoning (TxScript format, e.g. field.invoice_id)",
+                        },
+                        "matching": {
+                            "type": "object",
+                            "description": "Lookup field matching config (type + configuration with dataset, queries, placeholders). Required for lookup fields.",
                         },
                     },
                     "required": ["id", "label", "parent_section", "type"],
@@ -218,10 +230,14 @@ _APPLY_SCHEMA_CHANGES_TOOL: dict[str, Any] = {
                                 "edit": {"type": "string"},
                             },
                         },
+                        "matching": {
+                            "type": "object",
+                            "description": "Lookup field matching config update.",
+                        },
                     },
                     "required": ["id"],
                 },
-                "description": "Existing fields to update (e.g., change formula, label, type).",
+                "description": "Existing fields to update (e.g., change formula, label, type, matching).",
             },
         },
         "required": ["schema_id"],
@@ -320,13 +336,14 @@ def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
         "type": field_type,
     }
 
-    if field_type == "enum" and spec.get("options"):
-        node["options"] = spec["options"]
+    if field_type == "enum":
+        node["options"] = spec.get("options") or []
 
     if spec.get("format"):
         node["format"] = spec["format"]
 
-    if spec.get("rir_field_names"):
+    is_lookup = isinstance(spec.get("ui_configuration"), dict) and spec["ui_configuration"].get("type") == "lookup"
+    if not is_lookup and spec.get("rir_field_names"):
         node["rir_field_names"] = spec["rir_field_names"]
 
     if spec.get("hidden") is not None:
@@ -346,6 +363,9 @@ def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
 
     if spec.get("formula"):
         node["formula"] = spec["formula"]
+
+    if spec.get("matching"):
+        node["matching"] = spec["matching"]
 
     return node
 
@@ -582,8 +602,24 @@ def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> Su
         + (f" with label '{c.get('label')}'" if c.get("label") else "")
         + (f" [TABLE: {c.get('table_id')}]" if c.get("table_field") or c.get("table_id") else "")
         + (f" formula='{c.get('formula')}'" if c.get("formula") else "")
+        + (" [LOOKUP]" if c.get("matching") else "")
         for c in changes
     )
+
+    # Include full JSON specs for lookup fields so the sub-agent can pass matching configs through
+    lookup_changes = [c for c in changes if c.get("matching")]
+    lookup_section = ""
+    if lookup_changes:
+        lookup_json = json.dumps(lookup_changes, indent=2, ensure_ascii=False)
+        lookup_section = f"""
+
+## Lookup Field Specs (pass these EXACTLY to fields_to_add/fields_to_update including matching)
+
+```json
+{lookup_json}
+```
+
+Lookup fields MUST include: type "enum", ui_configuration {{"type": "lookup", "edit": "disabled"}}, and the matching object exactly as shown."""
 
     actions = {c.get("action", "add") for c in changes}
     if actions == {"update"}:
@@ -593,7 +629,7 @@ def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> Su
 
     user_content = f"""{intro}
 
-{changes_text}
+{changes_text}{lookup_section}
 
 ## Current Schema Tree
 {tree_str}

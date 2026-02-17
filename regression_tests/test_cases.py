@@ -20,6 +20,8 @@ from regression_tests.custom_checks import (
     check_hook_deleted_and_reverted,
     check_hook_test_results_reported,
     check_knowledge_base_hidden_multivalue_warning,
+    check_lookup_field_configured,
+    check_lookup_match_results,
     check_net_terms_formula_field_added,
     check_no_misleading_training_suggestions,
     check_queue_deleted,
@@ -115,6 +117,16 @@ SERVERLESS_HOOK_TXSCRIPT_CHECK = CustomCheck(
 HOOK_DELETED_AND_REVERTED_CHECK = CustomCheck(
     name="Hook was deleted and deletion was reverted",
     check_fn=check_hook_deleted_and_reverted,
+)
+
+LOOKUP_FIELD_CHECK = CustomCheck(
+    name="Lookup field has valid matching config and evaluation succeeded",
+    check_fn=check_lookup_field_configured,
+)
+
+LOOKUP_MATCH_RESULTS_CHECK = CustomCheck(
+    name="Lookup match results match expected vendor matches",
+    check_fn=check_lookup_match_results,
 )
 
 SCHEMA_REVERT_TYPE_VALIDATION_CHECK = CustomCheck(
@@ -647,6 +659,57 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             max_steps=6,
             file_expectation=FileExpectation(),
             custom_checks=[SCHEMA_REVERT_TYPE_VALIDATION_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="setup_invoice_queue_with_lookup_field",
+        description=(
+            "Create EU Invoice queue, upload documents, set up vendor lookup field, "
+            "and reason about unmatched records using raw MDH dataset data"
+        ),
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        rossum_url=None,
+        prompt=(
+            "# Set up Invoice queue with vendor lookup field\n\n"
+            "Workspace: 789108\n"
+            "Region: EU\n\n"
+            "## Tasks:\n\n"
+            "1. Load `lookup-fields` skill\n"
+            "2. Create a new queue from EU Invoice template: Invoices with Lookup\n"
+            "3. Upload documents from queue `2519295` to the new queue\n"
+            "4. Set up a lookup field for vendor matching following best practices:\n"
+            "    - Field name: Vendor match\n"
+            "    - Section: vendor_section\n"
+            "    - Match vendors from the `approved-vendors` Master Data Hub dataset\n"
+            "    - Use best practices\n"
+            "5. Evaluate the lookup field on the uploaded documents using `evaluate_lookup_field`\n"
+            "    - If evaluation shows issues, adjust the matching configuration and re-evaluate\n"
+            "    - Iterate until results look correct\n"
+            "6. For any non-matched cases, verify them against the real matching dataset before finalizing.\n\n"
+            "Store the final `evaluate_lookup_field` result as `output.json` without modification (pass through the JSON response directly)."
+        ),
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "list_annotations",
+                "copy_annotations",
+                "load_skill",
+                "suggest_lookup_field",
+                ("patch_schema", "patch_schema_with_subagent"),
+                "evaluate_lookup_field",
+                "get_lookup_dataset_raw_values",
+                "query_lookup_dataset",
+                "write_file",
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=250000, max_total_tokens=600000),
+        success_criteria=SuccessCriteria(
+            require_subagent=None,
+            required_keywords=[],
+            max_steps=18,
+            file_expectation=FileExpectation(expected_files=["output.json"]),
+            custom_checks=[LOOKUP_FIELD_CHECK, LOOKUP_MATCH_RESULTS_CHECK],
         ),
     ),
 ]

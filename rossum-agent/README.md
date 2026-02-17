@@ -135,6 +135,11 @@ The agent provides internal tools and access to 67 MCP tools via dynamic loading
 **Formula:**
 - `suggest_formula_field` - Suggest formula field expressions via Rossum Local Copilot
 
+**Lookup Fields:**
+- `suggest_lookup_field` - Suggest lookup field matching configuration for MDH datasets
+- `evaluate_lookup_field` - Evaluate lookup field results on a real annotation
+- `get_lookup_dataset_raw_values` - Fetch raw MDH dataset rows for unmatched/ambiguous case verification
+
 **Schema:**
 - `create_schema_with_subagent` - Create new schemas via Opus sub-agent
 - `patch_schema_with_subagent` - Safe schema modifications via Opus
