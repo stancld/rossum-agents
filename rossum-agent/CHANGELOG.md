@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+## [1.2.0] - 2026-02-17
+
 ### Added
 - Added tool call and result persistence in conversation history for full replay in multi-turn conversations [#184](https://github.com/stancld/rossum-agents/pull/184)
 - Moved `rossum-kb.json` into the `rossum_agent` package so it is included in installed distributions [#185](https://github.com/stancld/rossum-agents/pull/185)
