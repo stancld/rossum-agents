@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Added
+- Added `copy_annotations` tool for bulk copying annotations to another queue via `POST /v1/annotations/{id}/copy` with optional `reimport` and `target_status` parameters [#195](https://github.com/stancld/rossum-agents/pull/195)
+
 ## [1.2.3] - 2026-02-17
 
 ### Changed

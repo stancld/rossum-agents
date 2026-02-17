@@ -9,7 +9,7 @@ import anyio
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.annotation import Annotation
 
-from rossum_mcp.tools.base import build_filters, delete_resource, graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, build_resource_url, delete_resource, graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -121,6 +121,40 @@ async def _confirm_annotation(client: AsyncRossumAPIClient, annotation_id: int) 
     }
 
 
+async def _copy_annotations(
+    client: AsyncRossumAPIClient,
+    annotation_ids: Sequence[int],
+    target_queue_id: int,
+    target_status: str | None = None,
+    reimport: bool = False,
+) -> dict:
+    if not is_read_write_mode():
+        return {"error": "copy_annotations is not available in read-only mode"}
+
+    target_queue_url = build_resource_url("queues", target_queue_id)
+    params = {"reimport": "true"} if reimport else {}
+
+    results: list[dict] = []
+    errors: list[dict] = []
+    for annotation_id in annotation_ids:
+        try:
+            payload: dict = {"target_queue": target_queue_url}
+            if target_status is not None:
+                payload["target_status"] = target_status
+
+            response = await client._http_client.request_json(
+                method="POST",
+                url=f"annotations/{annotation_id}/copy",
+                json=payload,
+                params=params,
+            )
+            results.append({"annotation_id": annotation_id, "copied_annotation": response})
+        except Exception as e:
+            errors.append({"annotation_id": annotation_id, "error": f"{type(e).__name__}: {e!s}"})
+
+    return {"copied": len(results), "failed": len(errors), "results": results, "errors": errors}
+
+
 async def _delete_annotation(client: AsyncRossumAPIClient, annotation_id: int) -> dict:
     return await delete_resource(
         "annotation", annotation_id, client.delete_annotation, f"Annotation {annotation_id} moved to 'deleted' status"
@@ -158,6 +192,17 @@ def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> Non
     @mcp.tool(description="Set annotation status to 'confirmed' (typically after field updates).")
     async def confirm_annotation(annotation_id: int) -> dict:
         return await _confirm_annotation(client, annotation_id)
+
+    @mcp.tool(
+        description="Copy annotations to another queue. reimport=True re-extracts data in the target queue (use when moving/uploading documents between queues). reimport=False preserves original extracted data as-is."
+    )
+    async def copy_annotations(
+        annotation_ids: Sequence[int],
+        target_queue_id: int,
+        target_status: str | None = None,
+        reimport: bool = False,
+    ) -> dict:
+        return await _copy_annotations(client, annotation_ids, target_queue_id, target_status, reimport)
 
     @mcp.tool(description="Soft-delete an annotation (status 'deleted').")
     async def delete_annotation(annotation_id: int) -> dict:

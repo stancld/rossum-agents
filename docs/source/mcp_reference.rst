@@ -917,6 +917,20 @@ list_tool_categories
        if "schema" in cat["keywords"]:
            print(f"{cat['name']}: {cat['tool_count']} tools")
 
+copy_annotations
+^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``copy_annotations(annotation_ids: Sequence[int], target_queue_id: int, target_status: str | None = None, reimport: bool = False)``
+
+**API Endpoint:**
+  ``POST /v1/annotations/{annotation_id}/copy`` (called per annotation)
+
+**Implementation:**
+  Iterates over ``annotation_ids``, calling the copy endpoint for each. Collects
+  results and errors separately for graceful partial failure handling. Uses
+  ``_http_client.request_json`` directly since the SDK has no copy method.
+
 Delete Operations
 -----------------
 
