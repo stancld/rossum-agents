@@ -8,6 +8,7 @@ This folder contains practical examples and data for demonstrating the Rossum MC
 - **ORGANIZATION_SETUP.md**: End-to-end customer organization setup with queues, schemas, validations, and hooks
 - **EXPLAIN_HOOKS.md**: Example for explaining hook/extension functionality
 - **SPLITTING_AND_SORTING_DEMO.md**: Full S&S demo with training queues, inbox, and hooks
+- **SOW_DEMO.md**: How to scope projects and create Statements of Work with the agent
 - **README.md**: This file
 
 ## Using the Rossum Agent
