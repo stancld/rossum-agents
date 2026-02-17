@@ -47,6 +47,7 @@ class TestToolCatalog:
         expected = {
             "upload_document",
             "get_annotation",
+            "get_original_document",
             "list_annotations",
             "start_annotation",
             "bulk_update_annotation_fields",

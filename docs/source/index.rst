@@ -44,16 +44,18 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **67 tools** organized into twelve categories:
+The MCP server provides **68 tools** organized into twelve categories:
 
 **Document Processing**
 
 * **upload_document** - Upload documents for AI extraction
 * **get_annotation** - Retrieve extracted data and status
+* **get_original_document** - Download original uploaded document content (base64)
 * **list_annotations** - List all annotations with filtering
 * **start_annotation** - Start annotation for field updates
 * **bulk_update_annotation_fields** - Update field values with JSON Patch
 * **confirm_annotation** - Confirm and finalize annotations
+* **delete_annotation** - Soft-delete annotation
 
 **Queue Management**
 

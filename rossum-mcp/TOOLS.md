@@ -1,8 +1,8 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 67 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 68 MCP tools. For quick start and setup, see [README.md](README.md).
 
-## Document Processing (7 tools)
+## Document Processing (8 tools)
 
 ### upload_document
 
@@ -42,6 +42,23 @@ Retrieves annotation data for a previously uploaded document. Use this to check 
   "content": [...],
   "created_at": "2024-01-01T00:00:00Z",
   "modified_at": "2024-01-01T00:00:00Z"
+}
+```
+
+### get_original_document
+
+Downloads the original uploaded document for an annotation. Returns base64 payload and metadata.
+
+**Parameters:**
+- `annotation_id` (integer, required): Annotation ID to resolve and download the source document from
+
+**Returns:**
+```json
+{
+  "annotation_id": 12345,
+  "document_id": 22222,
+  "content_base64": "JVBERi0xLjQK...",
+  "byte_size": 104857
 }
 ```
 
@@ -871,7 +888,7 @@ Set the MCP operation mode. Use 'read-only' to disable write operations, 'read-w
 Lists all available tool categories with descriptions, tool names, and keywords for dynamic tool loading.
 
 **Available Categories:**
-- `annotations` - Document processing (7 tools)
+- `annotations` - Document processing (8 tools)
 - `queues` - Queue management (9 tools)
 - `schemas` - Schema management (8 tools)
 - `engines` - AI engine management (6 tools)
