@@ -31,8 +31,8 @@ async def run_regression_test(agent: RossumAgent, prompt: str) -> RegressionRun:
         if not step.is_streaming and step.tool_calls:
             all_tools.extend(tc.name for tc in step.tool_calls)
 
-    total_input_tokens = agent._total_input_tokens
-    total_output_tokens = agent._total_output_tokens
+    total_input_tokens = agent.tokens.total_input
+    total_output_tokens = agent.tokens.total_output
 
     final_steps = [s for s in steps if s.is_final]
     is_successful = bool(final_steps) and not any(s.error for s in steps)
