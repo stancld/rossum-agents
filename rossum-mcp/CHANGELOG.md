@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Changed
+- `patch_schema` now returns a concise confirmation dict (`status`, `schema_id`, `operation`, `node_id`, `node`) instead of the full schema object to reduce context bloat [#192](https://github.com/stancld/rossum-agents/pull/192)
 - `update_schema`, `patch_schema`, and `prune_schema_fields` now allow empty content — previously these operations rejected empty schema content, preventing intentional clearing of all fields
 
 ### Fixed

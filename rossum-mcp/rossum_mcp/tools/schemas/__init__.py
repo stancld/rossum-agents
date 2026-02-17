@@ -98,7 +98,7 @@ def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         node_data: SchemaNode | SchemaNodeUpdate | None = None,
         parent_id: str | None = None,
         position: int | None = None,
-    ) -> Schema | dict:
+    ) -> dict:
         return await ops.patch_schema(client, schema_id, operation, node_id, node_data, parent_id, position)
 
     @mcp.tool(description="Lightweight schema tree (ids/labels/categories/types); accepts schema_id or queue_id.")

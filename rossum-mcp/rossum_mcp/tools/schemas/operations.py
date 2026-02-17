@@ -20,7 +20,7 @@ from rossum_mcp.tools.base import (
     is_read_write_mode,
 )
 from rossum_mcp.tools.schemas.models import SchemaNode, SchemaNodeUpdate  # noqa: TC001 - needed at runtime for FastMCP
-from rossum_mcp.tools.schemas.patching import PatchOperation, apply_schema_patch
+from rossum_mcp.tools.schemas.patching import PatchOperation, _find_node_anywhere, apply_schema_patch
 from rossum_mcp.tools.schemas.pruning import (
     _collect_all_field_ids,
     _collect_ancestor_ids,
@@ -143,7 +143,7 @@ async def patch_schema(
     node_data: SchemaNode | SchemaNodeUpdate | None = None,
     parent_id: str | None = None,
     position: int | None = None,
-) -> Schema | dict:
+) -> dict:
     if not is_read_write_mode():
         return {"error": "patch_schema is not available in read-only mode"}
 
@@ -172,11 +172,20 @@ async def patch_schema(
         )
 
     try:
-        await _update_schema_with_retry(client, schema_id, prepare)
+        _, result_content = await _update_schema_with_retry(client, schema_id, prepare)
     except ValueError as e:
         return {"error": str(e)}
 
-    return await client.retrieve_schema(schema_id)
+    # Return concise confirmation with the affected node instead of the full schema
+    assert result_content is not None
+    node, _, _, _ = _find_node_anywhere(result_content, node_id)
+    return {
+        "status": "success",
+        "schema_id": schema_id,
+        "operation": operation,
+        "node_id": node_id,
+        "node": node,
+    }
 
 
 async def get_schema_tree_structure(

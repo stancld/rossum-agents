@@ -18,6 +18,7 @@ from rossum_agent.tools.subagents.schema_patching import (
     _call_opus_for_patching,
     _collect_field_ids,
     _execute_opus_tool,
+    _extract_schema_content,
     _filter_content,
     _find_or_create_section,
     _schema_content_cache,
@@ -637,6 +638,39 @@ class TestUpdateFieldsInContent:
         assert content[0]["children"][0]["formula"] == "old"
 
 
+class TestExtractSchemaContent:
+    """Test _extract_schema_content handles various MCP result formats."""
+
+    def test_direct_dict_with_content(self):
+        result = _extract_schema_content({"content": [{"id": "s1", "category": "section"}]})
+        assert len(result) == 1
+        assert result[0]["id"] == "s1"
+
+    def test_wrapped_result_with_content(self):
+        """MCP structured_content wraps the schema in {"result": {...}}."""
+        result = _extract_schema_content(
+            {"result": {"id": 123, "name": "Schema", "content": [{"id": "s1", "category": "section"}]}}
+        )
+        assert len(result) == 1
+        assert result[0]["id"] == "s1"
+
+    def test_wrapped_result_empty_content(self):
+        result = _extract_schema_content({"result": {"id": 123, "content": []}})
+        assert result == []
+
+    def test_none_returns_empty(self):
+        assert _extract_schema_content(None) == []
+
+    def test_pydantic_model_with_content(self):
+        model = MagicMock()
+        model.content = [{"id": "s1", "category": "section"}]
+        result = _extract_schema_content(model)
+        assert len(result) == 1
+
+    def test_no_content_returns_empty(self):
+        assert _extract_schema_content({"result": {"id": 123}}) == []
+
+
 class TestExecuteOpusTool:
     """Test _execute_opus_tool function."""
 
@@ -661,8 +695,10 @@ class TestExecuteOpusTool:
 
         with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
             mock_mcp.return_value = {
-                "id": 123,
-                "content": [{"id": "section1", "category": "section", "children": []}],
+                "result": {
+                    "id": 123,
+                    "content": [{"id": "section1", "category": "section", "children": []}],
+                }
             }
             _execute_opus_tool("get_full_schema", {"schema_id": 123})
 

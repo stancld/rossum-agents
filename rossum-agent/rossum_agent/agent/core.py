@@ -156,6 +156,25 @@ def _parse_json_encoded_strings(arguments: dict) -> dict:
     return result
 
 
+class _SchemaStagger:
+    """Stagger schema patch calls to avoid 412 conflicts from concurrent writes."""
+
+    _TOOLS = {"patch_schema", "patch_schema_with_subagent"}
+    _DELAY_SECONDS = 0.5
+
+    def __init__(self) -> None:
+        self._counter = 0
+
+    async def maybe_delay(self, tool_name: str) -> None:
+        if tool_name not in self._TOOLS:
+            return
+        delay = self._counter * self._DELAY_SECONDS
+        self._counter += 1
+        if delay > 0:
+            logger.info("Staggering %s by %.1fs to avoid conflicts", tool_name, delay)
+            await asyncio.sleep(delay)
+
+
 @dataclasses.dataclass
 class _StreamState:
     """Mutable state for streaming model response.
@@ -696,7 +715,12 @@ class RossumAgent:
         progress_queue: asyncio.Queue[AgentStep] = asyncio.Queue()
         results_by_id: dict[str, ToolResult] = {}
 
+        # Stagger schema patch calls to avoid 412 conflicts from concurrent writes
+        stagger = _SchemaStagger()
+
         async def execute_single_tool(tool_call: ToolCall, idx: int) -> None:
+            await stagger.maybe_delay(tool_call.name)
+
             tool_progress = (idx, total_tools)
             async for progress_or_result in self._execute_tool_with_progress(
                 tool_call, step_num, tool_calls, tool_progress
@@ -761,6 +785,8 @@ class RossumAgent:
 
         def token_callback(usage: SubAgentTokenUsage) -> None:
             token_queue.put(usage)
+
+        logger.info("Tool call: %s(%s)", tool_call.name, tool_call.arguments)
 
         try:
             if tool_call.name in get_internal_tool_names():

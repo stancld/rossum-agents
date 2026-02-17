@@ -9,7 +9,7 @@ This module implements the memory storage system following the smolagents patter
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from anthropic.types import MessageParam, TextBlockParam, ThinkingBlockParam, ToolResultBlockParam, ToolUseBlockParam
 
@@ -137,6 +137,8 @@ class AgentMemory:
     Stores structured step objects and rebuilds messages on demand.
     """
 
+    COLLAPSIBLE_TOOLS: set[str] = field(default_factory=lambda: {"patch_schema"}, repr=False)
+
     steps: list[TaskStep | MemoryStep] = field(default_factory=list)
 
     def reset(self) -> None:
@@ -154,10 +156,84 @@ class AgentMemory:
     def write_to_messages(self) -> list[MessageParam]:
         """Convert all steps to messages.
 
+        Collapses intermediate results of repeated collapsible tools
+        to reduce context size — only the last result is kept in full.
+
         Returns:
             List of message dicts ready for Anthropic API.
         """
-        return [msg for step in self.steps for msg in step.to_messages()]
+        messages = [msg for step in self.steps for msg in step.to_messages()]
+        return self._collapse_tool_results(messages)
+
+    def _collapse_tool_results(self, messages: list[MessageParam]) -> list[MessageParam]:
+        """Replace earlier tool_result contents for collapsible tools with a short summary.
+
+        Scans messages to find the last occurrence of each collapsible tool,
+        then replaces all earlier occurrences' content strings.
+        """
+        if not self.COLLAPSIBLE_TOOLS:
+            return messages
+
+        tool_use_id_to_name = self._build_collapsible_tool_map(messages)
+        if not tool_use_id_to_name:
+            return messages
+
+        positions = self._find_collapsible_positions(messages, tool_use_id_to_name)
+        if len(positions) <= 1:
+            return messages
+
+        self._replace_earlier_results(messages, positions)
+        return messages
+
+    def _build_collapsible_tool_map(self, messages: list[MessageParam]) -> dict[str, str]:
+        """Map tool_use_id -> tool_name for collapsible tools found in assistant messages."""
+        mapping: dict[str, str] = {}
+        for msg in messages:
+            if msg["role"] != "assistant":
+                continue
+            content = msg["content"]
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    name = block.get("name", "")
+                    if name in self.COLLAPSIBLE_TOOLS:
+                        mapping[cast("ToolUseBlockParam", block)["id"]] = name
+        return mapping
+
+    @staticmethod
+    def _find_collapsible_positions(
+        messages: list[MessageParam], tool_use_id_to_name: dict[str, str]
+    ) -> list[tuple[int, int, str]]:
+        """Find (msg_idx, block_idx, tool_name) for each collapsible tool_result block."""
+        positions: list[tuple[int, int, str]] = []
+        for msg_idx, msg in enumerate(messages):
+            if msg["role"] != "user":
+                continue
+            content = msg["content"]
+            if not isinstance(content, list):
+                continue
+            for block_idx, block in enumerate(content):
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    tool_name = tool_use_id_to_name.get(block.get("tool_use_id", ""))
+                    if tool_name:
+                        positions.append((msg_idx, block_idx, tool_name))
+        return positions
+
+    @staticmethod
+    def _replace_earlier_results(messages: list[MessageParam], positions: list[tuple[int, int, str]]) -> None:
+        """Collapse all but the last result per tool name."""
+        last_per_tool: dict[str, int] = {}
+        for idx, (_, _, tool_name) in enumerate(positions):
+            last_per_tool[tool_name] = idx
+        last_indices = set(last_per_tool.values())
+
+        for pos_idx, (msg_idx, block_idx, tool_name) in enumerate(positions):
+            if pos_idx not in last_indices:
+                content = messages[msg_idx]["content"]
+                cast("list", content)[block_idx]["content"] = (
+                    f"[Result collapsed — superseded by later {tool_name} call]"
+                )
 
     def to_dict(self) -> list[dict[str, Any]]:
         """Serialize all steps to a list of dictionaries for storage."""
