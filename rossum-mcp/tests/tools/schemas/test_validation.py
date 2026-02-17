@@ -380,3 +380,70 @@ class TestSanitizeSchemaContent:
         result = schemas.sanitize_schema_content(content)
         tuple_children = result[0]["children"][0]["children"]["children"]
         assert "ui_configuration" not in tuple_children[0]
+
+    def test_coerces_dict_type_to_string(self) -> None:
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "amount",
+                        "label": "Amount",
+                        "type": {"type": "number"},
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        assert result[0]["children"][0]["type"] == "number"
+
+    def test_removes_non_string_type_without_type_key(self) -> None:
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "field",
+                        "label": "Field",
+                        "type": {"foo": "bar"},
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        assert "type" not in result[0]["children"][0]
+
+    def test_strips_none_values_from_nodes(self) -> None:
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "field",
+                        "label": "Field",
+                        "type": "string",
+                        "score_threshold": None,
+                        "description": None,
+                        "formula": None,
+                        "prompt": None,
+                        "context": None,
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        dp = result[0]["children"][0]
+        for field in ("score_threshold", "description", "formula", "prompt", "context"):
+            assert field not in dp
+        # Non-None values are preserved
+        assert dp["id"] == "field"
+        assert dp["label"] == "Field"

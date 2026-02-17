@@ -10,6 +10,7 @@ import pytest
 from rossum_api import APIClientError
 from rossum_mcp.tools import base, schemas
 from rossum_mcp.tools.schemas import register_schema_tools
+from rossum_mcp.tools.schemas.models import SchemaListItem
 
 from .conftest import create_mock_schema
 
@@ -204,9 +205,11 @@ class TestListSchemas:
         result = await list_schemas()
 
         assert len(result) == 1
-        assert result[0].content == "<omitted>"
-        assert result[0].name == "Schema 1"
-        assert result[0].id == 1
+        item = result[0]
+        assert isinstance(item, SchemaListItem)
+        assert item.content == "<omitted>"
+        assert item.name == "Schema 1"
+        assert item.id == 1
 
     @pytest.mark.asyncio
     async def test_list_schemas_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:

@@ -5,8 +5,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from rossum_api import SyncRossumAPIClient
-from rossum_api.dtos import Token
+from regression_tests.custom_checks._utils import create_api_client, extract_id_from_final_answer
 
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
@@ -31,11 +30,11 @@ def check_business_validation_hook_settings(
     steps: list[AgentStep], api_base_url: str, api_token: str
 ) -> tuple[bool, str]:
     """Verify that business validation hook has correct check settings."""
-    hook_id = _extract_hook_id_from_final_answer(steps)
+    hook_id = extract_id_from_final_answer(steps)
     if not hook_id:
         return False, "No hook_id found in final answer"
 
-    client = SyncRossumAPIClient(base_url=api_base_url, credentials=Token(api_token))
+    client = create_api_client(api_base_url, api_token)
 
     try:
         hook = client.retrieve_hook(int(hook_id))
@@ -58,16 +57,6 @@ def check_business_validation_hook_settings(
             return (False, f"Check type mismatch: expected '{expected['type']}', got '{check.get('type')}'")
 
     return True, "All business validation checks match expected configuration"
-
-
-def _extract_hook_id_from_final_answer(steps: list[AgentStep]) -> str | None:
-    """Extract hook_id from the final answer (expected to be one-word answer)."""
-    for step in reversed(steps):
-        if step.final_answer:
-            match = re.search(r"\b(\d+)\b", step.final_answer)
-            if match:
-                return match.group(1)
-    return None
 
 
 def _extract_fields(rule: str) -> set[str]:

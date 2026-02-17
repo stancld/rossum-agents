@@ -58,6 +58,12 @@ class TestConcurrentAgentService:
                 patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=output_dir),
                 patch("rossum_agent.api.services.agent_service.get_system_prompt", return_value="test prompt"),
                 patch("rossum_agent.api.services.agent_service.extract_url_context") as mock_extract,
+                patch.object(
+                    AgentService,
+                    "_setup_change_tracking",
+                    new_callable=AsyncMock,
+                    return_value=(None, "https://api.rossum.ai"),
+                ),
             ):
                 mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
                 mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -77,8 +83,8 @@ class TestConcurrentAgentService:
 
             return events
 
-        task1 = asyncio.create_task(capture_context_and_run("request_1", delay=0.1))
-        task2 = asyncio.create_task(capture_context_and_run("request_2", delay=0.05))
+        task1 = asyncio.create_task(capture_context_and_run("request_1", delay=0.01))
+        task2 = asyncio.create_task(capture_context_and_run("request_2", delay=0.005))
 
         results = await asyncio.gather(task1, task2)
 
@@ -133,6 +139,12 @@ class TestConcurrentAgentService:
                 patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=output_dir),
                 patch("rossum_agent.api.services.agent_service.get_system_prompt", return_value="test"),
                 patch("rossum_agent.api.services.agent_service.extract_url_context") as mock_extract,
+                patch.object(
+                    AgentService,
+                    "_setup_change_tracking",
+                    new_callable=AsyncMock,
+                    return_value=(None, "https://api.rossum.ai"),
+                ),
             ):
                 mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
                 mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -156,8 +168,8 @@ class TestConcurrentAgentService:
                 except AttributeError as e:
                     return f"ERROR: {e}"
 
-        fast_task = asyncio.create_task(run_with_varying_delay("fast", delay=0.02))
-        slow_task = asyncio.create_task(run_with_varying_delay("slow", delay=0.1))
+        fast_task = asyncio.create_task(run_with_varying_delay("fast", delay=0.002))
+        slow_task = asyncio.create_task(run_with_varying_delay("slow", delay=0.01))
 
         fast_result, slow_result = await asyncio.gather(fast_task, slow_task)
 
@@ -198,6 +210,12 @@ class TestConcurrentAgentService:
                 patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=output_dir),
                 patch("rossum_agent.api.services.agent_service.get_system_prompt", return_value="test"),
                 patch("rossum_agent.api.services.agent_service.extract_url_context") as mock_extract,
+                patch.object(
+                    AgentService,
+                    "_setup_change_tracking",
+                    new_callable=AsyncMock,
+                    return_value=(None, "https://api.rossum.ai"),
+                ),
             ):
                 mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
                 mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from regression_tests.custom_checks._utils import call_haiku_check
+from regression_tests.custom_checks._utils import call_haiku_check, get_final_answer
 
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
@@ -37,12 +37,7 @@ def check_no_misleading_training_suggestions(
     Returns:
         Tuple of (passed, reasoning) where reasoning explains the LLM's evaluation.
     """
-    final_answer = None
-    for step in reversed(steps):
-        if step.final_answer:
-            final_answer = step.final_answer
-            break
-
+    final_answer = get_final_answer(steps)
     if not final_answer:
         return False, "No final answer found in agent steps"
 

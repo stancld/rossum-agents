@@ -9,6 +9,7 @@ from rossum_mcp.tools.schemas.models import (
     DatapointType,
     NodeCategory,
     SchemaDatapoint,
+    SchemaListItem,
     SchemaMultivalue,
     SchemaNode,
     SchemaNodeUpdate,
@@ -51,6 +52,7 @@ __all__ = [
     "NodeCategory",
     "PatchOperation",
     "SchemaDatapoint",
+    "SchemaListItem",
     "SchemaMultivalue",
     "SchemaNode",
     "SchemaNodeUpdate",
@@ -77,7 +79,7 @@ def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await ops.get_schema(client, schema_id)
 
     @mcp.tool(description="List all schemas with optional filters.")
-    async def list_schemas(name: str | None = None, queue_id: int | None = None) -> list[Schema]:
+    async def list_schemas(name: str | None = None, queue_id: int | None = None) -> list[SchemaListItem]:
         return await ops.list_schemas(client, name, queue_id)
 
     @mcp.tool(description="Update schema settings; requires full schema.")

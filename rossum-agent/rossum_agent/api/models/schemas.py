@@ -400,6 +400,9 @@ class StreamDoneEvent(BaseModel):
     cache_creation_input_tokens: int = 0
     cache_read_input_tokens: int = 0
     token_usage_breakdown: TokenUsageBreakdown | None = None
+    config_commit_hash: str | None = None
+    config_commit_message: str | None = None
+    config_changes_count: int = 0
 
 
 class FileCreatedEvent(BaseModel):

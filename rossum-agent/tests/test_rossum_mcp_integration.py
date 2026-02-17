@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from rossum_agent.change_tracking.models import EntityChange
 from rossum_agent.rossum_mcp_integration import (
     MCPConnection,
     connect_mcp_server,
@@ -259,3 +261,280 @@ class TestConnectMCPServer:
                 mcp_mode="read-write",
             )
             mock_client_class.assert_called_once_with(mock_transport)
+
+
+# -- Change tracking tests --
+
+
+def _make_mcp_result(data):
+    """Create a mock MCP call_tool result returning structured_content."""
+    result = MagicMock()
+    result.structured_content = data
+    result.data = None
+    result.content = []
+    return result
+
+
+def _make_connection(write_tools=None):
+    """Create an MCPConnection with a mocked client for testing."""
+    mock_client = AsyncMock()
+    return MCPConnection(client=mock_client, write_tools=write_tools or set())
+
+
+class TestHandleWriteUpdate:
+    @pytest.mark.asyncio
+    async def test_update_fetches_before_and_after_snapshots(self):
+        conn = _make_connection(write_tools={"update_queue"})
+        before = {"id": 1, "name": "Before"}
+        after = {"id": 1, "name": "After"}
+
+        call_count = 0
+
+        async def mock_call_tool(name, args):
+            nonlocal call_count
+            call_count += 1
+            if name == "get_queue":
+                return _make_mcp_result(before if call_count == 1 else after)
+            return _make_mcp_result({"ok": True})
+
+        conn.client.call_tool = mock_call_tool
+
+        result = await conn.call_tool("update_queue", {"queue_id": 1, "name": "After"})
+
+        assert result == {"ok": True}
+        assert len(conn.get_changes()) == 1
+        change = conn.get_changes()[0]
+        assert change.entity_type == "queue"
+        assert change.entity_id == "1"
+        assert change.operation == "update"
+        assert change.before == before
+        assert change.after == after
+
+
+class TestHandleWriteCreate:
+    @pytest.mark.asyncio
+    async def test_create_extracts_id_from_result(self):
+        conn = _make_connection(write_tools={"create_queue"})
+        created = {"result": {"id": 99, "name": "New Queue"}}
+
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
+
+        await conn.call_tool("create_queue", {"name": "New Queue"})
+
+        change = conn.get_changes()[0]
+        assert change.entity_type == "queue"
+        assert change.entity_id == "99"
+        assert change.operation == "create"
+        assert change.before is None
+        assert change.after == created
+
+
+class TestHandleWriteDelete:
+    @pytest.mark.asyncio
+    async def test_delete_sets_after_to_none(self):
+        conn = _make_connection(write_tools={"delete_hook"})
+        before = {"id": 5, "name": "Hook"}
+        conn._read_cache[("hook", "5")] = before
+
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result({"deleted": True}))
+
+        await conn.call_tool("delete_hook", {"hook_id": 5})
+
+        change = conn.get_changes()[0]
+        assert change.operation == "delete"
+        assert change.before == before
+        assert change.after is None
+
+
+class TestHandleWriteAutoCommit:
+    @pytest.mark.asyncio
+    async def test_auto_commits_on_operation_type_change(self):
+        conn = _make_connection(write_tools={"create_queue", "delete_queue"})
+        committed = False
+        conn._commit_store = object()  # type: ignore[assignment]
+
+        def on_flush(user_request: str) -> None:
+            nonlocal committed
+            committed = True
+
+        conn.flush_and_commit = on_flush  # type: ignore[method-assign]
+        # Simulate a prior create change on queue:1
+        conn._changes.append(
+            EntityChange(
+                entity_type="queue", entity_id="1", entity_name="Q", operation="create", before=None, after={}
+            )
+        )
+
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result({"deleted": True}))
+
+        await conn.call_tool("delete_queue", {"queue_id": 1})
+
+        assert committed
+
+    @pytest.mark.asyncio
+    async def test_no_auto_commit_for_same_operation_type(self):
+        conn = _make_connection(write_tools={"update_queue", "patch_queue"})
+        committed = False
+        conn._commit_store = object()  # type: ignore[assignment]
+
+        def on_flush(user_request: str) -> None:
+            nonlocal committed
+            committed = True
+
+        conn.flush_and_commit = on_flush  # type: ignore[method-assign]
+        conn._changes.append(
+            EntityChange(entity_type="queue", entity_id="1", entity_name="Q", operation="update", before={}, after={})
+        )
+
+        # patch_ also classifies as "update"
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result({"ok": True}))
+
+        # Need to also mock _fetch_snapshot for the after-snapshot
+        async def mock_call_tool(name, args):
+            return _make_mcp_result({"id": 1, "name": "Updated"})
+
+        conn.client.call_tool = mock_call_tool
+
+        await conn.call_tool("patch_queue", {"queue_id": 1})
+
+        assert not committed
+
+
+class TestHandleWriteUnknownEntity:
+    @pytest.mark.asyncio
+    async def test_unknown_entity_logs_warning_and_returns_result(self):
+        conn = _make_connection(write_tools={"do_something"})
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result({"done": True}))
+
+        result = await conn.call_tool("do_something", {"x": 1})
+
+        assert result == {"done": True}
+        assert conn.get_changes() == []
+
+
+class TestCallToolWriteDispatch:
+    @pytest.mark.asyncio
+    async def test_routes_write_tool_to_handle_write(self):
+        conn = _make_connection(write_tools={"update_schema"})
+        before = {"id": 10, "name": "S"}
+
+        async def mock_call_tool(name, args):
+            return _make_mcp_result(before)
+
+        conn.client.call_tool = mock_call_tool
+
+        await conn.call_tool("update_schema", {"schema_id": 10})
+
+        assert conn.has_changes()
+
+    @pytest.mark.asyncio
+    async def test_non_write_tool_not_tracked(self):
+        conn = _make_connection(write_tools={"update_schema"})
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result({"id": 1}))
+
+        await conn.call_tool("get_schema", {"schema_id": 1})
+
+        assert not conn.has_changes()
+
+
+# -- Cache tests --
+
+
+class TestCacheInMemory:
+    def test_round_trip(self):
+        conn = _make_connection()
+        conn._cache_set("queue", "1", {"id": 1, "name": "Q"})
+        assert conn._cache_get("queue", "1") == {"id": 1, "name": "Q"}
+
+    def test_miss_returns_none(self):
+        conn = _make_connection()
+        assert conn._cache_get("queue", "999") is None
+
+
+class TestCacheRedis:
+    def test_redis_set_and_get(self):
+        conn = _make_connection()
+        conn.chat_id = "chat-1"
+        mock_redis = MagicMock()
+        conn.redis_client = mock_redis
+
+        data = {"id": 1, "name": "Q"}
+        conn._cache_set("queue", "1", data)
+
+        expected_key = "read_cache:chat-1:queue:1"
+        mock_redis.setex.assert_called_once_with(expected_key, conn.cache_ttl_seconds, json.dumps(data, default=str))
+
+        # Simulate redis get
+        mock_redis.get.return_value = json.dumps(data).encode()
+        result = conn._cache_get("queue", "1")
+        assert result == data
+
+    def test_redis_miss(self):
+        conn = _make_connection()
+        conn.chat_id = "chat-1"
+        mock_redis = MagicMock()
+        mock_redis.get.return_value = None
+        conn.redis_client = mock_redis
+
+        assert conn._cache_get("queue", "999") is None
+
+
+class TestTryCacheRead:
+    @pytest.mark.asyncio
+    async def test_caches_get_result(self):
+        conn = _make_connection()
+        conn._try_cache_read("get_queue", {"queue_id": "1"}, {"id": 1, "name": "Q"})
+        assert conn._cache_get("queue", "1") == {"id": 1, "name": "Q"}
+
+    @pytest.mark.asyncio
+    async def test_skips_non_dict_result(self):
+        conn = _make_connection()
+        conn._try_cache_read("get_queue", {"queue_id": "1"}, "plain string")
+        assert conn._cache_get("queue", "1") is None
+
+    @pytest.mark.asyncio
+    async def test_get_without_id_in_args_uses_result_id(self):
+        conn = _make_connection()
+        conn._try_cache_read("get_queue", {}, {"id": 42, "name": "Q"})
+        assert conn._cache_get("queue", "42") == {"id": 42, "name": "Q"}
+
+
+class TestFetchSnapshot:
+    @pytest.mark.asyncio
+    async def test_success(self):
+        conn = _make_connection()
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result({"id": 1, "name": "Q"}))
+
+        result = await conn._fetch_snapshot("queue", "1")
+
+        assert result == {"id": 1, "name": "Q"}
+
+    @pytest.mark.asyncio
+    async def test_failure_returns_none(self):
+        conn = _make_connection()
+        conn.client.call_tool = AsyncMock(side_effect=Exception("API error"))
+
+        result = await conn._fetch_snapshot("queue", "1")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_non_dict_result_returns_none(self):
+        conn = _make_connection()
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(None))
+
+        result = await conn._fetch_snapshot("queue", "1")
+
+        assert result is None
+
+
+class TestChangeTrackerState:
+    def test_clear_changes(self):
+        conn = _make_connection()
+        conn._changes.append(
+            EntityChange(entity_type="queue", entity_id="1", entity_name="Q", operation="update", before={}, after={})
+        )
+        assert conn.has_changes()
+        conn.clear_changes()
+        assert not conn.has_changes()
+        assert conn.get_changes() == []

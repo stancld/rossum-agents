@@ -88,21 +88,14 @@ def _process_agent_event(event: AgentEvent) -> ProcessedEvent:
 
 def _yield_file_events(output_dir: Path | None, chat_id: str) -> Iterator[str]:
     """Yield SSE events for created files in the output directory."""
-    logger.info(f"_yield_file_events called with output_dir={output_dir}, chat_id={chat_id}")
-    if output_dir is None:
-        logger.info("output_dir is None, returning")
+    if output_dir is None or not output_dir.exists():
         return
-    if output_dir.exists():
-        logger.info(f"output_dir exists, listing files: {list(output_dir.iterdir())}")
-        for file_path in output_dir.iterdir():
-            if file_path.is_file():
-                logger.info(f"Yielding file_created event for {file_path.name}")
-                file_event = FileCreatedEvent(
-                    filename=file_path.name, url=f"/api/v1/chats/{chat_id}/files/{file_path.name}"
-                )
-                yield _format_sse_event("file_created", file_event.model_dump_json())
-    else:
-        logger.info(f"output_dir {output_dir} does not exist")
+    for file_path in output_dir.iterdir():
+        if file_path.is_file():
+            file_event = FileCreatedEvent(
+                filename=file_path.name, url=f"/api/v1/chats/{chat_id}/files/{file_path.name}"
+            )
+            yield _format_sse_event("file_created", file_event.model_dump_json())
 
 
 def _save_chat_history(
@@ -118,8 +111,12 @@ def _save_chat_history(
     documents: list[DocumentContent] | None,
     output_dir: Path | None,
     memory: AgentMemory | None,
+    done_event: StreamDoneEvent | None = None,
 ) -> None:
     """Persist updated conversation history after a successful agent run."""
+    if done_event and done_event.config_commit_hash:
+        chat_data.metadata.config_commits.append(done_event.config_commit_hash)
+
     updated_history = agent_service.build_updated_history(
         existing_history=history,
         user_prompt=user_prompt,
@@ -290,6 +287,7 @@ async def send_message(
             documents=documents,
             output_dir=output_dir,
             memory=memory,
+            done_event=done_event,
         )
 
         for file_event in _yield_file_events(output_dir, chat_id):

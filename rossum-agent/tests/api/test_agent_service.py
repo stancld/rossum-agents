@@ -772,6 +772,7 @@ class TestAgentServiceRunAgent:
             patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(AgentService, "_try_create_config_commit", return_value=None),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
             mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -812,6 +813,12 @@ class TestAgentServiceRunAgent:
             patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, "https://api.rossum.ai"),
+            ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
             mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -857,6 +864,12 @@ class TestAgentServiceRunAgent:
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
             patch.object(service, "_restore_conversation_history") as mock_restore,
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, "https://api.rossum.ai"),
+            ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
             mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -899,6 +912,12 @@ class TestAgentServiceRunAgent:
             patch(
                 "rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path
             ) as mock_create_dir,
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, "https://api.rossum.ai"),
+            ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
             mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -943,6 +962,12 @@ class TestAgentServiceRunAgent:
             patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, "https://api.rossum.ai"),
+            ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
             mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -1435,6 +1460,12 @@ class TestAgentServiceRunAgentWithImages:
             patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, "https://api.rossum.ai"),
+            ),
             caplog.at_level(logging.INFO),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)

@@ -93,15 +93,7 @@ For documentation: use Mermaid diagrams, cross-reference with anchors, explain b
 TASK_TRACKING = """
 # Task Tracking
 
-Use `create_task`, `update_task`, and `list_tasks` for complex multi-step operations (3+ steps). This gives users real-time progress visibility.
-
-| When | Action |
-|------|--------|
-| Starting multi-step work | `create_task` for each step, subject prefixed with step number (`1. ...`, `2. ...`) |
-| Beginning a step | `update_task(status="in_progress")` |
-| Finishing a step | `update_task(status="completed")` |
-
-Skip task tracking for simple single-step requests."""
+For complex multi-step operations (3+ steps), call `create_task` for each step (subject prefixed with `1. ...`, `2. ...`). Skip for simple requests. Do not call `update_task` — focus on executing the work."""
 
 
 def get_shared_prompt_sections() -> str:

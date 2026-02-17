@@ -46,15 +46,6 @@ class ChatService:
     def create_chat(
         self, user_id: str | None, mcp_mode: Literal["read-only", "read-write"] = "read-only"
     ) -> ChatResponse:
-        """Create a new chat session.
-
-        Args:
-            user_id: User identifier for isolation.
-            mcp_mode: MCP mode for this chat session.
-
-        Returns:
-            ChatResponse with the new chat_id and created_at timestamp.
-        """
         timestamp = dt.datetime.now(dt.UTC)
         timestamp_str = timestamp.strftime("%Y%m%d%H%M%S")
         unique_suffix = secrets.token_hex(4)
@@ -68,16 +59,6 @@ class ChatService:
         return ChatResponse(chat_id=chat_id, created_at=timestamp)
 
     def list_chats(self, user_id: str | None, limit: int = 50, offset: int = 0) -> ChatListResponse:
-        """List chat sessions for a user.
-
-        Args:
-            user_id: User identifier for isolation.
-            limit: Maximum number of chats to return.
-            offset: Pagination offset.
-
-        Returns:
-            ChatListResponse with paginated chat list.
-        """
         all_chats = self._storage.list_all_chats(user_id)
 
         paginated = all_chats[offset : offset + limit]
@@ -95,15 +76,6 @@ class ChatService:
         return ChatListResponse(chats=chats, total=len(all_chats), limit=limit, offset=offset)
 
     def get_chat(self, user_id: str | None, chat_id: str) -> ChatDetail | None:
-        """Get detailed chat information.
-
-        Args:
-            user_id: User identifier for isolation.
-            chat_id: Chat session identifier.
-
-        Returns:
-            ChatDetail with messages and files, or None if not found.
-        """
         if (chat_data := self._storage.load_chat(user_id, chat_id)) is None:
             return None
 
@@ -131,47 +103,20 @@ class ChatService:
         return ChatDetail(chat_id=chat_id, messages=messages, created_at=created_at, files=files)
 
     def delete_chat(self, user_id: str | None, chat_id: str) -> bool:
-        """Delete a chat session.
-
-        Args:
-            user_id: User identifier for isolation.
-            chat_id: Chat session identifier.
-
-        Returns:
-            True if deleted, False otherwise.
-        """
         self._storage.delete_all_files(chat_id)
         deleted = self._storage.delete_chat(user_id, chat_id)
         logger.info(f"Deleted chat {chat_id} for user {user_id or 'shared'}: {deleted}")
         return deleted
 
     def chat_exists(self, user_id: str | None, chat_id: str) -> bool:
-        """Check if a chat exists.
-
-        Args:
-            user_id: User identifier for isolation.
-            chat_id: Chat session identifier.
-        """
         return self._storage.chat_exists(user_id, chat_id)
 
     def get_messages(self, user_id: str | None, chat_id: str) -> list[dict[str, Any]] | None:
-        """Get raw messages for a chat session.
-
-        Args:
-            user_id: User identifier for isolation.
-            chat_id: Chat session identifier.
-        """
         if (chat_data := self._storage.load_chat(user_id, chat_id)) is None:
             return None
         return chat_data.messages
 
     def get_chat_data(self, user_id: str | None, chat_id: str) -> ChatData | None:
-        """Get full chat data including metadata.
-
-        Args:
-            user_id: User identifier for isolation.
-            chat_id: Chat session identifier.
-        """
         return self._storage.load_chat(user_id, chat_id)
 
     def save_messages(
@@ -182,16 +127,4 @@ class ChatService:
         output_dir: Path | None = None,
         metadata: ChatMetadata | None = None,
     ) -> bool:
-        """Save messages to a chat session.
-
-        Args:
-            user_id: User identifier for isolation.
-            chat_id: Chat session identifier.
-            messages: List of message dicts to save.
-            output_dir: Optional output directory path.
-            metadata: Optional chat metadata with token counts and step info.
-
-        Returns:
-            True if saved successfully, False otherwise.
-        """
         return self._storage.save_chat(user_id, chat_id, messages, output_dir, metadata)
