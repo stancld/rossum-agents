@@ -954,6 +954,36 @@ Confirms an annotation to move it to 'confirmed' status. Can be called after
      "message": "Annotation 12345 confirmed successfully. Status changed to 'confirmed'."
    }
 
+copy_annotations
+^^^^^^^^^^^^^^^^
+
+Copies one or more annotations to another queue. ``reimport=True`` re-extracts
+data in the target queue (use when moving documents between queues).
+``reimport=False`` (default) preserves original extracted data as-is.
+
+**Parameters:**
+
+- ``annotation_ids`` (array of integers, required): Annotation IDs to copy
+- ``target_queue_id`` (integer, required): Target queue ID
+- ``target_status`` (string, optional): Status of copied annotations (if not set, stays the same)
+- ``reimport`` (boolean, optional): Whether to reimport (default: false)
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "copied": 2,
+     "failed": 0,
+     "results": [
+       {"annotation_id": 111, "copied_annotation": {"id": 99991, "status": "to_review"}},
+       {"annotation_id": 222, "copied_annotation": {"id": 99992, "status": "to_review"}}
+     ],
+     "errors": []
+   }
+
+**Note:** This operation is only available in read-write mode.
+
 delete_annotation
 ^^^^^^^^^^^^^^^^^
 

@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **67 tools** organized into twelve categories:
+The MCP server provides **68 tools** organized into twelve categories:
 
 **Document Processing**
 
@@ -54,6 +54,7 @@ The MCP server provides **67 tools** organized into twelve categories:
 * **start_annotation** - Start annotation for field updates
 * **bulk_update_annotation_fields** - Update field values with JSON Patch
 * **confirm_annotation** - Confirm and finalize annotations
+* **copy_annotations** - Copy annotations to another queue
 
 **Queue Management**
 

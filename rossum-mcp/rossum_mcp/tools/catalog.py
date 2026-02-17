@@ -41,6 +41,7 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
             ToolInfo("start_annotation", "Start annotation (to_review -> reviewing)", read_only=False),
             ToolInfo("bulk_update_annotation_fields", "Bulk update annotation fields", read_only=False),
             ToolInfo("confirm_annotation", "Confirm annotation (-> confirmed)", read_only=False),
+            ToolInfo("copy_annotations", "Copy annotations to another queue", read_only=False),
             ToolInfo("delete_annotation", "Delete annotation (soft delete)", read_only=False),
         ],
         keywords=["annotation", "document", "upload", "extract", "confirm", "review"],
