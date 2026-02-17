@@ -5,6 +5,7 @@ from collections.abc import Sequence  # noqa: TC003 - needed at runtime for Fast
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+import anyio
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.annotation import Annotation
 
@@ -24,7 +25,7 @@ async def _upload_document(client: AsyncRossumAPIClient, file_path: str, queue_i
         return {"error": "upload_document is not available in read-only mode"}
 
     path = Path(file_path)
-    if not path.exists():
+    if not await anyio.Path(path).exists():
         logger.error(f"File not found: {file_path}")
         raise FileNotFoundError(f"File not found: {file_path}")
 
