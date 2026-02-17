@@ -37,7 +37,6 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
         tools=[
             ToolInfo("upload_document", "Upload document to queue", read_only=False),
             ToolInfo("get_annotation", "Retrieve annotation with extracted data"),
-            ToolInfo("get_original_document", "Download original uploaded document as base64"),
             ToolInfo("list_annotations", "List annotations for a queue"),
             ToolInfo("start_annotation", "Start annotation (to_review -> reviewing)", read_only=False),
             ToolInfo("bulk_update_annotation_fields", "Bulk update annotation fields", read_only=False),

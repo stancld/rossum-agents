@@ -198,27 +198,6 @@ status of a document.
      "modified_at": "2024-01-01T00:00:00Z"
    }
 
-get_original_document
-^^^^^^^^^^^^^^^^^^^^^
-
-Downloads the original uploaded document for an annotation. Returns the binary
-payload as base64 with metadata.
-
-**Parameters:**
-
-- ``annotation_id`` (integer, required): Annotation ID whose original document should be downloaded
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "annotation_id": 12345,
-     "document_id": 22222,
-     "content_base64": "JVBERi0xLjQK...",
-     "byte_size": 104857
-   }
-
 list_annotations
 ^^^^^^^^^^^^^^^^
 

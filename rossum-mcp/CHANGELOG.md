@@ -6,9 +6,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
-### Added
-- Added `get_original_document` tool to download the original uploaded document for an annotation via `retrieve_annotation(...).document` + `retrieve_document_content(...)`, returning base64 payload and metadata [#194](https://github.com/stancld/rossum-agents/pull/194)
-
 ## [1.2.3] - 2026-02-17
 
 ### Changed

@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_annotation
-from rossum_api.models.document import Document
 from rossum_mcp.tools import base
 from rossum_mcp.tools.annotations import register_annotation_tools
 
@@ -210,76 +209,6 @@ class TestGetAnnotation:
 
         assert result.id == 67890
         mock_client.retrieve_annotation.assert_called_once_with(67890, ())
-
-
-@pytest.mark.unit
-class TestGetOriginalDocument:
-    """Tests for get_original_document tool."""
-
-    @pytest.mark.asyncio
-    async def test_get_original_document_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test successful original document retrieval."""
-        register_annotation_tools(mock_mcp, mock_client)
-
-        mock_annotation = create_mock_annotation(id=67890, document="https://api.test.rossum.ai/v1/documents/1234")
-        mock_client.retrieve_annotation.return_value = mock_annotation
-        mock_client.retrieve_document_content.return_value = b"pdf-bytes"
-
-        get_original_document = mock_mcp._tools["get_original_document"]
-        result = await get_original_document(annotation_id=67890)
-
-        assert result["annotation_id"] == 67890
-        assert result["document_id"] == 1234
-        assert result["content_base64"] == "cGRmLWJ5dGVz"
-        assert result["byte_size"] == 9
-        mock_client.retrieve_annotation.assert_called_once_with(67890, ())
-        mock_client.retrieve_document_content.assert_called_once_with(1234)
-
-    @pytest.mark.asyncio
-    async def test_get_original_document_document_object(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test successful original document retrieval when annotation.document is a Document."""
-        register_annotation_tools(mock_mcp, mock_client)
-
-        document = Document(
-            id=1234,
-            url="https://api.test.rossum.ai/v1/documents/1234",
-            s3_name="s3-key",
-            parent=None,
-            email=None,
-            mime_type="application/pdf",
-            creator=None,
-            created_at="2025-01-01T00:00:00Z",
-            arrived_at="2025-01-01T00:00:00Z",
-            original_file_name="invoice.pdf",
-            content="",
-            metadata={},
-            annotations=[],
-        )
-        mock_annotation = create_mock_annotation(id=67890, document=document)
-        mock_client.retrieve_annotation.return_value = mock_annotation
-        mock_client.retrieve_document_content.return_value = b"pdf-bytes"
-
-        get_original_document = mock_mcp._tools["get_original_document"]
-        result = await get_original_document(annotation_id=67890)
-
-        assert result["document_id"] == 1234
-        mock_client.retrieve_document_content.assert_called_once_with(1234)
-
-    @pytest.mark.asyncio
-    async def test_get_original_document_invalid_document_ref(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test retrieval fails when annotation.document is not parseable as an integer ID."""
-        register_annotation_tools(mock_mcp, mock_client)
-
-        mock_annotation = create_mock_annotation(id=67890, document="not-a-document-url")
-        mock_client.retrieve_annotation.return_value = mock_annotation
-
-        get_original_document = mock_mcp._tools["get_original_document"]
-
-        with pytest.raises(ValueError) as exc_info:
-            await get_original_document(annotation_id=67890)
-
-        assert "Cannot extract resource ID from URL" in str(exc_info.value)
-        mock_client.retrieve_document_content.assert_not_called()
 
 
 @pytest.mark.unit

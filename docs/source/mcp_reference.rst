@@ -54,29 +54,6 @@ get_annotation
 **Implementation:**
   See ``rossum_mcp.server:69-98``
 
-get_original_document
-^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_original_document(annotation_id: int)``
-
-**Rossum SDK Methods:**
-  Combines two SDK calls:
-
-  1. ``AsyncRossumAPIClient.retrieve_annotation(annotation_id)``
-  2. ``AsyncRossumAPIClient.retrieve_document_content(document_id)``
-
-**API Endpoints:**
-  1. ``GET /v1/annotations/{annotation_id}``
-  2. ``GET /v1/documents/{document_id}/content``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Parses the document ID from ``annotation.document``, fetches binary document content,
-  and returns base64 payload plus metadata.
-
 list_annotations
 ^^^^^^^^^^^^^^^^
 

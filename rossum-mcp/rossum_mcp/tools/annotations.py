@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import logging
 from collections.abc import Sequence  # noqa: TC003 - needed at runtime for FastMCP
 from pathlib import Path
@@ -9,15 +8,8 @@ from typing import TYPE_CHECKING, Literal
 import anyio
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.annotation import Annotation
-from rossum_api.models.document import Document
 
-from rossum_mcp.tools.base import (
-    build_filters,
-    delete_resource,
-    extract_id_from_url,
-    graceful_list,
-    is_read_write_mode,
-)
+from rossum_mcp.tools.base import build_filters, delete_resource, graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -90,33 +82,6 @@ async def _list_annotations(
     return result.items
 
 
-def _parse_document_id(document_ref: str | Document | None) -> int:
-    if document_ref is None:
-        raise ValueError("Annotation has no document reference")
-
-    if isinstance(document_ref, Document):
-        return document_ref.id
-
-    if isinstance(document_ref, str):
-        return extract_id_from_url(document_ref)
-
-    raise TypeError(f"Unexpected annotation.document type: {type(document_ref).__name__}")
-
-
-async def _get_original_document(client: AsyncRossumAPIClient, annotation_id: int) -> dict[str, int | str]:
-    annotation = await _get_annotation(client, annotation_id)
-    document_id = _parse_document_id(annotation.document)
-    payload = await client.retrieve_document_content(document_id)
-    payload_base64 = base64.b64encode(payload).decode("ascii")
-
-    return {
-        "annotation_id": annotation_id,
-        "document_id": document_id,
-        "content_base64": payload_base64,
-        "byte_size": len(payload),
-    }
-
-
 async def _start_annotation(client: AsyncRossumAPIClient, annotation_id: int) -> dict:
     if not is_read_write_mode():
         return {"error": "start_annotation is not available in read-only mode"}
@@ -170,12 +135,6 @@ def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> Non
     @mcp.tool(description="Retrieve an annotation; include sideload='content' to return extracted data.")
     async def get_annotation(annotation_id: int, sideloads: Sequence[Sideload] = ()) -> Annotation:
         return await _get_annotation(client, annotation_id, sideloads)
-
-    @mcp.tool(
-        description="Download the original uploaded document for an annotation. Returns base64 content and metadata."
-    )
-    async def get_original_document(annotation_id: int) -> dict[str, int | str]:
-        return await _get_original_document(client, annotation_id)
 
     @mcp.tool(description="List queue annotations; ordering=['-created_at'] returns newest first.")
     async def list_annotations(
