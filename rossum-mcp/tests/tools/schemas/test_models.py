@@ -184,7 +184,9 @@ class TestSchemaDataclasses:
             node_data=SchemaDatapoint(label="Vendor Name", type="string"),
         )
 
-        assert result.id == 50
+        assert result["status"] == "success"
+        assert result["schema_id"] == 50
+        assert result["node"]["label"] == "Vendor Name"
         call_args = mock_client._http_client.update.call_args
         updated_content = call_args[1]["content"] if "content" in call_args[1] else call_args[0][2]["content"]
         header_section = updated_content[0]
@@ -225,7 +227,9 @@ class TestSchemaDataclasses:
             node_data=SchemaNodeUpdate(label="Invoice #", score_threshold=0.95),
         )
 
-        assert result.id == 50
+        assert result["status"] == "success"
+        assert result["schema_id"] == 50
+        assert result["node"]["label"] == "Invoice #"
         call_args = mock_client._http_client.update.call_args
         updated_content = call_args[1]["content"] if "content" in call_args[1] else call_args[0][2]["content"]
         datapoint = updated_content[0]["children"][0]

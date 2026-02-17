@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import asyncio
 
+    from rossum_agent.change_tracking.store import CommitStore
     from rossum_agent.rossum_mcp_integration import MCPConnection
     from rossum_agent.tools.task_tracker import TaskTracker
 
@@ -69,6 +70,8 @@ _mcp_event_loop: ContextVar[asyncio.AbstractEventLoop | None] = ContextVar("mcp_
 _mcp_mode: ContextVar[str] = ContextVar("mcp_mode", default="read-only")
 _output_dir: ContextVar[Path | None] = ContextVar("output_dir", default=None)
 _rossum_credentials: ContextVar[tuple[str, str] | None] = ContextVar("rossum_credentials", default=None)
+_commit_store: ContextVar[CommitStore | None] = ContextVar("commit_store", default=None)
+_rossum_environment: ContextVar[str | None] = ContextVar("rossum_environment", default=None)
 
 
 def set_progress_callback(callback: SubAgentProgressCallback | None) -> None:
@@ -214,3 +217,23 @@ def report_task_snapshot(snapshot: list[dict[str, object]]) -> None:
     """Report a task snapshot via the callback if set."""
     if (callback := _task_snapshot_callback.get()) is not None:
         callback(snapshot)
+
+
+def set_commit_store(store: CommitStore | None) -> None:
+    """Set the commit store for change tracking."""
+    _commit_store.set(store)
+
+
+def get_commit_store() -> CommitStore | None:
+    """Get the current commit store."""
+    return _commit_store.get()
+
+
+def set_rossum_environment(environment: str | None) -> None:
+    """Set the Rossum environment identifier."""
+    _rossum_environment.set(environment)
+
+
+def get_rossum_environment() -> str | None:
+    """Get the current Rossum environment identifier."""
+    return _rossum_environment.get()

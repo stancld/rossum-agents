@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
-from rossum_api import SyncRossumAPIClient
-from rossum_api.dtos import Token
+from regression_tests.custom_checks._utils import create_api_client, extract_id_from_final_answer
 
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
@@ -30,11 +28,11 @@ AMOUNT_FIELD_ALTERNATIVES = {("schema", "amount_total"), ("schema", "amount_due"
 
 def check_queue_ui_settings(steps: list[AgentStep], api_base_url: str, api_token: str) -> tuple[bool, str]:
     """Verify that queue has correct UI column settings."""
-    queue_id = _extract_queue_id_from_final_answer(steps)
+    queue_id = extract_id_from_final_answer(steps)
     if not queue_id:
         return False, "No queue_id found in final answer"
 
-    client = SyncRossumAPIClient(base_url=api_base_url, credentials=Token(api_token))
+    client = create_api_client(api_base_url, api_token)
 
     try:
         queue = client.retrieve_queue(int(queue_id))
@@ -70,13 +68,3 @@ def check_queue_ui_settings(steps: list[AgentStep], api_base_url: str, api_token
         return False, f"Missing amount field (need one of: {alts_str})"
 
     return True, f"All {len(EXPECTED_VISIBLE_COLUMNS) + 1} expected UI columns are visible"
-
-
-def _extract_queue_id_from_final_answer(steps: list[AgentStep]) -> str | None:
-    """Extract queue_id from the final answer (expected to be one-word answer)."""
-    for step in reversed(steps):
-        if step.final_answer:
-            match = re.search(r"\b(\d+)\b", step.final_answer)
-            if match:
-                return match.group(1)
-    return None

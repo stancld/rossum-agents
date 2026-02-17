@@ -37,6 +37,7 @@ export function loadPersistedState(): ChatState | null {
       subAgentProgress: null,
       finalAnswer: p.finalAnswer ?? null,
       tokenUsage: p.tokenUsage ?? null,
+      configCommit: null,
       files: p.files ?? [],
       error: null,
       userMessages: p.userMessages ?? [],

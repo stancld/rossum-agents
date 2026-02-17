@@ -7,6 +7,33 @@ All notable changes to this project will be documented in this file.
 ## [1.1.4] - 2026-02-12
 
 ### Added
+- Added tool call and result persistence in conversation history for full replay in multi-turn conversations [#184](https://github.com/stancld/rossum-agents/pull/184)
+- Moved `rossum-kb.json` into the `rossum_agent` package so it is included in installed distributions [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Added tool call argument logging in `_execute_tool_with_progress` for debugging agent behavior [#192](https://github.com/stancld/rossum-agents/pull/192)
+- Added configuration change tracking system that records every mutation as a `ConfigCommit` with before/after snapshots, LLM-generated commit messages, and Redis persistence [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Added `show_change_history`, `show_commit_details`, and `revert_commit` agent tools for querying and managing configuration changes [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Extended `MCPConnection` with transparent read caching and write interception for change tracking [#185](https://github.com/stancld/rossum-agents/pull/185)
+- Added config commit info (`config_commit_hash`, `config_commit_message`, `config_changes_count`) to `StreamDoneEvent` for TUI integration [#185](https://github.com/stancld/rossum-agents/pull/185)
+
+### Changed
+- Collapse repeated collapsible tool results (e.g. `patch_schema`) in `AgentMemory.write_to_messages()` — only the last result is sent in full to the LLM, earlier results are replaced with a short summary to reduce context bloat [#192](https://github.com/stancld/rossum-agents/pull/192)
+
+### Fixed
+- Fixed schema patching sub-agent silently dropping fields when `parent_section` doesn't exist — now auto-creates the missing section [#189](https://github.com/stancld/rossum-agents/pull/189)
+- Stagger concurrent `patch_schema` tool calls (0.5s delay between each) to avoid HTTP 412 conflicts from simultaneous schema writes [#192](https://github.com/stancld/rossum-agents/pull/192)
+
+### Changed
+- Changed `prune_schema_fields` `fields_to_keep` behavior — sections are no longer auto-included; list section IDs explicitly to preserve them as empty containers for `patch_schema` [#191](https://github.com/stancld/rossum-agents/pull/191)
+- Simplified Knowledge Base cache — use bundled `data/rossum-kb.json` instead of downloading from a remote URL with disk caching [#187](https://github.com/stancld/rossum-agents/pull/187)
+
+### Removed
+- Removed `refresh_knowledge_base` function and `ROSSUM_KB_DATA_URL` env var (no longer needed with bundled data) [#187](https://github.com/stancld/rossum-agents/pull/187)
+- Removed `httpx` dependency from `knowledge_base_search` module [#187](https://github.com/stancld/rossum-agents/pull/187)
+
+
+## [1.1.4] - 2026-02-12
+
+### Added
 - Added `txscript` skill — standalone TxScript language reference for formula fields, serverless functions, and rule trigger conditions [#176](https://github.com/stancld/rossum-agents/pull/176)
 - Added `fields_to_update` support to schema patching sub-agent for updating existing field properties (formula, label, type, ui_configuration) without removing and re-adding fields [#181](https://github.com/stancld/rossum-agents/pull/181)
 - Added `formula` property support to `_build_field_node` so new formula fields retain their formula code [#181](https://github.com/stancld/rossum-agents/pull/181)

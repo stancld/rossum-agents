@@ -13,14 +13,17 @@ from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.schema import Schema
 
 from rossum_mcp.tools.base import (
-    TRUNCATED_MARKER,
     delete_resource,
     extract_id_from_url,
     graceful_list,
     is_read_write_mode,
 )
-from rossum_mcp.tools.schemas.models import SchemaNode, SchemaNodeUpdate  # noqa: TC001 - needed at runtime for FastMCP
-from rossum_mcp.tools.schemas.patching import PatchOperation, apply_schema_patch
+from rossum_mcp.tools.schemas.models import (
+    SchemaListItem,
+    SchemaNode,
+    SchemaNodeUpdate,
+)
+from rossum_mcp.tools.schemas.patching import PatchOperation, _find_node_anywhere, apply_schema_patch
 from rossum_mcp.tools.schemas.pruning import (
     _collect_all_field_ids,
     _collect_ancestor_ids,
@@ -62,9 +65,6 @@ async def _update_schema_with_retry(
         if new_content is None:
             return content, None
 
-        if not new_content:
-            raise ValueError("Cannot update schema with empty content — this would remove all fields")
-
         sanitized = sanitize_schema_content(new_content)
         try:
             await client._http_client.update(Resource.Schema, schema_id, {"content": sanitized})
@@ -81,11 +81,17 @@ async def _update_schema_with_retry(
     raise RuntimeError("Unreachable")
 
 
-def _truncate_schema_for_list(schema: Schema) -> Schema:
-    """Truncate content field in schema to save context in list responses."""
-    from dataclasses import replace  # noqa: PLC0415 - avoid circular import with models
-
-    return replace(schema, content=TRUNCATED_MARKER)
+def _truncate_schema_for_list(schema: Schema) -> SchemaListItem:
+    """Convert to SchemaListItem with content omitted."""
+    return SchemaListItem(
+        id=schema.id,
+        name=schema.name,
+        queues=schema.queues,
+        url=schema.url,
+        metadata=schema.metadata,
+        modified_by=schema.modified_by,
+        modified_at=schema.modified_at,
+    )
 
 
 async def get_schema(client: AsyncRossumAPIClient, schema_id: int) -> Schema | dict:
@@ -100,7 +106,7 @@ async def get_schema(client: AsyncRossumAPIClient, schema_id: int) -> Schema | d
 
 async def list_schemas(
     client: AsyncRossumAPIClient, name: str | None = None, queue_id: int | None = None
-) -> list[Schema]:
+) -> list[SchemaListItem]:
     logger.debug(f"Listing schemas: name={name}, queue_id={queue_id}")
     filters: dict = {}
     if name is not None:
@@ -118,8 +124,6 @@ async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_dat
 
     logger.debug(f"Updating schema: schema_id={schema_id}")
     if "content" in schema_data and isinstance(schema_data["content"], list):
-        if not schema_data["content"]:
-            return {"error": "Cannot update schema with empty content — this would remove all fields"}
         schema_data = {**schema_data, "content": sanitize_schema_content(schema_data["content"])}
     await client._http_client.update(Resource.Schema, schema_id, schema_data)
     updated_schema: Schema = await client.retrieve_schema(schema_id)
@@ -148,7 +152,7 @@ async def patch_schema(
     node_data: SchemaNode | SchemaNodeUpdate | None = None,
     parent_id: str | None = None,
     position: int | None = None,
-) -> Schema | dict:
+) -> dict:
     if not is_read_write_mode():
         return {"error": "patch_schema is not available in read-only mode"}
 
@@ -177,11 +181,20 @@ async def patch_schema(
         )
 
     try:
-        await _update_schema_with_retry(client, schema_id, prepare)
+        _, result_content = await _update_schema_with_retry(client, schema_id, prepare)
     except ValueError as e:
         return {"error": str(e)}
 
-    return await client.retrieve_schema(schema_id)
+    # Return concise confirmation with the affected node instead of the full schema
+    assert result_content is not None
+    node, _, _, _ = _find_node_anywhere(result_content, node_id)
+    return {
+        "status": "success",
+        "schema_id": schema_id,
+        "operation": operation,
+        "node_id": node_id,
+        "node": node,
+    }
 
 
 async def get_schema_tree_structure(
@@ -213,27 +226,41 @@ async def prune_schema_fields(
     if not is_read_write_mode():
         return {"error": "prune_schema_fields is not available in read-only mode"}
 
-    if fields_to_keep and fields_to_remove:
+    if fields_to_keep is not None and fields_to_remove is not None:
         return {"error": "Specify fields_to_keep OR fields_to_remove, not both"}
-    if not fields_to_keep and not fields_to_remove:
+    if fields_to_keep is None and fields_to_remove is None:
         return {"error": "Must specify fields_to_keep or fields_to_remove"}
 
     def prepare(content: list) -> list | None:
         all_ids = _collect_all_field_ids(content)
         section_ids = {s.get("id") for s in content if s.get("category") == "section"}
 
-        if fields_to_keep:
-            fields_to_keep_set = set(fields_to_keep) | section_ids
+        if fields_to_keep is not None:
+            fields_to_keep_set = set(fields_to_keep)
             ancestor_ids = _collect_ancestor_ids(content, fields_to_keep_set)
             fields_to_keep_set |= ancestor_ids
             remove_set = all_ids - fields_to_keep_set
+            # Sections explicitly listed in fields_to_keep are preserved as empty containers
+            keep_empty_sections = set(fields_to_keep) & section_ids
         else:
             remove_set = set(fields_to_remove) - section_ids  # type: ignore[arg-type]
+            keep_empty_sections = set()
 
         if not remove_set:
             return None
 
         pruned_content, _ = _remove_fields_from_content(content, remove_set)
+
+        # Re-add sections that were auto-removed (empty) but explicitly requested
+        if keep_empty_sections:
+            kept_ids = {s.get("id") for s in pruned_content}
+            for section in content:
+                sid = section.get("id")
+                if sid in keep_empty_sections and sid not in kept_ids:
+                    pruned_content.append(
+                        {"id": sid, "label": section.get("label", ""), "category": "section", "children": []}
+                    )
+
         return pruned_content
 
     try:

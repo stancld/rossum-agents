@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rossum_agent.tools.change_history import revert_commit, show_change_history, show_commit_details
 from rossum_agent.tools.core import (
     SubAgentProgress,
     SubAgentProgressCallback,
@@ -14,21 +15,25 @@ from rossum_agent.tools.core import (
     SubAgentTextCallback,
     SubAgentTokenCallback,
     SubAgentTokenUsage,
+    get_commit_store,
     get_mcp_connection,
     get_mcp_event_loop,
     get_mcp_mode,
     get_output_dir,
     get_rossum_credentials,
+    get_rossum_environment,
     get_task_tracker,
     is_read_only_mode,
     report_progress,
     report_text,
     report_token_usage,
     require_rossum_credentials,
+    set_commit_store,
     set_mcp_connection,
     set_output_dir,
     set_progress_callback,
     set_rossum_credentials,
+    set_rossum_environment,
     set_task_snapshot_callback,
     set_task_tracker,
     set_text_callback,
@@ -57,6 +62,7 @@ from rossum_agent.tools.dynamic_tools import (
     get_loaded_categories,
     get_tools_version,
     get_write_tools,
+    get_write_tools_async,
     is_skill_loaded,
     load_tool,
     load_tool_category,
@@ -67,7 +73,7 @@ from rossum_agent.tools.dynamic_tools import (
 from rossum_agent.tools.elis_backend_openapi_search import elis_openapi_grep, elis_openapi_jq, refresh_openapi_spec
 from rossum_agent.tools.file_tools import write_file
 from rossum_agent.tools.formula import suggest_formula_field
-from rossum_agent.tools.knowledge_base_search import kb_get_article, kb_grep, refresh_knowledge_base
+from rossum_agent.tools.knowledge_base_search import kb_get_article, kb_grep
 from rossum_agent.tools.skills import load_skill
 from rossum_agent.tools.spawn_mcp import (
     SpawnedConnection,
@@ -110,6 +116,12 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     kb_get_article,
 ]
 
+_CHANGE_HISTORY_TOOLS: list[BetaTool[..., str]] = [
+    show_change_history,
+    show_commit_details,
+    revert_commit,
+]
+
 _DEPLOYMENT_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     spawn_mcp_connection,
     call_on_connection,
@@ -117,15 +129,18 @@ _DEPLOYMENT_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
 ]
 
 _INTERNAL_TOOL_REGISTRY: dict[str, BetaTool[..., str]] = {
-    t.name: t for t in (_ALWAYS_INTERNAL_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS)
+    t.name: t for t in (_ALWAYS_INTERNAL_TOOLS + _CHANGE_HISTORY_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS)
 }
 
 
 def _get_active_internal_tools() -> list[BetaTool[..., str]]:
     """Get internal tools based on loaded skills."""
+    tools = _ALWAYS_INTERNAL_TOOLS
+    if get_commit_store() is not None:
+        tools = tools + _CHANGE_HISTORY_TOOLS
     if is_skill_loaded("rossum-deployment"):
-        return _ALWAYS_INTERNAL_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS
-    return _ALWAYS_INTERNAL_TOOLS
+        tools = tools + _DEPLOYMENT_INTERNAL_TOOLS
+    return tools
 
 
 def get_internal_tools() -> list[ToolParam]:
@@ -178,7 +193,7 @@ def execute_tool(name: str, arguments: dict[str, object], tools: list[BetaTool[.
     raise ValueError(f"Unknown tool: {name}")
 
 
-INTERNAL_TOOLS = _ALWAYS_INTERNAL_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS
+INTERNAL_TOOLS = _ALWAYS_INTERNAL_TOOLS + _CHANGE_HISTORY_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS
 
 __all__ = [
     "DEPLOY_TOOLS",
@@ -212,6 +227,7 @@ __all__ = [
     "elis_openapi_jq",
     "execute_internal_tool",
     "execute_tool",
+    "get_commit_store",
     "get_deploy_tool_names",
     "get_deploy_tools",
     "get_dynamic_tools",
@@ -225,9 +241,11 @@ __all__ = [
     "get_mcp_mode",
     "get_output_dir",
     "get_rossum_credentials",
+    "get_rossum_environment",
     "get_task_tracker",
     "get_tools_version",
     "get_write_tools",
+    "get_write_tools_async",
     "is_read_only_mode",
     "is_skill_loaded",
     "kb_get_article",
@@ -238,23 +256,27 @@ __all__ = [
     "load_tool_category",
     "patch_schema_with_subagent",
     "preload_categories_for_request",
-    "refresh_knowledge_base",
     "refresh_openapi_spec",
     "report_progress",
     "report_text",
     "report_token_usage",
     "require_rossum_credentials",
     "reset_dynamic_tools",
+    "revert_commit",
     "search_elis_docs",
     "search_knowledge_base",
+    "set_commit_store",
     "set_mcp_connection",
     "set_output_dir",
     "set_progress_callback",
     "set_rossum_credentials",
+    "set_rossum_environment",
     "set_task_snapshot_callback",
     "set_task_tracker",
     "set_text_callback",
     "set_token_callback",
+    "show_change_history",
+    "show_commit_details",
     "spawn_mcp_connection",
     "suggest_categories_for_request",
     "suggest_formula_field",

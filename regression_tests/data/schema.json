@@ -1,0 +1,545 @@
+[
+  {
+    "category": "section",
+    "id": "basic_info_section",
+    "label": "Basic Information",
+    "children": [
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "default_value": null,
+        "category": "datapoint",
+        "id": "document_id",
+        "label": "Document ID",
+        "type": "string",
+        "ui_configuration": {
+          "type": "captured",
+          "edit": "enabled"
+        }
+      },
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "default_value": null,
+        "category": "datapoint",
+        "id": "date_issue",
+        "label": "Issue Date",
+        "type": "date",
+        "ui_configuration": {
+          "type": "captured",
+          "edit": "enabled"
+        },
+        "format": "D.M.YYYY"
+      },
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "default_value": null,
+        "category": "datapoint",
+        "id": "date_due",
+        "label": "Due Date",
+        "type": "date",
+        "ui_configuration": {
+          "type": "captured",
+          "edit": "enabled"
+        },
+        "format": "D.M.YYYY"
+      },
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "score_threshold": 0,
+        "default_value": null,
+        "category": "datapoint",
+        "id": "the_net_terms",
+        "label": "The Net Terms",
+        "hidden": false,
+        "disable_prediction": false,
+        "type": "string",
+        "can_export": true,
+        "ui_configuration": {
+          "type": "formula",
+          "edit": "disabled"
+        },
+        "formula": "(\n    'Net 15' if not is_empty(field.date_due) and not is_empty(field.date_issue) and (field.date_due - field.date_issue).days <= 15\n    else 'Net 30' if not is_empty(field.date_due) and not is_empty(field.date_issue) and (field.date_due - field.date_issue).days <= 30\n    else 'Outstanding' if not is_empty(field.date_due) and not is_empty(field.date_issue)\n    else ''\n)"
+      }
+    ],
+    "icon": null
+  },
+  {
+    "category": "section",
+    "id": "amounts_section",
+    "label": "VAT & Amounts",
+    "children": [
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "default_value": null,
+        "category": "datapoint",
+        "id": "amount_total",
+        "label": "Total Amount",
+        "type": "number",
+        "ui_configuration": {
+          "type": "captured",
+          "edit": "enabled"
+        },
+        "format": "# ##0.#"
+      },
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "default_value": null,
+        "category": "datapoint",
+        "id": "amount_total_tax",
+        "label": "Total Tax",
+        "type": "number",
+        "ui_configuration": {
+          "type": "captured",
+          "edit": "enabled"
+        },
+        "format": "# ##0.#"
+      },
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "default_value": null,
+        "category": "datapoint",
+        "id": "currency",
+        "label": "Currency",
+        "type": "enum",
+        "ui_configuration": {
+          "type": "captured",
+          "edit": "enabled_without_warning"
+        },
+        "options": [
+          {
+            "value": "usd",
+            "label": "USD",
+            "struct": null
+          },
+          {
+            "value": "gbp",
+            "label": "GBP",
+            "struct": null
+          },
+          {
+            "value": "eur",
+            "label": "EUR",
+            "struct": null
+          },
+          {
+            "value": "aed",
+            "label": "AED",
+            "struct": null
+          },
+          {
+            "value": "ars",
+            "label": "ARS",
+            "struct": null
+          },
+          {
+            "value": "aud",
+            "label": "AUD",
+            "struct": null
+          },
+          {
+            "value": "bgn",
+            "label": "BGN",
+            "struct": null
+          },
+          {
+            "value": "brl",
+            "label": "BRL",
+            "struct": null
+          },
+          {
+            "value": "cad",
+            "label": "CAD",
+            "struct": null
+          },
+          {
+            "value": "chf",
+            "label": "CHF",
+            "struct": null
+          },
+          {
+            "value": "clp",
+            "label": "CLP",
+            "struct": null
+          },
+          {
+            "value": "cny",
+            "label": "CNY",
+            "struct": null
+          },
+          {
+            "value": "cop",
+            "label": "COP",
+            "struct": null
+          },
+          {
+            "value": "crc",
+            "label": "CRC",
+            "struct": null
+          },
+          {
+            "value": "czk",
+            "label": "CZK",
+            "struct": null
+          },
+          {
+            "value": "dkk",
+            "label": "DKK",
+            "struct": null
+          },
+          {
+            "value": "gtq",
+            "label": "GTQ",
+            "struct": null
+          },
+          {
+            "value": "hkd",
+            "label": "HKD",
+            "struct": null
+          },
+          {
+            "value": "huf",
+            "label": "HUF",
+            "struct": null
+          },
+          {
+            "value": "idr",
+            "label": "IDR",
+            "struct": null
+          },
+          {
+            "value": "ils",
+            "label": "ILS",
+            "struct": null
+          },
+          {
+            "value": "inr",
+            "label": "INR",
+            "struct": null
+          },
+          {
+            "value": "isk",
+            "label": "ISK",
+            "struct": null
+          },
+          {
+            "value": "jmd",
+            "label": "JMD",
+            "struct": null
+          },
+          {
+            "value": "jpy",
+            "label": "JPY",
+            "struct": null
+          },
+          {
+            "value": "krw",
+            "label": "KRW",
+            "struct": null
+          },
+          {
+            "value": "mxn",
+            "label": "MXN",
+            "struct": null
+          },
+          {
+            "value": "myr",
+            "label": "MYR",
+            "struct": null
+          },
+          {
+            "value": "nok",
+            "label": "NOK",
+            "struct": null
+          },
+          {
+            "value": "nzd",
+            "label": "NZD",
+            "struct": null
+          },
+          {
+            "value": "pen",
+            "label": "PEN",
+            "struct": null
+          },
+          {
+            "value": "php",
+            "label": "PHP",
+            "struct": null
+          },
+          {
+            "value": "pln",
+            "label": "PLN",
+            "struct": null
+          },
+          {
+            "value": "ron",
+            "label": "RON",
+            "struct": null
+          },
+          {
+            "value": "rsd",
+            "label": "RSD",
+            "struct": null
+          },
+          {
+            "value": "sar",
+            "label": "SAR",
+            "struct": null
+          },
+          {
+            "value": "sek",
+            "label": "SEK",
+            "struct": null
+          },
+          {
+            "value": "sgd",
+            "label": "SGD",
+            "struct": null
+          },
+          {
+            "value": "thb",
+            "label": "THB",
+            "struct": null
+          },
+          {
+            "value": "try",
+            "label": "TRY",
+            "struct": null
+          },
+          {
+            "value": "twd",
+            "label": "TWD",
+            "struct": null
+          },
+          {
+            "value": "uah",
+            "label": "UAH",
+            "struct": null
+          },
+          {
+            "value": "ves",
+            "label": "VES",
+            "struct": null
+          },
+          {
+            "value": "vnd",
+            "label": "VND",
+            "struct": null
+          },
+          {
+            "value": "zar",
+            "label": "ZAR",
+            "struct": null
+          },
+          {
+            "value": "other",
+            "label": "Other",
+            "struct": null
+          }
+        ]
+      }
+    ],
+    "icon": null
+  },
+  {
+    "category": "section",
+    "id": "vendor_section",
+    "label": "Vendor & Customer",
+    "children": [
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "default_value": null,
+        "category": "datapoint",
+        "id": "sender_name",
+        "label": "Vendor Name",
+        "type": "string",
+        "ui_configuration": {
+          "type": "captured",
+          "edit": "enabled"
+        }
+      },
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "default_value": null,
+        "category": "datapoint",
+        "id": "sender_address",
+        "label": "Vendor Address",
+        "type": "string",
+        "ui_configuration": {
+          "type": "captured",
+          "edit": "enabled"
+        }
+      },
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "default_value": null,
+        "category": "datapoint",
+        "id": "recipient_name",
+        "label": "Customer Name",
+        "type": "string",
+        "ui_configuration": {
+          "type": "captured",
+          "edit": "enabled"
+        }
+      },
+      {
+        "rir_field_names": [],
+        "constraints": {
+          "required": false
+        },
+        "default_value": null,
+        "category": "datapoint",
+        "id": "recipient_address",
+        "label": "Customer Address",
+        "type": "string",
+        "ui_configuration": {
+          "type": "captured",
+          "edit": "enabled"
+        }
+      }
+    ],
+    "icon": null
+  },
+  {
+    "category": "section",
+    "id": "line_items_section",
+    "label": "Line Items",
+    "children": [
+      {
+        "rir_field_names": [
+          "line_items"
+        ],
+        "category": "multivalue",
+        "id": "line_items",
+        "label": "Line Item",
+        "children": {
+          "rir_field_names": [],
+          "category": "tuple",
+          "id": "line_item",
+          "label": "Line Item",
+          "children": [
+            {
+              "rir_field_names": [],
+              "constraints": {
+                "required": false
+              },
+              "default_value": null,
+              "category": "datapoint",
+              "id": "item_code",
+              "label": "Code",
+              "type": "string",
+              "ui_configuration": {
+                "type": "captured",
+                "edit": "enabled"
+              }
+            },
+            {
+              "rir_field_names": [],
+              "width": 50,
+              "constraints": {
+                "required": false
+              },
+              "default_value": null,
+              "category": "datapoint",
+              "id": "item_description",
+              "label": "Description",
+              "type": "string",
+              "ui_configuration": {
+                "type": "captured",
+                "edit": "enabled"
+              }
+            },
+            {
+              "rir_field_names": [],
+              "constraints": {
+                "required": false
+              },
+              "default_value": null,
+              "category": "datapoint",
+              "id": "item_quantity",
+              "label": "Quantity",
+              "type": "number",
+              "ui_configuration": {
+                "type": "captured",
+                "edit": "enabled"
+              },
+              "format": "# ##0.#"
+            },
+            {
+              "rir_field_names": [],
+              "constraints": {
+                "required": false
+              },
+              "default_value": null,
+              "category": "datapoint",
+              "id": "item_amount",
+              "label": "Unit Price",
+              "type": "number",
+              "ui_configuration": {
+                "type": "captured",
+                "edit": "enabled"
+              },
+              "format": "# ##0.#"
+            },
+            {
+              "rir_field_names": [],
+              "width": 15,
+              "constraints": {
+                "required": false
+              },
+              "default_value": null,
+              "category": "datapoint",
+              "id": "item_amount_total",
+              "label": "Total Amount",
+              "type": "number",
+              "ui_configuration": {
+                "type": "captured",
+                "edit": "enabled"
+              },
+              "format": "# ##0.#",
+              "aggregations": {
+                "sum": {
+                  "label": "Sum"
+                }
+              }
+            }
+          ]
+        },
+        "min_occurrences": null,
+        "max_occurrences": null,
+        "default_value": null,
+        "show_grid_by_default": false
+      }
+    ],
+    "icon": null
+  }
+]

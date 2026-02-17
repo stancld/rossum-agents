@@ -143,7 +143,7 @@ class TestAgentConfig:
     def test_default_values(self):
         """Test default configuration values."""
         config = AgentConfig()
-        assert config.max_output_tokens == 64000
+        assert config.max_output_tokens == 128000
         assert config.max_steps == 50
         assert config.temperature == 1.0  # Required for extended thinking
 
@@ -980,7 +980,10 @@ class TestAgentRun:
                     is_streaming=False,
                 )
 
-        with patch.object(agent, "_stream_model_response", side_effect=mock_stream_response):
+        with (
+            patch.object(agent, "_stream_model_response", side_effect=mock_stream_response),
+            patch("rossum_agent.agent.core.asyncio.sleep", new_callable=AsyncMock),
+        ):
             steps = []
             async for step in agent.run("Test prompt"):
                 steps.append(step)
@@ -1003,7 +1006,10 @@ class TestAgentRun:
                 is_streaming=False,
             )
 
-        with patch.object(agent, "_stream_model_response", side_effect=mock_stream_response):
+        with (
+            patch.object(agent, "_stream_model_response", side_effect=mock_stream_response),
+            patch("rossum_agent.agent.core.asyncio.sleep", new_callable=AsyncMock),
+        ):
             steps = []
             async for step in agent.run("Test prompt"):
                 steps.append(step)

@@ -578,8 +578,8 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
         assert updated[1]["type"] == "memory_step"
         assert updated[1]["text"] == "The answer is 4."
 
-    def test_build_history_strips_tool_calls_for_lean_context(self):
-        """Test that tool calls and results are stripped from history for lean context."""
+    def test_build_history_preserves_tool_calls_and_results(self):
+        """Test that tool calls and results are preserved in history."""
         service = AgentService()
 
         memory = AgentMemory()
@@ -602,12 +602,14 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
         assert updated[0]["type"] == "task_step"
         assert updated[1]["type"] == "memory_step"
         assert updated[1]["text"] == "Let me check..."
-        assert updated[1]["tool_calls"] == []
-        assert updated[1]["tool_results"] == []
+        assert updated[1]["tool_calls"] == [{"id": "tc1", "name": "weather", "arguments": {"city": "NYC"}}]
+        assert updated[1]["tool_results"] == [
+            {"tool_call_id": "tc1", "name": "weather", "content": "Rainy", "is_error": False}
+        ]
         assert updated[2]["text"] == "It's rainy in NYC."
 
-    def test_build_history_skips_memory_steps_without_text(self):
-        """Test that memory steps without text are skipped."""
+    def test_build_history_preserves_steps_with_only_tool_calls(self):
+        """Test that memory steps with tool calls but no text are preserved."""
         service = AgentService()
 
         memory = AgentMemory()
@@ -626,10 +628,47 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
             existing_history=[], user_prompt="ignored", final_response="ignored", memory=memory
         )
 
-        assert len(updated) == 2
+        assert len(updated) == 3
         assert updated[0]["type"] == "task_step"
         assert updated[1]["type"] == "memory_step"
-        assert updated[1]["text"] == "Final answer"
+        assert updated[1]["text"] is None
+        assert updated[1]["tool_calls"] == [{"id": "tc1", "name": "tool", "arguments": {}}]
+        assert updated[1]["tool_results"] == [
+            {"tool_call_id": "tc1", "name": "tool", "content": "result", "is_error": False}
+        ]
+        assert updated[2]["type"] == "memory_step"
+        assert updated[2]["text"] == "Final answer"
+
+    def test_build_history_preserves_steps_with_only_tool_results(self):
+        """Test that memory steps with tool results but no text are preserved."""
+        service = AgentService()
+
+        memory = AgentMemory()
+        memory.add_task("Do something")
+        memory.steps.append(
+            MemoryStep(
+                step_number=1,
+                text=None,
+                tool_calls=[],
+                tool_results=[ToolResult(tool_call_id="tc1", name="tool", content="result")],
+            )
+        )
+        memory.steps.append(MemoryStep(step_number=2, text="Final answer"))
+
+        updated = service.build_updated_history(
+            existing_history=[], user_prompt="ignored", final_response="ignored", memory=memory
+        )
+
+        assert len(updated) == 3
+        assert updated[0]["type"] == "task_step"
+        assert updated[1]["type"] == "memory_step"
+        assert updated[1]["text"] is None
+        assert updated[1]["tool_calls"] == []
+        assert updated[1]["tool_results"] == [
+            {"tool_call_id": "tc1", "name": "tool", "content": "result", "is_error": False}
+        ]
+        assert updated[2]["type"] == "memory_step"
+        assert updated[2]["text"] == "Final answer"
 
     def test_build_history_falls_back_when_no_memory(self):
         """Test fallback to legacy behavior when memory is None."""
@@ -671,8 +710,10 @@ class TestAgentServiceBuildUpdatedHistoryWithMemory:
         assert len(updated) == 2
         assert updated[1]["type"] == "memory_step"
         assert updated[1]["text"] == "Let me analyze..."
-        assert updated[1]["tool_calls"] == []
-        assert updated[1]["tool_results"] == []
+        assert updated[1]["tool_calls"] == [{"id": "tc1", "name": "get_doc", "arguments": {}}]
+        assert updated[1]["tool_results"] == [
+            {"tool_call_id": "tc1", "name": "get_doc", "content": "doc content", "is_error": False}
+        ]
         assert len(updated[1]["thinking_blocks"]) == 2
         assert updated[1]["thinking_blocks"][0]["thinking"] == "I need to consider..."
         assert updated[1]["thinking_blocks"][0]["signature"] == "sig123"
@@ -731,6 +772,7 @@ class TestAgentServiceRunAgent:
             patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(AgentService, "_try_create_config_commit", return_value=None),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
             mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -771,6 +813,12 @@ class TestAgentServiceRunAgent:
             patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, "https://api.rossum.ai"),
+            ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
             mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -816,6 +864,12 @@ class TestAgentServiceRunAgent:
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
             patch.object(service, "_restore_conversation_history") as mock_restore,
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, "https://api.rossum.ai"),
+            ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
             mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -858,6 +912,12 @@ class TestAgentServiceRunAgent:
             patch(
                 "rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path
             ) as mock_create_dir,
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, "https://api.rossum.ai"),
+            ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
             mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -874,6 +934,68 @@ class TestAgentServiceRunAgent:
 
             mock_create_dir.assert_called_once()
             assert service.get_output_dir("test-chat") == tmp_path
+
+    @pytest.mark.asyncio
+    async def test_run_agent_memory_available_after_run_for_pop(self, tmp_path):
+        """Test that run memory remains available until consumed by pop_last_memory."""
+        service = AgentService()
+
+        mock_mcp_connection = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent._total_input_tokens = 0
+        mock_agent._total_output_tokens = 0
+        mock_agent._total_cache_creation_tokens = 0
+        mock_agent._total_cache_read_tokens = 0
+        mock_agent.get_token_usage_breakdown.return_value = {}
+        mock_agent.log_token_usage_summary = MagicMock()
+
+        memory = AgentMemory()
+        memory.add_task("Test")
+        mock_agent.memory = memory
+
+        async def mock_run(prompt):
+            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+
+        mock_agent.run = mock_run
+
+        with (
+            patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
+            patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
+            patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, "https://api.rossum.ai"),
+            ),
+        ):
+            mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
+            mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_create_agent.return_value = mock_agent
+
+            async for _ in service.run_agent(
+                chat_id="test-chat",
+                prompt="Test",
+                conversation_history=[],
+                rossum_api_token="token",
+                rossum_api_base_url="https://api.rossum.ai",
+            ):
+                pass
+
+            assert service.pop_last_memory("test-chat") is memory
+            assert service.pop_last_memory("test-chat") is None
+
+    @pytest.mark.asyncio
+    async def test_register_run_clears_stale_memory(self):
+        """Test that stale memory is cleared at start of a new run."""
+        service = AgentService()
+        state = service._get_chat_run_state("test-chat")
+        state.last_memory = AgentMemory()
+
+        run_id = await service._register_run("test-chat")
+        assert state.last_memory is None
+
+        await service._clear_run("test-chat", run_id)
 
     def test_output_dir_initially_none(self):
         """Test that output_dir is None before running agent."""
@@ -1338,6 +1460,12 @@ class TestAgentServiceRunAgentWithImages:
             patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, "https://api.rossum.ai"),
+            ),
             caplog.at_level(logging.INFO),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)

@@ -5,8 +5,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from rossum_api import SyncRossumAPIClient
-from rossum_api.dtos import Token
+from regression_tests.custom_checks._utils import create_api_client, extract_id_from_final_answer
 
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
@@ -37,11 +36,11 @@ EXPECTED_RULES = [
 
 def check_business_validation_rules(steps: list[AgentStep], api_base_url: str, api_token: str) -> tuple[bool, str]:
     """Verify that business validation rules were created with correct conditions."""
-    rule_id = _extract_rule_id_from_final_answer(steps)
+    rule_id = extract_id_from_final_answer(steps)
     if not rule_id:
         return False, "No rule ID found in final answer"
 
-    client = SyncRossumAPIClient(base_url=api_base_url, credentials=Token(api_token))
+    client = create_api_client(api_base_url, api_token)
 
     try:
         rule = client.retrieve_rule(int(rule_id))
@@ -85,16 +84,6 @@ def check_business_validation_rules(steps: list[AgentStep], api_base_url: str, a
             return False, f"Rule '{rule.name}' missing show_message action with type '{expected['action_type']}'"
 
     return True, "All business validation rules match expected configuration"
-
-
-def _extract_rule_id_from_final_answer(steps: list[AgentStep]) -> str | None:
-    """Extract a rule ID from the final answer (expected to be a one-word answer)."""
-    for step in reversed(steps):
-        if step.final_answer:
-            match = re.search(r"\b(\d+)\b", step.final_answer)
-            if match:
-                return match.group(1)
-    return None
 
 
 def _extract_fields(condition: str) -> set[str]:

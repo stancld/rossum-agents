@@ -5,8 +5,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from rossum_api import SyncRossumAPIClient
-from rossum_api.dtos import Token
+from regression_tests.custom_checks._utils import create_api_client
 
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep, ToolCall, ToolResult
@@ -52,7 +51,7 @@ def check_queue_deleted(steps: list[AgentStep], api_base_url: str, api_token: st
         return False, "Could not find queue_id in agent steps"
 
     try:
-        client = SyncRossumAPIClient(base_url=api_base_url, credentials=Token(api_token))
+        client = create_api_client(api_base_url, api_token)
         queue = client.retrieve_queue(queue_id)
         if queue.delete_after:
             return True, f"Queue {queue_id} is scheduled for deletion (delete_after={queue.delete_after})"

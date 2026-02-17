@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     type Reasoning = str
     type CustomCheckResult = tuple[Passed, Reasoning]
     type CustomCheckFn = Callable[[list[AgentStep], str, str], CustomCheckResult]
+    type SetupFn = Callable[[str, str], dict[str, str]]
 
 
 class ToolMatchMode(Enum):
@@ -103,7 +104,7 @@ class SuccessCriteria:
     Attributes:
         required_keywords: Keywords that must appear in the final answer.
         max_steps: Maximum number of steps allowed.
-        require_subagent: Require that an Opus sub-agent was used during execution.
+        require_subagent: True = must use sub-agent, False = must not, None = either is fine.
         mermaid_expectation: Expected mermaid diagram content.
         file_expectation: Expected file outputs.
         custom_checks: List of custom checks to run against agent steps.
@@ -111,7 +112,7 @@ class SuccessCriteria:
 
     required_keywords: Sequence[str] = field(default_factory=list)
     max_steps: int | None = None
-    require_subagent: bool = False
+    require_subagent: bool | None = False
     mermaid_expectation: MermaidExpectation = field(default_factory=MermaidExpectation)
     file_expectation: FileExpectation = field(default_factory=FileExpectation)
     custom_checks: Sequence[CustomCheck] = field(default_factory=list)
@@ -143,6 +144,8 @@ class RegressionTestCase:
     api_token: str | None = None
     rossum_url: str | None = None
     sandbox_api_token: str | None = None
+    requires_redis: bool = False
+    setup_fn: SetupFn | None = None
     tool_expectation: ToolExpectation = field(default_factory=ToolExpectation)
     token_budget: TokenBudget = field(default_factory=TokenBudget)
     success_criteria: SuccessCriteria = field(default_factory=SuccessCriteria)

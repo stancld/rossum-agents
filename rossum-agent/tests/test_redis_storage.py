@@ -4,18 +4,11 @@ from __future__ import annotations
 
 import base64
 import json
-import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from rossum_agent.redis_storage import (
-    ChatData,
-    ChatMetadata,
-    RedisStorage,
-    extract_text_from_content,
-    get_commit_sha,
-)
+from rossum_agent.redis_storage import ChatData, ChatMetadata, RedisStorage, extract_text_from_content
 
 
 class TestExtractTextFromContent:
@@ -71,54 +64,6 @@ class TestExtractTextFromContent:
         assert extract_text_from_content(123) == ""
 
 
-class TestGetCommitSha:
-    """Test get_commit_sha function."""
-
-    @patch("rossum_agent.redis_storage.shutil.which", return_value="/usr/bin/git")
-    @patch("rossum_agent.redis_storage.subprocess.run")
-    def test_get_commit_sha_success(self, mock_run, mock_which):
-        """Test successful git commit SHA retrieval."""
-        mock_run.return_value = MagicMock(returncode=0, stdout="abc1234\n")
-        result = get_commit_sha()
-        assert result == "abc1234"
-        mock_which.assert_called_once_with("git")
-        mock_run.assert_called_once_with(
-            ["/usr/bin/git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-
-    @patch("rossum_agent.redis_storage.subprocess.run")
-    def test_get_commit_sha_not_git_repo(self, mock_run):
-        """Test returns None when not in git repo."""
-        mock_run.return_value = MagicMock(returncode=128, stdout="")
-        result = get_commit_sha()
-        assert result is None
-
-    @patch("rossum_agent.redis_storage.subprocess.run")
-    def test_get_commit_sha_subprocess_error(self, mock_run):
-        """Test returns None on subprocess error."""
-        mock_run.side_effect = subprocess.SubprocessError("Git not found")
-        result = get_commit_sha()
-        assert result is None
-
-    @patch("rossum_agent.redis_storage.subprocess.run")
-    def test_get_commit_sha_file_not_found(self, mock_run):
-        """Test returns None when git not installed."""
-        mock_run.side_effect = FileNotFoundError("git command not found")
-        result = get_commit_sha()
-        assert result is None
-
-    @patch("rossum_agent.redis_storage.subprocess.run")
-    def test_get_commit_sha_os_error(self, mock_run):
-        """Test returns None on OS error."""
-        mock_run.side_effect = OSError("OS error")
-        result = get_commit_sha()
-        assert result is None
-
-
 class TestChatMetadata:
     """Test ChatMetadata dataclass."""
 
@@ -163,6 +108,7 @@ class TestChatMetadata:
             "total_tool_calls": 5,
             "total_steps": 3,
             "mcp_mode": "read-only",
+            "config_commits": [],
         }
 
     def test_from_dict(self):
@@ -173,6 +119,7 @@ class TestChatMetadata:
             "total_output_tokens": 100,
             "total_tool_calls": 10,
             "total_steps": 5,
+            "config_commits": ["abc123", "def456"],
         }
         metadata = ChatMetadata.from_dict(data)
         assert metadata.commit_sha == "def456"
@@ -180,6 +127,7 @@ class TestChatMetadata:
         assert metadata.total_output_tokens == 100
         assert metadata.total_tool_calls == 10
         assert metadata.total_steps == 5
+        assert metadata.config_commits == ["abc123", "def456"]
 
     def test_from_dict_with_missing_keys(self):
         """Test from_dict with partial data."""
@@ -190,6 +138,7 @@ class TestChatMetadata:
         assert metadata.total_output_tokens == 0
         assert metadata.total_tool_calls == 0
         assert metadata.total_steps == 0
+        assert metadata.config_commits == []
 
     def test_from_dict_empty(self):
         """Test from_dict with empty dict."""

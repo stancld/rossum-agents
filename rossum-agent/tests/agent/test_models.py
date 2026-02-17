@@ -131,7 +131,7 @@ class TestAgentConfig:
 
     def test_default_values(self):
         config = AgentConfig()
-        assert config.max_output_tokens == 64000
+        assert config.max_output_tokens == 128000
         assert config.max_steps == 50
         assert config.temperature == 1.0  # Required for extended thinking
 
@@ -264,13 +264,9 @@ class TestAgentConfigValidation:
         with pytest.raises(ValueError, match=r"temperature must be 1\.0"):
             AgentConfig(temperature=0.5)
 
-    def test_default_thinking_budget(self):
+    def test_default_effort(self):
         config = AgentConfig()
-        assert config.thinking_budget_tokens == 10000
-
-    def test_thinking_budget_must_be_at_least_1024(self):
-        with pytest.raises(ValueError, match=r"thinking_budget_tokens must be at least 1024"):
-            AgentConfig(thinking_budget_tokens=1000)
+        assert config.effort == "high"
 
 
 class TestTokenUsageBreakdown:

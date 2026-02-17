@@ -9,6 +9,7 @@ import type {
   ChatState,
   CompletedStep,
   Config,
+  ConfigCommitInfo,
   FileCreatedEvent,
   SSEEvent,
   StepEvent,
@@ -27,6 +28,7 @@ const INITIAL_STATE: ChatState = {
   subAgentProgress: null,
   finalAnswer: null,
   tokenUsage: null,
+  configCommit: null,
   files: [],
   error: null,
   userMessages: [],
@@ -137,6 +139,14 @@ export function useChat(config: Config) {
           const extra: CompletedStep[] = lastStream
             ? [stepToCompleted(lastStream)]
             : [];
+          const commitInfo: ConfigCommitInfo | null = event.data
+            .config_commit_hash
+            ? {
+                hash: event.data.config_commit_hash,
+                message: event.data.config_commit_message ?? "",
+                changesCount: event.data.config_changes_count ?? 0,
+              }
+            : null;
           return {
             ...prev,
             connectionStatus: "idle",
@@ -145,6 +155,7 @@ export function useChat(config: Config) {
             subAgentProgress: null,
             tokenUsage: event.data
               .token_usage_breakdown as TokenUsageBreakdown | null,
+            configCommit: commitInfo,
           };
         }
 
@@ -181,6 +192,7 @@ export function useChat(config: Config) {
         subAgentProgress: null,
         finalAnswer: null,
         tokenUsage: null,
+        configCommit: null,
         tasks: [],
         error: null,
         userMessages: [

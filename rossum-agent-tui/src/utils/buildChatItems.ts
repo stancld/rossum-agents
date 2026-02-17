@@ -101,6 +101,10 @@ export function buildChatItems(state: ChatState): ChatItem[] {
     items.push({ kind: "file_created", filename: f.filename, url: f.url });
   }
 
+  if (state.configCommit) {
+    items.push({ kind: "config_commit", commit: state.configCommit });
+  }
+
   if (
     state.error &&
     (paired.length === 0 || paired[paired.length - 1]?.step.type !== "error")

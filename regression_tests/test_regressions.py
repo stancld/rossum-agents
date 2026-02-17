@@ -24,10 +24,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from regression_tests.conftest import try_connect_redis
 from regression_tests.framework.assertions import assert_files_created, assert_tokens_within_budget, assert_tools_match
 from regression_tests.framework.mermaid_analyzer import extract_mermaid_diagrams, validate_mermaid_diagrams
 from regression_tests.framework.runner import run_regression_test
 from regression_tests.test_cases import REGRESSION_TEST_CASES
+
+_REDIS_AVAILABLE = try_connect_redis() is not None
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -103,7 +106,9 @@ def _evaluate_criteria(
         )
 
     used_subagent = any(s.sub_agent_progress is not None for s in run.steps)
-    if criteria.require_subagent:
+    if criteria.require_subagent is None:
+        print(f"  - Sub-agent usage: optional (used={used_subagent})")
+    elif criteria.require_subagent:
         all_passed &= _check("Sub-agent used", used_subagent, "No sub-agent detected", failures)
     else:
         all_passed &= _check("Sub-agent not used", not used_subagent, "Sub-agent detected", failures)
@@ -166,8 +171,11 @@ def _evaluate_mermaid(final_answer: str, mermaid_exp, failures: list[str] | None
 
 def _apply_mode_marker(case: RegressionTestCase) -> pytest.ParameterSet:
     """Wrap test case in pytest.param with readonly/readwrite marker based on case.mode."""
-    marker = pytest.mark.readonly if case.mode == "read-only" else pytest.mark.readwrite
-    return pytest.param(case, marks=[marker], id=case.name)
+    marks: list[pytest.MarkDecorator] = []
+    marks.append(pytest.mark.readonly if case.mode == "read-only" else pytest.mark.readwrite)
+    if case.requires_redis and not _REDIS_AVAILABLE:
+        marks.append(pytest.mark.skip(reason="Redis not available"))
+    return pytest.param(case, marks=marks, id=case.name)
 
 
 @pytest.mark.regression
@@ -176,7 +184,12 @@ def _apply_mode_marker(case: RegressionTestCase) -> pytest.ParameterSet:
 async def test_agent_regression(case, create_live_agent, show_answer, temp_output_dir):
     """Run a single regression test case against live API."""
     async with create_live_agent(case) as ctx:
-        run = await run_regression_test(ctx.agent, case.prompt)
+        prompt = case.prompt
+        if case.setup_fn:
+            placeholders = case.setup_fn(case.api_base_url, ctx.api_token)
+            for key, value in placeholders.items():
+                prompt = prompt.replace(f"{{{key}}}", value)
+        run = await run_regression_test(ctx.agent, prompt)
 
         print(f"\n{'=' * 60}")
         print(f"Test: {case.name}")

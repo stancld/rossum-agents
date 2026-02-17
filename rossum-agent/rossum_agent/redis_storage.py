@@ -7,8 +7,6 @@ import datetime as dt
 import json
 import logging
 import os
-import shutil
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -31,24 +29,6 @@ def extract_text_from_content(content: str | list[dict[str, Any]] | None) -> str
     return ""
 
 
-def get_commit_sha() -> str | None:
-    """Get short commit SHA or None if not in a git repository."""
-    try:
-        if not (git_executable := shutil.which("git")):
-            return None
-        result = subprocess.run(
-            [git_executable, "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-        return result.stdout.strip() if result.returncode == 0 else None
-    except (subprocess.SubprocessError, FileNotFoundError, OSError):
-        logger.debug("Failed to get git commit SHA")
-        return None
-
-
 @dataclass
 class ChatMetadata:
     """Metadata for a chat session."""
@@ -59,6 +39,7 @@ class ChatMetadata:
     total_tool_calls: int = 0
     total_steps: int = 0
     mcp_mode: str = "read-only"
+    config_commits: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -69,6 +50,7 @@ class ChatMetadata:
             "total_tool_calls": self.total_tool_calls,
             "total_steps": self.total_steps,
             "mcp_mode": self.mcp_mode,
+            "config_commits": self.config_commits,
         }
 
     @classmethod
@@ -81,6 +63,7 @@ class ChatMetadata:
             total_tool_calls=data.get("total_tool_calls", 0),
             total_steps=data.get("total_steps", 0),
             mcp_mode=data.get("mcp_mode", "read-only"),
+            config_commits=data.get("config_commits", []),
         )
 
 

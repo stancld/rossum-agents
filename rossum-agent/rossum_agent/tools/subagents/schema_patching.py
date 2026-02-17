@@ -48,16 +48,27 @@ def _to_plain(obj: Any) -> Any:
 
 
 def _extract_schema_content(mcp_result: Any) -> list[dict[str, Any]]:
-    """Extract schema content list from MCP result, handling dict, dataclass, or Pydantic."""
+    """Extract schema content list from MCP result, handling dict, dataclass, or Pydantic.
+
+    Handles both direct schema dicts and wrapped results like {"result": {...}}.
+    """
     if mcp_result is None:
         return []
-    if isinstance(mcp_result, dict):
-        content = mcp_result.get("content", [])
+
+    # Unwrap structured_content {"result": {...}} wrapper from FastMCP
+    obj = mcp_result
+    if isinstance(obj, dict) and "result" in obj:
+        obj = obj["result"]
+    elif hasattr(obj, "result"):
+        obj = obj.result
+
+    if isinstance(obj, dict):
+        content = obj.get("content", [])
         if isinstance(content, list):
             return _to_plain(content)
         return []
-    if hasattr(mcp_result, "content"):
-        content = mcp_result.content
+    if hasattr(obj, "content"):
+        content = obj.content
         if isinstance(content, list):
             return _to_plain(content)
         return []
@@ -288,9 +299,18 @@ def _filter_content(
     return filtered, removed
 
 
+def _coerce_type_to_string(value: Any) -> str:
+    """Coerce a type value to a string, handling LLM-generated dicts like {"type": "number"}."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict) and isinstance(value.get("type"), str):
+        return value["type"]
+    return "string"
+
+
 def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
     """Build a schema field node from specification."""
-    field_type = spec.get("type", "string")
+    field_type = _coerce_type_to_string(spec.get("type", "string"))
     node: dict[str, Any] = {
         "id": spec["id"],
         "label": spec.get("label", spec["id"]),
@@ -328,6 +348,35 @@ def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
     return node
 
 
+def _section_label_from_id(section_id: str) -> str:
+    """Derive a human-readable label from a section ID (e.g. 'basic_info_section' → 'Basic Info')."""
+    label = section_id.removesuffix("_section").replace("_", " ").strip()
+    return label.title() if label else section_id
+
+
+def _find_or_create_section(
+    content: list[dict[str, Any]],
+    section_id: str | None,
+) -> dict[str, Any] | None:
+    """Find existing section by ID, or create it and append to content.
+
+    Returns None if section_id is empty/None.
+    """
+    if not section_id:
+        return None
+    for node in content:
+        if node.get("category") == "section" and node.get("id") == section_id:
+            return node
+    section: dict[str, Any] = {
+        "category": "section",
+        "id": section_id,
+        "label": _section_label_from_id(section_id),
+        "children": [],
+    }
+    content.append(section)
+    return section
+
+
 def _add_fields_to_content(
     content: list[dict[str, Any]],
     fields_to_add: list[dict[str, Any]],
@@ -341,24 +390,24 @@ def _add_fields_to_content(
         table_id = spec.get("table_id")
         field_node = _build_field_node(spec)
 
-        for section in modified:
-            if section.get("category") != "section" or section.get("id") != parent_section:
-                continue
+        section = _find_or_create_section(modified, parent_section)
+        if section is None:
+            logger.warning("Skipping field %r: no parent_section specified", spec.get("id"))
+            continue
 
-            if table_id:
-                for child in section.get("children", []):
-                    if child.get("category") == "multivalue" and child.get("id") == table_id:
-                        tuple_node = child.get("children", {})
-                        if isinstance(tuple_node, dict) and "children" in tuple_node:
-                            tuple_node["children"].append(field_node)
-                            added.append(spec["id"])
-                            break
-            else:
-                if "children" not in section:
-                    section["children"] = []
-                section["children"].append(field_node)
-                added.append(spec["id"])
-            break
+        if table_id:
+            for child in section.get("children", []):
+                if child.get("category") == "multivalue" and child.get("id") == table_id:
+                    tuple_node = child.get("children", {})
+                    if isinstance(tuple_node, dict) and "children" in tuple_node:
+                        tuple_node["children"].append(field_node)
+                        added.append(spec["id"])
+                        break
+        else:
+            if "children" not in section:
+                section["children"] = []
+            section["children"].append(field_node)
+            added.append(spec["id"])
 
     return modified, added
 
@@ -373,15 +422,19 @@ def _update_fields_in_content(
 
     updates_by_id = {spec["id"]: spec for spec in fields_to_update}
 
+    def _apply_spec(target: dict[str, Any], spec: dict[str, Any]) -> None:
+        for key, value in spec.items():
+            if key == "id":
+                continue
+            if key == "type":
+                value = _coerce_type_to_string(value)
+            target[key] = value
+
     def _apply_updates(nodes: list[dict[str, Any]]) -> None:
         for node in nodes:
             node_id = node.get("id", "")
             if node_id in updates_by_id:
-                spec = updates_by_id[node_id]
-                for key, value in spec.items():
-                    if key == "id":
-                        continue
-                    node[key] = value
+                _apply_spec(node, updates_by_id[node_id])
                 updated.append(node_id)
 
             children = node.get("children")
@@ -390,11 +443,7 @@ def _update_fields_in_content(
             elif isinstance(children, dict):
                 child_id = children.get("id", "")
                 if child_id in updates_by_id:
-                    spec = updates_by_id[child_id]
-                    for key, value in spec.items():
-                        if key == "id":
-                            continue
-                        children[key] = value
+                    _apply_spec(children, updates_by_id[child_id])
                     updated.append(child_id)
                 nested = children.get("children")
                 if isinstance(nested, list):
@@ -461,7 +510,7 @@ def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
         if mcp_result and schema_id:
             content = _extract_schema_content(mcp_result)
             if not content:
-                logger.warning("get_full_schema: empty content extracted; result type=%s", type(mcp_result).__name__)
+                logger.info("get_full_schema: schema %s has empty content", schema_id)
             _schema_content_cache[schema_id] = content
         plain_result = _to_plain(mcp_result) if mcp_result else None
         return json.dumps(plain_result, indent=2, default=str) if plain_result else "No data returned"

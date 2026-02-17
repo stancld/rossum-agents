@@ -10,6 +10,7 @@ import pytest
 from rossum_api import APIClientError
 from rossum_mcp.tools import base, schemas
 from rossum_mcp.tools.schemas import register_schema_tools
+from rossum_mcp.tools.schemas.models import SchemaListItem
 
 from .conftest import create_mock_schema
 
@@ -204,9 +205,11 @@ class TestListSchemas:
         result = await list_schemas()
 
         assert len(result) == 1
-        assert result[0].content == "<omitted>"
-        assert result[0].name == "Schema 1"
-        assert result[0].id == 1
+        item = result[0]
+        assert isinstance(item, SchemaListItem)
+        assert item.content == "<omitted>"
+        assert item.name == "Schema 1"
+        assert item.id == 1
 
     @pytest.mark.asyncio
     async def test_list_schemas_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -260,7 +263,7 @@ class TestUpdateSchema:
         assert result.name == "Updated Schema"
 
     @pytest.mark.asyncio
-    async def test_update_schema_rejects_empty_content(
+    async def test_update_schema_allows_empty_content(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
@@ -268,12 +271,15 @@ class TestUpdateSchema:
 
         register_schema_tools(mock_mcp, mock_client)
 
+        updated_schema = create_mock_schema(id=50, name="Empty Schema", content=[])
+        mock_client._http_client.update.return_value = {"id": 50}
+        mock_client.retrieve_schema.return_value = updated_schema
+
         update_schema = mock_mcp._tools["update_schema"]
         result = await update_schema(schema_id=50, schema_data={"content": []})
 
-        assert isinstance(result, dict)
-        assert "empty content" in result["error"]
-        mock_client._http_client.update.assert_not_called()
+        assert result.id == 50
+        mock_client._http_client.update.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_update_schema_read_only_mode(
@@ -396,7 +402,10 @@ class TestPatchSchema:
             node_data={"label": "Vendor Name", "type": "string", "category": "datapoint"},
         )
 
-        assert result.id == 50
+        assert result["status"] == "success"
+        assert result["schema_id"] == 50
+        assert result["node_id"] == "vendor_name"
+        assert result["node"]["label"] == "Vendor Name"
         mock_client._http_client.update.assert_called_once()
         call_args = mock_client._http_client.update.call_args
         updated_content = call_args[1]["content"] if "content" in call_args[1] else call_args[0][2]["content"]
@@ -444,7 +453,9 @@ class TestPatchSchema:
             node_data={"label": "Invoice #", "score_threshold": 0.9},
         )
 
-        assert result.id == 50
+        assert result["status"] == "success"
+        assert result["schema_id"] == 50
+        assert result["node"]["label"] == "Invoice #"
         call_args = mock_client._http_client.update.call_args
         updated_content = call_args[1]["content"] if "content" in call_args[1] else call_args[0][2]["content"]
         datapoint = updated_content[0]["children"][0]
@@ -486,7 +497,9 @@ class TestPatchSchema:
             node_id="old_field",
         )
 
-        assert result.id == 50
+        assert result["status"] == "success"
+        assert result["schema_id"] == 50
+        assert result["node"] is None
         call_args = mock_client._http_client.update.call_args
         updated_content = call_args[1]["content"] if "content" in call_args[1] else call_args[0][2]["content"]
         header_section = updated_content[0]
@@ -531,7 +544,8 @@ class TestPatchSchema:
                 node_data={"label": "Vendor Name", "type": "string", "category": "datapoint"},
             )
 
-        assert result.id == 50
+        assert result["status"] == "success"
+        assert result["schema_id"] == 50
         assert mock_client._http_client.update.call_count == 2
         assert mock_client._http_client.request_json.call_count == 2
 

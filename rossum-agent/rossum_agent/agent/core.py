@@ -57,7 +57,7 @@ from anthropic.types import (
     TextBlockParam,
     TextDelta,
     ThinkingBlock,
-    ThinkingConfigEnabledParam,
+    ThinkingConfigAdaptiveParam,
     ThinkingDelta,
     ToolParam,
     ToolUseBlock,
@@ -77,7 +77,7 @@ from rossum_agent.agent.models import (
 )
 from rossum_agent.api.models.schemas import TokenUsageBreakdown
 from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
-from rossum_agent.rossum_mcp_integration import MCPConnection, mcp_tools_to_anthropic_format
+from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
 from rossum_agent.tools import (
     DEPLOY_TOOLS,
     DISCOVERY_TOOL_NAME,
@@ -108,6 +108,7 @@ if TYPE_CHECKING:
     from anthropic import AnthropicBedrock
 
     from rossum_agent.agent.types import UserContent
+    from rossum_agent.rossum_mcp_integration import MCPConnection
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,25 @@ def _parse_json_encoded_strings(arguments: dict) -> dict:
         else:
             result[key] = value
     return result
+
+
+class _SchemaStagger:
+    """Stagger schema patch calls to avoid 412 conflicts from concurrent writes."""
+
+    _TOOLS = {"patch_schema", "patch_schema_with_subagent"}
+    _DELAY_SECONDS = 0.5
+
+    def __init__(self) -> None:
+        self._counter = 0
+
+    async def maybe_delay(self, tool_name: str) -> None:
+        if tool_name not in self._TOOLS:
+            return
+        delay = self._counter * self._DELAY_SECONDS
+        self._counter += 1
+        if delay > 0:
+            logger.info("Staggering %s by %.1fs to avoid conflicts", tool_name, delay)
+            await asyncio.sleep(delay)
 
 
 @dataclasses.dataclass
@@ -415,10 +435,7 @@ class RossumAgent:
         Yields:
             Tuples of (event, None) for each stream event, then (None, final_message) at the end.
         """
-        thinking_config: ThinkingConfigEnabledParam = {
-            "type": "enabled",
-            "budget_tokens": self.config.thinking_budget_tokens,
-        }
+        thinking_config: ThinkingConfigAdaptiveParam = {"type": "adaptive"}
 
         # Cache breakpoints: system prompt
         system: list[TextBlockParam] = [
@@ -441,6 +458,7 @@ class RossumAgent:
             tools=tools if tools else Omit(),
             thinking=thinking_config,
             temperature=self.config.temperature,
+            output_config={"effort": self.config.effort},
         ) as stream:
             for event in stream:
                 yield (event, None)
@@ -698,7 +716,12 @@ class RossumAgent:
         progress_queue: asyncio.Queue[AgentStep] = asyncio.Queue()
         results_by_id: dict[str, ToolResult] = {}
 
+        # Stagger schema patch calls to avoid 412 conflicts from concurrent writes
+        stagger = _SchemaStagger()
+
         async def execute_single_tool(tool_call: ToolCall, idx: int) -> None:
+            await stagger.maybe_delay(tool_call.name)
+
             tool_progress = (idx, total_tools)
             async for progress_or_result in self._execute_tool_with_progress(
                 tool_call, step_num, tool_calls, tool_progress
@@ -764,8 +787,11 @@ class RossumAgent:
         def token_callback(usage: SubAgentTokenUsage) -> None:
             token_queue.put(usage)
 
+        logger.info("Tool call: %s(%s)", tool_call.name, tool_call.arguments)
+
         try:
             if tool_call.name in get_internal_tool_names():
+                logger.info(f"Calling internal tool {tool_call.name}")
                 set_progress_callback(progress_callback)
                 set_token_callback(token_callback)
 
@@ -797,9 +823,11 @@ class RossumAgent:
 
                 result = future.result()
                 content = str(result)
+                logger.info(f"Internal tool {tool_call.name} result: {content}")
                 set_progress_callback(None)
                 set_token_callback(None)
             elif tool_call.name in get_deploy_tool_names():
+                logger.info(f"Calling deploy tool {tool_call.name}")
                 loop = asyncio.get_event_loop()
                 ctx = copy_context()
                 future = loop.run_in_executor(

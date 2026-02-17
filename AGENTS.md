@@ -5,6 +5,7 @@
 ## Critical Constraints
 
 - **No auto-commits** - Only `git commit`/`git push` when explicitly instructed
+- **Simplicity first** - Design the simplest solution that works. Fewer abstractions, fewer indirections, fewer layers. If a reader needs to jump through hoops to understand the code, it's too complex.
 - **YAGNI** - Don't add functionality until needed. Remove unused code proactively.
 - **Tests required** - New features and bug fixes must include tests
 - **Docs in sync** - Tool changes require documentation updates
@@ -46,8 +47,10 @@
 | Type hints | `str \| None` not `Optional[str]`, `list[str]` not `List[str]` |
 | No `Any` | Use specific types |
 | Imports | Standard library first, `from pathlib import Path` |
+| No lazy imports | All imports at module level. No `import` inside functions/methods. |
 | Comments | Explain why, not what |
 | No trailing commas | Follow ruff-format output |
+| Logging | f-strings in `logger.*()` calls are fine — prefer `logger.info(f"...")` over `%s` style |
 | Noqa comments | Always explain: `# noqa: TC003 - reason` |
 
 ## FastMCP Tools (rossum-mcp)
@@ -74,6 +77,7 @@ Import return types at module level (not TYPE_CHECKING) for FastMCP serializatio
 |------|--------|
 | Install latest SDK | Run `uv add rossum-api@latest` to get the newest `rossum-api` package |
 | Leverage SDK | Check if `rossum-api` already provides models, dataclasses, type literals, or helper methods for the feature before writing custom code |
+| Private SDK access | Usage of private/internal APIs in `rossum-api` is allowed — we control both packages |
 | Use typed constructs | Prefer dataclasses, `Literal` types, enums, and typed models from `rossum-api` over plain strings or untyped dicts |
 | API docs fallback | If the SDK doesn't cover the needed functionality, consult https://rossum.app/api/docs for the raw API spec |
 

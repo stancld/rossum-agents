@@ -11,12 +11,11 @@ from rossum_agent.tools.spawn_mcp import (
     SpawnedConnection,
     _close_spawned_connection_async,
     _spawn_connection_async,
+    _spawned_connections,
     call_on_connection,
     cleanup_all_spawned_connections,
     clear_spawned_connections,
     close_connection,
-    get_spawned_connections,
-    get_spawned_connections_lock,
     spawn_mcp_connection,
 )
 
@@ -76,7 +75,7 @@ class TestSpawnMcpConnection:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["existing"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -140,7 +139,7 @@ class TestCallOnConnection:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -166,7 +165,7 @@ class TestCallOnConnection:
         set_mcp_connection(mock_conn, loop)
 
         mock_connection = MagicMock()
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=mock_connection,
             client=MagicMock(),
@@ -202,7 +201,7 @@ class TestCallOnConnection:
         set_mcp_connection(mock_conn, loop)
 
         mock_connection = MagicMock()
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=mock_connection,
             client=MagicMock(),
@@ -234,7 +233,7 @@ class TestCallOnConnection:
         set_mcp_connection(mock_conn, loop)
 
         mock_connection = MagicMock()
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=mock_connection,
             client=MagicMock(),
@@ -289,7 +288,7 @@ class TestCloseConnection:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -315,7 +314,7 @@ class TestClearSpawnedConnections:
 
     def test_clear_removes_all_connections(self) -> None:
         """Test that clear removes all spawned connections."""
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["conn1"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -346,7 +345,7 @@ class TestCleanupAllSpawnedConnections:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test1"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -364,17 +363,6 @@ class TestCleanupAllSpawnedConnections:
             spawned.clear()
             loop.close()
             set_mcp_connection(None, None)
-
-
-class TestGetSpawnedConnectionsLock:
-    """Tests for get_spawned_connections_lock function."""
-
-    def test_returns_lock(self) -> None:
-        """Test that function returns a threading lock."""
-        import threading
-
-        lock = get_spawned_connections_lock()
-        assert isinstance(lock, type(threading.Lock()))
 
 
 class TestSpawnConnectionTimeout:
@@ -458,7 +446,7 @@ class TestCallOnConnectionEdgeCases:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -488,7 +476,7 @@ class TestCallOnConnectionEdgeCases:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -518,7 +506,7 @@ class TestCallOnConnectionEdgeCases:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -549,7 +537,7 @@ class TestCallOnConnectionEdgeCases:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -585,7 +573,7 @@ class TestCloseConnectionEdgeCases:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -611,7 +599,7 @@ class TestCloseConnectionEdgeCases:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -638,7 +626,7 @@ class TestAsyncSpawnConnection:
     @pytest.mark.asyncio
     async def test_spawn_connection_duplicate_id_raises(self) -> None:
         """Test that duplicate connection ID raises ValueError."""
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["existing"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -673,9 +661,9 @@ class TestAsyncSpawnConnection:
 
                     assert result.connection is mock_connection
                     assert result.api_base_url == "https://api.test.com"
-                    assert "test" in get_spawned_connections()
+                    assert "test" in _spawned_connections
 
-        get_spawned_connections().clear()
+        _spawned_connections.clear()
 
 
 class TestAsyncCloseConnection:
@@ -687,7 +675,7 @@ class TestAsyncCloseConnection:
         mock_client = AsyncMock()
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=mock_client,
@@ -717,7 +705,7 @@ class TestCleanupEdgeCases:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
@@ -742,7 +730,7 @@ class TestCleanupEdgeCases:
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
 
-        spawned = get_spawned_connections()
+        spawned = _spawned_connections
         spawned["test"] = SpawnedConnection(
             connection=MagicMock(),
             client=MagicMock(),
