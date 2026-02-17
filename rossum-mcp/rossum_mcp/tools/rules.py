@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.rule import Rule, RuleAction
 
-from rossum_mcp.tools.base import build_resource_url, delete_resource, graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, build_resource_url, delete_resource, graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -34,14 +34,7 @@ async def _list_rules(
     enabled: bool | None = None,
 ) -> list[Rule]:
     logger.debug(f"Listing rules: schema_id={schema_id}, organization_id={organization_id}, enabled={enabled}")
-    filters: dict = {}
-    if schema_id is not None:
-        filters["schema"] = schema_id
-    if organization_id is not None:
-        filters["organization"] = organization_id
-    if enabled is not None:
-        filters["enabled"] = enabled
-
+    filters = build_filters(schema=schema_id, organization=organization_id, enabled=enabled)
     result = await graceful_list(client, Resource.Rule, "rule", **filters)
     return result.items
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.annotation import Annotation
 
-from rossum_mcp.tools.base import delete_resource, graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, delete_resource, graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -76,13 +76,8 @@ async def _list_annotations(
     first_n: int | None = None,
 ) -> list[Annotation]:
     logger.debug(f"Listing annotations: queue_id={queue_id}, status={status}, ordering={ordering}, first_n={first_n}")
-    params: dict = {"queue": queue_id, "page_size": 100}
-    if status:
-        params["status"] = status
-    if ordering:
-        params["ordering"] = ordering
-
-    result = await graceful_list(client, Resource.Annotation, "annotation", max_items=first_n, **params)
+    filters = build_filters(queue=queue_id, page_size=100, status=status, ordering=ordering or None)
+    result = await graceful_list(client, Resource.Annotation, "annotation", max_items=first_n, **filters)
     return result.items
 
 

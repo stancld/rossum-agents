@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.organization_group import OrganizationGroup
 
-from rossum_mcp.tools.base import graceful_list
+from rossum_mcp.tools.base import build_filters, graceful_list
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -23,10 +23,7 @@ async def _get_organization_group(client: AsyncRossumAPIClient, organization_gro
 
 async def _list_organization_groups(client: AsyncRossumAPIClient, name: str | None = None) -> list[OrganizationGroup]:
     logger.debug(f"Listing organization groups: name={name}")
-    filters: dict[str, Any] = {}
-    if name is not None:
-        filters["name"] = name
-
+    filters = build_filters(name=name)
     result = await graceful_list(client, Resource.OrganizationGroup, "organization_group", **filters)
     return result.items
 

@@ -7,7 +7,7 @@ from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.group import Group
 from rossum_api.models.user import User
 
-from rossum_mcp.tools.base import graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -30,15 +30,9 @@ async def _list_users(
     is_active: bool | None = None,
     is_organization_group_admin: bool | None = None,
 ) -> list[User]:
-    filter_mapping: dict = {
-        "username": username,
-        "email": email,
-        "first_name": first_name,
-        "last_name": last_name,
-        "is_active": is_active,
-    }
-    filters = {k: v for k, v in filter_mapping.items() if v is not None}
-
+    filters = build_filters(
+        username=username, email=email, first_name=first_name, last_name=last_name, is_active=is_active
+    )
     result = await graceful_list(client, Resource.User, "user", **filters)
     users_list = result.items
 
@@ -114,20 +108,19 @@ async def _update_user(
 
     logger.debug(f"Updating user: user_id={user_id}")
 
-    field_mapping: dict[str, Any] = {
-        "username": username,
-        "email": email,
-        "first_name": first_name,
-        "last_name": last_name,
-        "queues": queues,
-        "groups": groups,
-        "is_active": is_active,
-        "metadata": metadata,
-        "oidc_id": oidc_id,
-        "auth_type": auth_type,
-        "ui_settings": ui_settings,
-    }
-    patch_data = {k: v for k, v in field_mapping.items() if v is not None}
+    patch_data = build_filters(
+        username=username,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        queues=queues,
+        groups=groups,
+        is_active=is_active,
+        metadata=metadata,
+        oidc_id=oidc_id,
+        auth_type=auth_type,
+        ui_settings=ui_settings,
+    )
 
     updated_user_data = await client._http_client.update(Resource.User, user_id, patch_data)
     return cast("User", client._deserializer(Resource.User, updated_user_data))

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.document_relation import DocumentRelation
 
-from rossum_mcp.tools.base import graceful_list
+from rossum_mcp.tools.base import build_filters, graceful_list
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -35,17 +35,6 @@ def register_document_relation_tools(mcp: FastMCP, client: AsyncRossumAPIClient)
         logger.debug(
             f"Listing document relations: id={id}, type={type}, annotation={annotation}, key={key}, documents={documents}"
         )
-        filters: dict[str, Any] = {}
-        if id is not None:
-            filters["id"] = id
-        if type is not None:
-            filters["type"] = type
-        if annotation is not None:
-            filters["annotation"] = annotation
-        if key is not None:
-            filters["key"] = key
-        if documents is not None:
-            filters["documents"] = documents
-
+        filters = build_filters(id=id, type=type, annotation=annotation, key=key, documents=documents)
         result = await graceful_list(client, Resource.DocumentRelation, "document_relation", **filters)
         return result.items
