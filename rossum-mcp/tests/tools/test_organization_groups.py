@@ -152,3 +152,79 @@ class TestListOrganizationGroups:
         result = await list_organization_groups()
 
         assert len(result) == 2
+
+
+@pytest.mark.unit
+class TestAreLookupFieldsEnabled:
+    """Tests for are_lookup_fields_enabled tool."""
+
+    @pytest.mark.asyncio
+    async def test_returns_enabled_when_both_features_set(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        from rossum_mcp.tools.organization_groups import register_organization_group_tools
+
+        register_organization_group_tools(mock_mcp, mock_client)
+
+        mock_og = create_mock_organization_group(features={"datasets": True, "lookup_fields": True})
+
+        async def mock_fetch_all(resource, **filters):
+            yield mock_og
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        are_lookup_fields_enabled = mock_mcp._tools["are_lookup_fields_enabled"]
+        result = await are_lookup_fields_enabled()
+
+        assert result == {"enabled": True}
+
+    @pytest.mark.asyncio
+    async def test_returns_disabled_when_lookup_fields_missing(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        from rossum_mcp.tools.organization_groups import register_organization_group_tools
+
+        register_organization_group_tools(mock_mcp, mock_client)
+
+        mock_og = create_mock_organization_group(features={"datasets": True})
+
+        async def mock_fetch_all(resource, **filters):
+            yield mock_og
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        are_lookup_fields_enabled = mock_mcp._tools["are_lookup_fields_enabled"]
+        result = await are_lookup_fields_enabled()
+
+        assert result == {"enabled": False}
+
+    @pytest.mark.asyncio
+    async def test_returns_disabled_when_features_none(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        from rossum_mcp.tools.organization_groups import register_organization_group_tools
+
+        register_organization_group_tools(mock_mcp, mock_client)
+
+        mock_og = create_mock_organization_group(features=None)
+
+        async def mock_fetch_all(resource, **filters):
+            yield mock_og
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        are_lookup_fields_enabled = mock_mcp._tools["are_lookup_fields_enabled"]
+        result = await are_lookup_fields_enabled()
+
+        assert result == {"enabled": False}
+
+    @pytest.mark.asyncio
+    async def test_returns_disabled_when_no_groups(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        from rossum_mcp.tools.organization_groups import register_organization_group_tools
+
+        register_organization_group_tools(mock_mcp, mock_client)
+
+        async def mock_fetch_all(resource, **filters):
+            return
+            yield  # make it an async generator
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        are_lookup_fields_enabled = mock_mcp._tools["are_lookup_fields_enabled"]
+        result = await are_lookup_fields_enabled()
+
+        assert result == {"enabled": False}

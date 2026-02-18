@@ -812,6 +812,23 @@ list_organization_groups
   Lists organization groups with optional name filter. Uses graceful deserialization
   to skip items that fail to parse.
 
+are_lookup_fields_enabled
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``are_lookup_fields_enabled()``
+
+**API Endpoint:**
+  ``GET /v1/organization_groups``
+
+**Returns:**
+  ``{"enabled": bool}``
+
+**Implementation:**
+  Returns ``{"enabled": True}`` if any organization group has both ``datasets`` and
+  ``lookup_fields`` set to a truthy value in its ``features`` dict. Returns
+  ``{"enabled": False}`` otherwise.
+
 get_organization_limit
 ^^^^^^^^^^^^^^^^^^^^^^
 

@@ -153,8 +153,9 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
         tools=[
             ToolInfo("get_organization_group", "Retrieve organization group details"),
             ToolInfo("list_organization_groups", "List organization groups"),
+            ToolInfo("are_lookup_fields_enabled", "Check if lookup fields are enabled"),
         ],
-        keywords=["organization group", "license", "trial", "production", "deployment"],
+        keywords=["organization group", "license", "trial", "production", "deployment", "lookup fields", "datasets"],
     ),
     "organization_limits": ToolCategory(
         name="organization_limits",
