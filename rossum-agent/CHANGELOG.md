@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Changed
+- Schema patching sub-agent pre-fetches schema tree structure and full schema content before invoking Opus, eliminating 2 redundant tool calls per patching run and reducing `max_iterations` from 5 to 3 [#196](https://github.com/stancld/rossum-agents/pull/196)
+
 ## [1.2.0] - 2026-02-17
 
 ### Added
@@ -19,14 +22,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Collapse repeated collapsible tool results (e.g. `patch_schema`) in `AgentMemory.write_to_messages()` — only the last result is sent in full to the LLM, earlier results are replaced with a short summary to reduce context bloat [#192](https://github.com/stancld/rossum-agents/pull/192)
+- Changed `prune_schema_fields` `fields_to_keep` behavior — sections are no longer auto-included; list section IDs explicitly to preserve them as empty containers for `patch_schema` [#191](https://github.com/stancld/rossum-agents/pull/191)
+- Simplified Knowledge Base cache — use bundled `data/rossum-kb.json` instead of downloading from a remote URL with disk caching [#187](https://github.com/stancld/rossum-agents/pull/187)
 
 ### Fixed
 - Fixed schema patching sub-agent silently dropping fields when `parent_section` doesn't exist — now auto-creates the missing section [#189](https://github.com/stancld/rossum-agents/pull/189)
 - Stagger concurrent `patch_schema` tool calls (0.5s delay between each) to avoid HTTP 412 conflicts from simultaneous schema writes [#192](https://github.com/stancld/rossum-agents/pull/192)
-
-### Changed
-- Changed `prune_schema_fields` `fields_to_keep` behavior — sections are no longer auto-included; list section IDs explicitly to preserve them as empty containers for `patch_schema` [#191](https://github.com/stancld/rossum-agents/pull/191)
-- Simplified Knowledge Base cache — use bundled `data/rossum-kb.json` instead of downloading from a remote URL with disk caching [#187](https://github.com/stancld/rossum-agents/pull/187)
 
 ### Removed
 - Removed `refresh_knowledge_base` function and `ROSSUM_KB_DATA_URL` env var (no longer needed with bundled data) [#187](https://github.com/stancld/rossum-agents/pull/187)

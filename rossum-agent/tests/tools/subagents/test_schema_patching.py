@@ -902,6 +902,7 @@ class TestCallOpusForPatching:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
             patch("rossum_agent.tools.subagents.base.report_progress", side_effect=capture_progress),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
+            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
         ):
             mock_client.return_value.messages.create.return_value = mock_response
 
@@ -943,6 +944,7 @@ class TestCallOpusForPatching:
                 "rossum_agent.tools.subagents.schema_patching._execute_opus_tool",
                 return_value='[{"id": "section1"}]',
             ),
+            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
         ):
             mock_client.return_value.messages.create.side_effect = [first_response, second_response]
 
@@ -954,8 +956,8 @@ class TestCallOpusForPatching:
             assert result.output_tokens == 150
             assert mock_client.return_value.messages.create.call_count == 2
 
-    def test_max_iterations_is_5(self):
-        """Test that max iterations is reduced to 5 for deterministic workflow."""
+    def test_max_iterations_is_3(self):
+        """Test that max iterations is 3 for deterministic workflow."""
         mock_tool_block = MagicMock()
         mock_tool_block.type = "tool_use"
         mock_tool_block.name = "get_schema_tree_structure"
@@ -977,20 +979,24 @@ class TestCallOpusForPatching:
                 return_value='[{"id": "section1"}]',
             ),
             patch("rossum_agent.tools.subagents.base.logger"),
+            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
         ):
             mock_client.return_value.messages.create.return_value = mock_response
 
             changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
             result = _call_opus_for_patching("123", changes)
 
-            assert result.iterations_used == 5
-            assert mock_client.return_value.messages.create.call_count == 5
+            assert result.iterations_used == 3
+            assert mock_client.return_value.messages.create.call_count == 3
 
     def test_bedrock_client_exception_returns_error(self):
         """Test that create_bedrock_client exception returns error message."""
-        with patch(
-            "rossum_agent.tools.subagents.base.create_bedrock_client",
-            side_effect=Exception("AWS error"),
+        with (
+            patch(
+                "rossum_agent.tools.subagents.base.create_bedrock_client",
+                side_effect=Exception("AWS error"),
+            ),
+            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
         ):
             result = _call_opus_for_patching("123", [{"id": "f1"}])
 
@@ -1012,6 +1018,7 @@ class TestCallOpusForPatching:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
+            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
         ):
             mock_client.return_value.messages.create.return_value = mock_response
 
@@ -1037,6 +1044,7 @@ class TestCallOpusForPatching:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
+            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
         ):
             mock_client.return_value.messages.create.return_value = mock_response
 
@@ -1064,6 +1072,7 @@ class TestCallOpusForPatching:
             patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
             patch("rossum_agent.tools.subagents.base.report_progress"),
             patch("rossum_agent.tools.subagents.base.report_token_usage"),
+            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
         ):
             mock_client.return_value.messages.create.return_value = mock_response
 
