@@ -19,6 +19,19 @@
 | Documentation | Changes reflected in README.md and CLAUDE.md |
 | Tests | New features/bug fixes have tests; existing tests not deleted without cause |
 | Breaking changes | Public API or tool signatures changed without backward compatibility |
+| Opus prompts | If `rossum_agent/prompts/` or `rossum_agent/skills/` changed — see **Opus Prompt Guidelines** below |
+
+## Opus Prompt Guidelines
+
+Apply when reviewing changes to `rossum_agent/prompts/` or `rossum_agent/skills/`:
+
+| Principle | Violation to flag |
+|-----------|-------------------|
+| Goals over procedures | Step-by-step instructions where a single goal statement suffices |
+| Constraints over explanations | Prose explaining *why* a constraint exists instead of stating it directly |
+| Tables for structure | Prose lists that would be clearer as markdown tables |
+| No redundancy | Repeating information Opus can infer from context or earlier in the same prompt |
+| Facts not warnings | "IMPORTANT:", "Note:", "WARNING:" preambles — state the rule directly instead |
 
 ## Approach
 
