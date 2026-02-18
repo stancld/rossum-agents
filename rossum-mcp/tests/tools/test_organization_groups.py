@@ -164,7 +164,9 @@ class TestAreLookupFieldsEnabled:
 
         register_organization_group_tools(mock_mcp, mock_client)
 
-        mock_og = create_mock_organization_group(features={"datasets": True, "lookup_fields": True})
+        mock_og = create_mock_organization_group(
+            features={"datasets": {"enabled": True}, "lookup_fields": {"enabled": True}}
+        )
 
         async def mock_fetch_all(resource, **filters):
             yield mock_og
@@ -182,7 +184,7 @@ class TestAreLookupFieldsEnabled:
 
         register_organization_group_tools(mock_mcp, mock_client)
 
-        mock_og = create_mock_organization_group(features={"datasets": True})
+        mock_og = create_mock_organization_group(features={"datasets": {"enabled": True}})
 
         async def mock_fetch_all(resource, **filters):
             yield mock_og
@@ -226,5 +228,64 @@ class TestAreLookupFieldsEnabled:
 
         are_lookup_fields_enabled = mock_mcp._tools["are_lookup_fields_enabled"]
         result = await are_lookup_fields_enabled()
+
+        assert result == {"enabled": False}
+
+
+@pytest.mark.unit
+class TestAreReasoningFieldsEnabled:
+    """Tests for are_reasoning_fields_enabled tool."""
+
+    @pytest.mark.asyncio
+    async def test_returns_enabled_when_feature_set(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        from rossum_mcp.tools.organization_groups import register_organization_group_tools
+
+        register_organization_group_tools(mock_mcp, mock_client)
+
+        mock_og = create_mock_organization_group(features={"reasoning_fields": {"enabled": True}})
+
+        async def mock_fetch_all(resource, **filters):
+            yield mock_og
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        are_reasoning_fields_enabled = mock_mcp._tools["are_reasoning_fields_enabled"]
+        result = await are_reasoning_fields_enabled()
+
+        assert result == {"enabled": True}
+
+    @pytest.mark.asyncio
+    async def test_returns_disabled_when_feature_missing(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        from rossum_mcp.tools.organization_groups import register_organization_group_tools
+
+        register_organization_group_tools(mock_mcp, mock_client)
+
+        mock_og = create_mock_organization_group(features={})
+
+        async def mock_fetch_all(resource, **filters):
+            yield mock_og
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        are_reasoning_fields_enabled = mock_mcp._tools["are_reasoning_fields_enabled"]
+        result = await are_reasoning_fields_enabled()
+
+        assert result == {"enabled": False}
+
+    @pytest.mark.asyncio
+    async def test_returns_disabled_when_features_none(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        from rossum_mcp.tools.organization_groups import register_organization_group_tools
+
+        register_organization_group_tools(mock_mcp, mock_client)
+
+        mock_og = create_mock_organization_group(features=None)
+
+        async def mock_fetch_all(resource, **filters):
+            yield mock_og
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        are_reasoning_fields_enabled = mock_mcp._tools["are_reasoning_fields_enabled"]
+        result = await are_reasoning_fields_enabled()
 
         assert result == {"enabled": False}

@@ -826,7 +826,24 @@ are_lookup_fields_enabled
 
 **Implementation:**
   Returns ``{"enabled": True}`` if any organization group has both ``datasets`` and
-  ``lookup_fields`` set to a truthy value in its ``features`` dict. Returns
+  ``lookup_fields`` features set to ``{"enabled": True}`` in its ``features`` dict.
+  Returns ``{"enabled": False}`` otherwise.
+
+are_reasoning_fields_enabled
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``are_reasoning_fields_enabled()``
+
+**API Endpoint:**
+  ``GET /v1/organization_groups``
+
+**Returns:**
+  ``{"enabled": bool}``
+
+**Implementation:**
+  Returns ``{"enabled": True}`` if any organization group has the ``reasoning_fields``
+  feature set to ``{"enabled": True}`` in its ``features`` dict. Returns
   ``{"enabled": False}`` otherwise.
 
 get_organization_limit
