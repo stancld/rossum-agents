@@ -684,7 +684,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "    - If evaluation shows issues, adjust the matching configuration and re-evaluate\n"
             "    - Iterate until results look correct\n"
             "5. For any non-matched cases, verify them against the real matching dataset before finalizing.\n\n"
-            "Store the final `evaluate_lookup_field` result as `output.json` without modification (pass through the JSON response directly)."
+            'Store `output.json` as a single JSON object with `schema_id` merged into the final `evaluate_lookup_field` result (e.g. `{"schema_id": <id>, "status": ..., "results": [...]}`).'
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
