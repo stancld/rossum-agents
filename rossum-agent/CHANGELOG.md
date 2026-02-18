@@ -4,14 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
-
-## [1.2.0] - 2026-02-17
+## [1.3.0] - 2026-02-18
 
 ### Added
 - Added `lookup-fields` skill and `suggest_lookup_field`, `evaluate_lookup_field`, `get_lookup_dataset_raw_values`, `query_lookup_dataset` tools for creating and testing lookup fields backed by Master Data Hub datasets [#183](https://github.com/stancld/rossum-agents/pull/183)
 
 ### Changed
+- Bumped `rossum-mcp` dependency to `>=1.3.0`
 - Schema patching sub-agent pre-fetches schema tree structure and full schema content before invoking Opus, eliminating 2 redundant tool calls per patching run and reducing `max_iterations` from 5 to 3 [#196](https://github.com/stancld/rossum-agents/pull/196)
 
 ## [1.2.0] - 2026-02-17
