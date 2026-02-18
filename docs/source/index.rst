@@ -155,6 +155,7 @@ The ``rossum_deploy`` package provides configuration deployment:
 The ``rossum_agent`` package provides additional capabilities:
 
 * Formula field suggestions via Rossum Local Copilot integration
+* Lookup field setup/evaluation plus raw MDH dataset verification for unmatched cases
 * Elis API OpenAPI search via jq queries and free-text grep with sub-agent analysis
 * Knowledge Base search with direct regex tools (``kb_grep``, ``kb_get_article``) and Opus-powered sub-agent analysis
 * Hook testing via native Rossum API endpoints

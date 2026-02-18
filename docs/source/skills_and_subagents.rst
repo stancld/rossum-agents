@@ -321,6 +321,18 @@ Returns JSON with:
 - Token usage (input/output)
 - List of searches performed
 
+Lookup Fields Skill
+^^^^^^^^^^^^^^^^^^^
+
+Load with ``load_skill(name="lookup-fields")`` when configuring or debugging lookup fields.
+
+Key workflow:
+
+1. ``suggest_lookup_field`` for matching config
+2. ``evaluate_lookup_field`` on real annotations — do not write to schema until this passes
+3. ``patch_schema_with_subagent`` to apply it
+4. ``get_lookup_dataset_raw_values`` + ``query_lookup_dataset`` for unmatched or ambiguous results, then re-call ``suggest_lookup_field`` with corrected hints
+
 Schema Patching Sub-Agent
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 

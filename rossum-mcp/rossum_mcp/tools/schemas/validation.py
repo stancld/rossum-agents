@@ -4,7 +4,7 @@ from __future__ import annotations
 
 MAX_ID_LENGTH = 50
 VALID_DATAPOINT_TYPES = {"string", "number", "date", "enum", "button"}
-VALID_UI_CONFIGURATION_TYPES = {"captured", "data", "manual", "formula", "reasoning", None}
+VALID_UI_CONFIGURATION_TYPES = {"captured", "data", "manual", "formula", "reasoning", "lookup", None}
 VALID_UI_CONFIGURATION_EDIT = {"enabled", "enabled_without_warning", "disabled"}
 # These attributes are only valid on datapoints inside a multivalue's tuple (table columns)
 MULTIVALUE_TUPLE_ONLY_FIELDS = {"width", "stretch", "can_collapse", "width_chars"}

@@ -141,7 +141,7 @@ The server provides **68 tools** organized into categories:
 `get_workspace`, `list_workspaces`, `create_workspace`, `delete_workspace`
 
 **Organization Groups:**
-`get_organization_group`, `list_organization_groups`
+`get_organization_group`, `list_organization_groups`, `are_lookup_fields_enabled`, `are_reasoning_fields_enabled`
 
 **Organization Limits:**
 `get_organization_limit`

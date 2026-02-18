@@ -28,6 +28,28 @@ async def _list_organization_groups(client: AsyncRossumAPIClient, name: str | No
     return result.items
 
 
+def _is_feature_enabled(features: dict, key: str) -> bool:
+    return bool(features.get(key, {}).get("enabled"))
+
+
+async def _are_lookup_fields_enabled(client: AsyncRossumAPIClient) -> dict:
+    groups = await _list_organization_groups(client)
+    for group in groups:
+        features = group.features or {}
+        if _is_feature_enabled(features, "datasets") and _is_feature_enabled(features, "lookup_fields"):
+            return {"enabled": True}
+    return {"enabled": False}
+
+
+async def _are_reasoning_fields_enabled(client: AsyncRossumAPIClient) -> dict:
+    groups = await _list_organization_groups(client)
+    for group in groups:
+        features = group.features or {}
+        if _is_feature_enabled(features, "reasoning_fields"):
+            return {"enabled": True}
+    return {"enabled": False}
+
+
 def register_organization_group_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(description="Retrieve organization group details.")
     async def get_organization_group(organization_group_id: int) -> OrganizationGroup:
@@ -36,3 +58,15 @@ def register_organization_group_tools(mcp: FastMCP, client: AsyncRossumAPIClient
     @mcp.tool(description="List organization groups with optional name filter.")
     async def list_organization_groups(name: str | None = None) -> list[OrganizationGroup]:
         return await _list_organization_groups(client, name)
+
+    @mcp.tool(
+        description="Check if lookup fields are enabled. Both 'datasets' and 'lookup_fields' features must be enabled in an organization group."
+    )
+    async def are_lookup_fields_enabled() -> dict:
+        return await _are_lookup_fields_enabled(client)
+
+    @mcp.tool(
+        description="Check if reasoning fields are enabled. The 'reasoning_fields' feature must be enabled in an organization group."
+    )
+    async def are_reasoning_fields_enabled() -> dict:
+        return await _are_reasoning_fields_enabled(client)
