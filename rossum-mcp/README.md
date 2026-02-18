@@ -2,14 +2,14 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 68 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. 70 tools for queues, schemas, hooks, engines, and more.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI - rossum-mcp](https://img.shields.io/pypi/v/rossum-mcp?label=rossum-mcp)](https://pypi.org/project/rossum-mcp/)
 [![Coverage](https://codecov.io/gh/stancld/rossum-agents/branch/master/graph/badge.svg?flag=rossum-mcp)](https://codecov.io/gh/stancld/rossum-agents)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-68-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-70-blue.svg)](#available-tools)
 
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
@@ -97,7 +97,7 @@ Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
 
 ## Available Tools
 
-The server provides **68 tools** organized into categories:
+The server provides **70 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
@@ -108,7 +108,7 @@ The server provides **68 tools** organized into categories:
 | **Extensions (Hooks)** | 9 | Webhooks, serverless functions, testing |
 | **Rules & Actions** | 6 | Business rules with triggers and actions |
 | **Workspace Management** | 4 | Organize and delete workspaces |
-| **Organization Groups** | 2 | View license groups across organizations |
+| **Organization Groups** | 4 | View license groups across organizations |
 | **Organization Limits** | 1 | Email sending limits and usage counters |
 | **User Management** | 5 | Create, update, list users and roles |
 | **Relations** | 4 | Annotation and document relations |

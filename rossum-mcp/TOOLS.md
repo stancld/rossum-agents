@@ -1,8 +1,8 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 67 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 70 MCP tools. For quick start and setup, see [README.md](README.md).
 
-## Document Processing (7 tools)
+## Document Processing (8 tools)
 
 ### upload_document
 
@@ -131,6 +131,29 @@ Confirms an annotation to move it to 'confirmed' status. Can be called after `bu
 {
   "annotation_id": 12345,
   "message": "Annotation 12345 confirmed successfully. Status changed to 'confirmed'."
+}
+```
+
+### copy_annotations
+
+Copies annotations to another queue. Use `reimport=True` to re-extract data in the target queue (e.g. when moving documents between queues). Use `reimport=False` to preserve the original extracted data as-is.
+
+**Parameters:**
+- `annotation_ids` (array of integers, required): List of annotation IDs to copy
+- `target_queue_id` (integer, required): Queue ID to copy annotations into
+- `target_status` (string, optional): Target annotation status after copying
+- `reimport` (boolean, optional): Whether to re-extract data in the target queue (default: false)
+
+**Returns:**
+```json
+{
+  "copied": 2,
+  "failed": 0,
+  "results": [
+    {"annotation_id": 12345, "copied_annotation": {...}},
+    {"annotation_id": 12346, "copied_annotation": {...}}
+  ],
+  "errors": []
 }
 ```
 
@@ -674,7 +697,7 @@ Deletes a workspace by ID.
 
 ---
 
-## Organization Groups (2 tools)
+## Organization Groups (4 tools)
 
 ### get_organization_group
 
@@ -689,6 +712,24 @@ Lists organization groups with optional name filter.
 
 **Parameters:**
 - `name` (string, optional): Filter by name
+
+### are_lookup_fields_enabled
+
+Checks whether lookup fields are available. Both `datasets` and `lookup_fields` features must be enabled in at least one organization group.
+
+**Returns:**
+```json
+{"enabled": true}
+```
+
+### are_reasoning_fields_enabled
+
+Checks whether reasoning fields are available. The `reasoning_fields` feature must be enabled in at least one organization group.
+
+**Returns:**
+```json
+{"enabled": true}
+```
 
 ---
 
@@ -871,7 +912,7 @@ Set the MCP operation mode. Use 'read-only' to disable write operations, 'read-w
 Lists all available tool categories with descriptions, tool names, and keywords for dynamic tool loading.
 
 **Available Categories:**
-- `annotations` - Document processing (7 tools)
+- `annotations` - Document processing (8 tools)
 - `queues` - Queue management (9 tools)
 - `schemas` - Schema management (8 tools)
 - `engines` - AI engine management (6 tools)
@@ -882,7 +923,7 @@ Lists all available tool categories with descriptions, tool names, and keywords 
 - `rules` - Validation rules (6 tools)
 - `users` - User management (5 tools)
 - `workspaces` - Workspace management (4 tools)
-- `organization_groups` - Organization group management (2 tools)
+- `organization_groups` - Organization group management (4 tools)
 - `organization_limits` - Organization limits (1 tool)
 
 ---
