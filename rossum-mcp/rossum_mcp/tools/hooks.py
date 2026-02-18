@@ -9,6 +9,7 @@ from rossum_api.models.hook import Hook, HookAction, HookEvent, HookEventAndActi
 from rossum_api.models.hook_template import HookTemplate
 
 from rossum_mcp.tools.base import (
+    build_filters,
     delete_resource,
     graceful_list,
     is_read_write_mode,
@@ -44,12 +45,7 @@ async def _list_hooks(
     active: bool | None = None,
     first_n: int | None = None,
 ) -> list[Hook]:
-    filters: dict = {}
-    if queue_id is not None:
-        filters["queue"] = queue_id
-    if active is not None:
-        filters["active"] = active
-
+    filters = build_filters(queue=queue_id, active=active)
     result = await graceful_list(client, Resource.Hook, "hook", max_items=first_n, **filters)
     return result.items
 
@@ -150,26 +146,24 @@ async def _list_hook_logs(
     search: str | None = None,
     page_size: int | None = None,
 ) -> list[HookRunData]:
-    filter_mapping: dict[str, Any] = {
-        "hook": hook_id,
-        "queue": queue_id,
-        "annotation": annotation_id,
-        "email": email_id,
-        "log_level": log_level,
-        "status": status,
-        "status_code": status_code,
-        "request_id": request_id,
-        "timestamp_before": timestamp_before,
-        "timestamp_after": timestamp_after,
-        "start_before": start_before,
-        "start_after": start_after,
-        "end_before": end_before,
-        "end_after": end_after,
-        "search": search,
-        "page_size": page_size,
-    }
-    filters = {k: v for k, v in filter_mapping.items() if v is not None}
-
+    filters = build_filters(
+        hook=hook_id,
+        queue=queue_id,
+        annotation=annotation_id,
+        email=email_id,
+        log_level=log_level,
+        status=status,
+        status_code=status_code,
+        request_id=request_id,
+        timestamp_before=timestamp_before,
+        timestamp_after=timestamp_after,
+        start_before=start_before,
+        start_after=start_after,
+        end_before=end_before,
+        end_after=end_after,
+        search=search,
+        page_size=page_size,
+    )
     result = await graceful_list(client, Resource.HookRunData, "hook_log", **filters)
     return result.items
 

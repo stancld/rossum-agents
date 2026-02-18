@@ -395,6 +395,108 @@ class TestConfirmAnnotation:
 
 
 @pytest.mark.unit
+class TestCopyAnnotations:
+    """Tests for copy_annotations (bulk) tool."""
+
+    @pytest.mark.asyncio
+    async def test_copy_annotations_success(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test successful bulk copy of annotations."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://example.rossum.app/api/v1")
+        importlib.reload(base)
+        register_annotation_tools(mock_mcp, mock_client)
+
+        mock_client._http_client.request_json.side_effect = [
+            {"id": 99991, "status": "to_review"},
+            {"id": 99992, "status": "to_review"},
+        ]
+
+        copy_annotations = mock_mcp._tools["copy_annotations"]
+        result = await copy_annotations(annotation_ids=[111, 222], target_queue_id=300)
+
+        assert result["copied"] == 2
+        assert result["failed"] == 0
+        assert len(result["results"]) == 2
+        assert result["results"][0]["annotation_id"] == 111
+        assert result["results"][1]["annotation_id"] == 222
+
+    @pytest.mark.asyncio
+    async def test_copy_annotations_partial_failure(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test bulk copy where some annotations fail."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://example.rossum.app/api/v1")
+        importlib.reload(base)
+        register_annotation_tools(mock_mcp, mock_client)
+
+        mock_client._http_client.request_json.side_effect = [
+            {"id": 99991, "status": "to_review"},
+            RuntimeError("Not found"),
+        ]
+
+        copy_annotations = mock_mcp._tools["copy_annotations"]
+        result = await copy_annotations(annotation_ids=[111, 222], target_queue_id=300)
+
+        assert result["copied"] == 1
+        assert result["failed"] == 1
+        assert result["errors"][0]["annotation_id"] == 222
+
+    @pytest.mark.asyncio
+    async def test_copy_annotations_with_reimport(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test bulk copy with reimport=True passes query param."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://example.rossum.app/api/v1")
+        importlib.reload(base)
+        register_annotation_tools(mock_mcp, mock_client)
+
+        mock_client._http_client.request_json.return_value = {"id": 99991, "status": "importing"}
+
+        copy_annotations = mock_mcp._tools["copy_annotations"]
+        await copy_annotations(annotation_ids=[111], target_queue_id=300, reimport=True)
+
+        call_kwargs = mock_client._http_client.request_json.call_args[1]
+        assert call_kwargs["params"] == {"reimport": "true"}
+
+    @pytest.mark.asyncio
+    async def test_copy_annotations_with_target_status(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test bulk copy with target_status."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://example.rossum.app/api/v1")
+        importlib.reload(base)
+        register_annotation_tools(mock_mcp, mock_client)
+
+        mock_client._http_client.request_json.return_value = {"id": 99991, "status": "confirmed"}
+
+        copy_annotations = mock_mcp._tools["copy_annotations"]
+        await copy_annotations(annotation_ids=[111], target_queue_id=300, target_status="confirmed")
+
+        call_kwargs = mock_client._http_client.request_json.call_args[1]
+        assert call_kwargs["json"]["target_status"] == "confirmed"
+
+    @pytest.mark.asyncio
+    async def test_copy_annotations_read_only_mode(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test copy_annotations is blocked in read-only mode."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
+        importlib.reload(base)
+        register_annotation_tools(mock_mcp, mock_client)
+
+        copy_annotations = mock_mcp._tools["copy_annotations"]
+        result = await copy_annotations(annotation_ids=[111, 222], target_queue_id=300)
+
+        assert result["error"] == "copy_annotations is not available in read-only mode"
+        mock_client._http_client.request_json.assert_not_called()
+
+
+@pytest.mark.unit
 class TestDeleteAnnotation:
     """Tests for delete_annotation tool."""
 

@@ -31,8 +31,8 @@ class TestConcurrentAgentService:
 
             mock_mcp_connection = MagicMock()
             mock_agent = MagicMock()
-            mock_agent._total_input_tokens = 100
-            mock_agent._total_output_tokens = 50
+            mock_agent.tokens.total_input = 100
+            mock_agent.tokens.total_output = 50
             mock_agent.memory = MagicMock()
             mock_agent.get_token_usage_breakdown.return_value = {}
             mock_agent.log_token_usage_summary = MagicMock()
@@ -114,8 +114,8 @@ class TestConcurrentAgentService:
             """Run agent with specified delay, return result or error."""
             mock_mcp_connection = MagicMock()
             mock_agent = MagicMock()
-            mock_agent._total_input_tokens = 100
-            mock_agent._total_output_tokens = 50
+            mock_agent.tokens.total_input = 100
+            mock_agent.tokens.total_output = 50
             mock_agent.memory = MagicMock()
             mock_agent.get_token_usage_breakdown.return_value = {}
             mock_agent.log_token_usage_summary = MagicMock()
@@ -189,8 +189,8 @@ class TestConcurrentAgentService:
         async def capture_output_dir(request_id: str) -> None:
             mock_mcp_connection = MagicMock()
             mock_agent = MagicMock()
-            mock_agent._total_input_tokens = 0
-            mock_agent._total_output_tokens = 0
+            mock_agent.tokens.total_input = 0
+            mock_agent.tokens.total_output = 0
             mock_agent.memory = MagicMock()
             mock_agent.get_token_usage_breakdown.return_value = {}
             mock_agent.log_token_usage_summary = MagicMock()

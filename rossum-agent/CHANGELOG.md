@@ -9,6 +9,14 @@ All notable changes to this project will be documented in this file.
 ## [1.2.0] - 2026-02-17
 
 ### Added
+- Added `lookup-fields` skill and `suggest_lookup_field`, `evaluate_lookup_field`, `get_lookup_dataset_raw_values`, `query_lookup_dataset` tools for creating and testing lookup fields backed by Master Data Hub datasets [#183](https://github.com/stancld/rossum-agents/pull/183)
+
+### Changed
+- Schema patching sub-agent pre-fetches schema tree structure and full schema content before invoking Opus, eliminating 2 redundant tool calls per patching run and reducing `max_iterations` from 5 to 3 [#196](https://github.com/stancld/rossum-agents/pull/196)
+
+## [1.2.0] - 2026-02-17
+
+### Added
 - Added tool call and result persistence in conversation history for full replay in multi-turn conversations [#184](https://github.com/stancld/rossum-agents/pull/184)
 - Moved `rossum-kb.json` into the `rossum_agent` package so it is included in installed distributions [#185](https://github.com/stancld/rossum-agents/pull/185)
 - Added tool call argument logging in `_execute_tool_with_progress` for debugging agent behavior [#192](https://github.com/stancld/rossum-agents/pull/192)

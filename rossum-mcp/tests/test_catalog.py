@@ -51,6 +51,7 @@ class TestToolCatalog:
             "start_annotation",
             "bulk_update_annotation_fields",
             "confirm_annotation",
+            "copy_annotations",
             "delete_annotation",
         }
         assert tool_names == expected
@@ -96,6 +97,7 @@ class TestToolCatalog:
             ("annotations", "start_annotation"),
             ("annotations", "bulk_update_annotation_fields"),
             ("annotations", "confirm_annotation"),
+            ("annotations", "copy_annotations"),
             ("annotations", "delete_annotation"),
             ("queues", "create_queue"),
             ("queues", "update_queue"),

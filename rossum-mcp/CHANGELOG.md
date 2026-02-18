@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+## [1.3.0] - 2026-02-18
+
+### Added
+- Added `copy_annotations` tool for bulk copying annotations to another queue via `POST /v1/annotations/{id}/copy` with optional `reimport` and `target_status` parameters [#195](https://github.com/stancld/rossum-agents/pull/195)
+- Added `are_lookup_fields_enabled` tool to check whether lookup fields are available — returns `{"enabled": bool}` based on whether both `datasets` and `lookup_fields` features are enabled in any organization group
+- Added `are_reasoning_fields_enabled` tool to check whether reasoning fields are available — returns `{"enabled": bool}` based on whether the `reasoning_fields` feature is enabled in any organization group
+
 ## [1.2.3] - 2026-02-17
 
 ### Changed

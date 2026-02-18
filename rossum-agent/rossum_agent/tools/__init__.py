@@ -74,6 +74,12 @@ from rossum_agent.tools.elis_backend_openapi_search import elis_openapi_grep, el
 from rossum_agent.tools.file_tools import write_file
 from rossum_agent.tools.formula import suggest_formula_field
 from rossum_agent.tools.knowledge_base_search import kb_get_article, kb_grep
+from rossum_agent.tools.lookup import (
+    evaluate_lookup_field,
+    get_lookup_dataset_raw_values,
+    query_lookup_dataset,
+    suggest_lookup_field,
+)
 from rossum_agent.tools.skills import load_skill
 from rossum_agent.tools.spawn_mcp import (
     SpawnedConnection,
@@ -106,6 +112,10 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     search_elis_docs,
     patch_schema_with_subagent,
     suggest_formula_field,
+    suggest_lookup_field,
+    evaluate_lookup_field,
+    get_lookup_dataset_raw_values,
+    query_lookup_dataset,
     load_skill,
     create_task,
     update_task,
@@ -225,6 +235,7 @@ __all__ = [
     "deploy_to_org",
     "elis_openapi_grep",
     "elis_openapi_jq",
+    "evaluate_lookup_field",
     "execute_internal_tool",
     "execute_tool",
     "get_commit_store",
@@ -236,6 +247,7 @@ __all__ = [
     "get_load_tool_category_definition",
     "get_load_tool_definition",
     "get_loaded_categories",
+    "get_lookup_dataset_raw_values",
     "get_mcp_connection",
     "get_mcp_event_loop",
     "get_mcp_mode",
@@ -256,6 +268,7 @@ __all__ = [
     "load_tool_category",
     "patch_schema_with_subagent",
     "preload_categories_for_request",
+    "query_lookup_dataset",
     "refresh_openapi_spec",
     "report_progress",
     "report_text",
@@ -280,6 +293,7 @@ __all__ = [
     "spawn_mcp_connection",
     "suggest_categories_for_request",
     "suggest_formula_field",
+    "suggest_lookup_field",
     "update_task",
     "write_file",
 ]

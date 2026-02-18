@@ -23,6 +23,7 @@ select = [
     "W",  # PEP8  (pycodestyle)
 ]
 extend-select = [
+    "ASYNC",  # asyncio
     "EXE",  # executable
     "ICN",  # import conventions
     "NPY",  # numpy-specific rules

@@ -13,6 +13,7 @@ from rossum_api.models.queue import Queue
 from rossum_api.models.schema import Schema
 
 from rossum_mcp.tools.base import (
+    build_filters,
     build_resource_url,
     delete_resource,
     extract_id_from_url,
@@ -57,14 +58,7 @@ async def _list_queues(
     name: str | None = None,
 ) -> list[Queue]:
     logger.debug(f"Listing queues: id={id}, workspace_id={workspace_id}, name={name}")
-    filters: dict = {}
-    if id is not None:
-        filters["id"] = id
-    if workspace_id is not None:
-        filters["workspace"] = workspace_id
-    if name is not None:
-        filters["name"] = name
-
+    filters = build_filters(id=id, workspace=workspace_id, name=name)
     result = await graceful_list(client, Resource.Queue, "queue", **filters)
     return [_truncate_queue_for_list(queue) for queue in result.items]
 

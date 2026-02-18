@@ -756,8 +756,8 @@ class TestAgentServiceRunAgent:
 
         mock_mcp_connection = MagicMock()
         mock_agent = MagicMock()
-        mock_agent._total_input_tokens = 100
-        mock_agent._total_output_tokens = 50
+        mock_agent.tokens.total_input = 100
+        mock_agent.tokens.total_output = 50
         mock_agent.get_token_usage_breakdown.return_value = TokenUsageBreakdown.from_raw_counts(
             total_input=100, total_output=50, main_input=100, main_output=50, sub_input=0, sub_output=0, sub_by_tool={}
         )
@@ -846,8 +846,8 @@ class TestAgentServiceRunAgent:
 
         mock_mcp_connection = MagicMock()
         mock_agent = MagicMock()
-        mock_agent._total_input_tokens = 0
-        mock_agent._total_output_tokens = 0
+        mock_agent.tokens.total_input = 0
+        mock_agent.tokens.total_output = 0
 
         async def mock_run(prompt):
             yield AgentStep(step_number=1, final_answer="Done", is_final=True)
@@ -893,10 +893,10 @@ class TestAgentServiceRunAgent:
 
         mock_mcp_connection = MagicMock()
         mock_agent = MagicMock()
-        mock_agent._total_input_tokens = 0
-        mock_agent._total_output_tokens = 0
-        mock_agent._total_cache_creation_tokens = 0
-        mock_agent._total_cache_read_tokens = 0
+        mock_agent.tokens.total_input = 0
+        mock_agent.tokens.total_output = 0
+        mock_agent.tokens.total_cache_creation = 0
+        mock_agent.tokens.total_cache_read = 0
         mock_agent.get_token_usage_breakdown.return_value = {}
         mock_agent.log_token_usage_summary = MagicMock()
         mock_agent.memory = MagicMock()
@@ -942,10 +942,10 @@ class TestAgentServiceRunAgent:
 
         mock_mcp_connection = MagicMock()
         mock_agent = MagicMock()
-        mock_agent._total_input_tokens = 0
-        mock_agent._total_output_tokens = 0
-        mock_agent._total_cache_creation_tokens = 0
-        mock_agent._total_cache_read_tokens = 0
+        mock_agent.tokens.total_input = 0
+        mock_agent.tokens.total_output = 0
+        mock_agent.tokens.total_cache_creation = 0
+        mock_agent.tokens.total_cache_read = 0
         mock_agent.get_token_usage_breakdown.return_value = {}
         mock_agent.log_token_usage_summary = MagicMock()
 
@@ -1443,8 +1443,8 @@ class TestAgentServiceRunAgentWithImages:
 
         mock_mcp_connection = MagicMock()
         mock_agent = MagicMock()
-        mock_agent._total_input_tokens = 0
-        mock_agent._total_output_tokens = 0
+        mock_agent.tokens.total_input = 0
+        mock_agent.tokens.total_output = 0
 
         async def mock_run(prompt):
             yield AgentStep(step_number=1, final_answer="Done", is_final=True)
@@ -1495,8 +1495,8 @@ class TestAgentServiceUrlContext:
 
         mock_mcp_connection = MagicMock()
         mock_agent = MagicMock()
-        mock_agent._total_input_tokens = 0
-        mock_agent._total_output_tokens = 0
+        mock_agent.tokens.total_input = 0
+        mock_agent.tokens.total_output = 0
 
         async def mock_run(prompt):
             yield AgentStep(step_number=1, final_answer="Done", is_final=True)

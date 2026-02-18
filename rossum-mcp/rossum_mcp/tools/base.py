@@ -90,6 +90,11 @@ def is_read_write_mode() -> bool:
     return _mcp_mode == "read-write"
 
 
+def build_filters(**kwargs: Any) -> dict[str, Any]:
+    """Build a filter dict from kwargs, excluding None values."""
+    return {k: v for k, v in kwargs.items() if v is not None}
+
+
 def truncate_dict_fields(data: dict[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
     """Truncate specified fields in a dictionary to save context.
 

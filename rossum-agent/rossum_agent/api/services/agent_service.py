@@ -477,8 +477,8 @@ class AgentService:
 
                             if not step.is_streaming:
                                 total_steps = step.step_number
-                                total_input_tokens = agent._total_input_tokens
-                                total_output_tokens = agent._total_output_tokens
+                                total_input_tokens = agent.tokens.total_input
+                                total_output_tokens = agent.tokens.total_output
 
                         for sub_event in self._drain_queue(ctx.event_queue):
                             yield sub_event
@@ -493,8 +493,8 @@ class AgentService:
                             total_steps=total_steps,
                             input_tokens=total_input_tokens,
                             output_tokens=total_output_tokens,
-                            cache_creation_input_tokens=agent._total_cache_creation_tokens,
-                            cache_read_input_tokens=agent._total_cache_read_tokens,
+                            cache_creation_input_tokens=agent.tokens.total_cache_creation,
+                            cache_read_input_tokens=agent.tokens.total_cache_read,
                             token_usage_breakdown=agent.get_token_usage_breakdown(),
                             config_commit_hash=commit.hash if commit else None,
                             config_commit_message=commit.message if commit else None,

@@ -26,6 +26,10 @@ from regression_tests.custom_checks.hidden_multivalue_warning import (
 from regression_tests.custom_checks.hook_test_payload import (
     check_hook_test_results_reported,
 )
+from regression_tests.custom_checks.lookup_field import (
+    check_lookup_field_configured,
+    check_lookup_match_results,
+)
 from regression_tests.custom_checks.net_terms_formula_field import (
     check_net_terms_formula_field_added,
 )
@@ -62,6 +66,8 @@ __all__ = [
     "check_hook_deleted_and_reverted",
     "check_hook_test_results_reported",
     "check_knowledge_base_hidden_multivalue_warning",
+    "check_lookup_field_configured",
+    "check_lookup_match_results",
     "check_net_terms_formula_field_added",
     "check_no_misleading_training_suggestions",
     "check_queue_deleted",

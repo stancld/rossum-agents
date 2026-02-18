@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.email_template import EmailTemplate
 
-from rossum_mcp.tools.base import graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, graceful_list, is_read_write_mode
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -29,14 +29,7 @@ async def _list_email_templates(
     name: str | None = None,
     first_n: int | None = None,
 ) -> list[EmailTemplate]:
-    filters: dict = {}
-    if queue_id is not None:
-        filters["queue"] = queue_id
-    if type is not None:
-        filters["type"] = type
-    if name is not None:
-        filters["name"] = name
-
+    filters = build_filters(queue=queue_id, type=type, name=name)
     result = await graceful_list(client, Resource.EmailTemplate, "email_template", max_items=first_n, **filters)
     return result.items
 

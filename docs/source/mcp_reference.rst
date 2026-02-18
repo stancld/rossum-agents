@@ -812,6 +812,40 @@ list_organization_groups
   Lists organization groups with optional name filter. Uses graceful deserialization
   to skip items that fail to parse.
 
+are_lookup_fields_enabled
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``are_lookup_fields_enabled()``
+
+**API Endpoint:**
+  ``GET /v1/organization_groups``
+
+**Returns:**
+  ``{"enabled": bool}``
+
+**Implementation:**
+  Returns ``{"enabled": True}`` if any organization group has both ``datasets`` and
+  ``lookup_fields`` features set to ``{"enabled": True}`` in its ``features`` dict.
+  Returns ``{"enabled": False}`` otherwise.
+
+are_reasoning_fields_enabled
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``are_reasoning_fields_enabled()``
+
+**API Endpoint:**
+  ``GET /v1/organization_groups``
+
+**Returns:**
+  ``{"enabled": bool}``
+
+**Implementation:**
+  Returns ``{"enabled": True}`` if any organization group has the ``reasoning_fields``
+  feature set to ``{"enabled": True}`` in its ``features`` dict. Returns
+  ``{"enabled": False}`` otherwise.
+
 get_organization_limit
 ^^^^^^^^^^^^^^^^^^^^^^
 
@@ -916,6 +950,20 @@ list_tool_categories
    for cat in categories:
        if "schema" in cat["keywords"]:
            print(f"{cat['name']}: {cat['tool_count']} tools")
+
+copy_annotations
+^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``copy_annotations(annotation_ids: Sequence[int], target_queue_id: int, target_status: str | None = None, reimport: bool = False)``
+
+**API Endpoint:**
+  ``POST /v1/annotations/{annotation_id}/copy`` (called per annotation)
+
+**Implementation:**
+  Iterates over ``annotation_ids``, calling the copy endpoint for each. Collects
+  results and errors separately for graceful partial failure handling. Uses
+  ``_http_client.request_json`` directly since the SDK has no copy method.
 
 Delete Operations
 -----------------

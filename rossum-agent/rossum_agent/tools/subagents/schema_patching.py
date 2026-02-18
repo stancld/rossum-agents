@@ -79,14 +79,16 @@ _SCHEMA_PATCHING_SYSTEM_PROMPT = """Goal: Update schema to match EXACTLY the req
 
 ## Workflow
 
-1. get_schema_tree_structure → see current field IDs
-2. get_full_schema → get complete schema content
-3. Analyze current vs requested fields
-4. Call apply_schema_changes with:
+Schema tree structure and full content are pre-fetched and provided in the user message.
+
+1. Analyze current vs requested fields
+2. Call apply_schema_changes with:
    - fields_to_keep: list of field IDs to retain
    - fields_to_add: list of new field specifications
    - fields_to_update: list of updates to existing fields (e.g., formula changes)
-5. Return summary of changes
+3. Return summary of changes
+
+Use get_schema_tree_structure / get_full_schema only if you need to verify or refresh data.
 
 ## Field Specification Format (for fields_to_add)
 
@@ -98,15 +100,23 @@ _SCHEMA_PATCHING_SYSTEM_PROMPT = """Goal: Update schema to match EXACTLY the req
 | type | Yes | string, number, date, enum |
 | table_id | If table | Multivalue ID for table columns |
 
-Optional: format, options (for enum), rir_field_names, hidden, can_export, ui_configuration, prompt, context
+Optional: format, options (for enum), rir_field_names, hidden, can_export, ui_configuration, prompt, context, matching
 
 ## Constraints
 
 - Field `id` must be valid identifier (lowercase, underscores, no spaces)
 - Do NOT set `rir_field_names` unless user explicitly provides engine field names
 - If user mentions extraction/AI capture, check existing schema for rir_field_names patterns first
-- `ui_configuration.type` must be one of: captured, data, manual, formula, reasoning
+- `ui_configuration.type` must be one of: captured, data, manual, formula, reasoning, lookup
 - `ui_configuration.edit` must be one of: enabled, enabled_without_warning, disabled
+
+## Lookup Fields
+
+Lookup fields require ALL of these attributes — omitting any causes API errors:
+- `type`: "enum"
+- `ui_configuration`: {"type": "lookup", "edit": "disabled"}
+- `matching`: the full matching config object (type, configuration with dataset/queries/placeholders)
+- Do NOT set `rir_field_names` on lookup fields
 
 ## Type Mappings
 
@@ -124,7 +134,7 @@ Return: Summary of fields kept, added, removed."""
 
 _GET_SCHEMA_TREE_STRUCTURE_TOOL: dict[str, Any] = {
     "name": "get_schema_tree_structure",
-    "description": "Get lightweight tree view with field IDs, labels, categories, types. Call first.",
+    "description": "Get lightweight tree view with field IDs, labels, categories, types.",
     "input_schema": {
         "type": "object",
         "properties": {"schema_id": {"type": "integer", "description": "Schema ID"}},
@@ -174,7 +184,7 @@ _APPLY_SCHEMA_CHANGES_TOOL: dict[str, Any] = {
                             "properties": {
                                 "type": {
                                     "type": "string",
-                                    "enum": ["captured", "data", "manual", "formula", "reasoning"],
+                                    "enum": ["captured", "data", "manual", "formula", "reasoning", "lookup"],
                                     "description": "Field value source type",
                                 },
                                 "edit": {
@@ -192,6 +202,10 @@ _APPLY_SCHEMA_CHANGES_TOOL: dict[str, Any] = {
                             "type": "array",
                             "items": {"type": "string"},
                             "description": "Context field IDs for reasoning (TxScript format, e.g. field.invoice_id)",
+                        },
+                        "matching": {
+                            "type": "object",
+                            "description": "Lookup field matching config (type + configuration with dataset, queries, placeholders). Required for lookup fields.",
                         },
                     },
                     "required": ["id", "label", "parent_section", "type"],
@@ -216,10 +230,14 @@ _APPLY_SCHEMA_CHANGES_TOOL: dict[str, Any] = {
                                 "edit": {"type": "string"},
                             },
                         },
+                        "matching": {
+                            "type": "object",
+                            "description": "Lookup field matching config update.",
+                        },
                     },
                     "required": ["id"],
                 },
-                "description": "Existing fields to update (e.g., change formula, label, type).",
+                "description": "Existing fields to update (e.g., change formula, label, type, matching).",
             },
         },
         "required": ["schema_id"],
@@ -318,13 +336,14 @@ def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
         "type": field_type,
     }
 
-    if field_type == "enum" and spec.get("options"):
-        node["options"] = spec["options"]
+    if field_type == "enum":
+        node["options"] = spec.get("options") or []
 
     if spec.get("format"):
         node["format"] = spec["format"]
 
-    if spec.get("rir_field_names"):
+    is_lookup = isinstance(spec.get("ui_configuration"), dict) and spec["ui_configuration"].get("type") == "lookup"
+    if not is_lookup and spec.get("rir_field_names"):
         node["rir_field_names"] = spec["rir_field_names"]
 
     if spec.get("hidden") is not None:
@@ -344,6 +363,9 @@ def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
 
     if spec.get("formula"):
         node["formula"] = spec["formula"]
+
+    if spec.get("matching"):
+        node["matching"] = spec["matching"]
 
     return node
 
@@ -539,7 +561,7 @@ class SchemaPatchingSubAgent(SubAgent):
             tool_name="patch_schema",
             system_prompt=_SCHEMA_PATCHING_SYSTEM_PROMPT,
             tools=_OPUS_TOOLS,
-            max_iterations=5,
+            max_iterations=3,
             max_tokens=4096,
         )
         super().__init__(config)
@@ -556,17 +578,48 @@ class SchemaPatchingSubAgent(SubAgent):
 def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> SubAgentResult:
     """Call Opus model for schema patching with deterministic tool workflow.
 
+    Pre-fetches schema data and injects it into context to skip redundant tool calls.
+
     Returns:
         SubAgentResult with analysis text and token counts.
     """
+    schema_id_int = int(schema_id)
+
+    tree_result = call_mcp_tool("get_schema_tree_structure", {"schema_id": schema_id_int})
+    schema_result = call_mcp_tool("get_schema", {"schema_id": schema_id_int})
+    if schema_result:
+        content = _extract_schema_content(schema_result)
+        if not content:
+            logger.info("_call_opus_for_patching: schema %s has empty content", schema_id)
+        _schema_content_cache[schema_id_int] = content
+
+    tree_str = json.dumps(_to_plain(tree_result), indent=2, default=str) if tree_result else "No data"
+    schema_str = json.dumps(_to_plain(schema_result), indent=2, default=str) if schema_result else "No data"
+
     changes_text = "\n".join(
         f"- {c.get('action', 'add')} field '{c.get('id')}' ({c.get('type', 'string')})"
         + (f" in section '{c.get('parent_section')}'" if c.get("parent_section") else "")
         + (f" with label '{c.get('label')}'" if c.get("label") else "")
         + (f" [TABLE: {c.get('table_id')}]" if c.get("table_field") or c.get("table_id") else "")
         + (f" formula='{c.get('formula')}'" if c.get("formula") else "")
+        + (" [LOOKUP]" if c.get("matching") else "")
         for c in changes
     )
+
+    # Include full JSON specs for lookup fields so the sub-agent can pass matching configs through
+    lookup_changes = [c for c in changes if c.get("matching")]
+    lookup_section = ""
+    if lookup_changes:
+        lookup_json = json.dumps(lookup_changes, indent=2, ensure_ascii=False)
+        lookup_section = f"""
+
+## Lookup Field Specs (pass these EXACTLY to fields_to_add/fields_to_update including matching)
+
+```json
+{lookup_json}
+```
+
+Lookup fields MUST include: type "enum", ui_configuration {{"type": "lookup", "edit": "disabled"}}, and the matching object exactly as shown."""
 
     actions = {c.get("action", "add") for c in changes}
     if actions == {"update"}:
@@ -576,13 +629,15 @@ def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> Su
 
     user_content = f"""{intro}
 
-{changes_text}
+{changes_text}{lookup_section}
 
-Workflow:
-1. get_schema_tree_structure to see current field IDs
-2. get_full_schema to load content
-3. apply_schema_changes with fields_to_keep (IDs to retain), fields_to_add, and/or fields_to_update
-4. Return summary"""
+## Current Schema Tree
+{tree_str}
+
+## Full Schema Content
+{schema_str}
+
+Call apply_schema_changes with fields_to_keep (IDs to retain), fields_to_add, and/or fields_to_update, then return summary."""
 
     sub_agent = SchemaPatchingSubAgent()
     return sub_agent.run(user_content)

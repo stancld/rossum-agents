@@ -41,6 +41,7 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
             ToolInfo("start_annotation", "Start annotation (to_review -> reviewing)", read_only=False),
             ToolInfo("bulk_update_annotation_fields", "Bulk update annotation fields", read_only=False),
             ToolInfo("confirm_annotation", "Confirm annotation (-> confirmed)", read_only=False),
+            ToolInfo("copy_annotations", "Copy annotations to another queue", read_only=False),
             ToolInfo("delete_annotation", "Delete annotation (soft delete)", read_only=False),
         ],
         keywords=["annotation", "document", "upload", "extract", "confirm", "review"],
@@ -152,8 +153,19 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
         tools=[
             ToolInfo("get_organization_group", "Retrieve organization group details"),
             ToolInfo("list_organization_groups", "List organization groups"),
+            ToolInfo("are_lookup_fields_enabled", "Check if lookup fields are enabled"),
+            ToolInfo("are_reasoning_fields_enabled", "Check if reasoning fields are enabled"),
         ],
-        keywords=["organization group", "license", "trial", "production", "deployment"],
+        keywords=[
+            "organization group",
+            "license",
+            "trial",
+            "production",
+            "deployment",
+            "lookup fields",
+            "datasets",
+            "reasoning fields",
+        ],
     ),
     "organization_limits": ToolCategory(
         name="organization_limits",

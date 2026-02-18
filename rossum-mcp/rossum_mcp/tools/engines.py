@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.engine import Engine, EngineField, EngineFieldType
 
-from rossum_mcp.tools.base import build_resource_url, graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, build_resource_url, graceful_list, is_read_write_mode
 
 type EngineType = Literal["extractor", "splitter"]
 
@@ -30,13 +30,7 @@ async def _list_engines(
     agenda_id: str | None = None,
 ) -> list[Engine]:
     logger.debug(f"Listing engines: id={id}, type={engine_type}, agenda_id={agenda_id}")
-    filters: dict[str, Any] = {}
-    if id is not None:
-        filters["id"] = id
-    if engine_type is not None:
-        filters["type"] = engine_type
-    if agenda_id is not None:
-        filters["agenda_id"] = agenda_id
+    filters = build_filters(id=id, type=engine_type, agenda_id=agenda_id)
     result = await graceful_list(client, Resource.Engine, "engine", **filters)
     return result.items
 

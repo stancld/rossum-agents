@@ -36,6 +36,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 - `load_skill("rules-and-actions")` → create validation rules with TxScript conditions and actions
 - `load_skill("formula-fields")` → create/configure formula fields with TxScript
 - `load_skill("reasoning-fields")` → create AI-powered reasoning fields with prompt + context
+- `load_skill("lookup-fields")` → create lookup fields matching against Master Data Hub datasets
 
 **MCP Tools** (pre-loaded based on request keywords, or load manually):
 - `load_tool_category(["queues", "schemas"])` to load multiple categories at once
@@ -45,7 +46,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 CRITICAL_REQUIREMENTS = """
 # Domain Knowledge
 
-**Schema**: sections → datapoints | multivalues → tuples (tables). Datapoint fields: `id`, `label`, `type`, `ui_configuration` (with `type`: `captured`/`data`/`manual`/`formula`/`reasoning`), `formula`, `prompt`, `context`, `score_threshold`.
+**Schema**: sections → datapoints | multivalues → tuples (tables). Datapoint fields: `id`, `label`, `type`, `ui_configuration` (with `type`: `captured`/`data`/`manual`/`formula`/`reasoning`/`lookup`), `formula`, `prompt`, `context`, `score_threshold`.
 
 **API constraints**:
 - IDs are integers: `queue_id=12345` not `"12345"`

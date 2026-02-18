@@ -954,6 +954,36 @@ Confirms an annotation to move it to 'confirmed' status. Can be called after
      "message": "Annotation 12345 confirmed successfully. Status changed to 'confirmed'."
    }
 
+copy_annotations
+^^^^^^^^^^^^^^^^
+
+Copies one or more annotations to another queue. ``reimport=True`` re-extracts
+data in the target queue (use when moving documents between queues).
+``reimport=False`` (default) preserves original extracted data as-is.
+
+**Parameters:**
+
+- ``annotation_ids`` (array of integers, required): Annotation IDs to copy
+- ``target_queue_id`` (integer, required): Target queue ID
+- ``target_status`` (string, optional): Status of copied annotations (if not set, stays the same)
+- ``reimport`` (boolean, optional): Whether to reimport (default: false)
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "copied": 2,
+     "failed": 0,
+     "results": [
+       {"annotation_id": 111, "copied_annotation": {"id": 99991, "status": "to_review"}},
+       {"annotation_id": 222, "copied_annotation": {"id": 99992, "status": "to_review"}}
+     ],
+     "errors": []
+   }
+
+**Note:** This operation is only available in read-write mode.
+
 delete_annotation
 ^^^^^^^^^^^^^^^^^
 
@@ -2240,6 +2270,65 @@ Files are saved to a session-specific directory that can be shared with the user
      "message": "Successfully wrote 1234 characters to report.md",
      "path": "/path/to/outputs/report.md"
    }
+
+Lookup Field Tools
+^^^^^^^^^^^^^^^^^^
+
+suggest_lookup_field
+""""""""""""""""""""
+
+Suggest matching configuration for a lookup field backed by Master Data Hub dataset.
+
+**Parameters:**
+
+- ``label`` (string, required): Field label.
+- ``hint`` (string, required): Matching intent and constraints.
+- ``schema_id`` (int, required): Target schema ID.
+- ``section_id`` (string, required): Section where the field belongs.
+- ``field_schema_id`` (string, optional): Field ID override.
+- ``dataset`` (string, optional): Dataset name or identifier.
+
+evaluate_lookup_field
+"""""""""""""""""""""
+
+Evaluate lookup field values on one or more annotations.
+
+**Parameters:**
+
+- ``schema_id`` (int, required): Schema containing lookup field.
+- ``annotation_urls`` (list[str], required): Annotation URLs or paths (e.g., ``['/api/v1/annotations/123456']``).
+
+get_lookup_dataset_raw_values
+"""""""""""""""""""""""""""""
+
+Fetch raw rows from a Master Data Hub dataset for unmatched/ambiguous lookup result verification.
+
+**Parameters:**
+
+- ``dataset`` (string, required): Dataset name or identifier.
+- ``limit`` (int, optional): Maximum rows to fetch (default ``10000``).
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "status": "success",
+     "dataset": "imported-0d652b68-fd8b-4fc8-9cee-d39105b1304b",
+     "limit": 10000,
+     "row_count": 2,
+     "note": "Dataset cached. Use query_lookup_dataset to explore rows."
+   }
+
+query_lookup_dataset
+""""""""""""""""""""
+
+Run a jq query on a previously downloaded MDH dataset. The dataset must be fetched first with ``get_lookup_dataset_raw_values``.
+
+**Parameters:**
+
+- ``dataset`` (string, required): Dataset name or identifier (same as used in ``get_lookup_dataset_raw_values``).
+- ``jq_query`` (string, required): A jq query string. The cached data is always a flat array of row objects — query with ``.[0] | keys`` to discover columns, ``.[]``, ``.[0]``, etc.
 
 Knowledge Base Tools
 ^^^^^^^^^^^^^^^^^^^^

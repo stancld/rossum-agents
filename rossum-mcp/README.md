@@ -2,14 +2,14 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 67 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. 70 tools for queues, schemas, hooks, engines, and more.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI - rossum-mcp](https://img.shields.io/pypi/v/rossum-mcp?label=rossum-mcp)](https://pypi.org/project/rossum-mcp/)
 [![Coverage](https://codecov.io/gh/stancld/rossum-agents/branch/master/graph/badge.svg?flag=rossum-mcp)](https://codecov.io/gh/stancld/rossum-agents)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-67-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-70-blue.svg)](#available-tools)
 
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
@@ -97,18 +97,18 @@ Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
 
 ## Available Tools
 
-The server provides **67 tools** organized into categories:
+The server provides **70 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
-| **Document Processing** | 7 | Upload documents, retrieve/update/confirm/delete annotations |
+| **Document Processing** | 8 | Upload documents, retrieve/update/confirm/copy/delete annotations |
 | **Queue Management** | 9 | Create, configure, delete, and list queues |
 | **Schema Management** | 8 | Define, modify, and delete field structures |
 | **Engine Management** | 6 | Configure extraction and splitting engines |
 | **Extensions (Hooks)** | 9 | Webhooks, serverless functions, testing |
 | **Rules & Actions** | 6 | Business rules with triggers and actions |
 | **Workspace Management** | 4 | Organize and delete workspaces |
-| **Organization Groups** | 2 | View license groups across organizations |
+| **Organization Groups** | 4 | View license groups across organizations |
 | **Organization Limits** | 1 | Email sending limits and usage counters |
 | **User Management** | 5 | Create, update, list users and roles |
 | **Relations** | 4 | Annotation and document relations |
@@ -120,7 +120,7 @@ The server provides **67 tools** organized into categories:
 <summary><strong>Tool List by Category</strong></summary>
 
 **Document Processing:**
-`upload_document`, `get_annotation`, `list_annotations`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `delete_annotation`
+`upload_document`, `get_annotation`, `list_annotations`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`, `delete_annotation`
 
 **Queue Management:**
 `get_queue`, `list_queues`, `get_queue_schema`, `get_queue_engine`, `create_queue`, `create_queue_from_template`, `get_queue_template_names`, `update_queue`, `delete_queue`
@@ -141,7 +141,7 @@ The server provides **67 tools** organized into categories:
 `get_workspace`, `list_workspaces`, `create_workspace`, `delete_workspace`
 
 **Organization Groups:**
-`get_organization_group`, `list_organization_groups`
+`get_organization_group`, `list_organization_groups`, `are_lookup_fields_enabled`, `are_reasoning_fields_enabled`
 
 **Organization Limits:**
 `get_organization_limit`
