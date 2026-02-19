@@ -75,40 +75,33 @@ _rossum_environment: ContextVar[str | None] = ContextVar("rossum_environment", d
 
 
 def set_progress_callback(callback: SubAgentProgressCallback | None) -> None:
-    """Set the progress callback for sub-agent progress reporting."""
     _progress_callback.set(callback)
 
 
 def set_text_callback(callback: SubAgentTextCallback | None) -> None:
-    """Set the text callback for sub-agent text reporting."""
     _text_callback.set(callback)
 
 
 def set_token_callback(callback: SubAgentTokenCallback | None) -> None:
-    """Set the token callback for sub-agent token usage reporting."""
     _token_callback.set(callback)
 
 
 def report_progress(progress: SubAgentProgress) -> None:
-    """Report progress via the callback if set."""
     if (callback := _progress_callback.get()) is not None:
         callback(progress)
 
 
 def report_text(text: SubAgentText) -> None:
-    """Report text via the callback if set."""
     if (callback := _text_callback.get()) is not None:
         callback(text)
 
 
 def report_token_usage(usage: SubAgentTokenUsage) -> None:
-    """Report token usage via the callback if set."""
     if (callback := _token_callback.get()) is not None:
         callback(usage)
 
 
 def set_output_dir(output_dir: Path | None) -> None:
-    """Set the output directory for internal tools."""
     _output_dir.set(output_dir)
 
 
@@ -126,39 +119,28 @@ def set_mcp_connection(
     loop: asyncio.AbstractEventLoop | None,
     mcp_mode: str = "read-only",
 ) -> None:
-    """Set the MCP connection for use by internal tools (pass None to clear)."""
     _mcp_connection.set(connection)
     _mcp_event_loop.set(loop)
     _mcp_mode.set(mcp_mode)
 
 
 def get_mcp_connection() -> MCPConnection | None:
-    """Get the current MCP connection."""
     return _mcp_connection.get()
 
 
 def get_mcp_event_loop() -> asyncio.AbstractEventLoop | None:
-    """Get the current MCP event loop."""
     return _mcp_event_loop.get()
 
 
 def get_mcp_mode() -> str:
-    """Get the current MCP mode ('read-only' or 'read-write')."""
     return _mcp_mode.get()
 
 
 def is_read_only_mode() -> bool:
-    """Check if MCP is in read-only mode."""
     return _mcp_mode.get() != "read-write"
 
 
 def set_rossum_credentials(api_base_url: str | None, token: str | None) -> None:
-    """Set Rossum API credentials for internal tools.
-
-    Args:
-        api_base_url: Rossum API base URL.
-        token: Rossum API token.
-    """
     if api_base_url and token:
         _rossum_credentials.set((api_base_url, token))
     else:
@@ -199,41 +181,33 @@ def require_rossum_credentials() -> tuple[str, str]:
 
 
 def set_task_tracker(tracker: TaskTracker | None) -> None:
-    """Set the task tracker for the current request."""
     _task_tracker.set(tracker)
 
 
 def get_task_tracker() -> TaskTracker | None:
-    """Get the current task tracker."""
     return _task_tracker.get()
 
 
 def set_task_snapshot_callback(callback: TaskSnapshotCallback | None) -> None:
-    """Set the callback for task snapshot reporting."""
     _task_snapshot_callback.set(callback)
 
 
 def report_task_snapshot(snapshot: list[dict[str, object]]) -> None:
-    """Report a task snapshot via the callback if set."""
     if (callback := _task_snapshot_callback.get()) is not None:
         callback(snapshot)
 
 
 def set_commit_store(store: CommitStore | None) -> None:
-    """Set the commit store for change tracking."""
     _commit_store.set(store)
 
 
 def get_commit_store() -> CommitStore | None:
-    """Get the current commit store."""
     return _commit_store.get()
 
 
 def set_rossum_environment(environment: str | None) -> None:
-    """Set the Rossum environment identifier."""
     _rossum_environment.set(environment)
 
 
 def get_rossum_environment() -> str | None:
-    """Get the current Rossum environment identifier."""
     return _rossum_environment.get()

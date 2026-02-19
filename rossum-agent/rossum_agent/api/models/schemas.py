@@ -321,8 +321,8 @@ class TokenUsageBreakdown(BaseModel):
             return self._format_summary_no_cache()
         return self._format_summary_with_cache()
 
-    def _format_summary_no_cache(self) -> list[str]:
-        """Format summary when no caching is active."""
+    def _format_table_lines(self) -> list[str]:
+        """Build the shared header and per-agent rows (used by both summary variants)."""
         w = 60
         lines = [
             "",
@@ -342,36 +342,23 @@ class TokenUsageBreakdown(BaseModel):
             [
                 "-" * w,
                 f"{'TOTAL':<25} {self.total.input_tokens:>12,} {self.total.output_tokens:>12,} {self.total.total_tokens:>12,}",
-                "=" * w,
             ]
         )
         return lines
 
+    def _format_summary_no_cache(self) -> list[str]:
+        w = 60
+        return [*self._format_table_lines(), "=" * w]
+
     def _format_summary_with_cache(self) -> list[str]:
-        """Format summary with cache token breakdown."""
         w = 60
 
         def _new_input(source: TokenUsageBySource | SubAgentTokenUsageDetail) -> int:
             return source.input_tokens - source.cache_creation_input_tokens - source.cache_read_input_tokens
 
-        lines = [
-            "",
-            "=" * w,
-            "TOKEN USAGE SUMMARY",
-            "=" * w,
-            f"{'Category':<25} {'Input':>12} {'Output':>12} {'Total':>12}",
-            "-" * w,
-            f"{'Main Agent':<25} {self.main_agent.input_tokens:>12,} {self.main_agent.output_tokens:>12,} {self.main_agent.total_tokens:>12,}",
-            f"{'Sub-agents (total)':<25} {self.sub_agents.input_tokens:>12,} {self.sub_agents.output_tokens:>12,} {self.sub_agents.total_tokens:>12,}",
-        ]
-        for tool_name, usage in self.sub_agents.by_tool.items():
-            lines.append(
-                f"  └─ {tool_name:<21} {usage.input_tokens:>12,} {usage.output_tokens:>12,} {usage.total_tokens:>12,}"
-            )
+        lines = self._format_table_lines()
         lines.extend(
             [
-                "-" * w,
-                f"{'TOTAL':<25} {self.total.input_tokens:>12,} {self.total.output_tokens:>12,} {self.total.total_tokens:>12,}",
                 "-" * w,
                 "",
                 "Input token breakdown:",

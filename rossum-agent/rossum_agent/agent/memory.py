@@ -82,7 +82,6 @@ class MemoryStep:
         return messages
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize to dictionary for storage."""
         return {
             "type": "memory_step",
             "step_number": self.step_number,
@@ -96,7 +95,6 @@ class MemoryStep:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> MemoryStep:
-        """Deserialize from dictionary."""
         return cls(
             step_number=data.get("step_number", 0),
             text=data.get("text"),
@@ -121,12 +119,10 @@ class TaskStep:
         return [MessageParam(role="user", content=self.task)]
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize to dictionary for storage."""
         return {"type": "task_step", "task": self.task}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TaskStep:
-        """Deserialize from dictionary."""
         return cls(task=data["task"])
 
 
@@ -236,7 +232,6 @@ class AgentMemory:
                 )
 
     def to_dict(self) -> list[dict[str, Any]]:
-        """Serialize all steps to a list of dictionaries for storage."""
         return [step.to_dict() for step in self.steps]
 
     @classmethod

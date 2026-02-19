@@ -42,7 +42,6 @@ class ChatMetadata:
     config_commits: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
         return {
             "commit_sha": self.commit_sha,
             "total_input_tokens": self.total_input_tokens,
@@ -55,7 +54,6 @@ class ChatMetadata:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ChatMetadata:
-        """Create from dictionary."""
         return cls(
             commit_sha=data.get("commit_sha"),
             total_input_tokens=data.get("total_input_tokens", 0),
@@ -88,7 +86,7 @@ class RedisStorage:
             ttl_days: Time-to-live for chat data in days (default: 30)
         """
         self.host = host or os.getenv("REDIS_HOST", "localhost")
-        self.port = int(port if port is not None else int(os.getenv("REDIS_PORT", "6379")))
+        self.port = port if port is not None else int(os.getenv("REDIS_PORT", "6379"))
         self.ttl = dt.timedelta(days=ttl_days)
         self._client: redis.Redis | None = None
 
