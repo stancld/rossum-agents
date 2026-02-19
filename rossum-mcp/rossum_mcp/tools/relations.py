@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 def register_relation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register relation-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve relation details.")
     async def get_relation(relation_id: int) -> Relation:
         logger.debug(f"Retrieving relation: relation_id={relation_id}")

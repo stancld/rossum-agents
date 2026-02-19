@@ -13,6 +13,7 @@ from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.schema import Schema
 
 from rossum_mcp.tools.base import (
+    build_filters,
     delete_resource,
     extract_id_from_url,
     graceful_list,
@@ -108,12 +109,7 @@ async def list_schemas(
     client: AsyncRossumAPIClient, name: str | None = None, queue_id: int | None = None
 ) -> list[SchemaListItem]:
     logger.debug(f"Listing schemas: name={name}, queue_id={queue_id}")
-    filters: dict = {}
-    if name is not None:
-        filters["name"] = name
-    if queue_id is not None:
-        filters["queue"] = queue_id
-
+    filters = build_filters(name=name, queue=queue_id)
     result = await graceful_list(client, Resource.Schema, "schema", **filters)
     return [_truncate_schema_for_list(schema) for schema in result.items]
 

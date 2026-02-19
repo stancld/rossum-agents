@@ -17,8 +17,7 @@ logger = logging.getLogger(__name__)
 
 async def _get_workspace(client: AsyncRossumAPIClient, workspace_id: int) -> Workspace:
     logger.debug(f"Retrieving workspace: workspace_id={workspace_id}")
-    workspace: Workspace = await client.retrieve_workspace(workspace_id)
-    return workspace
+    return await client.retrieve_workspace(workspace_id)
 
 
 async def _list_workspaces(
@@ -26,8 +25,7 @@ async def _list_workspaces(
 ) -> list[Workspace]:
     logger.debug(f"Listing workspaces: organization_id={organization_id}, name={name}")
     filters = build_filters(organization=organization_id, name=name)
-    result = await graceful_list(client, Resource.Workspace, "workspace", **filters)
-    return result.items
+    return (await graceful_list(client, Resource.Workspace, "workspace", **filters)).items
 
 
 async def _create_workspace(
@@ -37,15 +35,11 @@ async def _create_workspace(
         return {"error": "create_workspace is not available in read-only mode"}
 
     organization_url = build_resource_url("organizations", organization_id)
-    logger.info(
-        f"Creating workspace: name={name}, organization_id={organization_id}, "
-        f"organization_url={organization_url}, metadata={metadata}"
-    )
+    logger.debug(f"Creating workspace: name={name}, organization_id={organization_id}, metadata={metadata}")
     workspace_data: dict = {"name": name, "organization": organization_url}
     if metadata is not None:
         workspace_data["metadata"] = metadata
 
-    logger.debug(f"Workspace creation payload: {workspace_data}")
     workspace: Workspace = await client.create_new_workspace(workspace_data)
     logger.info(f"Successfully created workspace: id={workspace.id}, name={workspace.name}")
     return workspace

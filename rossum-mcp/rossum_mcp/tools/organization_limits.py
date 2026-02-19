@@ -14,8 +14,7 @@ logger = logging.getLogger(__name__)
 
 async def _get_organization_limit(client: AsyncRossumAPIClient, organization_id: int) -> OrganizationLimit:
     logger.debug(f"Retrieving organization limit: organization_id={organization_id}")
-    organization_limit: OrganizationLimit = await client.retrieve_organization_limit(organization_id)
-    return organization_limit
+    return await client.retrieve_organization_limit(organization_id)
 
 
 def register_organization_limit_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:

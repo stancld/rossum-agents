@@ -19,8 +19,7 @@ logger = logging.getLogger(__name__)
 
 async def _get_engine(client: AsyncRossumAPIClient, engine_id: int) -> Engine:
     logger.debug(f"Retrieving engine: engine_id={engine_id}")
-    engine: Engine = await client.retrieve_engine(engine_id)
-    return engine
+    return await client.retrieve_engine(engine_id)
 
 
 async def _list_engines(

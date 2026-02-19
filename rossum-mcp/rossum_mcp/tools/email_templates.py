@@ -18,8 +18,7 @@ EmailTemplateType = Literal["rejection", "rejection_default", "email_with_no_pro
 
 
 async def _get_email_template(client: AsyncRossumAPIClient, email_template_id: int) -> EmailTemplate:
-    email_template: EmailTemplate = await client.retrieve_email_template(email_template_id)
-    return email_template
+    return await client.retrieve_email_template(email_template_id)
 
 
 async def _list_email_templates(
