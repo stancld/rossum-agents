@@ -156,8 +156,7 @@ class TestDiscoveryTools:
         return mcp
 
     async def test_list_tool_categories_returns_all_categories(self, mcp_with_discovery: FastMCP) -> None:
-        tools = mcp_with_discovery._tool_manager._tools
-        list_categories_tool = tools["list_tool_categories"]
+        list_categories_tool = await mcp_with_discovery.get_tool("list_tool_categories")
 
         result = await list_categories_tool.fn()
 
@@ -166,8 +165,7 @@ class TestDiscoveryTools:
         assert category_names == set(TOOL_CATALOG.keys())
 
     async def test_list_tool_categories_includes_tool_info(self, mcp_with_discovery: FastMCP) -> None:
-        tools = mcp_with_discovery._tool_manager._tools
-        list_categories_tool = tools["list_tool_categories"]
+        list_categories_tool = await mcp_with_discovery.get_tool("list_tool_categories")
 
         result = await list_categories_tool.fn()
 
@@ -179,8 +177,7 @@ class TestDiscoveryTools:
         assert queues_cat["tool_count"] == len(TOOL_CATALOG["queues"].tools)
 
     async def test_list_tool_categories_includes_keywords(self, mcp_with_discovery: FastMCP) -> None:
-        tools = mcp_with_discovery._tool_manager._tools
-        list_categories_tool = tools["list_tool_categories"]
+        list_categories_tool = await mcp_with_discovery.get_tool("list_tool_categories")
 
         result = await list_categories_tool.fn()
 
