@@ -11,6 +11,7 @@ from rossum_api.models.hook_template import HookTemplate
 from rossum_mcp.tools.base import (
     build_filters,
     delete_resource,
+    extract_id_from_url,
     graceful_list,
     is_read_write_mode,
 )
@@ -250,7 +251,7 @@ async def _resolve_annotation_for_hook(client: AsyncRossumAPIClient, hook_id: in
     """Find an annotation URL from one of the hook's queues."""
     hook = await client.retrieve_hook(hook_id)
     for queue_url in hook.queues or []:
-        queue_id = int(str(queue_url).rstrip("/").split("/")[-1])
+        queue_id = extract_id_from_url(str(queue_url))
         params: dict = {"queue": queue_id, "page_size": 1, "status": "to_review,confirmed,exported,importing"}
         async for annotation in client.list_annotations(**params):
             return str(annotation.url)

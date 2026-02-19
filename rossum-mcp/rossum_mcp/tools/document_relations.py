@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 def register_document_relation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    """Register document relation-related tools with the FastMCP server."""
-
     @mcp.tool(description="Retrieve document relation details.")
     async def get_document_relation(document_relation_id: int) -> DocumentRelation:
         logger.debug(f"Retrieving document relation: document_relation_id={document_relation_id}")

@@ -17,8 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 async def _get_user(client: AsyncRossumAPIClient, user_id: int) -> User:
-    user: User = await client.retrieve_user(user_id)
-    return user
+    return await client.retrieve_user(user_id)
 
 
 async def _list_users(

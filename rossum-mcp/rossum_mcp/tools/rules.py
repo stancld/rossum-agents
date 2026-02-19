@@ -23,8 +23,7 @@ def _actions_to_dicts(actions: list[RuleAction]) -> list[dict]:
 
 async def _get_rule(client: AsyncRossumAPIClient, rule_id: int) -> Rule:
     logger.debug(f"Retrieving rule: rule_id={rule_id}")
-    rule: Rule = await client.retrieve_rule(rule_id)
-    return rule
+    return await client.retrieve_rule(rule_id)
 
 
 async def _list_rules(
@@ -54,7 +53,7 @@ async def _create_rule(
     if schema_id is None and not queue_ids:
         return {"error": "Provide at least one of schema_id or queue_ids to scope the rule."}
 
-    logger.info(f"Creating rule: name={name}, schema_id={schema_id}, enabled={enabled}")
+    logger.debug(f"Creating rule: name={name}, schema_id={schema_id}, enabled={enabled}")
 
     rule_data: dict = {
         "name": name,
@@ -69,9 +68,8 @@ async def _create_rule(
     if queue_ids is not None:
         rule_data["queues"] = [build_resource_url("queues", qid) for qid in queue_ids]
 
-    logger.debug(f"Rule creation payload: {rule_data}")
     rule: Rule = await client.create_new_rule(rule_data)
-    logger.info(f"Successfully created rule: id={rule.id}, name={rule.name}")
+    logger.info(f"Rule {rule.id} '{rule.name}' created")
     return rule
 
 
@@ -88,7 +86,7 @@ async def _update_rule(
     if not is_read_write_mode():
         return {"error": "update_rule is not available in read-only mode"}
 
-    logger.info(f"Updating rule: rule_id={rule_id}, name={name}")
+    logger.debug(f"Updating rule: rule_id={rule_id}, name={name}")
     existing_rule: Rule = await client.retrieve_rule(rule_id)
 
     rule_data: dict = {
@@ -102,10 +100,9 @@ async def _update_rule(
     if existing_rule.schema is not None:
         rule_data["schema"] = existing_rule.schema
 
-    logger.debug(f"Rule update payload: {rule_data}")
     await client._http_client.update(Resource.Rule, rule_id, rule_data)
     updated_rule: Rule = await client.retrieve_rule(rule_id)
-    logger.info(f"Successfully updated rule: id={updated_rule.id}")
+    logger.info(f"Rule {updated_rule.id} updated")
     return updated_rule
 
 
@@ -122,7 +119,7 @@ async def _patch_rule(
     if not is_read_write_mode():
         return {"error": "patch_rule is not available in read-only mode"}
 
-    logger.info(f"Patching rule: rule_id={rule_id}")
+    logger.debug(f"Patching rule: rule_id={rule_id}")
 
     patch_data: dict = {}
     if name is not None:
@@ -139,9 +136,8 @@ async def _patch_rule(
     if not patch_data:
         return {"error": "No fields provided to update"}
 
-    logger.debug(f"Rule patch payload: {patch_data}")
     updated_rule: Rule = await client.update_part_rule(rule_id, patch_data)
-    logger.info(f"Successfully patched rule: id={updated_rule.id}")
+    logger.info(f"Rule {updated_rule.id} patched")
     return updated_rule
 
 

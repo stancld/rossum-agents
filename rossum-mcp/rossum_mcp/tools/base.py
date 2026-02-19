@@ -134,11 +134,11 @@ async def graceful_list(
         except Exception:
             item_id = raw.get("id", "unknown")
             skipped_ids.append(item_id)
-            logger.warning("Failed to deserialize %s (id=%s), skipping", resource_label, item_id)
+            logger.warning(f"Failed to deserialize {resource_label} (id={item_id}), skipping")
         if max_items is not None and len(items) >= max_items:
             break
     if skipped_ids:
-        logger.warning("Skipped %d %s item(s) that failed to deserialize", len(skipped_ids), resource_label)
+        logger.warning(f"Skipped {len(skipped_ids)} {resource_label} item(s) that failed to deserialize")
     return GracefulListResult(items=items, skipped_ids=skipped_ids)
 
 
