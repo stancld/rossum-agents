@@ -92,7 +92,6 @@ def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentP
 
 
 def _create_tool_start_event(step: AgentStep, current_tool: str) -> StepEvent:
-    """Create a tool_start event from an AgentStep."""
     current_tool_args = None
     current_tool_call_id = None
     for tc in step.tool_calls:
@@ -112,7 +111,6 @@ def _create_tool_start_event(step: AgentStep, current_tool: str) -> StepEvent:
 
 
 def _create_tool_result_event(step_number: int, result: ToolResult) -> StepEvent:
-    """Create a tool_result event from a single ToolResult."""
     return StepEvent(
         type="tool_result",
         step_number=step_number,
@@ -350,26 +348,14 @@ class AgentService:
         ctx.event_loop.call_soon_threadsafe(_put)
 
     def _on_sub_agent_progress(self, progress: SubAgentProgress) -> None:
-        """Callback for sub-agent progress updates.
-
-        Converts the progress to an event and puts it on the queue for streaming.
-        """
         event = convert_sub_agent_progress_to_event(progress)
         self._enqueue_event_threadsafe(event, "Sub-agent progress")
 
     def _on_sub_agent_text(self, text: SubAgentText) -> None:
-        """Callback for sub-agent text streaming.
-
-        Converts the text to an event and puts it on the queue for streaming.
-        """
         event = SubAgentTextEvent(tool_name=text.tool_name, text=text.text, is_final=text.is_final)
         self._enqueue_event_threadsafe(event, "Sub-agent text")
 
     def _on_task_snapshot(self, snapshot: list[dict[str, object]]) -> None:
-        """Callback for task tracker state changes.
-
-        Puts a TaskSnapshotEvent on the queue for streaming.
-        """
         event = TaskSnapshotEvent(tasks=snapshot)
         self._enqueue_event_threadsafe(event, "Task snapshot")
 

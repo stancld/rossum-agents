@@ -1,9 +1,3 @@
-"""Data models for the agent module.
-
-This module contains the core data classes used throughout the agent system
-for representing tool calls, results, and agent steps.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -34,12 +28,10 @@ class ToolCall:
     arguments: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize to dictionary for storage."""
         return {"id": self.id, "name": self.name, "arguments": self.arguments}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ToolCall:
-        """Deserialize from dictionary."""
         return cls(id=data["id"], name=data["name"], arguments=data.get("arguments", {}))
 
 
@@ -53,7 +45,6 @@ class ToolResult:
     is_error: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize to dictionary for storage."""
         return {
             "tool_call_id": self.tool_call_id,
             "name": self.name,
@@ -63,7 +54,6 @@ class ToolResult:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ToolResult:
-        """Deserialize from dictionary."""
         return cls(
             tool_call_id=data["tool_call_id"],
             name=data["name"],
@@ -91,12 +81,10 @@ class ThinkingBlockData:
     signature: str
 
     def to_dict(self) -> ThinkingBlockParam:
-        """Serialize to dictionary for storage and API message format."""
         return ThinkingBlockParam(type="thinking", thinking=self.thinking, signature=self.signature)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ThinkingBlockData:
-        """Deserialize from dictionary."""
         return cls(thinking=data["thinking"], signature=data["signature"])
 
 
@@ -126,7 +114,6 @@ class AgentStep:
     step_type: StepType | None = None
 
     def has_tool_calls(self) -> bool:
-        """Check if this step contains tool calls."""
         return bool(self.tool_calls)
 
 
