@@ -91,6 +91,19 @@ Match response length to question complexity. Be concise for simple questions.
 
 For documentation: use Mermaid diagrams, cross-reference with anchors, explain business logic in prose (not JSON dumps), flag issues with `⚠️ SUSPICIOUS:`."""
 
+CHANGE_HISTORY = """
+# Change History
+
+**Undo = revert commits**. When the user wants to undo, roll back, or reverse changes, use `revert_commit` on the specific commits that should be undone. Leave other commits intact.
+
+| Rule | Detail |
+|------|--------|
+| Default undo strategy | `revert_commit` per commit — revert only the unwanted commits |
+| `restore_entity_version` | Only when user explicitly asks to restore an entity to a specific point in time |
+| Never reconstruct after revert | Do not use `patch_schema`, `create_hook`, etc. to re-add content lost during a revert. If content was lost, you reverted the wrong commit — revert more selectively instead |
+| Partial revert | If `revert_commit` returns `"partial"`, execute the remaining plan actions it provides |
+"""
+
 TASK_TRACKING = """
 # Task Tracking
 
@@ -100,5 +113,12 @@ For complex multi-step operations (3+ steps), call `create_task` for each step (
 def get_shared_prompt_sections() -> str:
     """Get all shared prompt sections combined."""
     return "\n\n---\n".join(
-        [CRITICAL_REQUIREMENTS, DOCUMENTATION_WORKFLOWS, CONFIGURATION_WORKFLOWS, OUTPUT_FORMATTING, TASK_TRACKING]
+        [
+            CRITICAL_REQUIREMENTS,
+            DOCUMENTATION_WORKFLOWS,
+            CONFIGURATION_WORKFLOWS,
+            CHANGE_HISTORY,
+            OUTPUT_FORMATTING,
+            TASK_TRACKING,
+        ]
     )

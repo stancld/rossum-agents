@@ -22,6 +22,7 @@ from regression_tests.custom_checks import (
     check_knowledge_base_hidden_multivalue_warning,
     check_lookup_field_configured,
     check_lookup_match_results,
+    check_multi_turn_schema_reverted,
     check_net_terms_formula_field_added,
     check_no_misleading_training_suggestions,
     check_queue_deleted,
@@ -132,6 +133,11 @@ LOOKUP_MATCH_RESULTS_CHECK = CustomCheck(
 SCHEMA_REVERT_TYPE_VALIDATION_CHECK = CustomCheck(
     name="Reverted schema has valid field types (not dicts) and expected fields",
     check_fn=check_schema_reverted_with_valid_types,
+)
+
+MULTI_TURN_SCHEMA_REVERTED_CHECK = CustomCheck(
+    name="Multi-turn session fields reverted and feature availability checked",
+    check_fn=check_multi_turn_schema_reverted,
 )
 
 
@@ -660,6 +666,54 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             max_steps=6,
             file_expectation=FileExpectation(),
             custom_checks=[SCHEMA_REVERT_TYPE_VALIDATION_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="multi_turn_create_and_restore_schema",
+        description=(
+            "Multi-turn: create queue, add formula + reasoning fields via conversation, "
+            "verify feature availability, then revert all schema changes"
+        ),
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        rossum_url=None,
+        requires_redis=True,
+        prompts=[
+            "Create a 'New revert queue' in workspace 785638. Use EU template.",
+            (
+                "Add field to the queue.\n"
+                "    - Field name: The Net Terms\n"
+                "    - Section: basic_info_section\n"
+                "    - Logic: Compute 'Due Date' - 'Issue Date' and categorize it as 'Net 15', 'Net 30' and 'Outstanding'"
+            ),
+            "If either date missing, please return 'Unavailable' instead of 'Outstanding'.",
+            (
+                "Add a reasoning field that will take city from the customer address and derive the country of the customer. "
+                "Before adding that, can you reason it's a good idea to do it like that?"
+            ),
+            "Thank you for the considerations. Also, are reasoning fields available on my account?",
+            "Then derive it from the whole address, let's see. Add it to the schema.",
+            "Print me the list of changes we made.",
+            "Add timestamps pls also",
+            "I'm not really sure we took a good approach. Please restore the schema back to how it was right after the queue was created.",
+        ],
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "suggest_formula_field",
+                ("patch_schema", "patch_schema_with_subagent"),
+                "are_reasoning_fields_enabled",
+                "load_skill",
+                "restore_entity_version",
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=300000, max_total_tokens=900000),
+        success_criteria=SuccessCriteria(
+            require_subagent=None,
+            required_keywords=[],
+            max_steps=45,
+            file_expectation=FileExpectation(),
+            custom_checks=[MULTI_TURN_SCHEMA_REVERTED_CHECK],
         ),
     ),
     RegressionTestCase(

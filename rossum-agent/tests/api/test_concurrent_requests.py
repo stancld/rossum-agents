@@ -62,7 +62,7 @@ class TestConcurrentAgentService:
                     AgentService,
                     "_setup_change_tracking",
                     new_callable=AsyncMock,
-                    return_value=(None, "https://api.rossum.ai"),
+                    return_value=(None, None, "https://api.rossum.ai"),
                 ),
             ):
                 mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -143,7 +143,7 @@ class TestConcurrentAgentService:
                     AgentService,
                     "_setup_change_tracking",
                     new_callable=AsyncMock,
-                    return_value=(None, "https://api.rossum.ai"),
+                    return_value=(None, None, "https://api.rossum.ai"),
                 ),
             ):
                 mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -214,7 +214,7 @@ class TestConcurrentAgentService:
                     AgentService,
                     "_setup_change_tracking",
                     new_callable=AsyncMock,
-                    return_value=(None, "https://api.rossum.ai"),
+                    return_value=(None, None, "https://api.rossum.ai"),
                 ),
             ):
                 mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)

@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import asyncio
 
-    from rossum_agent.change_tracking.store import CommitStore
+    from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
     from rossum_agent.rossum_mcp_integration import MCPConnection
     from rossum_agent.tools.task_tracker import TaskTracker
 
@@ -71,6 +71,7 @@ _mcp_mode: ContextVar[str] = ContextVar("mcp_mode", default="read-only")
 _output_dir: ContextVar[Path | None] = ContextVar("output_dir", default=None)
 _rossum_credentials: ContextVar[tuple[str, str] | None] = ContextVar("rossum_credentials", default=None)
 _commit_store: ContextVar[CommitStore | None] = ContextVar("commit_store", default=None)
+_snapshot_store: ContextVar[SnapshotStore | None] = ContextVar("snapshot_store", default=None)
 _rossum_environment: ContextVar[str | None] = ContextVar("rossum_environment", default=None)
 
 
@@ -203,6 +204,14 @@ def set_commit_store(store: CommitStore | None) -> None:
 
 def get_commit_store() -> CommitStore | None:
     return _commit_store.get()
+
+
+def set_snapshot_store(store: SnapshotStore | None) -> None:
+    _snapshot_store.set(store)
+
+
+def get_snapshot_store() -> SnapshotStore | None:
+    return _snapshot_store.get()
 
 
 def set_rossum_environment(environment: str | None) -> None:

@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import logging
+import random
+import time
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from anthropic import beta_tool
-from rossum_api import AsyncRossumAPIClient
+from rossum_api import APIClientError, AsyncRossumAPIClient
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.dtos import Token
 from rossum_mcp.tools.schemas.validation import sanitize_schema_content
@@ -21,10 +25,13 @@ from rossum_agent.tools.core import (
     get_mcp_event_loop,
     get_rossum_credentials,
     get_rossum_environment,
+    get_snapshot_store,
 )
 
 if TYPE_CHECKING:
     from typing import Literal
+
+    from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +112,32 @@ def _compute_revert_patch(before: dict, after: dict) -> dict:
     return patch
 
 
+_SCHEMA_REVERT_RETRIES = 5
+
+
+async def _revert_schema_with_retry(client: AsyncRossumAPIClient, schema_id: int, patch: dict) -> None:
+    """Apply a schema revert PATCH with fetch-then-patch and retry on 412.
+
+    A GET before PATCH registers the current state with the server, preventing
+    412 Precondition Failed from rapid successive updates. Retries with backoff
+    if concurrent modification is detected.
+    """
+    for attempt in range(_SCHEMA_REVERT_RETRIES):
+        await client._http_client.request_json("GET", f"schemas/{schema_id}")
+        try:
+            await client._http_client.update(Resource.Schema, schema_id, patch)
+            return
+        except APIClientError as e:
+            if e.status_code == 412 and attempt < _SCHEMA_REVERT_RETRIES - 1:
+                logger.warning(
+                    f"Schema {schema_id} revert got 412 (concurrent modification), "
+                    f"retrying ({attempt + 1}/{_SCHEMA_REVERT_RETRIES})..."
+                )
+                await asyncio.sleep(0.5 * (attempt + 1) + random.uniform(0, 0.5))
+                continue
+            raise
+
+
 async def _revert_entity_update(api_base_url: str, token: str, change: EntityChange) -> dict:
     """Revert an entity update by patching changed fields back to the before state."""
     entity_id = int(change.entity_id)
@@ -114,20 +147,21 @@ async def _revert_entity_update(api_base_url: str, token: str, change: EntityCha
         msg = f"Cannot revert {change.entity_type} {entity_id}: missing before/after snapshot"
         raise ValueError(msg)
 
+    client = AsyncRossumAPIClient(base_url=api_base_url, credentials=Token(token=token))
+
     if change.entity_type == "schema":
         before_inner = unwrap(change.before)
         content = before_inner.get("content")
         if not isinstance(content, list):
             msg = f"Cannot revert schema {entity_id}: 'before' snapshot has no content"
             raise ValueError(msg)
-        patch = {"content": sanitize_schema_content(content)}
-    else:
-        patch = _compute_revert_patch(change.before, change.after)
+        await _revert_schema_with_retry(client, entity_id, {"content": sanitize_schema_content(content)})
+        return {"status": "reverted", "entity_type": change.entity_type, "entity_id": change.entity_id}
 
+    patch = _compute_revert_patch(change.before, change.after)
     if not patch:
         return {"status": "no_changes", "entity_type": change.entity_type, "entity_id": change.entity_id}
 
-    client = AsyncRossumAPIClient(base_url=api_base_url, credentials=Token(token=token))
     await client._http_client.update(resource, entity_id, patch)
     return {"status": "reverted", "entity_type": change.entity_type, "entity_id": change.entity_id}
 
@@ -325,14 +359,14 @@ def _deduplicate_changes(changes: list[EntityChange]) -> list[EntityChange]:
 
 @beta_tool
 def revert_commit(commit_hash: str) -> str:
-    """Revert the most recent configuration commit by applying inverse operations.
+    """Revert a configuration commit by applying inverse operations.
 
     Updates, creates, and deletes of known entity types are reverted programmatically
     when SDK methods are available. Unsupported operations produce a revert plan for
     the agent to execute.
 
     Args:
-        commit_hash: Hash of the commit to revert (must be the latest).
+        commit_hash: Hash of the commit to revert.
 
     Returns:
         JSON with revert results (executed reverts and remaining plan actions).
@@ -343,11 +377,6 @@ def revert_commit(commit_hash: str) -> str:
         return json.dumps({"error": "Change tracking not available"})
 
     _flush_pending_changes()
-
-    if (latest_hash := store.get_latest_hash(environment)) != commit_hash:
-        return json.dumps(
-            {"error": f"Can only revert the latest commit. Latest is {latest_hash}, requested {commit_hash}"}
-        )
 
     if (commit := store.get_commit(environment, commit_hash)) is None:
         return json.dumps({"error": f"Commit {commit_hash} not found"})
@@ -362,7 +391,11 @@ def revert_commit(commit_hash: str) -> str:
     plan_actions: list[dict] = []
     errors: list[dict] = []
 
-    for change in deduped:
+    for i, change in enumerate(deduped):
+        if i > 0:
+            # Stagger reverts to avoid 412 from rapid successive updates to the same entity
+            time.sleep(0.5)
+
         if _can_direct_revert(change) and credentials and loop:
             api_base_url, token = credentials
             try:
@@ -400,3 +433,212 @@ def revert_commit(commit_hash: str) -> str:
         response["instructions"] = "Execute each remaining action above using the specified MCP tools."
 
     return json.dumps(response)
+
+
+@beta_tool
+def show_entity_history(entity_type: str, entity_id: str, limit: int = 10) -> str:
+    """Show version history for a specific entity.
+
+    Lists all recorded snapshots within the retention window, enabling
+    restore to any historical version via restore_entity_version.
+
+    Args:
+        entity_type: Entity type (e.g. "schema", "queue", "hook").
+        entity_id: Entity ID.
+        limit: Maximum number of versions to return (default 10).
+
+    Returns:
+        JSON list of versions with commit_hash, timestamp, and commit message.
+    """
+    snapshot_store = get_snapshot_store()
+    commit_store = get_commit_store()
+    environment = get_rossum_environment()
+    if snapshot_store is None or commit_store is None or environment is None:
+        return json.dumps({"error": "Snapshot tracking not available"})
+
+    _flush_pending_changes()
+
+    versions = snapshot_store.list_versions(environment, entity_type, entity_id, limit=limit)
+    if not versions:
+        return json.dumps({"message": f"No snapshots found for {entity_type} {entity_id}"})
+
+    result: list[dict] = []
+    for commit_hash, ts in versions:
+        commit = commit_store.get_commit(environment, commit_hash)
+        available = snapshot_store.get_snapshot(environment, entity_type, entity_id, commit_hash) is not None
+        result.append(
+            {
+                "commit_hash": commit_hash,
+                "timestamp": datetime.fromtimestamp(ts, tz=UTC).isoformat(),
+                "commit_message": commit.message if commit else None,
+                "available": available,
+            }
+        )
+
+    return json.dumps(result)
+
+
+async def _restore_entity(api_base_url: str, token: str, entity_type: str, entity_id: str, snapshot: dict) -> dict:
+    """Restore an entity to a snapshot state by PATCHing changed fields."""
+    resource = _ENTITY_TYPE_TO_RESOURCE.get(entity_type)
+    if resource is None:
+        msg = f"Unsupported entity type for restore: {entity_type}"
+        raise ValueError(msg)
+
+    int_id = int(entity_id)
+    client = AsyncRossumAPIClient(base_url=api_base_url, credentials=Token(token=token))
+
+    if entity_type == "schema":
+        inner = unwrap(snapshot)
+        content = inner.get("content")
+        if not isinstance(content, list):
+            msg = f"Cannot restore schema {entity_id}: snapshot has no content"
+            raise ValueError(msg)
+        patch = {"content": sanitize_schema_content(content)}
+    else:
+        # Fetch current state and compute minimal diff
+        current = await client._http_client.fetch_one(resource, int_id)
+        current_dict = current if isinstance(current, dict) else {}
+        patch = _compute_revert_patch(snapshot, current_dict)
+
+    if not patch:
+        return {"status": "no_changes", "entity_type": entity_type, "entity_id": entity_id}
+
+    await client._http_client.update(resource, int_id, patch)
+    return {"status": "restored", "entity_type": entity_type, "entity_id": entity_id}
+
+
+def _resolve_snapshot(
+    snapshot_store: SnapshotStore,
+    commit_store: CommitStore,
+    environment: str,
+    entity_type: str,
+    entity_id: str,
+    commit_hash: str,
+) -> tuple[dict | None, str | None]:
+    """Resolve a snapshot for an entity at a given commit. Returns (snapshot, error_message)."""
+    # 1. Exact snapshot at this commit
+    snapshot = snapshot_store.get_snapshot(environment, entity_type, entity_id, commit_hash)
+
+    # 2. Most recent snapshot at or before the commit's timestamp
+    if snapshot is None:
+        target_commit = commit_store.get_commit(environment, commit_hash)
+        if target_commit is None:
+            return None, f"Commit {commit_hash} not found"
+        snapshot = snapshot_store.get_snapshot_at(
+            environment, entity_type, entity_id, target_commit.timestamp.timestamp()
+        )
+
+    # 3. Pre-change state from the earliest recorded change for this entity
+    if snapshot is None:
+        earliest = snapshot_store.get_earliest_version(environment, entity_type, entity_id)
+        if earliest:
+            earliest_commit = commit_store.get_commit(environment, earliest[0])
+            if earliest_commit:
+                for change in earliest_commit.changes:
+                    if change.entity_type == entity_type and change.entity_id == entity_id:
+                        snapshot = change.before
+                        break
+
+    if snapshot is None:
+        versions = snapshot_store.list_versions(environment, entity_type, entity_id, limit=1)
+        if versions:
+            return None, (
+                f"Snapshot data for {entity_type} {entity_id} has expired. "
+                f"The version index still lists entries but the underlying data is no longer available."
+            )
+        return None, f"No snapshot found for {entity_type} {entity_id} at commit {commit_hash}"
+
+    return snapshot, None
+
+
+@beta_tool
+def restore_entity_version(entity_type: str, entity_id: str, commit_hash: str) -> str:
+    """Restore an entity to the state it was in at a given commit.
+
+    The commit hash identifies a point in time — the entity does not need to
+    have been modified in that commit. Any commit hash from show_change_history
+    works as a time reference. Resolution order:
+    1. Exact snapshot at that commit.
+    2. Most recent snapshot at or before the commit's timestamp.
+    3. Pre-change state before the entity's first tracked modification.
+
+    Args:
+        entity_type: Entity type (e.g. "schema", "queue", "hook").
+        entity_id: Entity ID.
+        commit_hash: Commit hash identifying the target point in time.
+
+    Returns:
+        JSON with restore status.
+    """
+    snapshot_store = get_snapshot_store()
+    commit_store = get_commit_store()
+    environment = get_rossum_environment()
+    if snapshot_store is None or commit_store is None or environment is None:
+        return json.dumps({"error": "Snapshot tracking not available"})
+
+    _flush_pending_changes()
+
+    snapshot, error = _resolve_snapshot(snapshot_store, commit_store, environment, entity_type, entity_id, commit_hash)
+    if error:
+        return json.dumps({"error": error})
+    assert snapshot is not None  # _resolve_snapshot returns None snapshot iff error is set
+
+    credentials = get_rossum_credentials()
+    loop = get_mcp_event_loop()
+    if not credentials or not loop:
+        return json.dumps({"error": "API credentials or event loop not available"})
+
+    api_base_url, token = credentials
+    try:
+        coro = _restore_entity(api_base_url, token, entity_type, entity_id, snapshot)
+        result = asyncio.run_coroutine_threadsafe(coro, loop).result()
+        return json.dumps(result)
+    except Exception as e:
+        logger.exception(f"Failed to restore {entity_type}:{entity_id}")
+        return json.dumps({"error": str(e), "entity_type": entity_type, "entity_id": entity_id})
+
+
+def _parse_json_arg(value: str) -> object:
+    """Parse a JSON argument, tolerating dicts passed directly or double-encoded strings."""
+    if not isinstance(value, str):
+        # Agent passed a dict/list object directly instead of a JSON string
+        return value
+    parsed = json.loads(value)
+    if isinstance(parsed, str):
+        # Agent double-encoded: the JSON string contained another JSON string
+        try:
+            return json.loads(parsed)
+        except json.JSONDecodeError:
+            return parsed
+    return parsed
+
+
+@beta_tool
+def diff_objects(before: str, after: str) -> str:
+    """Compute a unified diff between two JSON objects.
+
+    Use only when the user explicitly asks to compare or diff two objects.
+    Both inputs are pretty-printed with sorted keys before diffing so structural
+    changes are stable and readable.
+
+    Args:
+        before: JSON string of the first object.
+        after: JSON string of the second object.
+
+    Returns:
+        Unified diff text, or "No differences found." if identical.
+    """
+    try:
+        before_obj = _parse_json_arg(before)
+        after_obj = _parse_json_arg(after)
+    except json.JSONDecodeError as e:
+        return json.dumps({"error": f"Invalid JSON: {e}"})
+
+    before_lines = json.dumps(before_obj, indent=2, sort_keys=True).splitlines(keepends=True)
+    after_lines = json.dumps(after_obj, indent=2, sort_keys=True).splitlines(keepends=True)
+
+    diff = list(difflib.unified_diff(before_lines, after_lines, fromfile="before", tofile="after"))
+    if not diff:
+        return "No differences found."
+    return "".join(diff)
