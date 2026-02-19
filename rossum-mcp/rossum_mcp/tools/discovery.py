@@ -1,15 +1,14 @@
 """Discovery tools for dynamic tool loading.
 
 Provides MCP tool to explore available tool categories and their metadata.
-The agent uses this to fetch the catalog and load tools on-demand.
+Tool lists are derived from tags on @mcp.tool decorators rather than a static catalog.
 """
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from typing import TYPE_CHECKING
 
-from rossum_mcp.tools.catalog import TOOL_CATALOG
+from rossum_mcp.tools.catalog import CATEGORY_META
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -20,13 +19,30 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         description="List tool categories (descriptions, tool names, keywords). Use load_tool_category to load a category. read_only=false indicates write tools."
     )
     async def list_tool_categories() -> list[dict]:
+        all_tools = await mcp.local_provider.list_tools()
+
+        # Group tools by category tag
+        categories: dict[str, list[dict]] = {}
+        for tool in all_tools:
+            tool_tags = tool.tags or set()
+            for cat_name in CATEGORY_META:
+                if cat_name in tool_tags:
+                    categories.setdefault(cat_name, []).append(
+                        {
+                            "name": tool.name,
+                            "description": tool.description or "",
+                            "read_only": "write" not in tool_tags,
+                        }
+                    )
+                    break
+
         return [
             {
-                "name": category.name,
-                "description": category.description,
-                "tool_count": len(category.tools),
-                "tools": [asdict(tool) for tool in category.tools],
-                "keywords": category.keywords,
+                "name": cat_name,
+                "description": meta.description,
+                "tool_count": len(categories.get(cat_name, [])),
+                "tools": categories.get(cat_name, []),
+                "keywords": meta.keywords,
             }
-            for category in TOOL_CATALOG.values()
+            for cat_name, meta in CATEGORY_META.items()
         ]

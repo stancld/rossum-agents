@@ -84,12 +84,6 @@ def build_resource_url(resource_type: str, resource_id: int) -> str:
     return f"{_base_url}/{resource_type}/{resource_id}"
 
 
-def is_read_write_mode() -> bool:
-    """Check if server is in read-write mode."""
-    _ensure_configured()
-    return _mcp_mode == "read-write"
-
-
 def build_filters(**kwargs: Any) -> dict[str, Any]:
     """Build a filter dict from kwargs, excluding None values."""
     return {k: v for k, v in kwargs.items() if v is not None}
@@ -148,21 +142,16 @@ async def delete_resource(
     delete_fn: Callable[[int], Awaitable[None]],
     success_message: str | None = None,
 ) -> dict:
-    """Generic delete operation with read-only mode check.
+    """Generic delete operation.
+
+    Write-access is enforced at the MCP layer via tags={"write"} + mcp.disable().
 
     Args:
         resource_type: Name of the resource (e.g., "queue", "workspace")
         resource_id: ID of the resource to delete
         delete_fn: Async function that performs the deletion
         success_message: Custom success message. If None, uses default format.
-
-    Returns:
-        Dict with "message" on success or "error" in read-only mode.
     """
-    tool_name = f"delete_{resource_type}"
-    if not is_read_write_mode():
-        return {"error": f"{tool_name} is not available in read-only mode"}
-
     logger.debug(f"Deleting {resource_type}: {resource_type}_id={resource_id}")
     await delete_fn(resource_id)
 

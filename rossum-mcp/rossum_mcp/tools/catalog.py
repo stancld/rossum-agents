@@ -1,7 +1,7 @@
-"""Tool catalog for dynamic tool discovery.
+"""Category metadata for dynamic tool discovery.
 
-Provides lightweight metadata for all MCP tools organized by category.
-This is the single source of truth for tool categorization - the agent fetches this catalog from MCP to avoid data duplication.
+Provides descriptions and keywords for tool categories. Tool membership and
+read_only status are derived from tags set on individual @mcp.tool decorators.
 """
 
 from __future__ import annotations
@@ -10,152 +10,54 @@ from dataclasses import dataclass
 
 
 @dataclass
-class ToolInfo:
-    """Lightweight tool metadata for catalog."""
+class CategoryMeta:
+    """Lightweight metadata for a tool category."""
 
-    name: str
     description: str
-    read_only: bool = True
-
-
-@dataclass
-class ToolCategory:
-    """A category of related tools."""
-
-    name: str
-    description: str
-    tools: list[ToolInfo]
     keywords: list[str]
 
 
-# Tool catalog organized by functional category
-# Keywords enable automatic pre-loading based on user request text
-TOOL_CATALOG: dict[str, ToolCategory] = {
-    "annotations": ToolCategory(
-        name="annotations",
+# Category descriptions and keywords for agent pre-loading.
+# Tool lists are derived dynamically from tags on @mcp.tool decorators.
+CATEGORY_META: dict[str, CategoryMeta] = {
+    "annotations": CategoryMeta(
         description="Document processing: upload, retrieve, update, and confirm annotations",
-        tools=[
-            ToolInfo("upload_document", "Upload document to queue", read_only=False),
-            ToolInfo("get_annotation", "Retrieve annotation with extracted data"),
-            ToolInfo("list_annotations", "List annotations for a queue"),
-            ToolInfo("start_annotation", "Start annotation (to_review -> reviewing)", read_only=False),
-            ToolInfo("bulk_update_annotation_fields", "Bulk update annotation fields", read_only=False),
-            ToolInfo("confirm_annotation", "Confirm annotation (-> confirmed)", read_only=False),
-            ToolInfo("copy_annotations", "Copy annotations to another queue", read_only=False),
-            ToolInfo("delete_annotation", "Delete annotation (soft delete)", read_only=False),
-        ],
         keywords=["annotation", "document", "upload", "extract", "confirm", "review"],
     ),
-    "queues": ToolCategory(
-        name="queues",
+    "queues": CategoryMeta(
         description="Queue management: create, configure, and list document processing queues",
-        tools=[
-            ToolInfo("get_queue", "Retrieve queue details"),
-            ToolInfo("list_queues", "List all queues"),
-            ToolInfo("get_queue_schema", "Get queue's schema"),
-            ToolInfo("get_queue_engine", "Get queue's AI engine"),
-            ToolInfo("create_queue", "Create a queue", read_only=False),
-            ToolInfo("update_queue", "Update queue settings", read_only=False),
-            ToolInfo("get_queue_template_names", "List available queue templates"),
-            ToolInfo("create_queue_from_template", "Create queue from template", read_only=False),
-            ToolInfo("delete_queue", "Delete queue (24h delayed)", read_only=False),
-        ],
         keywords=["queue", "inbox", "connector"],
     ),
-    "schemas": ToolCategory(
-        name="schemas",
+    "schemas": CategoryMeta(
         description="Schema management: define and modify document field structures",
-        tools=[
-            ToolInfo("get_schema", "Retrieve schema details"),
-            ToolInfo("list_schemas", "List all schemas"),
-            ToolInfo("update_schema", "Update schema", read_only=False),
-            ToolInfo("create_schema", "Create new schema", read_only=False),
-            ToolInfo("patch_schema", "Add/update/remove schema fields", read_only=False),
-            ToolInfo("get_schema_tree_structure", "Get lightweight schema tree"),
-            ToolInfo("prune_schema_fields", "Bulk remove schema fields", read_only=False),
-            ToolInfo("delete_schema", "Delete schema", read_only=False),
-        ],
         keywords=["schema", "field", "datapoint", "section", "multivalue", "tuple"],
     ),
-    "engines": ToolCategory(
-        name="engines",
+    "engines": CategoryMeta(
         description="AI engine management: create and configure extraction/splitting engines",
-        tools=[
-            ToolInfo("get_engine", "Retrieve engine details"),
-            ToolInfo("list_engines", "List all engines"),
-            ToolInfo("update_engine", "Update engine settings", read_only=False),
-            ToolInfo("create_engine", "Create new engine", read_only=False),
-            ToolInfo("create_engine_field", "Create engine field mapping", read_only=False),
-            ToolInfo("get_engine_fields", "List engine fields"),
-        ],
         keywords=["engine", "ai", "extractor", "splitter", "training"],
     ),
-    "hooks": ToolCategory(
-        name="hooks",
+    "hooks": CategoryMeta(
         description="Extensions/webhooks: create and manage automation hooks",
-        tools=[
-            ToolInfo("get_hook", "Retrieve hook details with code"),
-            ToolInfo("list_hooks", "List all hooks for a queue"),
-            ToolInfo("create_hook", "Create new hook", read_only=False),
-            ToolInfo("update_hook", "Update hook configuration", read_only=False),
-            ToolInfo("list_hook_logs", "View hook execution logs"),
-            ToolInfo("list_hook_templates", "List Rossum Store templates"),
-            ToolInfo("create_hook_from_template", "Create hook from template", read_only=False),
-            ToolInfo("test_hook", "Test hook with payload", read_only=False),
-            ToolInfo("delete_hook", "Delete hook", read_only=False),
-        ],
         keywords=["hook", "extension", "webhook", "automation", "function", "serverless"],
     ),
-    "email_templates": ToolCategory(
-        name="email_templates",
+    "email_templates": CategoryMeta(
         description="Email templates: configure automated email responses",
-        tools=[
-            ToolInfo("get_email_template", "Retrieve email template"),
-            ToolInfo("list_email_templates", "List email templates"),
-            ToolInfo("create_email_template", "Create email template", read_only=False),
-        ],
         keywords=["email", "template", "notification", "rejection"],
     ),
-    "document_relations": ToolCategory(
-        name="document_relations",
+    "document_relations": CategoryMeta(
         description="Document relations: manage export/einvoice document links",
-        tools=[
-            ToolInfo("get_document_relation", "Retrieve document relation"),
-            ToolInfo("list_document_relations", "List document relations"),
-        ],
         keywords=["document relation", "export", "einvoice"],
     ),
-    "relations": ToolCategory(
-        name="relations",
+    "relations": CategoryMeta(
         description="Annotation relations: manage edit/attachment/duplicate links",
-        tools=[
-            ToolInfo("get_relation", "Retrieve relation details"),
-            ToolInfo("list_relations", "List annotation relations"),
-        ],
         keywords=["relation", "duplicate", "attachment"],
     ),
-    "rules": ToolCategory(
-        name="rules",
+    "rules": CategoryMeta(
         description="Validation rules: manage schema validation rules",
-        tools=[
-            ToolInfo("get_rule", "Retrieve rule details"),
-            ToolInfo("list_rules", "List validation rules"),
-            ToolInfo("create_rule", "Create validation rule", read_only=False),
-            ToolInfo("update_rule", "Full update rule (PUT)", read_only=False),
-            ToolInfo("patch_rule", "Partial update rule (PATCH)", read_only=False),
-            ToolInfo("delete_rule", "Delete rule", read_only=False),
-        ],
         keywords=["rule", "validation", "constraint"],
     ),
-    "organization_groups": ToolCategory(
-        name="organization_groups",
+    "organization_groups": CategoryMeta(
         description="Organization group management: view license groups shared across organizations",
-        tools=[
-            ToolInfo("get_organization_group", "Retrieve organization group details"),
-            ToolInfo("list_organization_groups", "List organization groups"),
-            ToolInfo("are_lookup_fields_enabled", "Check if lookup fields are enabled"),
-            ToolInfo("are_reasoning_fields_enabled", "Check if reasoning fields are enabled"),
-        ],
         keywords=[
             "organization group",
             "license",
@@ -167,35 +69,16 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
             "reasoning fields",
         ],
     ),
-    "organization_limits": ToolCategory(
-        name="organization_limits",
+    "organization_limits": CategoryMeta(
         description="Organization limits: view email sending limits and usage counters",
-        tools=[
-            ToolInfo("get_organization_limit", "Retrieve organization email limits"),
-        ],
         keywords=["organization limit", "email limit", "quota", "email usage"],
     ),
-    "users": ToolCategory(
-        name="users",
+    "users": CategoryMeta(
         description="User management: create, update, list users and roles",
-        tools=[
-            ToolInfo("get_user", "Retrieve user details"),
-            ToolInfo("list_users", "List users with filters"),
-            ToolInfo("create_user", "Create a new user", read_only=False),
-            ToolInfo("update_user", "Update user (PATCH)", read_only=False),
-            ToolInfo("list_user_roles", "List available user roles"),
-        ],
         keywords=["user", "role", "permission", "token_owner"],
     ),
-    "workspaces": ToolCategory(
-        name="workspaces",
+    "workspaces": CategoryMeta(
         description="Workspace management: organize queues into workspaces",
-        tools=[
-            ToolInfo("get_workspace", "Retrieve workspace details"),
-            ToolInfo("list_workspaces", "List all workspaces"),
-            ToolInfo("create_workspace", "Create new workspace", read_only=False),
-            ToolInfo("delete_workspace", "Delete workspace", read_only=False),
-        ],
         keywords=["workspace", "organization"],
     ),
 }
@@ -204,7 +87,6 @@ TOOL_CATALOG: dict[str, ToolCategory] = {
 def get_catalog_summary() -> str:
     """Get a compact text summary of all tool categories for the system prompt."""
     lines = ["Available MCP tool categories (use `list_tool_categories` for details):"]
-    for category in TOOL_CATALOG.values():
-        tool_names = ", ".join(t.name for t in category.tools)
-        lines.append(f"- **{category.name}**: {category.description} [{tool_names}]")
+    for name, meta in CATEGORY_META.items():
+        lines.append(f"- **{name}**: {meta.description}")
     return "\n".join(lines)

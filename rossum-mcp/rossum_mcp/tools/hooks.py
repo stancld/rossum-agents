@@ -13,7 +13,6 @@ from rossum_mcp.tools.base import (
     delete_resource,
     extract_id_from_url,
     graceful_list,
-    is_read_write_mode,
 )
 
 if TYPE_CHECKING:
@@ -61,9 +60,6 @@ async def _create_hook(
     settings: dict | None = None,
     secret: str | None = None,
 ) -> Hook | dict:
-    if not is_read_write_mode():
-        return {"error": "create_hook is not available in read-only mode"}
-
     hook_data: dict[str, Any] = {"name": name, "type": type, "sideload": ["schemas"]}
 
     if queues is not None:
@@ -98,9 +94,6 @@ async def _update_hook(
     settings: dict | None = None,
     active: bool | None = None,
 ) -> Hook | dict:
-    if not is_read_write_mode():
-        return {"error": "update_hook is not available in read-only mode"}
-
     logger.debug(f"Updating hook: hook_id={hook_id}")
 
     existing_hook: Hook = await client.retrieve_hook(hook_id)
@@ -202,9 +195,6 @@ async def _create_hook_from_template(
     events: list[HookEventAndAction] | None = None,
     token_owner: str | None = None,
 ) -> Hook | dict:
-    if not is_read_write_mode():
-        return {"error": "create_hook_from_template is not available in read-only mode"}
-
     logger.debug(f"Creating hook from template: name={name}, template_id={hook_template_id}")
 
     hook_template_url = f"{client._http_client.base_url.rstrip('/')}/hook_templates/{hook_template_id}"
@@ -298,12 +288,18 @@ async def _delete_hook(client: AsyncRossumAPIClient, hook_id: int) -> dict:
 
 
 def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve one hook by ID (function hook code is in hook.config['code']).")
+    @mcp.tool(
+        description="Retrieve one hook by ID (function hook code is in hook.config['code']).",
+        tags={"hooks"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_hook(hook_id: int) -> Hook:
         return await _get_hook(client, hook_id)
 
     @mcp.tool(
-        description="List hooks for a queue; returns full config/settings (function hook code in config['code'])."
+        description="List hooks for a queue; returns full config/settings (function hook code in config['code']).",
+        tags={"hooks"},
+        annotations={"readOnlyHint": True},
     )
     async def list_hooks(
         queue_id: int | None = None, active: bool | None = None, first_n: int | None = None
@@ -311,7 +307,9 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await _list_hooks(client, queue_id, active, first_n)
 
     @mcp.tool(
-        description="Create a hook. Function hooks: config.source auto-renamed to config.function, default runtime python3.12, timeout_s capped at 60. token_owner cannot be an organization_group_admin user."
+        description="Create a hook. Function hooks: config.source auto-renamed to config.function, default runtime python3.12, timeout_s capped at 60. token_owner cannot be an organization_group_admin user.",
+        tags={"hooks", "write"},
+        annotations={"readOnlyHint": False},
     )
     async def create_hook(
         name: str,
@@ -324,7 +322,11 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     ) -> Hook | dict:
         return await _create_hook(client, name, type, queues, events, config, settings, secret)
 
-    @mcp.tool(description="Patch a hook; only provided fields change.")
+    @mcp.tool(
+        description="Patch a hook; only provided fields change.",
+        tags={"hooks", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def update_hook(
         hook_id: int,
         name: str | None = None,
@@ -336,7 +338,11 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     ) -> Hook | dict:
         return await _update_hook(client, hook_id, name, queues, events, config, settings, active)
 
-    @mcp.tool(description="List hook execution logs (7-day retention, max 100 per call).")
+    @mcp.tool(
+        description="List hook execution logs (7-day retention, max 100 per call).",
+        tags={"hooks"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_hook_logs(
         hook_id: int | None = None,
         queue_id: int | None = None,
@@ -375,12 +381,18 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
             page_size,
         )
 
-    @mcp.tool(description="List Rossum Store hook templates (use with create_hook_from_template).")
+    @mcp.tool(
+        description="List Rossum Store hook templates (use with create_hook_from_template).",
+        tags={"hooks"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_hook_templates() -> list[HookTemplate]:
         return await _list_hook_templates(client)
 
     @mcp.tool(
-        description="Create a hook from a template; events may override template defaults. If template requires use_token_owner, provide token_owner (not an organization_group_admin user)."
+        description="Create a hook from a template; events may override template defaults. If template requires use_token_owner, provide token_owner (not an organization_group_admin user).",
+        tags={"hooks", "write"},
+        annotations={"readOnlyHint": False},
     )
     async def create_hook_from_template(
         name: str,
@@ -392,7 +404,9 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await _create_hook_from_template(client, name, hook_template_id, queues, events, token_owner)
 
     @mcp.tool(
-        description="Test a hook by auto-generating a realistic payload and executing it. For annotation_content/annotation_status events, annotation and status are auto-resolved from the hook's queues if not provided. If no annotations exist on the hook's queues, ask the user to upload a document first — never upload documents yourself."
+        description="Test a hook by auto-generating a realistic payload and executing it. For annotation_content/annotation_status events, annotation and status are auto-resolved from the hook's queues if not provided. If no annotations exist on the hook's queues, ask the user to upload a document first — never upload documents yourself.",
+        tags={"hooks", "write"},
+        annotations={"readOnlyHint": False},
     )
     async def test_hook(
         hook_id: int,
@@ -403,10 +417,12 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         previous_status: str | None = None,
         config: dict | None = None,
     ) -> dict:
-        if not is_read_write_mode():
-            return {"error": "test_hook requires read-write mode (hook execution has side effects)."}
         return await _test_hook(client, hook_id, event, action, annotation, status, previous_status, config)
 
-    @mcp.tool(description="Delete a hook.")
+    @mcp.tool(
+        description="Delete a hook.",
+        tags={"hooks", "write"},
+        annotations={"readOnlyHint": False, "destructiveHint": True},
+    )
     async def delete_hook(hook_id: int) -> dict:
         return await _delete_hook(client, hook_id)

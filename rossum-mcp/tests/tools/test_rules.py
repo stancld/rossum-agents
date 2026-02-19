@@ -332,29 +332,6 @@ class TestCreateRule:
         mock_client.create_new_rule.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_create_rule_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_rule is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
-        create_rule = mock_mcp._tools["create_rule"]
-        result = await create_rule(
-            name="Test Rule",
-            trigger_condition="True",
-            actions=[],
-            queue_ids=[1],
-        )
-
-        assert result["error"] == "create_rule is not available in read-only mode"
-        mock_client.create_new_rule.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_create_rule_with_disabled(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
@@ -548,30 +525,6 @@ class TestUpdateRule:
             "https://api.test.rossum.ai/v1/queues/40",
         ]
 
-    @pytest.mark.asyncio
-    async def test_update_rule_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test update_rule is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
-        update_rule = mock_mcp._tools["update_rule"]
-        result = await update_rule(
-            rule_id=123,
-            name="Test",
-            trigger_condition="True",
-            actions=[],
-            enabled=True,
-            queue_ids=[],
-        )
-
-        assert result["error"] == "update_rule is not available in read-only mode"
-
 
 @pytest.mark.unit
 class TestPatchRule:
@@ -636,24 +589,6 @@ class TestPatchRule:
         result = await patch_rule(rule_id=123)
 
         assert result["error"] == "No fields provided to update"
-        mock_client.update_part_rule.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_patch_rule_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test patch_rule is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
-        patch_rule = mock_mcp._tools["patch_rule"]
-        result = await patch_rule(rule_id=123, name="Test")
-
-        assert result["error"] == "patch_rule is not available in read-only mode"
         mock_client.update_part_rule.assert_not_called()
 
     @pytest.mark.asyncio
@@ -729,24 +664,6 @@ class TestDeleteRule:
         assert "deleted successfully" in result["message"]
         assert "123" in result["message"]
         mock_client.delete_rule.assert_called_once_with(123)
-
-    @pytest.mark.asyncio
-    async def test_delete_rule_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test delete_rule is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
-        delete_rule = mock_mcp._tools["delete_rule"]
-        result = await delete_rule(rule_id=123)
-
-        assert result["error"] == "delete_rule is not available in read-only mode"
-        mock_client.delete_rule.assert_not_called()
 
 
 @pytest.mark.unit

@@ -238,27 +238,6 @@ class TestCreateWorkspace:
         call_args = mock_client.create_new_workspace.call_args[0][0]
         assert call_args["metadata"] == {"department": "finance"}
 
-    @pytest.mark.asyncio
-    async def test_create_workspace_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_workspace is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-
-        from rossum_mcp.tools import base
-
-        importlib.reload(base)
-
-        from rossum_mcp.tools.workspaces import register_workspace_tools
-
-        register_workspace_tools(mock_mcp, mock_client)
-
-        create_workspace = mock_mcp._tools["create_workspace"]
-        result = await create_workspace(name="New Workspace", organization_id=1)
-
-        assert result["error"] == "create_workspace is not available in read-only mode"
-        mock_client.create_new_workspace.assert_not_called()
-
 
 @pytest.mark.unit
 class TestDeleteWorkspace:
@@ -287,24 +266,3 @@ class TestDeleteWorkspace:
         assert "deleted successfully" in result["message"]
         assert "100" in result["message"]
         mock_client.delete_workspace.assert_called_once_with(100)
-
-    @pytest.mark.asyncio
-    async def test_delete_workspace_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test delete_workspace is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-
-        from rossum_mcp.tools import base
-
-        importlib.reload(base)
-
-        from rossum_mcp.tools.workspaces import register_workspace_tools
-
-        register_workspace_tools(mock_mcp, mock_client)
-
-        delete_workspace = mock_mcp._tools["delete_workspace"]
-        result = await delete_workspace(workspace_id=100)
-
-        assert result["error"] == "delete_workspace is not available in read-only mode"
-        mock_client.delete_workspace.assert_not_called()

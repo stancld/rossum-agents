@@ -49,22 +49,34 @@ async def _are_reasoning_fields_enabled(client: AsyncRossumAPIClient) -> dict:
 
 
 def register_organization_group_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve organization group details.")
+    @mcp.tool(
+        description="Retrieve organization group details.",
+        tags={"organization_groups"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_organization_group(organization_group_id: int) -> OrganizationGroup:
         return await _get_organization_group(client, organization_group_id)
 
-    @mcp.tool(description="List organization groups with optional name filter.")
+    @mcp.tool(
+        description="List organization groups with optional name filter.",
+        tags={"organization_groups"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_organization_groups(name: str | None = None) -> list[OrganizationGroup]:
         return await _list_organization_groups(client, name)
 
     @mcp.tool(
-        description="Check if lookup fields are enabled. Both 'datasets' and 'lookup_fields' features must be enabled in an organization group."
+        description="Check if lookup fields are enabled. Both 'datasets' and 'lookup_fields' features must be enabled in an organization group.",
+        tags={"organization_groups"},
+        annotations={"readOnlyHint": True},
     )
     async def are_lookup_fields_enabled() -> dict:
         return await _are_lookup_fields_enabled(client)
 
     @mcp.tool(
-        description="Check if reasoning fields are enabled. The 'reasoning_fields' feature must be enabled in an organization group."
+        description="Check if reasoning fields are enabled. The 'reasoning_fields' feature must be enabled in an organization group.",
+        tags={"organization_groups"},
+        annotations={"readOnlyHint": True},
     )
     async def are_reasoning_fields_enabled() -> dict:
         return await _are_reasoning_fields_enabled(client)

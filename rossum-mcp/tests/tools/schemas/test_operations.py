@@ -281,22 +281,6 @@ class TestUpdateSchema:
         assert result.id == 50
         mock_client._http_client.update.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_update_schema_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test update_schema is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-
-        register_schema_tools(mock_mcp, mock_client)
-
-        update_schema = mock_mcp._tools["update_schema"]
-        result = await update_schema(schema_id=50, schema_data={"name": "Updated"})
-
-        assert result["error"] == "update_schema is not available in read-only mode"
-        mock_client._http_client.update.assert_not_called()
-
 
 @pytest.mark.unit
 class TestCreateSchema:
@@ -345,22 +329,6 @@ class TestCreateSchema:
 
         assert isinstance(result, dict)
         assert "empty content" in result["error"]
-        mock_client.create_new_schema.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_create_schema_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_schema is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-
-        register_schema_tools(mock_mcp, mock_client)
-
-        create_schema = mock_mcp._tools["create_schema"]
-        result = await create_schema(name="New Schema", content=[])
-
-        assert result["error"] == "create_schema is not available in read-only mode"
         mock_client.create_new_schema.assert_not_called()
 
 
@@ -629,29 +597,6 @@ class TestPatchSchema:
         mock_client._http_client.update.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_patch_schema_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test patch_schema is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        importlib.reload(schemas)
-
-        schemas.register_schema_tools(mock_mcp, mock_client)
-
-        patch_schema = mock_mcp._tools["patch_schema"]
-        result = await patch_schema(
-            schema_id=50,
-            operation="add",
-            node_id="new_field",
-            parent_id="header_section",
-            node_data={"label": "New Field"},
-        )
-
-        assert result["error"] == "patch_schema is not available in read-only mode"
-        mock_client._http_client.update.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_patch_schema_node_not_found(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
@@ -845,20 +790,3 @@ class TestDeleteSchema:
         assert "deleted successfully" in result["message"]
         assert "50" in result["message"]
         mock_client.delete_schema.assert_called_once_with(50)
-
-    @pytest.mark.asyncio
-    async def test_delete_schema_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test delete_schema is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        importlib.reload(schemas)
-
-        schemas.register_schema_tools(mock_mcp, mock_client)
-
-        delete_schema = mock_mcp._tools["delete_schema"]
-        result = await delete_schema(schema_id=50)
-
-        assert result["error"] == "delete_schema is not available in read-only mode"
-        mock_client.delete_schema.assert_not_called()

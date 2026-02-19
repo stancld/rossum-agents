@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.workspace import Workspace
 
-from rossum_mcp.tools.base import build_filters, build_resource_url, delete_resource, graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, build_resource_url, delete_resource, graceful_list
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -31,9 +31,6 @@ async def _list_workspaces(
 async def _create_workspace(
     client: AsyncRossumAPIClient, name: str, organization_id: int, metadata: dict | None = None
 ) -> Workspace | dict:
-    if not is_read_write_mode():
-        return {"error": "create_workspace is not available in read-only mode"}
-
     organization_url = build_resource_url("organizations", organization_id)
     logger.debug(f"Creating workspace: name={name}, organization_id={organization_id}, metadata={metadata}")
     workspace_data: dict = {"name": name, "organization": organization_url}
@@ -50,18 +47,34 @@ async def _delete_workspace(client: AsyncRossumAPIClient, workspace_id: int) -> 
 
 
 def register_workspace_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve workspace details.")
+    @mcp.tool(
+        description="Retrieve workspace details.",
+        tags={"workspaces"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_workspace(workspace_id: int) -> Workspace:
         return await _get_workspace(client, workspace_id)
 
-    @mcp.tool(description="List all workspaces with optional filters.")
+    @mcp.tool(
+        description="List all workspaces with optional filters.",
+        tags={"workspaces"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_workspaces(organization_id: int | None = None, name: str | None = None) -> list[Workspace]:
         return await _list_workspaces(client, organization_id, name)
 
-    @mcp.tool(description="Create a new workspace.")
+    @mcp.tool(
+        description="Create a new workspace.",
+        tags={"workspaces", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def create_workspace(name: str, organization_id: int, metadata: dict | None = None) -> Workspace | dict:
         return await _create_workspace(client, name, organization_id, metadata)
 
-    @mcp.tool(description="Delete a workspace; fails if it still contains queues.")
+    @mcp.tool(
+        description="Delete a workspace; fails if it still contains queues.",
+        tags={"workspaces", "write"},
+        annotations={"readOnlyHint": False, "destructiveHint": True},
+    )
     async def delete_workspace(workspace_id: int) -> dict:
         return await _delete_workspace(client, workspace_id)

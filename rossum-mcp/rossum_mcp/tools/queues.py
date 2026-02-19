@@ -18,7 +18,6 @@ from rossum_mcp.tools.base import (
     delete_resource,
     extract_id_from_url,
     graceful_list,
-    is_read_write_mode,
     truncate_dict_fields,
 )
 
@@ -115,9 +114,6 @@ async def _create_queue(
     training_enabled: bool = True,
     splitting_screen_feature_flag: bool = False,
 ) -> Queue | dict:
-    if not is_read_write_mode():
-        return {"error": "create_queue is not available in read-only mode"}
-
     logger.debug(
         f"Creating queue: name={name}, workspace_id={workspace_id}, schema_id={schema_id}, engine_id={engine_id}"
     )
@@ -194,9 +190,6 @@ def _validate_queue_column_settings(queue_data: dict) -> str | None:
 
 
 async def _update_queue(client: AsyncRossumAPIClient, queue_id: int, queue_data: dict) -> Queue | dict:
-    if not is_read_write_mode():
-        return {"error": "update_queue is not available in read-only mode"}
-
     validation_error = _validate_queue_column_settings(queue_data)
     if validation_error:
         return {"error": validation_error}
@@ -246,9 +239,6 @@ async def _create_queue_from_template(
     include_documents: bool = False,
     engine_id: int | None = None,
 ) -> Queue | dict:
-    if not is_read_write_mode():
-        return {"error": "create_queue_from_template is not available in read-only mode"}
-
     if template_name not in QUEUE_TEMPLATE_NAMES:
         return {
             "error": f"Invalid template_name: '{template_name}'",
@@ -278,25 +268,45 @@ async def _create_queue_from_template(
 
 
 def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve queue details.")
+    @mcp.tool(
+        description="Retrieve queue details.",
+        tags={"queues"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_queue(queue_id: int) -> Queue:
         return await _get_queue(client, queue_id)
 
-    @mcp.tool(description="List queues with filters; id supports comma-separated values.")
+    @mcp.tool(
+        description="List queues with filters; id supports comma-separated values.",
+        tags={"queues"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_queues(
         id: str | None = None, workspace_id: int | None = None, name: str | None = None
     ) -> list[Queue]:
         return await _list_queues(client, id, workspace_id, name)
 
-    @mcp.tool(description="Retrieve queue schema.")
+    @mcp.tool(
+        description="Retrieve queue schema.",
+        tags={"queues"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_queue_schema(queue_id: int) -> Schema:
         return await _get_queue_schema(client, queue_id)
 
-    @mcp.tool(description="Retrieve queue engine. Returns None if no engine assigned.")
+    @mcp.tool(
+        description="Retrieve queue engine. Returns None if no engine assigned.",
+        tags={"queues"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_queue_engine(queue_id: int) -> Engine | dict:
         return await _get_queue_engine(client, queue_id)
 
-    @mcp.tool(description="Create a queue.")
+    @mcp.tool(
+        description="Create a queue.",
+        tags={"queues", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def create_queue(
         name: str,
         workspace_id: int,
@@ -325,19 +335,35 @@ def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
             splitting_screen_feature_flag,
         )
 
-    @mcp.tool(description="Update queue settings.")
+    @mcp.tool(
+        description="Update queue settings.",
+        tags={"queues", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def update_queue(queue_id: int, queue_data: dict) -> Queue | dict:
         return await _update_queue(client, queue_id, queue_data)
 
-    @mcp.tool(description="Delete a queue (deletion begins after ~24h); cascades to annotations/documents.")
+    @mcp.tool(
+        description="Delete a queue (deletion begins after ~24h); cascades to annotations/documents.",
+        tags={"queues", "write"},
+        annotations={"readOnlyHint": False, "destructiveHint": True},
+    )
     async def delete_queue(queue_id: int) -> dict:
         return await _delete_queue(client, queue_id)
 
-    @mcp.tool(description="List template names usable by create_queue_from_template.")
+    @mcp.tool(
+        description="List template names usable by create_queue_from_template.",
+        tags={"queues"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_queue_template_names() -> list[str]:
         return list(QUEUE_TEMPLATE_NAMES)
 
-    @mcp.tool(description="Create a queue from a template (includes schema + engine defaults).")
+    @mcp.tool(
+        description="Create a queue from a template (includes schema + engine defaults).",
+        tags={"queues", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def create_queue_from_template(
         name: str,
         template_name: QueueTemplateName,

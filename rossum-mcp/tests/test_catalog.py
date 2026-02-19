@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 from fastmcp import FastMCP
-from rossum_mcp.tools.catalog import TOOL_CATALOG, get_catalog_summary
+from rossum_mcp.tools.catalog import CATEGORY_META, get_catalog_summary
 from rossum_mcp.tools.discovery import register_discovery_tools
 
 
-class TestToolCatalog:
-    """Tests for TOOL_CATALOG structure."""
+class TestCategoryMeta:
+    """Tests for CATEGORY_META structure."""
 
-    def test_catalog_has_all_expected_categories(self) -> None:
+    def test_has_all_expected_categories(self) -> None:
         expected_categories = {
             "annotations",
             "queues",
@@ -27,106 +27,15 @@ class TestToolCatalog:
             "users",
             "workspaces",
         }
-        assert set(TOOL_CATALOG.keys()) == expected_categories
-
-    def test_each_category_has_tools(self) -> None:
-        for category_name, category in TOOL_CATALOG.items():
-            assert len(category.tools) > 0, f"Category {category_name} has no tools"
+        assert set(CATEGORY_META.keys()) == expected_categories
 
     def test_each_category_has_description(self) -> None:
-        for category_name, category in TOOL_CATALOG.items():
-            assert category.description, f"Category {category_name} has no description"
+        for name, meta in CATEGORY_META.items():
+            assert meta.description, f"Category {name} has no description"
 
     def test_each_category_has_keywords(self) -> None:
-        for category_name, category in TOOL_CATALOG.items():
-            assert len(category.keywords) > 0, f"Category {category_name} has no keywords"
-
-    def test_annotations_category_tools(self) -> None:
-        annotations = TOOL_CATALOG["annotations"]
-        tool_names = {t.name for t in annotations.tools}
-        expected = {
-            "upload_document",
-            "get_annotation",
-            "list_annotations",
-            "start_annotation",
-            "bulk_update_annotation_fields",
-            "confirm_annotation",
-            "copy_annotations",
-            "delete_annotation",
-        }
-        assert tool_names == expected
-
-    def test_queues_category_tools(self) -> None:
-        queues = TOOL_CATALOG["queues"]
-        tool_names = {t.name for t in queues.tools}
-        expected = {
-            "get_queue",
-            "list_queues",
-            "get_queue_schema",
-            "get_queue_engine",
-            "create_queue",
-            "update_queue",
-            "get_queue_template_names",
-            "create_queue_from_template",
-            "delete_queue",
-        }
-        assert tool_names == expected
-
-    def test_hooks_category_tools(self) -> None:
-        hooks = TOOL_CATALOG["hooks"]
-        tool_names = {t.name for t in hooks.tools}
-        expected = {
-            "get_hook",
-            "list_hooks",
-            "create_hook",
-            "update_hook",
-            "list_hook_logs",
-            "list_hook_templates",
-            "create_hook_from_template",
-            "test_hook",
-            "delete_hook",
-        }
-        assert tool_names == expected
-
-    def test_write_tools_are_marked(self) -> None:
-        write_tools = [
-            (cat_name, t.name) for cat_name, cat in TOOL_CATALOG.items() for t in cat.tools if not t.read_only
-        ]
-        expected_write = {
-            ("annotations", "upload_document"),
-            ("annotations", "start_annotation"),
-            ("annotations", "bulk_update_annotation_fields"),
-            ("annotations", "confirm_annotation"),
-            ("annotations", "copy_annotations"),
-            ("annotations", "delete_annotation"),
-            ("queues", "create_queue"),
-            ("queues", "update_queue"),
-            ("queues", "create_queue_from_template"),
-            ("queues", "delete_queue"),
-            ("schemas", "update_schema"),
-            ("schemas", "create_schema"),
-            ("schemas", "patch_schema"),
-            ("schemas", "prune_schema_fields"),
-            ("schemas", "delete_schema"),
-            ("engines", "update_engine"),
-            ("engines", "create_engine"),
-            ("engines", "create_engine_field"),
-            ("hooks", "create_hook"),
-            ("hooks", "update_hook"),
-            ("hooks", "create_hook_from_template"),
-            ("hooks", "test_hook"),
-            ("hooks", "delete_hook"),
-            ("email_templates", "create_email_template"),
-            ("rules", "create_rule"),
-            ("rules", "update_rule"),
-            ("rules", "patch_rule"),
-            ("rules", "delete_rule"),
-            ("users", "create_user"),
-            ("users", "update_user"),
-            ("workspaces", "create_workspace"),
-            ("workspaces", "delete_workspace"),
-        }
-        assert set(write_tools) == expected_write
+        for name, meta in CATEGORY_META.items():
+            assert len(meta.keywords) > 0, f"Category {name} has no keywords"
 
 
 class TestCatalogSummary:
@@ -134,59 +43,87 @@ class TestCatalogSummary:
 
     def test_summary_contains_all_categories(self) -> None:
         summary = get_catalog_summary()
-        for category_name in TOOL_CATALOG:
+        for category_name in CATEGORY_META:
             assert category_name in summary
 
-    def test_summary_contains_tool_names(self) -> None:
+    def test_summary_contains_descriptions(self) -> None:
         summary = get_catalog_summary()
-        # Check a few sample tools are in the summary
-        assert "get_queue" in summary
-        assert "list_annotations" in summary
-        assert "patch_schema" in summary
+        for meta in CATEGORY_META.values():
+            assert meta.description in summary
 
 
 class TestDiscoveryTools:
     """Tests for discovery MCP tools."""
 
     @pytest.fixture
-    def mcp_with_discovery(self) -> FastMCP:
-        """Create FastMCP instance with discovery tools registered."""
+    def mcp_with_tools(self) -> FastMCP:
+        """Create FastMCP instance with discovery + a few tagged tools registered."""
         mcp = FastMCP("test-discovery")
         register_discovery_tools(mcp)
+
+        # Register a few tagged tools to test dynamic grouping
+        @mcp.tool(tags={"queues"}, annotations={"readOnlyHint": True})
+        async def get_queue(queue_id: int) -> dict:
+            return {}
+
+        @mcp.tool(tags={"queues", "write"}, annotations={"readOnlyHint": False})
+        async def create_queue(name: str) -> dict:
+            return {}
+
+        @mcp.tool(tags={"hooks"}, annotations={"readOnlyHint": True})
+        async def list_hooks() -> list:
+            return []
+
         return mcp
 
-    async def test_list_tool_categories_returns_all_categories(self, mcp_with_discovery: FastMCP) -> None:
-        list_categories_tool = await mcp_with_discovery.get_tool("list_tool_categories")
+    async def test_list_tool_categories_returns_all_categories(self, mcp_with_tools: FastMCP) -> None:
+        list_categories_tool = await mcp_with_tools.get_tool("list_tool_categories")
 
         result = await list_categories_tool.fn()
 
-        assert len(result) == len(TOOL_CATALOG)
+        assert len(result) == len(CATEGORY_META)
         category_names = {cat["name"] for cat in result}
-        assert category_names == set(TOOL_CATALOG.keys())
+        assert category_names == set(CATEGORY_META.keys())
 
-    async def test_list_tool_categories_includes_tool_info(self, mcp_with_discovery: FastMCP) -> None:
-        list_categories_tool = await mcp_with_discovery.get_tool("list_tool_categories")
+    async def test_list_tool_categories_groups_by_tag(self, mcp_with_tools: FastMCP) -> None:
+        list_categories_tool = await mcp_with_tools.get_tool("list_tool_categories")
 
         result = await list_categories_tool.fn()
 
-        # Find queues category
         queues_cat = next(cat for cat in result if cat["name"] == "queues")
-        assert "description" in queues_cat
-        assert "tool_count" in queues_cat
-        assert "tools" in queues_cat
-        assert queues_cat["tool_count"] == len(TOOL_CATALOG["queues"].tools)
+        assert queues_cat["tool_count"] == 2
+        tool_names = {t["name"] for t in queues_cat["tools"]}
+        assert tool_names == {"get_queue", "create_queue"}
 
-    async def test_list_tool_categories_includes_keywords(self, mcp_with_discovery: FastMCP) -> None:
-        list_categories_tool = await mcp_with_discovery.get_tool("list_tool_categories")
+    async def test_list_tool_categories_marks_write_tools(self, mcp_with_tools: FastMCP) -> None:
+        list_categories_tool = await mcp_with_tools.get_tool("list_tool_categories")
 
         result = await list_categories_tool.fn()
 
-        # Find queues category
+        queues_cat = next(cat for cat in result if cat["name"] == "queues")
+        tools_by_name = {t["name"]: t for t in queues_cat["tools"]}
+        assert tools_by_name["get_queue"]["read_only"] is True
+        assert tools_by_name["create_queue"]["read_only"] is False
+
+    async def test_list_tool_categories_includes_keywords(self, mcp_with_tools: FastMCP) -> None:
+        list_categories_tool = await mcp_with_tools.get_tool("list_tool_categories")
+
+        result = await list_categories_tool.fn()
+
         queues_cat = next(cat for cat in result if cat["name"] == "queues")
         assert "keywords" in queues_cat
         assert "queue" in queues_cat["keywords"]
 
-        # Find hooks category
         hooks_cat = next(cat for cat in result if cat["name"] == "hooks")
         assert "hook" in hooks_cat["keywords"]
         assert "webhook" in hooks_cat["keywords"]
+
+    async def test_list_tool_categories_empty_categories_have_zero_tools(self, mcp_with_tools: FastMCP) -> None:
+        list_categories_tool = await mcp_with_tools.get_tool("list_tool_categories")
+
+        result = await list_categories_tool.fn()
+
+        # Categories without registered tools should show 0
+        engines_cat = next(cat for cat in result if cat["name"] == "engines")
+        assert engines_cat["tool_count"] == 0
+        assert engines_cat["tools"] == []

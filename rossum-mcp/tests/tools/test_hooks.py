@@ -265,23 +265,6 @@ class TestCreateHook:
         assert "function" in call_args["config"]  # source converted to function
 
     @pytest.mark.asyncio
-    async def test_create_hook_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_hook is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-
-        importlib.reload(base)
-
-        register_hook_tools(mock_mcp, mock_client)
-
-        create_hook = mock_mcp._tools["create_hook"]
-        result = await create_hook(name="New Hook", type="function")
-
-        assert result["error"] == "create_hook is not available in read-only mode"
-        mock_client.create_new_hook.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_create_hook_with_settings_secret_timeout(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
@@ -455,28 +438,6 @@ class TestCreateHookFromTemplate:
         )
         mock_client.retrieve_hook.assert_called_once_with(400)
 
-    @pytest.mark.asyncio
-    async def test_create_hook_from_template_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_hook_from_template is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-
-        importlib.reload(base)
-
-        register_hook_tools(mock_mcp, mock_client)
-
-        create_hook_from_template = mock_mcp._tools["create_hook_from_template"]
-        result = await create_hook_from_template(
-            name="My Hook",
-            hook_template_id=5,
-            queues=["https://api.test.rossum.ai/v1/queues/1"],
-            events=["annotation_content.initialize"],
-        )
-
-        assert result["error"] == "create_hook_from_template is not available in read-only mode"
-        mock_client.create_new_hook.assert_not_called()
-
 
 @pytest.mark.unit
 class TestUpdateHook:
@@ -547,23 +508,6 @@ class TestUpdateHook:
         assert call_args["config"] == {"new": "config"}
         assert call_args["settings"] == {"setting": "value"}
         assert call_args["active"] is False
-
-    @pytest.mark.asyncio
-    async def test_update_hook_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test update_hook is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-
-        importlib.reload(base)
-
-        register_hook_tools(mock_mcp, mock_client)
-
-        update_hook = mock_mcp._tools["update_hook"]
-        result = await update_hook(hook_id=100, name="New Name")
-
-        assert result["error"] == "update_hook is not available in read-only mode"
-        mock_client.update_part_hook.assert_not_called()
 
 
 @pytest.mark.unit
@@ -697,21 +641,6 @@ class TestDeleteHook:
         assert "123" in result["message"]
         mock_client.delete_hook.assert_called_once_with(123)
 
-    @pytest.mark.asyncio
-    async def test_delete_hook_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test delete_hook is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_hook_tools(mock_mcp, mock_client)
-
-        delete_hook = mock_mcp._tools["delete_hook"]
-        result = await delete_hook(hook_id=123)
-
-        assert result["error"] == "delete_hook is not available in read-only mode"
-        mock_client.delete_hook.assert_not_called()
-
 
 @pytest.mark.unit
 class TestValidateEvents:
@@ -811,21 +740,6 @@ class TestTestHook:
                 "config": {"timeout_s": 30},
             },
         )
-
-    @pytest.mark.asyncio
-    async def test_test_hook_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test test_hook is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_hook_tools(mock_mcp, mock_client)
-
-        test_hook = mock_mcp._tools["test_hook"]
-        result = await test_hook(hook_id=123, event="annotation_content", action="initialize")
-
-        assert result["error"] == "test_hook requires read-write mode (hook execution has side effects)."
-        mock_client._http_client.request_json.assert_not_called()
 
 
 @pytest.mark.unit
