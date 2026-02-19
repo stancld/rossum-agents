@@ -109,6 +109,19 @@ TASK_TRACKING = """
 
 For complex multi-step operations (3+ steps), call `create_task` for each step (subject prefixed with `1. ...`, `2. ...`). Skip for simple requests. Do not call `update_task` — focus on executing the work."""
 
+PERSONA_BEHAVIORS: dict[str, str] = {
+    "default": "# Persona: default",
+    "cautious": """
+# Persona: cautious
+
+- Plan first and make the plan explicit before execution
+- ALWAYS Ask clarifying questions if there is any degree of uncertainty, i.e. when a user doesn't specify corner case behavior
+- Ask for permission before write operations unless the user has explicitly pre-approved the exact change; You cannot modify object without permission!
+- Ask clarifying questions by default before taking actions with side effects
+- Prefer validation and verification steps before and after changes
+""",
+}
+
 
 def get_shared_prompt_sections() -> str:
     """Get all shared prompt sections combined."""
@@ -122,3 +135,8 @@ def get_shared_prompt_sections() -> str:
             TASK_TRACKING,
         ]
     )
+
+
+def get_persona_behavior(persona: str) -> str:
+    """Get persona-specific behavior guidance."""
+    return PERSONA_BEHAVIORS.get(persona, PERSONA_BEHAVIORS["default"])

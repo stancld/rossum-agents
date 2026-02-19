@@ -39,6 +39,7 @@ class ChatMetadata:
     total_tool_calls: int = 0
     total_steps: int = 0
     mcp_mode: str = "read-only"
+    persona: str = "default"
     config_commits: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -49,6 +50,7 @@ class ChatMetadata:
             "total_tool_calls": self.total_tool_calls,
             "total_steps": self.total_steps,
             "mcp_mode": self.mcp_mode,
+            "persona": self.persona,
             "config_commits": self.config_commits,
         }
 
@@ -61,6 +63,7 @@ class ChatMetadata:
             total_tool_calls=data.get("total_tool_calls", 0),
             total_steps=data.get("total_steps", 0),
             mcp_mode=data.get("mcp_mode", "read-only"),
+            persona=data.get("persona", "default"),
             config_commits=data.get("config_commits", []),
         )
 

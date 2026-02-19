@@ -287,40 +287,50 @@ class TestResolveConfig:
             rossum_api_base_url="https://api.rossum.ai",
             rossum_api_token="token123",
             mcp_mode="read-write",
+            persona="cautious",
         )
 
-        agent_url, rossum_url, token, mcp_mode = _resolve_config(args)
+        agent_url, rossum_url, token, mcp_mode, persona = _resolve_config(args)
 
         assert agent_url == "https://agent.example.com"
         assert rossum_url == "https://api.rossum.ai"
         assert token == "token123"
         assert mcp_mode == "read-write"
+        assert persona == "cautious"
 
     def test_resolves_from_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ROSSUM_AGENT_API_URL", "https://env-agent.example.com")
         monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://env-api.rossum.ai")
         monkeypatch.setenv("ROSSUM_API_TOKEN", "env-token")
         monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
+        monkeypatch.setenv("ROSSUM_AGENT_PERSONA", "cautious")
 
-        args = argparse.Namespace(agent_api_url=None, rossum_api_base_url=None, rossum_api_token=None, mcp_mode=None)
+        args = argparse.Namespace(
+            agent_api_url=None, rossum_api_base_url=None, rossum_api_token=None, mcp_mode=None, persona=None
+        )
 
-        agent_url, rossum_url, token, mcp_mode = _resolve_config(args)
+        agent_url, rossum_url, token, mcp_mode, persona = _resolve_config(args)
 
         assert agent_url == "https://env-agent.example.com"
         assert rossum_url == "https://env-api.rossum.ai"
         assert token == "env-token"
         assert mcp_mode == "read-only"
+        assert persona == "cautious"
 
     def test_defaults_mcp_mode_to_read_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ROSSUM_AGENT_API_URL", "https://agent.example.com")
         monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.rossum.ai")
         monkeypatch.setenv("ROSSUM_API_TOKEN", "token")
         monkeypatch.delenv("ROSSUM_MCP_MODE", raising=False)
+        monkeypatch.delenv("ROSSUM_AGENT_PERSONA", raising=False)
 
-        args = argparse.Namespace(agent_api_url=None, rossum_api_base_url=None, rossum_api_token=None, mcp_mode=None)
+        args = argparse.Namespace(
+            agent_api_url=None, rossum_api_base_url=None, rossum_api_token=None, mcp_mode=None, persona=None
+        )
 
-        _, _, _, mcp_mode = _resolve_config(args)
+        _, _, _, mcp_mode, persona = _resolve_config(args)
         assert mcp_mode == "read-only"
+        assert persona == "default"
 
     def test_exits_on_invalid_mcp_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ROSSUM_AGENT_API_URL", "https://agent.example.com")
@@ -328,7 +338,9 @@ class TestResolveConfig:
         monkeypatch.setenv("ROSSUM_API_TOKEN", "token")
         monkeypatch.setenv("ROSSUM_MCP_MODE", "invalid-mode")
 
-        args = argparse.Namespace(agent_api_url=None, rossum_api_base_url=None, rossum_api_token=None, mcp_mode=None)
+        args = argparse.Namespace(
+            agent_api_url=None, rossum_api_base_url=None, rossum_api_token=None, mcp_mode=None, persona=None
+        )
 
         with pytest.raises(SystemExit) as exc_info:
             _resolve_config(args)
@@ -337,7 +349,11 @@ class TestResolveConfig:
     def test_exits_on_missing_agent_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("ROSSUM_AGENT_API_URL", raising=False)
         args = argparse.Namespace(
-            agent_api_url=None, rossum_api_base_url="https://api.rossum.ai", rossum_api_token="token", mcp_mode=None
+            agent_api_url=None,
+            rossum_api_base_url="https://api.rossum.ai",
+            rossum_api_token="token",
+            mcp_mode=None,
+            persona=None,
         )
 
         with pytest.raises(SystemExit) as exc_info:

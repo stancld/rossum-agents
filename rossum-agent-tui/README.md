@@ -20,6 +20,7 @@ npm run build
 | Rossum API token | `--token` | `ROSSUM_API_TOKEN` | Yes |
 | Rossum API base URL | `--rossum-url` | `ROSSUM_API_BASE_URL` | Yes |
 | MCP mode | `--mcp-mode` | `ROSSUM_MCP_MODE` | No (default: `read-only`) |
+| Persona | `--persona` | `ROSSUM_AGENT_PERSONA` | No (default: `default`) |
 
 ## Usage
 
@@ -35,6 +36,9 @@ fabry --api-url http://localhost:8000 --token your-token --rossum-url https://ap
 
 # Read-write mode
 fabry --mcp-mode read-write
+
+# Cautious persona
+fabry --persona cautious
 ```
 
 ## Keyboard Controls
@@ -47,6 +51,9 @@ fabry --mcp-mode read-write
 | Browse | `k` / `↑` | Move selection up |
 | Browse | `Enter` / `Space` | Expand/collapse selected item |
 | Browse | `G` | Jump to bottom (re-enable auto-scroll) |
+| Input | `Meta+1` | Quick reply: Approve |
+| Input | `Meta+2` | Quick reply: Reject |
+| Input | `Meta+3` | Quick reply: Let's chat about it. |
 
 Expandable items: thinking steps, tool calls, and intermediate content (instructions).
 

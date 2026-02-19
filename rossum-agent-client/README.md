@@ -43,6 +43,9 @@ rossum-agent-client \
 
 # Use read-write mode
 rossum-agent-client --mcp-mode read-write -x "Create a new queue"
+
+# Use cautious persona
+rossum-agent-client --persona cautious -x "List all queues"
 ```
 
 Files created by the agent (via `write_file` tool) are automatically downloaded and saved to the current directory.
@@ -55,6 +58,7 @@ Files created by the agent (via `write_file` tool) are automatically downloaded 
 | `ROSSUM_API_BASE_URL` | Rossum API base URL |
 | `ROSSUM_API_TOKEN` | Rossum API authentication token |
 | `ROSSUM_MCP_MODE` | MCP mode: `read-only` (default) or `read-write` |
+| `ROSSUM_AGENT_PERSONA` | Agent persona: `default` (default) or `cautious` |
 
 ## Quick Start
 
@@ -69,7 +73,7 @@ client = RossumAgentClient(
 )
 
 # Create a chat session
-chat = client.create_chat(mcp_mode="read-only")
+chat = client.create_chat(mcp_mode="read-only", persona="default")
 print(f"Created chat: {chat.chat_id}")
 
 # Send a message and stream the response
@@ -133,7 +137,7 @@ health = client.health_check()
 
 ```python
 # Create a new chat
-chat = client.create_chat(mcp_mode="read-only")  # or "read-write"
+chat = client.create_chat(mcp_mode="read-only", persona="default")  # or "cautious"
 
 # List all chats
 chats = client.list_chats(limit=50, offset=0)

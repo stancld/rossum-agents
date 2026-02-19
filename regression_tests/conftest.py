@@ -233,7 +233,7 @@ def create_live_agent(
             set_task_tracker(TaskTracker())
 
             client = create_bedrock_client()
-            system_prompt = get_system_prompt()
+            system_prompt = get_system_prompt(persona=case.persona)
 
             if case.rossum_url:
                 url_context = extract_url_context(case.rossum_url)

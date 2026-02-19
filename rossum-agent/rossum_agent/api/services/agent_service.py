@@ -392,6 +392,7 @@ class AgentService:
         rossum_api_token: str,
         rossum_api_base_url: str,
         mcp_mode: Literal["read-only", "read-write"] = "read-only",
+        persona: Literal["default", "cautious"] = "default",
         rossum_url: str | None = None,
         images: list[ImageContent] | None = None,
         documents: list[DocumentContent] | None = None,
@@ -432,7 +433,7 @@ class AgentService:
         set_task_tracker(TaskTracker())
         set_task_snapshot_callback(self._on_task_snapshot)
 
-        system_prompt = self._build_system_prompt(rossum_url)
+        system_prompt = self._build_system_prompt(rossum_url, persona)
 
         try:
             try:
@@ -519,8 +520,8 @@ class AgentService:
             await self._clear_run(chat_id, run_id)
 
     @staticmethod
-    def _build_system_prompt(rossum_url: str | None) -> str:
-        system_prompt = get_system_prompt()
+    def _build_system_prompt(rossum_url: str | None, persona: Literal["default", "cautious"] = "default") -> str:
+        system_prompt = get_system_prompt(persona)
         url_context = extract_url_context(rossum_url)
         if not url_context.is_empty():
             context_section = format_context_for_prompt(url_context)

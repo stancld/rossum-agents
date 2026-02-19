@@ -1,10 +1,11 @@
-import type { Config, McpMode } from "../types.js";
+import type { Config, McpMode, Persona } from "../types.js";
 
 interface CliFlags {
   apiUrl?: string;
   token?: string;
   rossumUrl?: string;
   mcpMode?: string;
+  persona?: string;
 }
 
 function resolve(
@@ -41,5 +42,19 @@ export function resolveConfig(flags: CliFlags): Config {
     );
   }
 
-  return { apiUrl, token, rossumUrl, mcpMode: mcpModeRaw as McpMode };
+  const personaRaw =
+    flags.persona || process.env["ROSSUM_AGENT_PERSONA"] || "default";
+  if (personaRaw !== "default" && personaRaw !== "cautious") {
+    throw new Error(
+      `Invalid persona: ${personaRaw}. Must be 'default' or 'cautious'.`,
+    );
+  }
+
+  return {
+    apiUrl,
+    token,
+    rossumUrl,
+    mcpMode: mcpModeRaw as McpMode,
+    persona: personaRaw as Persona,
+  };
 }

@@ -155,6 +155,13 @@ def _resolve_mcp_mode(message: MessageRequest, chat_data: ChatData) -> str:
     return chat_data.metadata.mcp_mode
 
 
+def _resolve_persona(message: MessageRequest, chat_data: ChatData) -> str:
+    """Resolve the effective persona from the message and chat metadata."""
+    if message.persona is not None:
+        chat_data.metadata.persona = message.persona
+    return chat_data.metadata.persona
+
+
 async def _with_sse_keepalive(
     events: AsyncIterator[AgentEvent],
     interval: float = SSE_KEEPALIVE_INTERVAL,
@@ -224,6 +231,7 @@ async def send_message(
 
     history = chat_data.messages
     mcp_mode = _resolve_mcp_mode(message, chat_data)
+    persona = _resolve_persona(message, chat_data)
     user_prompt = message.content
     images: list[ImageContent] | None = message.images
     documents: list[DocumentContent] | None = message.documents
@@ -245,6 +253,7 @@ async def send_message(
                 rossum_api_base_url=credentials.api_url,
                 rossum_url=message.rossum_url,
                 mcp_mode=mcp_mode,
+                persona=persona,
             )
             async for event, is_keepalive in _with_sse_keepalive(agent_events):
                 if is_keepalive:

@@ -75,6 +75,7 @@ class TestChatMetadata:
         assert metadata.total_output_tokens == 0
         assert metadata.total_tool_calls == 0
         assert metadata.total_steps == 0
+        assert metadata.persona == "default"
 
     def test_custom_values(self):
         """Test custom values."""
@@ -108,6 +109,7 @@ class TestChatMetadata:
             "total_tool_calls": 5,
             "total_steps": 3,
             "mcp_mode": "read-only",
+            "persona": "default",
             "config_commits": [],
         }
 
@@ -128,6 +130,7 @@ class TestChatMetadata:
         assert metadata.total_tool_calls == 10
         assert metadata.total_steps == 5
         assert metadata.config_commits == ["abc123", "def456"]
+        assert metadata.persona == "default"
 
     def test_from_dict_with_missing_keys(self):
         """Test from_dict with partial data."""
@@ -139,6 +142,13 @@ class TestChatMetadata:
         assert metadata.total_tool_calls == 0
         assert metadata.total_steps == 0
         assert metadata.config_commits == []
+        assert metadata.persona == "default"
+
+    def test_from_dict_with_persona(self):
+        """Test from_dict loads persona when present."""
+        data = {"persona": "cautious"}
+        metadata = ChatMetadata.from_dict(data)
+        assert metadata.persona == "cautious"
 
     def test_from_dict_empty(self):
         """Test from_dict with empty dict."""

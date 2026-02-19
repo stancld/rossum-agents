@@ -68,6 +68,20 @@ export function App({ config }: AppProps) {
     [sendMessage],
   );
 
+  const sendQuickReply = useCallback(
+    (message: string) => {
+      if (mode !== "input") return;
+      if (
+        state.connectionStatus === "connecting" ||
+        state.connectionStatus === "streaming"
+      ) {
+        return;
+      }
+      handleSendMessage(message);
+    },
+    [handleSendMessage, mode, state.connectionStatus],
+  );
+
   useInput(
     (input, key) => {
       if (input === "i" || key.tab) {
@@ -134,6 +148,21 @@ export function App({ config }: AppProps) {
     }
   });
 
+  useInput((input, key) => {
+    if (!key.meta) return;
+    if (input === "1") {
+      sendQuickReply("Approve");
+      return;
+    }
+    if (input === "2") {
+      sendQuickReply("Reject");
+      return;
+    }
+    if (input === "3") {
+      sendQuickReply("Let's chat about it.");
+    }
+  });
+
   // Layout: ChatView (flex) + InputArea (1 row) + TaskList (N rows) + StatusBar (3 rows with border)
   const taskListHeight = state.tasks.length;
   const fixedHeight = 3 + 1 + taskListHeight; // statusBar + input + taskList
@@ -157,6 +186,7 @@ export function App({ config }: AppProps) {
       <StatusBar
         connectionStatus={state.connectionStatus}
         mcpMode={config.mcpMode}
+        persona={config.persona}
         chatId={state.chatId}
         tokenUsage={state.tokenUsage}
         mode={mode}

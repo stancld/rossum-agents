@@ -20,7 +20,7 @@ export async function streamMessage(opts: StreamOptions): Promise<void> {
     res = await fetch(`${config.apiUrl}/api/v1/chats/${chatId}/messages`, {
       method: "POST",
       headers: buildHeaders(config),
-      body: JSON.stringify({ content: message }),
+      body: JSON.stringify({ content: message, persona: config.persona }),
       signal,
     });
   } catch (err) {
