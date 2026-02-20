@@ -1435,6 +1435,9 @@ class TestRestoreEntityVersion:
 
         mock_http_client = MagicMock()
         mock_http_client.update = AsyncMock()
+        mock_http_client.request_json = AsyncMock(
+            return_value={"content": [{"category": "datapoint"}, {"category": "new"}]}
+        )
         mock_client_instance = MagicMock()
         mock_client_instance._http_client = mock_http_client
         mock_client_cls.return_value = mock_client_instance
