@@ -16,13 +16,21 @@ logger = logging.getLogger(__name__)
 
 
 def register_relation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve relation details.")
+    @mcp.tool(
+        description="Retrieve relation details.",
+        tags={"relations"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_relation(relation_id: int) -> Relation:
         logger.debug(f"Retrieving relation: relation_id={relation_id}")
         relation_data = await client._http_client.fetch_one(Resource.Relation, relation_id)
         return cast("Relation", client._deserializer(Resource.Relation, relation_data))
 
-    @mcp.tool(description="List annotation relations with optional filters; e.g. edit/attachment/duplicate.")
+    @mcp.tool(
+        description="List annotation relations with optional filters; e.g. edit/attachment/duplicate.",
+        tags={"relations"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_relations(
         id: int | None = None,
         type: RelationType | None = None,

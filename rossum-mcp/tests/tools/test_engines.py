@@ -198,20 +198,6 @@ class TestUpdateEngine:
         assert result.name == "Updated Engine"
         mock_client._http_client.update.assert_called_once_with(Resource.Engine, 123, {"name": "Updated Engine"})
 
-    @pytest.mark.asyncio
-    async def test_update_engine_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test update_engine is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_engine_tools(mock_mcp, mock_client)
-
-        update_engine = mock_mcp._tools["update_engine"]
-        result = await update_engine(engine_id=123, engine_data={"name": "Updated"})
-
-        assert result["error"] == "update_engine is not available in read-only mode"
-
 
 @pytest.mark.unit
 class TestCreateEngine:
@@ -252,20 +238,6 @@ class TestCreateEngine:
             await create_engine(name="New Engine", organization_id=1, engine_type="invalid")
 
         assert "Invalid engine_type" in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    async def test_create_engine_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_engine is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_engine_tools(mock_mcp, mock_client)
-
-        create_engine = mock_mcp._tools["create_engine"]
-        result = await create_engine(name="New Engine", organization_id=1, engine_type="extractor")
-
-        assert result["error"] == "create_engine is not available in read-only mode"
 
 
 @pytest.mark.unit
@@ -341,26 +313,6 @@ class TestCreateEngineField:
             )
 
         assert "Invalid field_type" in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    async def test_create_engine_field_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_engine_field is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_engine_tools(mock_mcp, mock_client)
-
-        create_engine_field = mock_mcp._tools["create_engine_field"]
-        result = await create_engine_field(
-            engine_id=123,
-            name="field",
-            label="Field",
-            field_type="string",
-            schema_ids=[1],
-        )
-
-        assert result["error"] == "create_engine_field is not available in read-only mode"
 
     @pytest.mark.asyncio
     async def test_create_engine_field_with_optional_params(

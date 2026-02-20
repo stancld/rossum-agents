@@ -16,13 +16,21 @@ logger = logging.getLogger(__name__)
 
 
 def register_document_relation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve document relation details.")
+    @mcp.tool(
+        description="Retrieve document relation details.",
+        tags={"document_relations"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_document_relation(document_relation_id: int) -> DocumentRelation:
         logger.debug(f"Retrieving document relation: document_relation_id={document_relation_id}")
         document_relation: DocumentRelation = await client.retrieve_document_relation(document_relation_id)
         return document_relation
 
-    @mcp.tool(description="List document relations with optional filters.; e.g. export/e-invoice links.")
+    @mcp.tool(
+        description="List document relations with optional filters.; e.g. export/e-invoice links.",
+        tags={"document_relations"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_document_relations(
         id: int | None = None,
         type: str | None = None,

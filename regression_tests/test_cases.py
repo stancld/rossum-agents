@@ -144,7 +144,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url=None,
         prompt="Hey, what can you do?",
         tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=4800, max_total_tokens=5500),
+        token_budget=TokenBudget(min_total_tokens=6000, max_total_tokens=6500),
         success_criteria=SuccessCriteria(
             required_keywords=["hook", "queue"],
             max_steps=1,
@@ -537,6 +537,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
+                "get_schema_tree_structure",
                 "prune_schema_fields",
                 ("patch_schema", "patch_schema_with_subagent"),
             ],

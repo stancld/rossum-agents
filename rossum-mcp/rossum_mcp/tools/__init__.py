@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from rossum_mcp.tools.annotations import register_annotation_tools
 from rossum_mcp.tools.catalog import (
-    TOOL_CATALOG,
-    ToolCategory,
-    ToolInfo,
+    CATEGORY_META,
+    CategoryMeta,
     get_catalog_summary,
 )
 from rossum_mcp.tools.discovery import register_discovery_tools
@@ -24,9 +23,8 @@ from rossum_mcp.tools.users import register_user_tools
 from rossum_mcp.tools.workspaces import register_workspace_tools
 
 __all__ = [
-    "TOOL_CATALOG",
-    "ToolCategory",
-    "ToolInfo",
+    "CATEGORY_META",
+    "CategoryMeta",
     "get_catalog_summary",
     "register_annotation_tools",
     "register_discovery_tools",

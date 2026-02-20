@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.rule import Rule, RuleAction
 
-from rossum_mcp.tools.base import build_filters, build_resource_url, delete_resource, graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, build_resource_url, delete_resource, graceful_list
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -47,9 +47,6 @@ async def _create_rule(
     schema_id: int | None = None,
     queue_ids: list[int] | None = None,
 ) -> Rule | dict:
-    if not is_read_write_mode():
-        return {"error": "create_rule is not available in read-only mode"}
-
     if schema_id is None and not queue_ids:
         return {"error": "Provide at least one of schema_id or queue_ids to scope the rule."}
 
@@ -83,9 +80,6 @@ async def _update_rule(
     queue_ids: list[int],
 ) -> Rule | dict:
     """Full update (PUT) - all fields required."""
-    if not is_read_write_mode():
-        return {"error": "update_rule is not available in read-only mode"}
-
     logger.debug(f"Updating rule: rule_id={rule_id}, name={name}")
     existing_rule: Rule = await client.retrieve_rule(rule_id)
 
@@ -116,9 +110,6 @@ async def _patch_rule(
     queue_ids: list[int] | None = None,
 ) -> Rule | dict:
     """Partial update (PATCH) - only provided fields are updated."""
-    if not is_read_write_mode():
-        return {"error": "patch_rule is not available in read-only mode"}
-
     logger.debug(f"Patching rule: rule_id={rule_id}")
 
     patch_data: dict = {}
@@ -146,18 +137,28 @@ async def _delete_rule(client: AsyncRossumAPIClient, rule_id: int) -> dict:
 
 
 def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve rule details.")
+    @mcp.tool(
+        description="Retrieve rule details.",
+        tags={"rules"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_rule(rule_id: int) -> Rule:
         return await _get_rule(client, rule_id)
 
-    @mcp.tool(description="List all rules.")
+    @mcp.tool(
+        description="List all rules.",
+        tags={"rules"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_rules(
         schema_id: int | None = None, organization_id: int | None = None, enabled: bool | None = None
     ) -> list[Rule]:
         return await _list_rules(client, schema_id, organization_id, enabled)
 
     @mcp.tool(
-        description="Create a rule: trigger is a TxScript condition; action includes id, type, event, payload. Scope with schema_id and/or queue_ids (at least one required)."
+        description="Create a rule: trigger is a TxScript condition; action includes id, type, event, payload. Scope with schema_id and/or queue_ids (at least one required).",
+        tags={"rules", "write"},
+        annotations={"readOnlyHint": False},
     )
     async def create_rule(
         name: str,
@@ -169,7 +170,11 @@ def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     ) -> Rule | dict:
         return await _create_rule(client, name, trigger_condition, actions, enabled, schema_id, queue_ids)
 
-    @mcp.tool(description="Replace a rule (PUT); all fields required. Use patch_rule for partial changes.")
+    @mcp.tool(
+        description="Replace a rule (PUT); all fields required. Use patch_rule for partial changes.",
+        tags={"rules", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def update_rule(
         rule_id: int,
         name: str,
@@ -180,7 +185,11 @@ def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     ) -> Rule | dict:
         return await _update_rule(client, rule_id, name, trigger_condition, actions, enabled, queue_ids)
 
-    @mcp.tool(description="Patch a rule (PATCH); only provided fields change. queue_ids=[] clears queue scoping.")
+    @mcp.tool(
+        description="Patch a rule (PATCH); only provided fields change. queue_ids=[] clears queue scoping.",
+        tags={"rules", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def patch_rule(
         rule_id: int,
         name: str | None = None,
@@ -191,6 +200,10 @@ def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     ) -> Rule | dict:
         return await _patch_rule(client, rule_id, name, trigger_condition, actions, enabled, queue_ids)
 
-    @mcp.tool(description="Delete a rule.")
+    @mcp.tool(
+        description="Delete a rule.",
+        tags={"rules", "write"},
+        annotations={"readOnlyHint": False, "destructiveHint": True},
+    )
     async def delete_rule(rule_id: int) -> dict:
         return await _delete_rule(client, rule_id)

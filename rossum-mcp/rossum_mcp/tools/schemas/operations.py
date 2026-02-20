@@ -17,7 +17,6 @@ from rossum_mcp.tools.base import (
     delete_resource,
     extract_id_from_url,
     graceful_list,
-    is_read_write_mode,
 )
 from rossum_mcp.tools.schemas.models import (
     SchemaListItem,
@@ -115,9 +114,6 @@ async def list_schemas(
 
 
 async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_data: dict) -> Schema | dict:
-    if not is_read_write_mode():
-        return {"error": "update_schema is not available in read-only mode"}
-
     logger.debug(f"Updating schema: schema_id={schema_id}")
     if "content" in schema_data and isinstance(schema_data["content"], list):
         schema_data = {**schema_data, "content": sanitize_schema_content(schema_data["content"])}
@@ -127,9 +123,6 @@ async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_dat
 
 
 async def create_schema(client: AsyncRossumAPIClient, name: str, content: list[dict]) -> Schema | dict:
-    if not is_read_write_mode():
-        return {"error": "create_schema is not available in read-only mode"}
-
     if not content:
         return {"error": "Cannot create schema with empty content"}
 
@@ -149,9 +142,6 @@ async def patch_schema(
     parent_id: str | None = None,
     position: int | None = None,
 ) -> dict:
-    if not is_read_write_mode():
-        return {"error": "patch_schema is not available in read-only mode"}
-
     if operation not in ("add", "update", "remove"):
         return {"error": f"Invalid operation '{operation}'. Must be 'add', 'update', or 'remove'."}
 
@@ -219,9 +209,6 @@ async def prune_schema_fields(
     fields_to_keep: list[str] | None = None,
     fields_to_remove: list[str] | None = None,
 ) -> dict:
-    if not is_read_write_mode():
-        return {"error": "prune_schema_fields is not available in read-only mode"}
-
     if fields_to_keep is not None and fields_to_remove is not None:
         return {"error": "Specify fields_to_keep OR fields_to_remove, not both"}
     if fields_to_keep is None and fields_to_remove is None:

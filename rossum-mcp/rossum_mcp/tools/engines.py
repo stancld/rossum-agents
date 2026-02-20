@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Literal, cast
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.engine import Engine, EngineField, EngineFieldType
 
-from rossum_mcp.tools.base import build_filters, build_resource_url, graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, build_resource_url, graceful_list
 
 type EngineType = Literal["extractor", "splitter"]
 
@@ -35,9 +35,6 @@ async def _list_engines(
 
 
 async def _update_engine(client: AsyncRossumAPIClient, engine_id: int, engine_data: dict) -> Engine | dict:
-    if not is_read_write_mode():
-        return {"error": "update_engine is not available in read-only mode"}
-
     logger.debug(f"Updating engine: engine_id={engine_id}, data={engine_data}")
     updated_engine_data = await client._http_client.update(Resource.Engine, engine_id, engine_data)
     return cast("Engine", client._deserializer(Resource.Engine, updated_engine_data))
@@ -46,9 +43,6 @@ async def _update_engine(client: AsyncRossumAPIClient, engine_id: int, engine_da
 async def _create_engine(
     client: AsyncRossumAPIClient, name: str, organization_id: int, engine_type: EngineType
 ) -> Engine | dict:
-    if not is_read_write_mode():
-        return {"error": "create_engine is not available in read-only mode"}
-
     if engine_type not in ("extractor", "splitter"):
         raise ValueError(f"Invalid engine_type '{engine_type}'. Must be 'extractor' or 'splitter'")
 
@@ -74,9 +68,6 @@ async def _create_engine_field(
     subtype: str | None = None,
     pre_trained_field_id: str | None = None,
 ) -> EngineField | dict:
-    if not is_read_write_mode():
-        return {"error": "create_engine_field is not available in read-only mode"}
-
     valid_types = ("string", "number", "date", "enum")
     if field_type not in valid_types:
         raise ValueError(f"Invalid field_type '{field_type}'. Must be one of: {', '.join(valid_types)}")
@@ -108,25 +99,45 @@ async def _get_engine_fields(client: AsyncRossumAPIClient, engine_id: int | None
 
 
 def register_engine_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve a single engine by ID.")
+    @mcp.tool(
+        description="Retrieve a single engine by ID.",
+        tags={"engines"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_engine(engine_id: int) -> Engine:
         return await _get_engine(client, engine_id)
 
-    @mcp.tool(description="List all engines with optional filters.")
+    @mcp.tool(
+        description="List all engines with optional filters.",
+        tags={"engines"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_engines(
         id: int | None = None, engine_type: EngineType | None = None, agenda_id: str | None = None
     ) -> list[Engine]:
         return await _list_engines(client, id, engine_type, agenda_id)
 
-    @mcp.tool(description="Update engine settings.")
+    @mcp.tool(
+        description="Update engine settings.",
+        tags={"engines", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def update_engine(engine_id: int, engine_data: dict) -> Engine | dict:
         return await _update_engine(client, engine_id, engine_data)
 
-    @mcp.tool(description="Create an engine; create matching engine fields for the target schema immediately after.")
+    @mcp.tool(
+        description="Create an engine; create matching engine fields for the target schema immediately after.",
+        tags={"engines", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def create_engine(name: str, organization_id: int, engine_type: EngineType) -> Engine | dict:
         return await _create_engine(client, name, organization_id, engine_type)
 
-    @mcp.tool(description="Create an engine field corresponding to a schema field (used during engine+schema setup).")
+    @mcp.tool(
+        description="Create an engine field corresponding to a schema field (used during engine+schema setup).",
+        tags={"engines", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def create_engine_field(
         engine_id: int,
         name: str,
@@ -142,6 +153,10 @@ def register_engine_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
             client, engine_id, name, label, field_type, schema_ids, tabular, multiline, subtype, pre_trained_field_id
         )
 
-    @mcp.tool(description="Retrieve engine fields for a specific engine or all engine fields.")
+    @mcp.tool(
+        description="Retrieve engine fields for a specific engine or all engine fields.",
+        tags={"engines"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_engine_fields(engine_id: int | None = None) -> list[EngineField]:
         return await _get_engine_fields(client, engine_id)

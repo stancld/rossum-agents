@@ -18,6 +18,10 @@ async def _get_organization_limit(client: AsyncRossumAPIClient, organization_id:
 
 
 def register_organization_limit_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve email sending limits and usage counters for an organization.")
+    @mcp.tool(
+        description="Retrieve email sending limits and usage counters for an organization.",
+        tags={"organization_limits"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_organization_limit(organization_id: int) -> OrganizationLimit:
         return await _get_organization_limit(client, organization_id)
