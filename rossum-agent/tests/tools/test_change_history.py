@@ -761,7 +761,7 @@ class TestRevertSchemaWith412:
 
         mock_http_client = MagicMock()
         # First update call raises 412, second succeeds
-        err_412 = APIClientError("Precondition Failed", status_code=412)
+        err_412 = APIClientError("PATCH", "schemas/999", 412, Exception("Precondition Failed"))
         mock_http_client.update = AsyncMock(side_effect=[err_412, None])
         mock_http_client.request_json = AsyncMock(return_value={"content": []})
         mock_client_instance = MagicMock()
@@ -809,7 +809,7 @@ class TestRevertSchemaWith412:
         loop, thread = self._make_loop()
         mock_loop.return_value = loop
 
-        err_412 = APIClientError("Precondition Failed", status_code=412)
+        err_412 = APIClientError("PATCH", "schemas/999", 412, Exception("Precondition Failed"))
         mock_http_client = MagicMock()
         mock_http_client.update = AsyncMock(side_effect=err_412)
         mock_http_client.request_json = AsyncMock(return_value={"content": []})
@@ -914,7 +914,7 @@ class TestRevertSchemaWithRetryUnit:
         loop = asyncio.new_event_loop()
 
         async def run():
-            err = APIClientError("Precondition Failed", status_code=412)
+            err = APIClientError("PATCH", "schemas/99", 412, Exception("Precondition Failed"))
             client = MagicMock()
             client._http_client.request_json = AsyncMock(return_value={"content": []})
             client._http_client.update = AsyncMock(side_effect=[err, None])
@@ -932,7 +932,7 @@ class TestRevertSchemaWithRetryUnit:
         loop = asyncio.new_event_loop()
 
         async def run():
-            err = APIClientError("Not Found", status_code=404)
+            err = APIClientError("PATCH", "schemas/1", 404, Exception("Not Found"))
             client = MagicMock()
             client._http_client.request_json = AsyncMock(return_value={"content": []})
             client._http_client.update = AsyncMock(side_effect=err)

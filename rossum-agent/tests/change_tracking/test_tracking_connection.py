@@ -1006,6 +1006,7 @@ class TestSchemaRewriteAndRevert:
 
         mock_http_client = MagicMock()
         mock_http_client.update = AsyncMock()
+        mock_http_client.request_json = AsyncMock(return_value={"content": []})
         mock_api_client = MagicMock()
         mock_api_client._http_client = mock_http_client
 

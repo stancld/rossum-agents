@@ -59,6 +59,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+async def _log_commit_hook(commit: ConfigCommit) -> str | None:
+    """Built-in hook: show a commit summary after the agent turn."""
+    _op_icon = {"create": "+", "update": "~", "delete": "-"}
+    lines = [f"✓ {commit.hash[:8]} — {commit.message}"]
+    for change in commit.changes:
+        icon = _op_icon.get(change.operation, "?")
+        lines.append(f'  [{icon}] {change.entity_type} "{change.entity_name}"')
+    return "\n".join(lines)
+
+
 @dataclass
 class _RequestContext:
     """Per-request context for agent execution."""
@@ -422,11 +432,7 @@ class AgentService:
         set_task_tracker(TaskTracker())
         set_task_snapshot_callback(self._on_task_snapshot)
 
-        system_prompt = get_system_prompt()
-        url_context = extract_url_context(rossum_url)
-        if not url_context.is_empty():
-            context_section = format_context_for_prompt(url_context)
-            system_prompt = system_prompt + "\n\n---\n" + context_section
+        system_prompt = self._build_system_prompt(rossum_url)
 
         try:
             try:
@@ -474,26 +480,19 @@ class AgentService:
 
                         self._get_chat_run_state(chat_id).last_memory = agent.memory
 
-                        commit = (
-                            self._try_create_config_commit(
-                                commit_store, snapshot_store, mcp_connection, chat_id, prompt, rossum_api_base_url
-                            )
-                            if commit_store and snapshot_store
-                            else None
-                        )
-
-                        yield StreamDoneEvent(
-                            total_steps=total_steps,
-                            input_tokens=total_input_tokens,
-                            output_tokens=total_output_tokens,
-                            cache_creation_input_tokens=agent.tokens.total_cache_creation,
-                            cache_read_input_tokens=agent.tokens.total_cache_read,
-                            token_usage_breakdown=agent.get_token_usage_breakdown(),
-                            config_commit_hash=commit.hash if commit else None,
-                            config_commit_message=commit.message if commit else None,
-                            config_changes_count=len(commit.changes) if commit else 0,
-                        )
-                        agent.log_token_usage_summary()
+                        async for event in self._stream_finalization(
+                            commit_store,
+                            snapshot_store,
+                            mcp_connection,
+                            chat_id,
+                            prompt,
+                            rossum_api_base_url,
+                            total_steps,
+                            total_input_tokens,
+                            total_output_tokens,
+                            agent,
+                        ):
+                            yield event
 
                     except Exception as e:
                         logger.error(f"Agent execution failed: {e}", exc_info=True)
@@ -518,6 +517,58 @@ class AgentService:
             raise
         finally:
             await self._clear_run(chat_id, run_id)
+
+    @staticmethod
+    def _build_system_prompt(rossum_url: str | None) -> str:
+        system_prompt = get_system_prompt()
+        url_context = extract_url_context(rossum_url)
+        if not url_context.is_empty():
+            context_section = format_context_for_prompt(url_context)
+            system_prompt = system_prompt + "\n\n---\n" + context_section
+        return system_prompt
+
+    async def _stream_finalization(
+        self,
+        commit_store: CommitStore | None,
+        snapshot_store: SnapshotStore | None,
+        mcp_connection: MCPConnection,
+        chat_id: str,
+        prompt: str,
+        rossum_api_base_url: str,
+        total_steps: int,
+        total_input_tokens: int,
+        total_output_tokens: int,
+        agent: RossumAgent,
+    ) -> AsyncIterator[StepEvent | StreamDoneEvent]:
+        commit = (
+            self._try_create_config_commit(
+                commit_store, snapshot_store, mcp_connection, chat_id, prompt, rossum_api_base_url
+            )
+            if commit_store and snapshot_store
+            else None
+        )
+        if commit is not None:
+            hook_output = await _log_commit_hook(commit)
+            if hook_output:
+                yield StepEvent(
+                    type="final_answer",
+                    step_number=total_steps + 1,
+                    content=hook_output,
+                    is_final=True,
+                    is_hook_output=True,
+                )
+        yield StreamDoneEvent(
+            total_steps=total_steps,
+            input_tokens=total_input_tokens,
+            output_tokens=total_output_tokens,
+            cache_creation_input_tokens=agent.tokens.total_cache_creation,
+            cache_read_input_tokens=agent.tokens.total_cache_read,
+            token_usage_breakdown=agent.get_token_usage_breakdown(),
+            config_commit_hash=commit.hash if commit else None,
+            config_commit_message=commit.message if commit else None,
+            config_changes_count=len(commit.changes) if commit else 0,
+        )
+        agent.log_token_usage_summary()
 
     @staticmethod
     def _try_create_config_commit(

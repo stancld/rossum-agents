@@ -165,6 +165,7 @@ class StepEvent(BaseModel):
     is_streaming: bool = False
     is_final: bool = False
     tool_call_id: str | None = None
+    is_hook_output: bool = False
 
 
 class SubAgentProgressEvent(BaseModel):
