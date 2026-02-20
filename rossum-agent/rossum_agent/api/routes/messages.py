@@ -253,7 +253,8 @@ async def send_message(
                 result = _process_agent_event(event)
                 if result.done_event:
                     done_event = result.done_event
-                if result.final_response_update:
+                # Hook output is shown in chat but excluded from conversation history
+                if result.final_response_update and not (isinstance(event, StepEvent) and event.is_hook_output):
                     final_response = result.final_response_update
                 if result.sse_event:
                     yield result.sse_event

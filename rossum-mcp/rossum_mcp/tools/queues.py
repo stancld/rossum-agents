@@ -20,6 +20,7 @@ from rossum_mcp.tools.base import (
     graceful_list,
     truncate_dict_fields,
 )
+from rossum_mcp.tools.resource_tracking import embed_tracked_resources, track_resource
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -231,6 +232,15 @@ QueueTemplateName = Literal[
 QUEUE_TEMPLATE_NAMES = get_args(QueueTemplateName)
 
 
+def _get_engine_url(queue: Queue) -> str | None:
+    """Extract the engine URL from a queue, checking all engine fields."""
+    for attr in ("dedicated_engine", "generic_engine", "engine"):
+        value = getattr(queue, attr, None)
+        if value and isinstance(value, str):
+            return value
+    return None
+
+
 async def _create_queue_from_template(
     client: AsyncRossumAPIClient,
     name: str,
@@ -264,7 +274,29 @@ async def _create_queue_from_template(
         url="queues/from_template",
         json=payload,
     )
-    return cast("Queue", client._deserializer(Resource.Queue, response))
+    queue = cast("Queue", client._deserializer(Resource.Queue, response))
+
+    tracked: list[dict] = []
+
+    # Track the schema created as a side effect
+    try:
+        schema_id = extract_id_from_url(queue.schema)
+        schema = await client.retrieve_schema(schema_id)
+        track_resource(tracked, "schema", schema_id, schema)
+    except Exception:
+        logger.warning(f"Failed to fetch schema for tracked resource (queue={queue.id})", exc_info=True)
+
+    # Track the engine created as a side effect
+    engine_url = _get_engine_url(queue)
+    if engine_url:
+        try:
+            eid = extract_id_from_url(engine_url)
+            engine = await client.retrieve_engine(eid)
+            track_resource(tracked, "engine", eid, engine)
+        except Exception:
+            logger.warning(f"Failed to fetch engine for tracked resource (queue={queue.id})", exc_info=True)
+
+    return embed_tracked_resources(queue, tracked)
 
 
 def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:

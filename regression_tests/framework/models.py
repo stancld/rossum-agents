@@ -125,8 +125,8 @@ class RegressionTestCase:
     Attributes:
         name: Unique identifier for this test case.
         api_base_url: Rossum API base URL.
-        prompt: The prompt to send to the agent. Use {sandbox_api_token} placeholder
-            to inject sandbox token into prompt.
+        prompt: The prompt to send to the agent (ignored when prompts is set).
+            Use {sandbox_api_token} placeholder to inject sandbox token into prompt.
         mode: MCP server mode — "read-only" or "read-write". Defaults to "read-write".
         api_token: Rossum API token (optional, can be provided via ROSSUM_API_TOKEN env var).
         rossum_url: Optional Rossum app URL for context extraction (e.g., queue/document URL).
@@ -139,7 +139,7 @@ class RegressionTestCase:
 
     name: str
     api_base_url: str
-    prompt: str
+    prompt: str = ""
     mode: Literal["read-only", "read-write"] = "read-write"
     api_token: str | None = None
     rossum_url: str | None = None
@@ -150,6 +150,7 @@ class RegressionTestCase:
     token_budget: TokenBudget = field(default_factory=TokenBudget)
     success_criteria: SuccessCriteria = field(default_factory=SuccessCriteria)
     description: str | None = None
+    prompts: list[str] | None = None  # If set, runs as multi-turn conversation (overrides prompt)
 
 
 @dataclass

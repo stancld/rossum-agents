@@ -7,7 +7,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from rossum_agent.tools.change_history import revert_commit, show_change_history, show_commit_details
+from rossum_agent.tools.change_history import (
+    diff_objects,
+    restore_entity_version,
+    revert_commit,
+    show_change_history,
+    show_commit_details,
+    show_entity_history,
+)
 from rossum_agent.tools.core import (
     SubAgentProgress,
     SubAgentProgressCallback,
@@ -22,6 +29,7 @@ from rossum_agent.tools.core import (
     get_output_dir,
     get_rossum_credentials,
     get_rossum_environment,
+    get_snapshot_store,
     get_task_tracker,
     is_read_only_mode,
     report_progress,
@@ -34,6 +42,7 @@ from rossum_agent.tools.core import (
     set_progress_callback,
     set_rossum_credentials,
     set_rossum_environment,
+    set_snapshot_store,
     set_task_snapshot_callback,
     set_task_tracker,
     set_text_callback,
@@ -108,6 +117,7 @@ if TYPE_CHECKING:
 
 _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     write_file,
+    diff_objects,
     search_knowledge_base,
     search_elis_docs,
     patch_schema_with_subagent,
@@ -129,7 +139,9 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
 _CHANGE_HISTORY_TOOLS: list[BetaTool[..., str]] = [
     show_change_history,
     show_commit_details,
+    show_entity_history,
     revert_commit,
+    restore_entity_version,
 ]
 
 _DEPLOYMENT_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
@@ -233,6 +245,7 @@ __all__ = [
     "deploy_pull",
     "deploy_push",
     "deploy_to_org",
+    "diff_objects",
     "elis_openapi_grep",
     "elis_openapi_jq",
     "evaluate_lookup_field",
@@ -254,6 +267,7 @@ __all__ = [
     "get_output_dir",
     "get_rossum_credentials",
     "get_rossum_environment",
+    "get_snapshot_store",
     "get_task_tracker",
     "get_tools_version",
     "get_write_tools",
@@ -275,6 +289,7 @@ __all__ = [
     "report_token_usage",
     "require_rossum_credentials",
     "reset_dynamic_tools",
+    "restore_entity_version",
     "revert_commit",
     "search_elis_docs",
     "search_knowledge_base",
@@ -284,12 +299,14 @@ __all__ = [
     "set_progress_callback",
     "set_rossum_credentials",
     "set_rossum_environment",
+    "set_snapshot_store",
     "set_task_snapshot_callback",
     "set_task_tracker",
     "set_text_callback",
     "set_token_callback",
     "show_change_history",
     "show_commit_details",
+    "show_entity_history",
     "spawn_mcp_connection",
     "suggest_categories_for_request",
     "suggest_formula_field",

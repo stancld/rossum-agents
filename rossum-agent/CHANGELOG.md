@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Added
+- Added `SnapshotStore` — Redis-backed store (7-day TTL) that indexes full entity snapshots by `(entity_type, entity_id, commit_hash)` for point-in-time restore [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Added `show_entity_history` tool — lists all historical versions of a specific entity [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Added `restore_entity_version` tool — restores an entity to a specific historical version by commit hash [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Added `diff_objects` tool — computes unified diff between two JSON objects for explicit comparison requests [#200](https://github.com/stancld/rossum-agents/pull/200)
+
+### Changed
+- `revert_commit` no longer restricted to the latest commit — any historical commit can now be reverted [#200](https://github.com/stancld/rossum-agents/pull/200)
+
+### Fixed
+- Fixed schema revert failing under concurrent modifications — now retries with backoff on HTTP 412 (up to 5 attempts) using fetch-then-patch to register current state before each write [#200](https://github.com/stancld/rossum-agents/pull/200)
+
 ## [1.2.1] - 2026-02-18
 
 ### Added

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,9 +21,11 @@ from rossum_agent.api.services.agent_service import (
     AgentService,
     _create_tool_result_event,
     _create_tool_start_event,
+    _log_commit_hook,
     convert_step_to_events,
     convert_sub_agent_progress_to_event,
 )
+from rossum_agent.change_tracking.models import ConfigCommit, EntityChange
 from rossum_agent.tools import SubAgentProgress, SubAgentText
 
 
@@ -817,7 +821,7 @@ class TestAgentServiceRunAgent:
                 AgentService,
                 "_setup_change_tracking",
                 new_callable=AsyncMock,
-                return_value=(None, "https://api.rossum.ai"),
+                return_value=(None, None, "https://api.rossum.ai"),
             ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -868,7 +872,7 @@ class TestAgentServiceRunAgent:
                 AgentService,
                 "_setup_change_tracking",
                 new_callable=AsyncMock,
-                return_value=(None, "https://api.rossum.ai"),
+                return_value=(None, None, "https://api.rossum.ai"),
             ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -916,7 +920,7 @@ class TestAgentServiceRunAgent:
                 AgentService,
                 "_setup_change_tracking",
                 new_callable=AsyncMock,
-                return_value=(None, "https://api.rossum.ai"),
+                return_value=(None, None, "https://api.rossum.ai"),
             ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -966,7 +970,7 @@ class TestAgentServiceRunAgent:
                 AgentService,
                 "_setup_change_tracking",
                 new_callable=AsyncMock,
-                return_value=(None, "https://api.rossum.ai"),
+                return_value=(None, None, "https://api.rossum.ai"),
             ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -1292,7 +1296,6 @@ class TestAgentServiceSubAgentCallbacks:
 
     async def test_on_sub_agent_progress_queue_full(self, caplog):
         """Test _on_sub_agent_progress logs warning when queue is full."""
-        import logging
 
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
@@ -1360,7 +1363,6 @@ class TestAgentServiceSubAgentCallbacks:
 
     async def test_on_sub_agent_text_queue_full(self, caplog):
         """Test _on_sub_agent_text logs warning when queue is full."""
-        import logging
 
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
@@ -1412,7 +1414,6 @@ class TestAgentServiceSubAgentCallbacks:
 
     async def test_on_task_snapshot_queue_full(self, caplog):
         """Test _on_task_snapshot logs warning when queue is full."""
-        import logging
 
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
@@ -1437,7 +1438,6 @@ class TestAgentServiceRunAgentWithImages:
     @pytest.mark.asyncio
     async def test_run_agent_logs_image_count(self, tmp_path, caplog):
         """Test that run_agent logs the number of images."""
-        import logging
 
         service = AgentService()
 
@@ -1464,7 +1464,7 @@ class TestAgentServiceRunAgentWithImages:
                 AgentService,
                 "_setup_change_tracking",
                 new_callable=AsyncMock,
-                return_value=(None, "https://api.rossum.ai"),
+                return_value=(None, None, "https://api.rossum.ai"),
             ),
             caplog.at_level(logging.INFO),
         ):
@@ -1531,3 +1531,176 @@ class TestAgentServiceUrlContext:
 
             call_kwargs = mock_create_agent.call_args
             assert "URL context" in call_kwargs.kwargs["system_prompt"]
+
+
+class TestAfterLoopHook:
+    """Tests for the log_commit hook invocation."""
+
+    @pytest.mark.asyncio
+    async def test_log_commit_hook_no_changes(self):
+        commit = ConfigCommit(
+            hash="deadbeef1234",
+            chat_id="test",
+            timestamp=datetime.now(),
+            message="Updated queue settings",
+            user_request="Update settings",
+            environment="https://api.rossum.ai",
+            changes=[],
+        )
+        result = await _log_commit_hook(commit)
+        assert result == "✓ deadbeef — Updated queue settings"
+
+    async def test_log_commit_hook_with_changes(self):
+        commit = ConfigCommit(
+            hash="cafebabe5678",
+            chat_id="test",
+            timestamp=datetime.now(),
+            message="Configured schema",
+            user_request="Configure",
+            environment="https://api.rossum.ai",
+            changes=[
+                EntityChange(
+                    entity_type="queue",
+                    entity_id="1",
+                    entity_name="Main Queue",
+                    operation="update",
+                    before={},
+                    after={},
+                ),
+                EntityChange(
+                    entity_type="schema",
+                    entity_id="2",
+                    entity_name="Invoice",
+                    operation="create",
+                    before=None,
+                    after={},
+                ),
+                EntityChange(
+                    entity_type="hook",
+                    entity_id="3",
+                    entity_name="Old Hook",
+                    operation="delete",
+                    before={},
+                    after=None,
+                ),
+            ],
+        )
+        result = await _log_commit_hook(commit)
+        assert result is not None
+        lines = result.splitlines()
+        assert lines[0] == "✓ cafebabe — Configured schema"
+        assert lines[1] == '  [~] queue "Main Queue"'
+        assert lines[2] == '  [+] schema "Invoice"'
+        assert lines[3] == '  [-] hook "Old Hook"'
+
+    @pytest.mark.asyncio
+    async def test_run_agent_calls_hook_on_commit(self, tmp_path):
+        """Test that the log_commit hook is called when a commit is created."""
+        service = AgentService()
+
+        mock_mcp_connection = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tokens.total_input = 0
+        mock_agent.tokens.total_output = 0
+        mock_agent.tokens.total_cache_creation = 0
+        mock_agent.tokens.total_cache_read = 0
+        mock_agent.get_token_usage_breakdown.return_value = {}
+        mock_agent.log_token_usage_summary = MagicMock()
+        mock_agent.memory = MagicMock()
+
+        async def mock_run(prompt):
+            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+
+        mock_agent.run = mock_run
+
+        fake_commit = ConfigCommit(
+            hash="abc123",
+            chat_id="test-chat",
+            timestamp=datetime.now(),
+            message="Updated schema",
+            user_request="Update schema",
+            environment="https://api.rossum.ai",
+            changes=[],
+        )
+
+        with (
+            patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
+            patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
+            patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(AgentService, "_try_create_config_commit", return_value=fake_commit),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(MagicMock(), MagicMock(), "https://api.rossum.ai"),
+            ),
+        ):
+            mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
+            mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_create_agent.return_value = mock_agent
+
+            events = []
+            async for event in service.run_agent(
+                chat_id="test-chat",
+                prompt="Test",
+                conversation_history=[],
+                rossum_api_token="token",
+                rossum_api_base_url="https://api.rossum.ai",
+            ):
+                events.append(event)
+
+        # Hook output is yielded as a StepEvent before StreamDoneEvent
+        hook_events = [e for e in events if isinstance(e, StepEvent) and e.is_hook_output]
+        assert len(hook_events) == 1
+        assert hook_events[0].type == "final_answer"
+        assert "abc123" in hook_events[0].content
+        assert hook_events[0].is_final is True
+
+    @pytest.mark.asyncio
+    async def test_run_agent_skips_hook_when_no_commit(self, tmp_path):
+        """Test that hook output is not emitted when no commit is created."""
+        service = AgentService()
+
+        mock_mcp_connection = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tokens.total_input = 0
+        mock_agent.tokens.total_output = 0
+        mock_agent.tokens.total_cache_creation = 0
+        mock_agent.tokens.total_cache_read = 0
+        mock_agent.get_token_usage_breakdown.return_value = {}
+        mock_agent.log_token_usage_summary = MagicMock()
+        mock_agent.memory = MagicMock()
+
+        async def mock_run(prompt):
+            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+
+        mock_agent.run = mock_run
+
+        with (
+            patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
+            patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
+            patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(AgentService, "_try_create_config_commit", return_value=None),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(MagicMock(), MagicMock(), "https://api.rossum.ai"),
+            ),
+        ):
+            mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
+            mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_create_agent.return_value = mock_agent
+
+            events = []
+            async for event in service.run_agent(
+                chat_id="test-chat",
+                prompt="Test",
+                conversation_history=[],
+                rossum_api_token="token",
+                rossum_api_base_url="https://api.rossum.ai",
+            ):
+                events.append(event)
+
+        hook_events = [e for e in events if isinstance(e, StepEvent) and e.is_hook_output]
+        assert len(hook_events) == 0

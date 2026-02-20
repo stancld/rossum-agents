@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from rossum_agent.change_tracking.models import ConfigCommit, EntityChange
-from rossum_agent.change_tracking.store import DEFAULT_COMMIT_TTL_SECONDS, CommitStore
+from rossum_agent.change_tracking.store import (
+    DEFAULT_COMMIT_TTL_SECONDS,
+    DEFAULT_SNAPSHOT_TTL_SECONDS,
+    CommitStore,
+    SnapshotStore,
+)
 
 
 def _make_change(**overrides) -> EntityChange:
@@ -250,3 +256,223 @@ class TestCommitStoreCustomTTL:
             custom_ttl,
             commit.model_dump_json(),
         )
+
+
+class TestSnapshotStoreSaveAndGet:
+    """Test SnapshotStore save/get roundtrip."""
+
+    def test_save_snapshot(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+        env = "https://example.rossum.app/api/v1"
+        ts = datetime(2025, 2, 13, 12, 0, 0, tzinfo=UTC)
+
+        store.save_snapshot(env, "schema", "100", "abc123", ts, {"content": [{"id": "f1"}]})
+
+        pipe = client.pipeline.return_value
+        pipe.setex.assert_called_once()
+        key = pipe.setex.call_args.args[0]
+        assert key == "snapshot:https://example.rossum.app/api/v1:schema:100:abc123"
+        assert pipe.setex.call_args.args[1] == DEFAULT_SNAPSHOT_TTL_SECONDS
+        pipe.zadd.assert_called_once_with(
+            "snapshot_versions:https://example.rossum.app/api/v1:schema:100",
+            {"abc123": ts.timestamp()},
+        )
+        pipe.expire.assert_called_once_with(
+            "snapshot_versions:https://example.rossum.app/api/v1:schema:100",
+            DEFAULT_SNAPSHOT_TTL_SECONDS,
+        )
+        pipe.execute.assert_called_once()
+
+    def test_get_snapshot_roundtrip(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+        env = "https://example.rossum.app/api/v1"
+        data = {"content": [{"id": "f1"}]}
+
+        client.get.return_value = json.dumps(data).encode()
+
+        result = store.get_snapshot(env, "schema", "100", "abc123")
+
+        assert result == data
+        client.get.assert_called_once_with("snapshot:https://example.rossum.app/api/v1:schema:100:abc123")
+
+    def test_get_snapshot_not_found(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+
+        client.get.return_value = None
+
+        result = store.get_snapshot("https://example.rossum.app/api/v1", "schema", "100", "nonexistent")
+        assert result is None
+
+
+class TestSnapshotStoreGetSnapshotAt:
+    """Test get_snapshot_at."""
+
+    def test_finds_snapshot_at_timestamp(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+        env = "https://example.rossum.app/api/v1"
+        data = {"content": [{"id": "f1"}]}
+
+        client.zrevrangebyscore.return_value = [b"abc123"]
+        client.get.return_value = json.dumps(data).encode()
+
+        result = store.get_snapshot_at(env, "schema", "100", 1000.0)
+
+        assert result == data
+        client.zrevrangebyscore.assert_called_once_with(
+            f"snapshot_versions:{env}:schema:100", 1000.0, "-inf", start=0, num=1
+        )
+        client.get.assert_called_once_with(f"snapshot:{env}:schema:100:abc123")
+
+    def test_returns_none_when_no_snapshot_before_timestamp(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+
+        client.zrevrangebyscore.return_value = []
+
+        result = store.get_snapshot_at("env", "schema", "100", 0.0)
+        assert result is None
+
+    def test_returns_none_when_snapshot_data_expired(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+
+        client.zrevrangebyscore.return_value = [b"abc123"]
+        client.get.return_value = None
+
+        result = store.get_snapshot_at("env", "schema", "100", 1000.0)
+        assert result is None
+
+
+class TestSnapshotStoreGetEarliestVersion:
+    """Test get_earliest_version."""
+
+    def test_returns_oldest_entry(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+        env = "https://example.rossum.app/api/v1"
+
+        client.zrange.return_value = [(b"old_hash", 500.0)]
+
+        result = store.get_earliest_version(env, "schema", "100")
+
+        assert result == ("old_hash", 500.0)
+        client.zrange.assert_called_once_with(f"snapshot_versions:{env}:schema:100", 0, 0, withscores=True)
+
+    def test_returns_none_when_empty(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+
+        client.zrange.return_value = []
+
+        result = store.get_earliest_version("env", "schema", "100")
+        assert result is None
+
+    def test_handles_string_hash(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+
+        client.zrange.return_value = [("str_hash", 100.0)]
+
+        result = store.get_earliest_version("env", "schema", "100")
+        assert result == ("str_hash", 100.0)
+
+
+class TestSnapshotStoreListVersions:
+    """Test list_versions."""
+
+    def test_list_versions(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+        env = "https://example.rossum.app/api/v1"
+
+        ts1 = datetime(2025, 2, 12, 10, 0, 0, tzinfo=UTC).timestamp()
+        ts2 = datetime(2025, 2, 13, 12, 0, 0, tzinfo=UTC).timestamp()
+        client.zrevrange.return_value = [(b"new_hash", ts2), (b"old_hash", ts1)]
+
+        result = store.list_versions(env, "schema", "100")
+
+        assert len(result) == 2
+        assert result[0] == ("new_hash", ts2)
+        assert result[1] == ("old_hash", ts1)
+        client.zrevrange.assert_called_once_with(
+            "snapshot_versions:https://example.rossum.app/api/v1:schema:100", 0, 19, withscores=True
+        )
+
+    def test_list_versions_empty(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+
+        client.zrevrange.return_value = []
+
+        result = store.list_versions("https://example.rossum.app/api/v1", "schema", "100")
+        assert result == []
+
+    def test_list_versions_with_limit(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+        env = "https://example.rossum.app/api/v1"
+
+        client.zrevrange.return_value = [(b"hash1", 1000.0)]
+
+        result = store.list_versions(env, "schema", "100", limit=1)
+
+        assert len(result) == 1
+        client.zrevrange.assert_called_once_with(f"snapshot_versions:{env}:schema:100", 0, 0, withscores=True)
+
+
+class TestSnapshotStoreGetSnapshotAtStringHash:
+    """Test get_snapshot_at handles string-typed hash from Redis."""
+
+    def test_string_hash_response(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+        env = "https://example.rossum.app/api/v1"
+        data = {"content": [{"id": "f1"}]}
+
+        # Some Redis clients return strings instead of bytes
+        client.zrevrangebyscore.return_value = ["str_hash"]
+        client.get.return_value = json.dumps(data).encode()
+
+        result = store.get_snapshot_at(env, "schema", "100", 1000.0)
+
+        assert result == data
+        client.get.assert_called_once_with(f"snapshot:{env}:schema:100:str_hash")
+
+
+class TestSnapshotStoreListVersionsStringHash:
+    """Test list_versions handles string-typed hashes from Redis."""
+
+    def test_string_hashes(self):
+        client = _make_mock_client()
+        store = SnapshotStore(client)
+        env = "https://example.rossum.app/api/v1"
+
+        client.zrevrange.return_value = [("str_hash1", 2000.0), ("str_hash2", 1000.0)]
+
+        result = store.list_versions(env, "schema", "100")
+
+        assert len(result) == 2
+        assert result[0] == ("str_hash1", 2000.0)
+        assert result[1] == ("str_hash2", 1000.0)
+
+
+class TestSnapshotStoreCustomTTL:
+    """Test custom TTL for snapshots."""
+
+    def test_custom_ttl(self):
+        client = _make_mock_client()
+        custom_ttl = 24 * 3600  # 1 day
+        store = SnapshotStore(client, ttl_seconds=custom_ttl)
+        ts = datetime(2025, 2, 13, 12, 0, 0, tzinfo=UTC)
+
+        store.save_snapshot("env", "schema", "100", "abc", ts, {"data": True})
+
+        pipe = client.pipeline.return_value
+        pipe.setex.assert_called_once()
+        assert pipe.setex.call_args.args[1] == custom_ttl
+        pipe.expire.assert_called_once()
+        assert pipe.expire.call_args.args[1] == custom_ttl

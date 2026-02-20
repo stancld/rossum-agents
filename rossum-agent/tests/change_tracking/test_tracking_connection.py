@@ -982,7 +982,7 @@ class TestSchemaRewriteAndRevert:
         # 4. Create commit from tracked changes
         mock_store = MagicMock()
         mock_store.get_latest_hash.return_value = None
-        commit_service = CommitService(store=mock_store)
+        commit_service = CommitService(store=mock_store, snapshot_store=MagicMock())
         with patch(
             "rossum_agent.change_tracking.commit_service.generate_commit_message",
             return_value="Clear Invoice Schema content",
@@ -1006,6 +1006,7 @@ class TestSchemaRewriteAndRevert:
 
         mock_http_client = MagicMock()
         mock_http_client.update = AsyncMock()
+        mock_http_client.request_json = AsyncMock(return_value={"content": []})
         mock_api_client = MagicMock()
         mock_api_client._http_client = mock_http_client
 

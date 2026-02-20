@@ -24,7 +24,7 @@ from rossum_agent.api.models.schemas import (
     TaskSnapshotEvent,
 )
 from rossum_agent.change_tracking.commit_service import CommitService
-from rossum_agent.change_tracking.store import CommitStore
+from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.redis_storage import RedisStorage
 from rossum_agent.rossum_mcp_integration import MCPConnection, connect_mcp_server
@@ -39,6 +39,7 @@ from rossum_agent.tools import (
     set_progress_callback,
     set_rossum_credentials,
     set_rossum_environment,
+    set_snapshot_store,
     set_task_snapshot_callback,
     set_task_tracker,
     set_text_callback,
@@ -56,6 +57,16 @@ if TYPE_CHECKING:
     from rossum_agent.change_tracking.models import ConfigCommit
 
 logger = logging.getLogger(__name__)
+
+
+async def _log_commit_hook(commit: ConfigCommit) -> str | None:
+    """Built-in hook: show a commit summary after the agent turn."""
+    _op_icon = {"create": "+", "update": "~", "delete": "-"}
+    lines = [f"✓ {commit.hash[:8]} — {commit.message}"]
+    for change in commit.changes:
+        icon = _op_icon.get(change.operation, "?")
+        lines.append(f'  [{icon}] {change.entity_type} "{change.entity_name}"')
+    return "\n".join(lines)
 
 
 @dataclass
@@ -236,26 +247,27 @@ class AgentService:
         """Initialize agent service."""
         self._chat_runs: dict[str, _ChatRunState] = {}
 
-    def _get_or_create_commit_store(self) -> CommitStore | None:
+    def _get_or_create_stores(self) -> tuple[CommitStore | None, SnapshotStore | None]:
         storage = RedisStorage()
         if storage.is_connected():
-            return CommitStore(storage.client)
+            return CommitStore(storage.client), SnapshotStore(storage.client)
         logger.warning("Redis unavailable — change tracking disabled for this run")
-        return None
+        return None, None
 
     async def _setup_change_tracking(
         self, mcp_connection: MCPConnection, chat_id: str, rossum_api_base_url: str
-    ) -> tuple[CommitStore | None, str]:
-        """Configure change tracking on the MCP connection. Returns (store, environment)."""
-        commit_store = self._get_or_create_commit_store()
+    ) -> tuple[CommitStore | None, SnapshotStore | None, str]:
+        """Configure change tracking on the MCP connection. Returns (commit_store, snapshot_store, environment)."""
+        commit_store, snapshot_store = self._get_or_create_stores()
         write_tools = await get_write_tools_async(mcp_connection)
         environment = rossum_api_base_url.rstrip("/")
         if commit_store is not None:
-            mcp_connection.setup_change_tracking(write_tools, chat_id, environment, commit_store)
+            assert snapshot_store is not None  # both created together from the same Redis client
+            mcp_connection.setup_change_tracking(write_tools, chat_id, environment, commit_store, snapshot_store)
         else:
             mcp_connection.write_tools = write_tools
             mcp_connection.chat_id = chat_id
-        return commit_store, environment
+        return commit_store, snapshot_store, environment
 
     def _get_context(self) -> _RequestContext:
         """Get the current request context, creating if needed."""
@@ -420,11 +432,7 @@ class AgentService:
         set_task_tracker(TaskTracker())
         set_task_snapshot_callback(self._on_task_snapshot)
 
-        system_prompt = get_system_prompt()
-        url_context = extract_url_context(rossum_url)
-        if not url_context.is_empty():
-            context_section = format_context_for_prompt(url_context)
-            system_prompt = system_prompt + "\n\n---\n" + context_section
+        system_prompt = self._build_system_prompt(rossum_url)
 
         try:
             try:
@@ -433,7 +441,7 @@ class AgentService:
                     rossum_api_base_url=rossum_api_base_url,
                     mcp_mode=mcp_mode,
                 ) as mcp_connection:
-                    commit_store, environment = await self._setup_change_tracking(
+                    commit_store, snapshot_store, environment = await self._setup_change_tracking(
                         mcp_connection, chat_id, rossum_api_base_url
                     )
 
@@ -443,6 +451,7 @@ class AgentService:
 
                     set_mcp_connection(mcp_connection, asyncio.get_event_loop(), mcp_mode)
                     set_commit_store(commit_store)
+                    set_snapshot_store(snapshot_store)
                     set_rossum_environment(environment)
 
                     self._restore_conversation_history(agent, conversation_history)
@@ -471,22 +480,19 @@ class AgentService:
 
                         self._get_chat_run_state(chat_id).last_memory = agent.memory
 
-                        commit = self._try_create_config_commit(
-                            commit_store, mcp_connection, chat_id, prompt, rossum_api_base_url
-                        )
-
-                        yield StreamDoneEvent(
-                            total_steps=total_steps,
-                            input_tokens=total_input_tokens,
-                            output_tokens=total_output_tokens,
-                            cache_creation_input_tokens=agent.tokens.total_cache_creation,
-                            cache_read_input_tokens=agent.tokens.total_cache_read,
-                            token_usage_breakdown=agent.get_token_usage_breakdown(),
-                            config_commit_hash=commit.hash if commit else None,
-                            config_commit_message=commit.message if commit else None,
-                            config_changes_count=len(commit.changes) if commit else 0,
-                        )
-                        agent.log_token_usage_summary()
+                        async for event in self._stream_finalization(
+                            commit_store,
+                            snapshot_store,
+                            mcp_connection,
+                            chat_id,
+                            prompt,
+                            rossum_api_base_url,
+                            total_steps,
+                            total_input_tokens,
+                            total_output_tokens,
+                            agent,
+                        ):
+                            yield event
 
                     except Exception as e:
                         logger.error(f"Agent execution failed: {e}", exc_info=True)
@@ -504,6 +510,7 @@ class AgentService:
                 set_output_dir(None)
                 set_rossum_credentials(None, None)
                 set_commit_store(None)
+                set_snapshot_store(None)
                 set_rossum_environment(None)
         except asyncio.CancelledError:
             logger.info(f"Run cancelled for chat {chat_id} (run_id={run_id})")
@@ -512,17 +519,70 @@ class AgentService:
             await self._clear_run(chat_id, run_id)
 
     @staticmethod
-    def _try_create_config_commit(
+    def _build_system_prompt(rossum_url: str | None) -> str:
+        system_prompt = get_system_prompt()
+        url_context = extract_url_context(rossum_url)
+        if not url_context.is_empty():
+            context_section = format_context_for_prompt(url_context)
+            system_prompt = system_prompt + "\n\n---\n" + context_section
+        return system_prompt
+
+    async def _stream_finalization(
+        self,
         commit_store: CommitStore | None,
+        snapshot_store: SnapshotStore | None,
+        mcp_connection: MCPConnection,
+        chat_id: str,
+        prompt: str,
+        rossum_api_base_url: str,
+        total_steps: int,
+        total_input_tokens: int,
+        total_output_tokens: int,
+        agent: RossumAgent,
+    ) -> AsyncIterator[StepEvent | StreamDoneEvent]:
+        commit = (
+            self._try_create_config_commit(
+                commit_store, snapshot_store, mcp_connection, chat_id, prompt, rossum_api_base_url
+            )
+            if commit_store and snapshot_store
+            else None
+        )
+        if commit is not None:
+            hook_output = await _log_commit_hook(commit)
+            if hook_output:
+                yield StepEvent(
+                    type="final_answer",
+                    step_number=total_steps + 1,
+                    content=hook_output,
+                    is_final=True,
+                    is_hook_output=True,
+                )
+        yield StreamDoneEvent(
+            total_steps=total_steps,
+            input_tokens=total_input_tokens,
+            output_tokens=total_output_tokens,
+            cache_creation_input_tokens=agent.tokens.total_cache_creation,
+            cache_read_input_tokens=agent.tokens.total_cache_read,
+            token_usage_breakdown=agent.get_token_usage_breakdown(),
+            config_commit_hash=commit.hash if commit else None,
+            config_commit_message=commit.message if commit else None,
+            config_changes_count=len(commit.changes) if commit else 0,
+        )
+        agent.log_token_usage_summary()
+
+    @staticmethod
+    def _try_create_config_commit(
+        commit_store: CommitStore,
+        snapshot_store: SnapshotStore,
         mcp_connection: MCPConnection,
         chat_id: str,
         prompt: str,
         rossum_api_base_url: str,
     ) -> ConfigCommit | None:
         """Create a config commit if there are tracked changes."""
-        if not commit_store or not mcp_connection.has_changes():
+        if not mcp_connection.has_changes():
             return None
-        commit_service = CommitService(commit_store)
+        commit_service = CommitService(commit_store, snapshot_store)
         return commit_service.create_commit(mcp_connection, chat_id, prompt, rossum_api_base_url.rstrip("/"))
 
     def _save_documents_to_output_dir(self, documents: list[DocumentContent], output_dir: Path) -> None:
