@@ -504,7 +504,10 @@ async def _restore_entity(api_base_url: str, token: str, entity_type: str, entit
     if not patch:
         return {"status": "no_changes", "entity_type": entity_type, "entity_id": entity_id}
 
-    await client._http_client.update(resource, int_id, patch)
+    if entity_type == "schema":
+        await _revert_schema_with_retry(client, int_id, patch)
+    else:
+        await client._http_client.update(resource, int_id, patch)
     return {"status": "restored", "entity_type": entity_type, "entity_id": entity_id}
 
 
