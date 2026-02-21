@@ -80,9 +80,11 @@ from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
 from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
 from rossum_agent.tools import execute_internal_tool, execute_tool, get_internal_tool_names, get_internal_tools
 from rossum_agent.tools.core import (
+    AgentContext,
     SubAgentProgress,
     SubAgentTokenUsage,
     get_context,
+    set_context,
 )
 from rossum_agent.tools.deploy import DEPLOY_TOOLS, get_deploy_tool_names, get_deploy_tools
 from rossum_agent.tools.dynamic_tools import (
@@ -785,14 +787,23 @@ class RossumAgent:
         try:
             if tool_call.name in get_internal_tool_names():
                 logger.info(f"Calling internal tool {tool_call.name}")
+                # Create a per-tool AgentContext copy with isolated callbacks
+                # to avoid races when multiple tools run in parallel
                 agent_ctx = get_context()
-                agent_ctx.progress_callback = progress_callback
-                agent_ctx.token_callback = token_callback
+                tool_ctx = dataclasses.replace(
+                    agent_ctx,
+                    progress_callback=progress_callback,
+                    token_callback=token_callback,
+                )
+
+                def _run_internal_tool(tool_ctx: AgentContext, name: str, arguments: dict) -> object:
+                    set_context(tool_ctx)
+                    return execute_internal_tool(name, arguments)
 
                 loop = asyncio.get_event_loop()
                 ctx = copy_context()
                 future = loop.run_in_executor(
-                    None, partial(ctx.run, execute_internal_tool, tool_call.name, tool_call.arguments)
+                    None, partial(ctx.run, _run_internal_tool, tool_ctx, tool_call.name, tool_call.arguments)
                 )
 
                 while not future.done():
@@ -818,8 +829,6 @@ class RossumAgent:
                 result = future.result()
                 content = str(result)
                 logger.info(f"Internal tool {tool_call.name} result: {content}")
-                agent_ctx.progress_callback = None
-                agent_ctx.token_callback = None
             elif tool_call.name in get_deploy_tool_names():
                 logger.info(f"Calling deploy tool {tool_call.name}")
                 loop = asyncio.get_event_loop()
@@ -837,9 +846,6 @@ class RossumAgent:
             yield ToolResult(tool_call_id=tool_call.id, name=tool_call.name, content=content)
 
         except Exception as e:
-            agent_ctx = get_context()
-            agent_ctx.progress_callback = None
-            agent_ctx.token_callback = None
             error_msg = f"Tool {tool_call.name} failed: {e}"
             logger.warning(f"Tool {tool_call.name} failed: {e}", exc_info=True)
             yield ToolResult(tool_call_id=tool_call.id, name=tool_call.name, content=error_msg, is_error=True)
