@@ -95,7 +95,6 @@ all = [
     "pytest-cov>=4.0.0",
     "pytest-xdist>=3.0.0",
     "pyyaml>=6.0",
-    "pre-commit",
     "redis>=7.0.0",
     "requests>=2.32",
     "rossum-api>=3.9.1",
