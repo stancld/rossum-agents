@@ -81,13 +81,6 @@ class RedisStorage:
     """Redis storage for chat conversations."""
 
     def __init__(self, host: str | None = None, port: int | None = None, ttl_days: int = 30) -> None:
-        """Initialize Redis storage.
-
-        Args:
-            host: Redis host (defaults to REDIS_HOST env var or 'localhost')
-            port: Redis port (defaults to REDIS_PORT env var or 6379)
-            ttl_days: Time-to-live for chat data in days (default: 30)
-        """
         self.host = host or os.getenv("REDIS_HOST", "localhost")
         self.port = port if port is not None else int(os.getenv("REDIS_PORT", "6379"))
         self.ttl = dt.timedelta(days=ttl_days)
@@ -95,7 +88,6 @@ class RedisStorage:
 
     @property
     def client(self) -> redis.Redis:
-        """Get or create Redis client."""
         if self._client is None:
             self._client = redis.Redis(
                 host=self.host, port=self.port, decode_responses=False, socket_connect_timeout=5
@@ -135,16 +127,6 @@ class RedisStorage:
             return False
 
     def load_chat(self, user_id: str | None, chat_id: str, output_dir: Path | None = None) -> ChatData | None:
-        """Load chat from Redis and restore files to output directory.
-
-        Args:
-            user_id: Optional user identifier
-            chat_id: Chat identifier
-            output_dir: Directory to restore files to. If None, a new temp directory is created.
-
-        Returns:
-            ChatData containing messages, output_dir, and metadata, or None if chat not found
-        """
         try:
             key = self._get_chat_key(user_id, chat_id)
             value = self.client.get(key)
@@ -197,24 +179,12 @@ class RedisStorage:
             return False
 
     def _get_chat_key(self, user_id: str | None, chat_id: str) -> str:
-        """Generate Redis key for a chat."""
         return f"user:{user_id}:chat:{chat_id}" if user_id else f"chat:{chat_id}"
 
     def _get_chat_pattern(self, user_id: str | None = None) -> str:
-        """Generate Redis key pattern for listing chats."""
         return f"user:{user_id}:chat:*" if user_id else "chat:*"
 
     def list_all_chats(self, user_id: str | None = None) -> list[dict[str, Any]]:
-        """List all chat conversations with metadata.
-
-        Args:
-            user_id: Optional user ID to filter chats (None = all chats or shared chats)
-
-        Returns:
-            List of dicts with chat_id, timestamp, message_count, first_message,
-            and metadata (commit_sha, total_input_tokens, total_output_tokens,
-            total_tool_calls, total_steps)
-        """
         try:
             pattern = self._get_chat_pattern(user_id)
             keys = cast("list[bytes]", self.client.keys(pattern.encode("utf-8")))
@@ -262,16 +232,7 @@ class RedisStorage:
             return []
 
     def save_file(self, chat_id: str, file_path: Path | str, content: bytes | None = None) -> bool:
-        """Save a file to Redis associated with a chat session.
-
-        Args:
-            chat_id: Chat session ID
-            file_path: Path to the file (or filename)
-            content: Optional file content as bytes. If not provided, reads from file_path
-
-        Returns:
-            True if successful, False otherwise
-        """
+        # If content is None, reads from file_path on disk
         try:
             if isinstance(file_path, str):
                 file_path = Path(file_path)
@@ -302,15 +263,6 @@ class RedisStorage:
             return False
 
     def load_file(self, chat_id: str, filename: str) -> bytes | None:
-        """Load a file from Redis for a chat session.
-
-        Args:
-            chat_id: Chat session ID
-            filename: Name of the file to load
-
-        Returns:
-            File content as bytes, or None if not found
-        """
         try:
             key = f"file:{chat_id}:{filename}"
             value = self.client.get(key)
@@ -327,14 +279,6 @@ class RedisStorage:
             return None
 
     def list_files(self, chat_id: str) -> list[dict[str, Any]]:
-        """List all files for a chat session.
-
-        Args:
-            chat_id: Chat session ID
-
-        Returns:
-            List of dicts with filename, size, and timestamp
-        """
         try:
             pattern = f"file:{chat_id}:*"
             keys = cast("list[bytes]", self.client.keys(pattern.encode("utf-8")))
@@ -361,15 +305,6 @@ class RedisStorage:
             return []
 
     def delete_file(self, chat_id: str, filename: str) -> bool:
-        """Delete a file from Redis for a chat session.
-
-        Args:
-            chat_id: Chat session ID
-            filename: Name of the file to delete
-
-        Returns:
-            True if deleted, False otherwise
-        """
         try:
             key = f"file:{chat_id}:{filename}"
             deleted = self.client.delete(key)
@@ -380,14 +315,6 @@ class RedisStorage:
             return False
 
     def delete_all_files(self, chat_id: str) -> int:
-        """Delete all files for a chat session.
-
-        Args:
-            chat_id: Chat session ID
-
-        Returns:
-            Number of files deleted
-        """
         try:
             pattern = f"file:{chat_id}:*"
             keys = cast("list[bytes]", self.client.keys(pattern.encode("utf-8")))
@@ -403,15 +330,6 @@ class RedisStorage:
             return 0
 
     def save_all_files(self, chat_id: str, output_dir: Path) -> int:
-        """Save all files from output directory to Redis.
-
-        Args:
-            chat_id: Chat session ID
-            output_dir: Directory containing files to save
-
-        Returns:
-            Number of files saved successfully
-        """
         saved_count = 0
         try:
             if not output_dir.exists() or not output_dir.is_dir():
@@ -430,15 +348,6 @@ class RedisStorage:
             return saved_count
 
     def load_all_files(self, chat_id: str, output_dir: Path) -> int:
-        """Load all files from Redis to output directory.
-
-        Args:
-            chat_id: Chat session ID
-            output_dir: Directory where files will be restored
-
-        Returns:
-            Number of files loaded successfully
-        """
         loaded_count = 0
         try:
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -459,7 +368,6 @@ class RedisStorage:
             return loaded_count
 
     def close(self) -> None:
-        """Close Redis connection."""
         if self._client is not None:
             self._client.close()
             self._client = None

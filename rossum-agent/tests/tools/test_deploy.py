@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
-from rossum_agent.tools import DEPLOY_TOOLS, execute_tool, set_output_dir
-from rossum_agent.tools.core import require_rossum_credentials
+from rossum_agent.tools import execute_tool
+from rossum_agent.tools.core import AgentContext, get_context, set_context
 from rossum_agent.tools.deploy import (
+    DEPLOY_TOOLS,
     create_workspace,
     deploy_compare_workspaces,
     deploy_copy_org,
@@ -537,7 +538,8 @@ class TestDeployCompareWorkspaces:
         mock_result.source_only = [(ObjectType.HOOK, 1, "Hook1")]
         mock_result.target_only = []
 
-        with patch("rossum_agent.tools.deploy.require_rossum_credentials", return_value=("https://api.test", "token")):
+        set_context(AgentContext(rossum_credentials=("https://api.test", "token")))
+        try:
             with patch("rossum_agent.tools.deploy.Workspace") as mock_ws_class:
                 mock_source_ws = MagicMock()
                 mock_source_ws.compare_workspaces.return_value = mock_result
@@ -547,6 +549,8 @@ class TestDeployCompareWorkspaces:
                     source_workspace_path=str(source_path),
                     target_workspace_path=str(target_path),
                 )
+        finally:
+            set_context(AgentContext())
 
         result = json.loads(result_json)
         assert result["status"] == "success"
@@ -574,7 +578,8 @@ class TestDeployCompareWorkspaces:
         mock_result.source_only = []
         mock_result.target_only = []
 
-        with patch("rossum_agent.tools.deploy.require_rossum_credentials", return_value=("https://api.test", "token")):
+        set_context(AgentContext(rossum_credentials=("https://api.test", "token")))
+        try:
             with patch("rossum_agent.tools.deploy.Workspace") as mock_ws_class:
                 with patch("rossum_agent.tools.deploy.IdMapping.model_validate") as mock_validate:
                     mock_source_ws = MagicMock()
@@ -587,21 +592,27 @@ class TestDeployCompareWorkspaces:
                         target_workspace_path=str(target_path),
                         id_mapping_path=str(mapping_file),
                     )
+        finally:
+            set_context(AgentContext())
 
         result = json.loads(result_json)
         assert result["status"] == "success"
 
     def test_compare_handles_error(self, tmp_path: Path):
-        """Test compare error handling."""
-        with patch("rossum_agent.tools.deploy.require_rossum_credentials", side_effect=Exception("Creds error")):
-            result_json = deploy_compare_workspaces(
-                source_workspace_path=str(tmp_path),
-                target_workspace_path=str(tmp_path),
-            )
+        """Test compare error handling when credentials are missing."""
+        set_context(AgentContext())
+        try:
+            with patch.dict("os.environ", {}, clear=True):
+                result_json = deploy_compare_workspaces(
+                    source_workspace_path=str(tmp_path),
+                    target_workspace_path=str(tmp_path),
+                )
+        finally:
+            set_context(AgentContext())
 
         result = json.loads(result_json)
         assert result["status"] == "error"
-        assert "Creds error" in result["error"]
+        assert "credentials not available" in result["error"]
 
 
 class TestDeployToOrg:
@@ -703,7 +714,7 @@ class TestExecuteDeployTool:
         mock_workspace.pull.return_value = mock_result
         mock_workspace.path = tmp_path
 
-        set_output_dir(tmp_path)
+        set_context(AgentContext(output_dir=tmp_path))
         try:
             with patch("rossum_agent.tools.deploy.create_workspace", return_value=mock_workspace):
                 result_json = execute_tool("deploy_pull", {"org_id": 123}, DEPLOY_TOOLS)
@@ -711,7 +722,7 @@ class TestExecuteDeployTool:
             result = json.loads(result_json)
             assert result["status"] == "success"
         finally:
-            set_output_dir(None)
+            set_context(AgentContext())
 
     def test_execute_deploy_diff(self, tmp_path: Path):
         """Test execute_tool with deploy_diff."""
@@ -720,7 +731,7 @@ class TestExecuteDeployTool:
         mock_workspace.diff.return_value = mock_result
         mock_workspace.path = tmp_path
 
-        set_output_dir(tmp_path)
+        set_context(AgentContext(output_dir=tmp_path))
         try:
             with patch("rossum_agent.tools.deploy.create_workspace", return_value=mock_workspace):
                 result_json = execute_tool("deploy_diff", {}, DEPLOY_TOOLS)
@@ -728,7 +739,7 @@ class TestExecuteDeployTool:
             result = json.loads(result_json)
             assert result["status"] == "success"
         finally:
-            set_output_dir(None)
+            set_context(AgentContext())
 
     def test_execute_deploy_push(self, tmp_path: Path):
         """Test execute_tool with deploy_push."""
@@ -737,7 +748,7 @@ class TestExecuteDeployTool:
         mock_workspace.push.return_value = mock_result
         mock_workspace.path = tmp_path
 
-        set_output_dir(tmp_path)
+        set_context(AgentContext(output_dir=tmp_path))
         try:
             with patch("rossum_agent.tools.deploy.create_workspace", return_value=mock_workspace):
                 result_json = execute_tool("deploy_push", {"dry_run": True}, DEPLOY_TOOLS)
@@ -746,7 +757,7 @@ class TestExecuteDeployTool:
             assert result["status"] == "success"
             assert result["dry_run"] is True
         finally:
-            set_output_dir(None)
+            set_context(AgentContext())
 
     def test_execute_deploy_copy_org(self, tmp_path: Path):
         """Test execute_tool with deploy_copy_org."""
@@ -755,7 +766,7 @@ class TestExecuteDeployTool:
         mock_workspace.copy_org.return_value = mock_result
         mock_workspace.path = tmp_path
 
-        set_output_dir(tmp_path)
+        set_context(AgentContext(output_dir=tmp_path))
         try:
             with patch("rossum_agent.tools.deploy.create_workspace", return_value=mock_workspace):
                 result_json = execute_tool(
@@ -765,7 +776,7 @@ class TestExecuteDeployTool:
             result = json.loads(result_json)
             assert result["status"] == "success"
         finally:
-            set_output_dir(None)
+            set_context(AgentContext())
 
     def test_execute_deploy_copy_workspace(self, tmp_path: Path):
         """Test execute_tool with deploy_copy_workspace."""
@@ -774,7 +785,7 @@ class TestExecuteDeployTool:
         mock_workspace.copy_workspace.return_value = mock_result
         mock_workspace.path = tmp_path
 
-        set_output_dir(tmp_path)
+        set_context(AgentContext(output_dir=tmp_path))
         try:
             with patch("rossum_agent.tools.deploy.create_workspace", return_value=mock_workspace):
                 result_json = execute_tool(
@@ -784,7 +795,7 @@ class TestExecuteDeployTool:
             result = json.loads(result_json)
             assert result["status"] == "success"
         finally:
-            set_output_dir(None)
+            set_context(AgentContext())
 
     def test_execute_deploy_to_org(self, tmp_path: Path):
         """Test execute_tool with deploy_to_org."""
@@ -793,7 +804,7 @@ class TestExecuteDeployTool:
         mock_workspace.deploy.return_value = mock_result
         mock_workspace.path = tmp_path
 
-        set_output_dir(tmp_path)
+        set_context(AgentContext(output_dir=tmp_path))
         try:
             with patch("rossum_agent.tools.deploy.create_workspace", return_value=mock_workspace):
                 result_json = execute_tool("deploy_to_org", {"target_org_id": 200}, DEPLOY_TOOLS)
@@ -801,7 +812,7 @@ class TestExecuteDeployTool:
             result = json.loads(result_json)
             assert result["status"] == "success"
         finally:
-            set_output_dir(None)
+            set_context(AgentContext())
 
     def test_execute_deploy_tool_unknown_name(self):
         """Test that unknown tool name raises ValueError."""
@@ -814,7 +825,7 @@ class TestCreateWorkspaceHelper:
 
     def test_uses_default_path_when_none(self, tmp_path: Path):
         """Test that default path is used when workspace_path is None."""
-        set_output_dir(tmp_path)
+        set_context(AgentContext(output_dir=tmp_path))
         try:
             with patch("rossum_agent.tools.deploy.Workspace") as mock_ws_class:
                 mock_ws_class.return_value = MagicMock()
@@ -828,7 +839,7 @@ class TestCreateWorkspaceHelper:
                 path_arg = call_args[0][0]
                 assert str(path_arg).endswith("rossum-config")
         finally:
-            set_output_dir(None)
+            set_context(AgentContext())
 
     def test_uses_custom_path(self, tmp_path: Path):
         """Test that custom path is used when provided."""
@@ -862,23 +873,29 @@ class TestCreateWorkspaceHelper:
 
 
 class TestRequireRossumCredentials:
-    """Test require_rossum_credentials helper function."""
+    """Test require_rossum_credentials via AgentContext."""
 
     def test_returns_env_credentials(self):
         """Test that env vars are returned when set."""
-        with patch.dict(
-            "os.environ",
-            {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"},
-        ):
-            api_base, token = require_rossum_credentials()
+        set_context(AgentContext())
+        try:
+            with patch.dict(
+                "os.environ",
+                {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"},
+            ):
+                api_base, token = get_context().require_rossum_credentials()
 
-        assert api_base == "https://api.rossum.ai/v1"
-        assert token == "test_token"
+            assert api_base == "https://api.rossum.ai/v1"
+            assert token == "test_token"
+        finally:
+            set_context(AgentContext())
 
-    @patch("rossum_agent.tools.core._rossum_credentials")
-    def test_raises_when_credentials_missing(self, mock_creds):
+    def test_raises_when_credentials_missing(self):
         """Test that error is raised when neither context nor env vars have credentials."""
-        mock_creds.get.return_value = None
-        with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ValueError, match="credentials not available"):
-                require_rossum_credentials()
+        set_context(AgentContext())
+        try:
+            with patch.dict("os.environ", {}, clear=True):
+                with pytest.raises(ValueError, match="credentials not available"):
+                    get_context().require_rossum_credentials()
+        finally:
+            set_context(AgentContext())

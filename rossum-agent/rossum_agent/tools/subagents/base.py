@@ -15,8 +15,7 @@ from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
 from rossum_agent.tools.core import (
     SubAgentProgress,
     SubAgentTokenUsage,
-    report_progress,
-    report_token_usage,
+    get_context,
 )
 from rossum_agent.utils import add_message_cache_breakpoint
 
@@ -116,7 +115,7 @@ class SubAgent(ABC):
                     f"{self.config.tool_name} sub-agent: iteration {current_iteration}/{self.config.max_iterations}"
                 )
 
-                report_progress(
+                get_context().report_progress(
                     SubAgentProgress(
                         tool_name=self.config.tool_name,
                         iteration=current_iteration,
@@ -150,7 +149,7 @@ class SubAgent(ABC):
                     f"LLM {llm_elapsed_ms:.1f}ms, tokens in={input_tokens} out={output_tokens}"
                 )
 
-                report_token_usage(
+                get_context().report_token_usage(
                     SubAgentTokenUsage(
                         tool_name=self.config.tool_name,
                         input_tokens=input_tokens + cache_creation + cache_read,
@@ -169,7 +168,7 @@ class SubAgent(ABC):
                         f"{self.config.tool_name}: completed after {current_iteration} iterations "
                         f"in {iter_elapsed_ms:.1f}ms (stop_reason={response.stop_reason}, has_tool_use={has_tool_use})"
                     )
-                    report_progress(
+                    get_context().report_progress(
                         SubAgentProgress(
                             tool_name=self.config.tool_name,
                             iteration=current_iteration,
@@ -208,7 +207,7 @@ class SubAgent(ABC):
                             f"{self.config.tool_name} [iter {current_iteration}]: calling tool '{display_call}'"
                         )
 
-                        report_progress(
+                        get_context().report_progress(
                             SubAgentProgress(
                                 tool_name=self.config.tool_name,
                                 iteration=current_iteration,
@@ -243,7 +242,7 @@ class SubAgent(ABC):
                 if tool_results:
                     messages.append({"role": "user", "content": tool_results})
 
-                    report_progress(
+                    get_context().report_progress(
                         SubAgentProgress(
                             tool_name=self.config.tool_name,
                             iteration=current_iteration,

@@ -125,11 +125,6 @@ class SpecCache:
 _cache = SpecCache()
 
 
-def refresh_openapi_spec() -> None:
-    """Delete cached OpenAPI spec to force fresh download on next use."""
-    _cache.invalidate()
-
-
 def _extract_spec_from_redocly(html: str) -> dict[str, Any]:
     """Extract OpenAPI spec from Redocly HTML page.
 

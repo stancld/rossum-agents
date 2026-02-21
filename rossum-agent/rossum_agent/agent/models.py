@@ -16,7 +16,7 @@ class StepType(Enum):
 
 
 if TYPE_CHECKING:
-    from rossum_agent.tools import SubAgentProgress
+    from rossum_agent.tools.core import SubAgentProgress
 
 
 @dataclass

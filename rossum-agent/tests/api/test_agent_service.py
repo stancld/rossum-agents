@@ -26,7 +26,7 @@ from rossum_agent.api.services.agent_service import (
     convert_sub_agent_progress_to_event,
 )
 from rossum_agent.change_tracking.models import ConfigCommit, EntityChange
-from rossum_agent.tools import SubAgentProgress, SubAgentText
+from rossum_agent.tools.core import SubAgentProgress, SubAgentText
 
 
 class TestConvertStepToEvents:

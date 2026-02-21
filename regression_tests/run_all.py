@@ -26,14 +26,7 @@ from rossum_agent.bedrock_client import create_bedrock_client
 from rossum_agent.change_tracking.store import CommitStore
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.rossum_mcp_integration import connect_mcp_server
-from rossum_agent.tools.core import (
-    set_commit_store,
-    set_mcp_connection,
-    set_output_dir,
-    set_rossum_credentials,
-    set_rossum_environment,
-    set_task_tracker,
-)
+from rossum_agent.tools.core import AgentContext, reset_context, set_context
 from rossum_agent.tools.dynamic_tools import get_write_tools_async
 from rossum_agent.tools.task_tracker import TaskTracker
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
@@ -119,11 +112,8 @@ async def create_agent(case: RegressionTestCase, api_token: str, output_dir: Pat
     async with connect_mcp_server(
         rossum_api_token=api_token, rossum_api_base_url=case.api_base_url, mcp_mode=case.mode
     ) as mcp_connection:
-        set_output_dir(output_dir)
-        set_rossum_credentials(case.api_base_url, api_token)
-        set_mcp_connection(mcp_connection, asyncio.get_event_loop(), case.mode)
-
         commit_store = None
+        environment = None
         if case.requires_redis:
             commit_store = _create_commit_store()
             if commit_store:
@@ -131,10 +121,18 @@ async def create_agent(case: RegressionTestCase, api_token: str, output_dir: Pat
                 chat_id = f"regression-test-{case.name}"
                 environment = case.api_base_url.rstrip("/")
                 mcp_connection.setup_change_tracking(write_tools, chat_id, environment, commit_store)
-                set_commit_store(commit_store)
-                set_rossum_environment(environment)
 
-        set_task_tracker(TaskTracker())
+        ctx = AgentContext(
+            mcp_connection=mcp_connection,
+            mcp_event_loop=asyncio.get_event_loop(),
+            mcp_mode=case.mode,
+            rossum_credentials=(case.api_base_url, api_token),
+            rossum_environment=environment,
+            output_dir=output_dir,
+            commit_store=commit_store,
+            task_tracker=TaskTracker(),
+        )
+        token_ref = set_context(ctx)
 
         client = create_bedrock_client()
         system_prompt = get_system_prompt()
@@ -150,13 +148,7 @@ async def create_agent(case: RegressionTestCase, api_token: str, output_dir: Pat
         try:
             yield agent
         finally:
-            set_output_dir(None)
-            set_rossum_credentials(None, None)
-            set_mcp_connection(None, None)  # type: ignore[arg-type]
-            set_task_tracker(None)
-            if commit_store:
-                set_commit_store(None)
-                set_rossum_environment(None)
+            reset_context(token_ref)
 
 
 async def run_single_attempt(case: RegressionTestCase, api_token: str, output_dir: Path) -> AttemptResult:

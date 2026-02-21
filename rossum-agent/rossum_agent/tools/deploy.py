@@ -15,7 +15,7 @@ from anthropic import beta_tool
 from rossum_deploy.models import IdMapping
 from rossum_deploy.workspace import Workspace
 
-from rossum_agent.tools.core import get_output_dir, require_rossum_credentials
+from rossum_agent.tools.core import get_context
 
 if TYPE_CHECKING:
     from anthropic._tools import BetaTool  # ty: ignore[unresolved-import] - private API
@@ -29,11 +29,12 @@ def create_workspace(
     path: str | None = None, api_base_url: str | None = None, token: str | None = None
 ) -> WorkspaceType:
     """Create a Workspace instance for deployment operations."""
-    default_api_base, default_token = require_rossum_credentials()
+    ctx = get_context()
+    default_api_base, default_token = ctx.require_rossum_credentials()
     api_base = api_base_url or default_api_base
     api_token = token or default_token
 
-    workspace_path = Path(path) if path else get_output_dir() / "rossum-config"
+    workspace_path = Path(path) if path else ctx.get_output_dir() / "rossum-config"
     workspace_path.mkdir(parents=True, exist_ok=True)
 
     return Workspace(workspace_path, api_base=api_base, token=api_token)
@@ -306,7 +307,7 @@ def deploy_compare_workspaces(
     )
 
     try:
-        api_base, token = require_rossum_credentials()
+        api_base, token = get_context().require_rossum_credentials()
 
         source_ws = Workspace(Path(source_workspace_path), api_base=api_base, token=token)
         target_ws = Workspace(Path(target_workspace_path), api_base=api_base, token=token)

@@ -28,22 +28,15 @@ from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.redis_storage import RedisStorage
 from rossum_agent.rossum_mcp_integration import MCPConnection, connect_mcp_server
-from rossum_agent.tools import (
+from rossum_agent.tools.core import (
+    AgentContext,
     SubAgentProgress,
     SubAgentText,
-    TaskTracker,
-    get_write_tools_async,
-    set_commit_store,
-    set_mcp_connection,
-    set_output_dir,
-    set_progress_callback,
-    set_rossum_credentials,
-    set_rossum_environment,
-    set_snapshot_store,
-    set_task_snapshot_callback,
-    set_task_tracker,
-    set_text_callback,
+    reset_context,
+    set_context,
 )
+from rossum_agent.tools.dynamic_tools import get_write_tools_async
+from rossum_agent.tools.task_tracker import TaskTracker
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
 from rossum_agent.utils import create_session_output_dir, get_display_tool_name
 
@@ -414,24 +407,28 @@ class AgentService:
 
         run_id = await self._register_run(chat_id)
 
-        ctx = _RequestContext()
-        _request_context.set(ctx)
+        req_ctx = _RequestContext()
+        _request_context.set(req_ctx)
 
         output_dir = create_session_output_dir()
-        set_output_dir(output_dir)
-        set_rossum_credentials(rossum_api_base_url, rossum_api_token)
         self._get_chat_run_state(chat_id).output_dir = output_dir
         logger.info(f"Created session output directory: {output_dir}")
 
         if documents:
             self._save_documents_to_output_dir(documents, output_dir)
 
-        ctx.event_queue = asyncio.Queue(maxsize=100)
-        ctx.event_loop = asyncio.get_running_loop()
-        set_progress_callback(self._on_sub_agent_progress)
-        set_text_callback(self._on_sub_agent_text)
-        set_task_tracker(TaskTracker())
-        set_task_snapshot_callback(self._on_task_snapshot)
+        req_ctx.event_queue = asyncio.Queue(maxsize=100)
+        req_ctx.event_loop = asyncio.get_running_loop()
+
+        agent_ctx = AgentContext(
+            output_dir=output_dir,
+            rossum_credentials=(rossum_api_base_url, rossum_api_token),
+            progress_callback=self._on_sub_agent_progress,
+            text_callback=self._on_sub_agent_text,
+            task_tracker=TaskTracker(),
+            task_snapshot_callback=self._on_task_snapshot,
+        )
+        ctx_token = set_context(agent_ctx)
 
         system_prompt = self._build_system_prompt(rossum_url, persona)
 
@@ -450,10 +447,12 @@ class AgentService:
                         mcp_connection=mcp_connection, system_prompt=system_prompt, config=AgentConfig()
                     )
 
-                    set_mcp_connection(mcp_connection, asyncio.get_event_loop(), mcp_mode)
-                    set_commit_store(commit_store)
-                    set_snapshot_store(snapshot_store)
-                    set_rossum_environment(environment)
+                    agent_ctx.mcp_connection = mcp_connection
+                    agent_ctx.mcp_event_loop = asyncio.get_event_loop()
+                    agent_ctx.mcp_mode = mcp_mode
+                    agent_ctx.commit_store = commit_store
+                    agent_ctx.snapshot_store = snapshot_store
+                    agent_ctx.rossum_environment = environment
 
                     self._restore_conversation_history(agent, conversation_history)
 
@@ -465,7 +464,7 @@ class AgentService:
 
                     try:
                         async for step in agent.run(user_content):
-                            for sub_event in self._drain_queue(ctx.event_queue):
+                            for sub_event in self._drain_queue(req_ctx.event_queue):
                                 yield sub_event
 
                             for event in convert_step_to_events(step):
@@ -476,7 +475,7 @@ class AgentService:
                                 total_input_tokens = agent.tokens.total_input
                                 total_output_tokens = agent.tokens.total_output
 
-                        for sub_event in self._drain_queue(ctx.event_queue):
+                        for sub_event in self._drain_queue(req_ctx.event_queue):
                             yield sub_event
 
                         self._get_chat_run_state(chat_id).last_memory = agent.memory
@@ -504,15 +503,7 @@ class AgentService:
                             is_final=True,
                         )
             finally:
-                set_progress_callback(None)
-                set_text_callback(None)
-                set_task_snapshot_callback(None)
-                set_task_tracker(None)
-                set_output_dir(None)
-                set_rossum_credentials(None, None)
-                set_commit_store(None)
-                set_snapshot_store(None)
-                set_rossum_environment(None)
+                reset_context(ctx_token)
         except asyncio.CancelledError:
             logger.info(f"Run cancelled for chat {chat_id} (run_id={run_id})")
             raise

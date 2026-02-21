@@ -19,14 +19,7 @@ from rossum_mcp.tools.schemas.validation import sanitize_schema_content
 
 from rossum_agent.change_tracking.models import EntityChange
 from rossum_agent.rossum_mcp_integration import unwrap
-from rossum_agent.tools.core import (
-    get_commit_store,
-    get_mcp_connection,
-    get_mcp_event_loop,
-    get_rossum_credentials,
-    get_rossum_environment,
-    get_snapshot_store,
-)
+from rossum_agent.tools.core import get_context
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -88,11 +81,11 @@ def _flush_pending_changes() -> None:
     Called before reading history or reverting so the agent can see
     changes made earlier in the same run.
     """
-    mcp_connection = get_mcp_connection()
-    if not mcp_connection or not mcp_connection.has_changes():
+    ctx = get_context()
+    if not ctx.mcp_connection or not ctx.mcp_connection.has_changes():
         return
 
-    mcp_connection.flush_and_commit("auto-flush before history query")
+    ctx.mcp_connection.flush_and_commit("auto-flush before history query")
 
 
 def _compute_revert_patch(before: dict, after: dict) -> dict:
@@ -208,14 +201,13 @@ def show_change_history(limit: int = 10) -> str:
     Returns:
         JSON list of recent commits with hash, message, timestamp, and change count.
     """
-    store = get_commit_store()
-    environment = get_rossum_environment()
-    if store is None or environment is None:
+    ctx = get_context()
+    if ctx.commit_store is None or ctx.rossum_environment is None:
         return json.dumps({"error": "Change tracking not available"})
 
     _flush_pending_changes()
 
-    commits = store.list_commits(environment, limit=limit)
+    commits = ctx.commit_store.list_commits(ctx.rossum_environment, limit=limit)
     if not commits:
         return json.dumps({"message": "No configuration changes recorded"})
 
@@ -243,12 +235,11 @@ def show_commit_details(commit_hash: str) -> str:
     Returns:
         JSON with commit metadata and before/after snapshots for each change.
     """
-    store = get_commit_store()
-    environment = get_rossum_environment()
-    if store is None or environment is None:
+    ctx = get_context()
+    if ctx.commit_store is None or ctx.rossum_environment is None:
         return json.dumps({"error": "Change tracking not available"})
 
-    commit = store.get_commit(environment, commit_hash)
+    commit = ctx.commit_store.get_commit(ctx.rossum_environment, commit_hash)
     if commit is None:
         return json.dumps({"error": f"Commit {commit_hash} not found"})
 
@@ -371,18 +362,17 @@ def revert_commit(commit_hash: str) -> str:
     Returns:
         JSON with revert results (executed reverts and remaining plan actions).
     """
-    store = get_commit_store()
-    environment = get_rossum_environment()
-    if store is None or environment is None:
+    ctx = get_context()
+    if ctx.commit_store is None or ctx.rossum_environment is None:
         return json.dumps({"error": "Change tracking not available"})
 
     _flush_pending_changes()
 
-    if (commit := store.get_commit(environment, commit_hash)) is None:
+    if (commit := ctx.commit_store.get_commit(ctx.rossum_environment, commit_hash)) is None:
         return json.dumps({"error": f"Commit {commit_hash} not found"})
 
-    credentials = get_rossum_credentials()
-    loop = get_mcp_event_loop()
+    credentials = ctx.get_rossum_credentials()
+    loop = ctx.mcp_event_loop
 
     # Deduplicate: for each entity, keep only the earliest "before" and latest operation
     deduped = _deduplicate_changes(commit.changes)
@@ -450,22 +440,22 @@ def show_entity_history(entity_type: str, entity_id: str, limit: int = 10) -> st
     Returns:
         JSON list of versions with commit_hash, timestamp, and commit message.
     """
-    snapshot_store = get_snapshot_store()
-    commit_store = get_commit_store()
-    environment = get_rossum_environment()
-    if snapshot_store is None or commit_store is None or environment is None:
+    ctx = get_context()
+    if ctx.snapshot_store is None or ctx.commit_store is None or ctx.rossum_environment is None:
         return json.dumps({"error": "Snapshot tracking not available"})
 
     _flush_pending_changes()
 
-    versions = snapshot_store.list_versions(environment, entity_type, entity_id, limit=limit)
+    versions = ctx.snapshot_store.list_versions(ctx.rossum_environment, entity_type, entity_id, limit=limit)
     if not versions:
         return json.dumps({"message": f"No snapshots found for {entity_type} {entity_id}"})
 
     result: list[dict] = []
     for commit_hash, ts in versions:
-        commit = commit_store.get_commit(environment, commit_hash)
-        available = snapshot_store.get_snapshot(environment, entity_type, entity_id, commit_hash) is not None
+        commit = ctx.commit_store.get_commit(ctx.rossum_environment, commit_hash)
+        available = (
+            ctx.snapshot_store.get_snapshot(ctx.rossum_environment, entity_type, entity_id, commit_hash) is not None
+        )
         result.append(
             {
                 "commit_hash": commit_hash,
@@ -574,21 +564,21 @@ def restore_entity_version(entity_type: str, entity_id: str, commit_hash: str) -
     Returns:
         JSON with restore status.
     """
-    snapshot_store = get_snapshot_store()
-    commit_store = get_commit_store()
-    environment = get_rossum_environment()
-    if snapshot_store is None or commit_store is None or environment is None:
+    ctx = get_context()
+    if ctx.snapshot_store is None or ctx.commit_store is None or ctx.rossum_environment is None:
         return json.dumps({"error": "Snapshot tracking not available"})
 
     _flush_pending_changes()
 
-    snapshot, error = _resolve_snapshot(snapshot_store, commit_store, environment, entity_type, entity_id, commit_hash)
+    snapshot, error = _resolve_snapshot(
+        ctx.snapshot_store, ctx.commit_store, ctx.rossum_environment, entity_type, entity_id, commit_hash
+    )
     if error:
         return json.dumps({"error": error})
     assert snapshot is not None  # _resolve_snapshot returns None snapshot iff error is set
 
-    credentials = get_rossum_credentials()
-    loop = get_mcp_event_loop()
+    credentials = ctx.get_rossum_credentials()
+    loop = ctx.mcp_event_loop
     if not credentials or not loop:
         return json.dumps({"error": "API credentials or event loop not available"})
 

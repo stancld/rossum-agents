@@ -17,7 +17,7 @@ from anthropic import beta_tool
 from fastmcp import Client
 
 from rossum_agent.rossum_mcp_integration import MCPConnection, create_mcp_transport
-from rossum_agent.tools.core import get_mcp_event_loop
+from rossum_agent.tools.core import get_context
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +34,6 @@ class SpawnedConnection:
 # Secondary MCP connections spawned at runtime for different environments
 _spawned_connections: dict[str, SpawnedConnection] = {}
 _spawned_connections_lock = threading.Lock()
-
-
-def clear_spawned_connections() -> None:
-    """Clear all spawned connections. Called when MCP connection is reset."""
-    with _spawned_connections_lock:
-        _spawned_connections.clear()
 
 
 async def _spawn_connection_async(
@@ -77,28 +71,6 @@ async def _close_spawned_connection_async(connection_id: str) -> None:
         await record.client.__aexit__(None, None, None)
 
 
-def cleanup_all_spawned_connections() -> None:
-    """Cleanup all spawned connections. Call this when the agent session ends.
-
-    Should only be called once at session teardown, after no more tool calls are expected.
-    """
-    if (mcp_event_loop := get_mcp_event_loop()) is None:
-        return
-
-    with _spawned_connections_lock:
-        conn_ids = list(_spawned_connections.keys())
-
-    for conn_id in conn_ids:
-        try:
-            future = asyncio.run_coroutine_threadsafe(_close_spawned_connection_async(conn_id), mcp_event_loop)
-            future.result(timeout=10)
-        except FuturesTimeoutError:
-            future.cancel()
-            logger.warning(f"Timeout cleaning up connection {conn_id}")
-        except Exception as e:
-            logger.warning(f"Failed to cleanup connection {conn_id}: {e}")
-
-
 @beta_tool
 def spawn_mcp_connection(connection_id: str, api_token: str, api_base_url: str, mcp_mode: str = "read-write") -> str:
     """Spawn a new MCP connection to a different Rossum environment.
@@ -112,7 +84,7 @@ def spawn_mcp_connection(connection_id: str, api_token: str, api_base_url: str, 
     Returns:
         Success message with available tools, or error message if failed.
     """
-    if (mcp_event_loop := get_mcp_event_loop()) is None:
+    if (mcp_event_loop := get_context().mcp_event_loop) is None:
         return "Error: MCP event loop not set. Agent not properly initialized."
 
     if not connection_id or not connection_id.strip():
@@ -160,7 +132,7 @@ def call_on_connection(connection_id: str, tool_name: str, arguments: str | dict
     Returns:
         The result of the tool call as a JSON string, or error message.
     """
-    if (mcp_event_loop := get_mcp_event_loop()) is None:
+    if (mcp_event_loop := get_context().mcp_event_loop) is None:
         return "Error: MCP event loop not set."
 
     with _spawned_connections_lock:
@@ -199,7 +171,7 @@ def call_on_connection(connection_id: str, tool_name: str, arguments: str | dict
 @beta_tool
 def close_connection(connection_id: str) -> str:
     """Close a spawned MCP connection."""
-    if (mcp_event_loop := get_mcp_event_loop()) is None:
+    if (mcp_event_loop := get_context().mcp_event_loop) is None:
         return "Error: MCP event loop not set."
 
     with _spawned_connections_lock:

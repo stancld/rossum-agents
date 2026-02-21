@@ -78,26 +78,22 @@ from rossum_agent.agent.models import (
 from rossum_agent.api.models.schemas import TokenUsageBreakdown
 from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
 from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
-from rossum_agent.tools import (
-    DEPLOY_TOOLS,
-    DISCOVERY_TOOL_NAME,
+from rossum_agent.tools import execute_internal_tool, execute_tool, get_internal_tool_names, get_internal_tools
+from rossum_agent.tools.core import (
+    AgentContext,
     SubAgentProgress,
     SubAgentTokenUsage,
-    execute_internal_tool,
-    execute_tool,
-    get_deploy_tool_names,
-    get_deploy_tools,
+    get_context,
+    set_context,
+)
+from rossum_agent.tools.deploy import DEPLOY_TOOLS, get_deploy_tool_names, get_deploy_tools
+from rossum_agent.tools.dynamic_tools import (
+    DISCOVERY_TOOL_NAME,
     get_dynamic_tools,
-    get_internal_tool_names,
-    get_internal_tools,
-    get_mcp_mode,
     get_tools_version,
     is_skill_loaded,
     preload_categories_for_request,
     reset_dynamic_tools,
-    set_mcp_connection,
-    set_progress_callback,
-    set_token_callback,
 )
 from rossum_agent.utils import add_message_cache_breakpoint
 
@@ -788,13 +784,23 @@ class RossumAgent:
         try:
             if tool_call.name in get_internal_tool_names():
                 logger.info(f"Calling internal tool {tool_call.name}")
-                set_progress_callback(progress_callback)
-                set_token_callback(token_callback)
+                # Create a per-tool AgentContext copy with isolated callbacks
+                # to avoid races when multiple tools run in parallel
+                agent_ctx = get_context()
+                tool_ctx = dataclasses.replace(
+                    agent_ctx,
+                    progress_callback=progress_callback,
+                    token_callback=token_callback,
+                )
+
+                def _run_internal_tool(tool_ctx: AgentContext, name: str, arguments: dict) -> object:
+                    set_context(tool_ctx)
+                    return execute_internal_tool(name, arguments)
 
                 loop = asyncio.get_event_loop()
                 ctx = copy_context()
                 future = loop.run_in_executor(
-                    None, partial(ctx.run, execute_internal_tool, tool_call.name, tool_call.arguments)
+                    None, partial(ctx.run, _run_internal_tool, tool_ctx, tool_call.name, tool_call.arguments)
                 )
 
                 while not future.done():
@@ -820,8 +826,6 @@ class RossumAgent:
                 result = future.result()
                 content = str(result)
                 logger.info(f"Internal tool {tool_call.name} result: {content}")
-                set_progress_callback(None)
-                set_token_callback(None)
             elif tool_call.name in get_deploy_tool_names():
                 logger.info(f"Calling deploy tool {tool_call.name}")
                 loop = asyncio.get_event_loop()
@@ -839,8 +843,6 @@ class RossumAgent:
             yield ToolResult(tool_call_id=tool_call.id, name=tool_call.name, content=content)
 
         except Exception as e:
-            set_progress_callback(None)
-            set_token_callback(None)
             error_msg = f"Tool {tool_call.name} failed: {e}"
             logger.warning(f"Tool {tool_call.name} failed: {e}", exc_info=True)
             yield ToolResult(tool_call_id=tool_call.id, name=tool_call.name, content=error_msg, is_error=True)
@@ -883,8 +885,9 @@ class RossumAgent:
         Rate limiting is handled with exponential backoff and jitter.
         """
         loop = asyncio.get_event_loop()
-        mcp_mode = get_mcp_mode()
-        set_mcp_connection(self.mcp_connection, loop, mcp_mode)
+        agent_ctx = get_context()
+        agent_ctx.mcp_connection = self.mcp_connection
+        agent_ctx.mcp_event_loop = loop
 
         # Pre-load tool categories based on keywords in the user's request
         # Run in thread pool to avoid blocking the event loop (preload uses sync MCP calls)

@@ -16,7 +16,7 @@ import httpx
 import jq as jq_lib  # ty: ignore[unresolved-import] - no type stubs for jq
 from anthropic import beta_tool
 
-from rossum_agent.tools.core import require_rossum_credentials
+from rossum_agent.tools.core import get_context
 from rossum_agent.tools.formula import _fetch_schema_content, _find_field_in_schema
 
 logger = logging.getLogger(__name__)
@@ -409,7 +409,7 @@ def suggest_lookup_field(
     logger.info(f"suggest_lookup_field: {field_schema_id=}, {schema_id=}, {section_id=}, hint={hint[:100]}...")
 
     try:
-        api_base_url, token = require_rossum_credentials()
+        api_base_url, token = get_context().require_rossum_credentials()
         url = _build_suggest_computed_field_url(api_base_url)
 
         schema_content = _fetch_schema_content(api_base_url, token, schema_id)
@@ -525,7 +525,7 @@ def evaluate_lookup_field(
                     }
                 )
 
-        api_base_url, token = require_rossum_credentials()
+        api_base_url, token = get_context().require_rossum_credentials()
         url = _build_evaluate_computed_fields_url(api_base_url)
 
         schema_content = _fetch_schema_content(api_base_url, token, schema_id)
@@ -596,7 +596,7 @@ def get_lookup_dataset_raw_values(dataset: str, limit: int = 10000) -> str:
     logger.info(f"get_lookup_dataset_raw_values: dataset={dataset}, limit={limit}")
 
     try:
-        api_base_url, token = require_rossum_credentials()
+        api_base_url, token = get_context().require_rossum_credentials()
         aggregate_url = _build_mdh_aggregate_url(api_base_url)
 
         normalized_dataset = dataset.strip()

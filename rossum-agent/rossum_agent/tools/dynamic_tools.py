@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
-from rossum_agent.tools.core import get_mcp_connection, get_mcp_event_loop, is_read_only_mode
+from rossum_agent.tools.core import get_context
 
 if TYPE_CHECKING:
     from anthropic.types import ToolParam
@@ -51,70 +51,36 @@ _catalog_cache: CatalogData | None = None
 DISCOVERY_TOOL_NAME = "list_tool_categories"
 
 
-@dataclass
-class DynamicToolsState:
-    """Mutable state container for dynamically loaded tools.
-
-    Stored on RossumAgent instance and passed to functions that need to modify
-    tool state. Using a class allows modifications in thread pool executors to
-    be visible in the main context (unlike context variables which are copied).
-    """
-
-    loaded_categories: set[str] = field(default_factory=set)
-    tools: list[ToolParam] = field(default_factory=list)
-    loaded_skills: set[str] = field(default_factory=set)
-    version: int = 0
-
-    def reset(self) -> None:
-        """Reset state for a new conversation."""
-        self.loaded_categories.clear()
-        self.tools.clear()
-        self.loaded_skills.clear()
-        self.version += 1
-
-
-# Global state for backwards compatibility (used when agent instance not available)
-_global_state: DynamicToolsState | None = None
-
-
-def get_global_state() -> DynamicToolsState:
-    """Get or create global state for backwards compatibility."""
-    global _global_state
-    if _global_state is None:
-        _global_state = DynamicToolsState()
-    return _global_state
+# ---------------------------------------------------------------------------
+# Convenience accessors - read from the per-request AgentContext
+# ---------------------------------------------------------------------------
 
 
 def reset_dynamic_tools() -> None:
-    """Reset dynamic tool state for a new conversation (global state)."""
-    get_global_state().reset()
-
-
-def get_loaded_categories() -> set[str]:
-    """Get the set of currently loaded categories (global state)."""
-    return get_global_state().loaded_categories
+    """Reset dynamic tool state for a new conversation."""
+    get_context().dynamic_tools.reset()
 
 
 def get_dynamic_tools() -> list[ToolParam]:
-    """Get the list of dynamically loaded tools (global state)."""
-    return get_global_state().tools
+    """Get the list of dynamically loaded tools."""
+    return get_context().dynamic_tools.tools
 
 
 def mark_skill_loaded(name: str) -> None:
     """Mark a skill as loaded and increment version to invalidate tool cache."""
-    state = get_global_state()
+    state = get_context().dynamic_tools
     state.loaded_skills.add(name)
     state.version += 1
 
 
 def is_skill_loaded(name: str) -> bool:
     """Check if a skill has been loaded."""
-    return name in get_global_state().loaded_skills
+    return name in get_context().dynamic_tools.loaded_skills
 
 
 def get_tools_version() -> int:
     """Get current tools version for cache invalidation."""
-    return get_global_state().version
+    return get_context().dynamic_tools.version
 
 
 def _parse_catalog_result(result: object) -> CatalogData:
@@ -155,17 +121,16 @@ def _fetch_catalog_from_mcp() -> CatalogData:
     if _catalog_cache is not None:
         return _catalog_cache
 
-    mcp_connection = get_mcp_connection()
-    loop = get_mcp_event_loop()
+    ctx = get_context()
 
-    if mcp_connection is None or loop is None:
+    if ctx.mcp_connection is None or ctx.mcp_event_loop is None:
         logger.warning("MCP connection not available, returning empty catalog")
         return CatalogData()
 
     try:
-        result = asyncio.run_coroutine_threadsafe(mcp_connection.call_tool("list_tool_categories", {}), loop).result(
-            timeout=10
-        )
+        result = asyncio.run_coroutine_threadsafe(
+            ctx.mcp_connection.call_tool("list_tool_categories", {}), ctx.mcp_event_loop
+        ).result(timeout=10)
         _catalog_cache = _parse_catalog_result(result)
         logger.info(f"Fetched catalog with {len(_catalog_cache.catalog)} categories from MCP")
         return _catalog_cache
@@ -237,16 +202,12 @@ def _filter_mcp_tools_by_names(mcp_tools: list[MCPTool], tool_names: set[str]) -
     return [tool for tool in mcp_tools if tool.name in tool_names]
 
 
-def _load_categories_impl(
-    categories: list[str],
-    state: DynamicToolsState | None = None,
-) -> str:
+def _load_categories_impl(categories: list[str]) -> str:
     """Load multiple tool categories at once.
 
     In read-only mode, write tools (read_only=False) are excluded.
     """
-    if state is None:
-        state = get_global_state()
+    state = get_context().dynamic_tools
 
     catalog = get_category_tool_names()
     if not catalog:
@@ -262,21 +223,21 @@ def _load_categories_impl(
     if not to_load:
         return f"Categories already loaded: {categories}"
 
-    mcp_connection, loop = get_mcp_connection(), get_mcp_event_loop()
-    if mcp_connection is None or loop is None:
+    ctx = get_context()
+    if ctx.mcp_connection is None or ctx.mcp_event_loop is None:
         return "Error: MCP connection not available"
 
     tool_names_to_load: set[str] = set()
     for category in to_load:
         tool_names_to_load.update(catalog[category])
 
-    read_only = is_read_only_mode()
+    read_only = ctx.is_read_only
     if read_only:
         tool_names_to_load -= get_write_tools()
 
     tool_names_to_load -= set(HIDDEN_TOOLS)
 
-    mcp_tools = asyncio.run_coroutine_threadsafe(mcp_connection.get_tools(), loop).result()
+    mcp_tools = asyncio.run_coroutine_threadsafe(ctx.mcp_connection.get_tools(), ctx.mcp_event_loop).result()
     tools_to_add = _filter_mcp_tools_by_names(mcp_tools, tool_names_to_load)
 
     if not tools_to_add:
@@ -357,16 +318,14 @@ def get_load_tool_definition() -> ToolParam:
     }
 
 
-def load_tool(tool_names: list[str], state: DynamicToolsState | None = None) -> str:
+def load_tool(tool_names: list[str]) -> str:
     """Load specific MCP tools by name. In read-only mode, write tools are excluded."""
-    if state is None:
-        state = get_global_state()
-
-    mcp_connection, loop = get_mcp_connection(), get_mcp_event_loop()
-    if mcp_connection is None or loop is None:
+    ctx = get_context()
+    state = ctx.dynamic_tools
+    if ctx.mcp_connection is None or ctx.mcp_event_loop is None:
         return "Error: MCP connection not available"
 
-    mcp_tools = asyncio.run_coroutine_threadsafe(mcp_connection.get_tools(), loop).result()
+    mcp_tools = asyncio.run_coroutine_threadsafe(ctx.mcp_connection.get_tools(), ctx.mcp_event_loop).result()
     available_tool_names = {t.name for t in mcp_tools}
 
     hidden = [name for name in tool_names if name in HIDDEN_TOOLS]
@@ -378,7 +337,7 @@ def load_tool(tool_names: list[str], state: DynamicToolsState | None = None) -> 
     if invalid:
         return f"Error: Unknown tools {invalid}"
 
-    read_only = is_read_only_mode()
+    read_only = ctx.is_read_only
     if read_only:
         write_tools = get_write_tools()
         blocked = [name for name in tool_names if name in write_tools]

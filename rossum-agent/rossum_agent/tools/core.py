@@ -1,20 +1,23 @@
-"""Core module with shared types, callbacks, and MCP state management.
+"""Core module with shared types, callbacks, and per-request state management.
 
 This module provides the foundational types and state management used by
-all internal tools. Uses contextvars for thread-safe state management.
+all internal tools. A single AgentContext dataclass replaces individual
+ContextVars for cleaner setup/teardown.
 """
 
 from __future__ import annotations
 
+import contextvars
 import os
 from collections.abc import Callable
-from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import asyncio
+
+    from anthropic.types import ToolParam
 
     from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
     from rossum_agent.rossum_mcp_integration import MCPConnection
@@ -59,164 +62,115 @@ SubAgentTextCallback = Callable[[SubAgentText], None]
 SubAgentTokenCallback = Callable[[SubAgentTokenUsage], None]
 TaskSnapshotCallback = Callable[[list[dict[str, object]]], None]
 
-# Context variables for thread-safe state management
-_progress_callback: ContextVar[SubAgentProgressCallback | None] = ContextVar("progress_callback", default=None)
-_text_callback: ContextVar[SubAgentTextCallback | None] = ContextVar("text_callback", default=None)
-_token_callback: ContextVar[SubAgentTokenCallback | None] = ContextVar("token_callback", default=None)
-_task_snapshot_callback: ContextVar[TaskSnapshotCallback | None] = ContextVar("task_snapshot_callback", default=None)
-_task_tracker: ContextVar[TaskTracker | None] = ContextVar("task_tracker", default=None)
-_mcp_connection: ContextVar[MCPConnection | None] = ContextVar("mcp_connection", default=None)
-_mcp_event_loop: ContextVar[asyncio.AbstractEventLoop | None] = ContextVar("mcp_event_loop", default=None)
-_mcp_mode: ContextVar[str] = ContextVar("mcp_mode", default="read-only")
-_output_dir: ContextVar[Path | None] = ContextVar("output_dir", default=None)
-_rossum_credentials: ContextVar[tuple[str, str] | None] = ContextVar("rossum_credentials", default=None)
-_commit_store: ContextVar[CommitStore | None] = ContextVar("commit_store", default=None)
-_snapshot_store: ContextVar[SnapshotStore | None] = ContextVar("snapshot_store", default=None)
-_rossum_environment: ContextVar[str | None] = ContextVar("rossum_environment", default=None)
 
+@dataclass
+class DynamicToolsState:
+    """Per-conversation state for dynamically loaded MCP tools.
 
-def set_progress_callback(callback: SubAgentProgressCallback | None) -> None:
-    _progress_callback.set(callback)
-
-
-def set_text_callback(callback: SubAgentTextCallback | None) -> None:
-    _text_callback.set(callback)
-
-
-def set_token_callback(callback: SubAgentTokenCallback | None) -> None:
-    _token_callback.set(callback)
-
-
-def report_progress(progress: SubAgentProgress) -> None:
-    if (callback := _progress_callback.get()) is not None:
-        callback(progress)
-
-
-def report_text(text: SubAgentText) -> None:
-    if (callback := _text_callback.get()) is not None:
-        callback(text)
-
-
-def report_token_usage(usage: SubAgentTokenUsage) -> None:
-    if (callback := _token_callback.get()) is not None:
-        callback(usage)
-
-
-def set_output_dir(output_dir: Path | None) -> None:
-    _output_dir.set(output_dir)
-
-
-def get_output_dir() -> Path:
-    """Get the output directory for internal tools."""
-    if (output_dir := _output_dir.get()) is not None:
-        return output_dir
-    fallback = Path("./outputs")
-    fallback.mkdir(exist_ok=True)
-    return fallback
-
-
-def set_mcp_connection(
-    connection: MCPConnection | None,
-    loop: asyncio.AbstractEventLoop | None,
-    mcp_mode: str = "read-only",
-) -> None:
-    _mcp_connection.set(connection)
-    _mcp_event_loop.set(loop)
-    _mcp_mode.set(mcp_mode)
-
-
-def get_mcp_connection() -> MCPConnection | None:
-    return _mcp_connection.get()
-
-
-def get_mcp_event_loop() -> asyncio.AbstractEventLoop | None:
-    return _mcp_event_loop.get()
-
-
-def get_mcp_mode() -> str:
-    return _mcp_mode.get()
-
-
-def is_read_only_mode() -> bool:
-    return _mcp_mode.get() != "read-write"
-
-
-def set_rossum_credentials(api_base_url: str | None, token: str | None) -> None:
-    if api_base_url and token:
-        _rossum_credentials.set((api_base_url, token))
-    else:
-        _rossum_credentials.set(None)
-
-
-def get_rossum_credentials() -> tuple[str, str] | None:
-    """Get Rossum API credentials from context or environment.
-
-    Checks context first (set by API service), then falls back to environment variables.
-
-    Returns:
-        Tuple of (api_base_url, token) or None if neither context nor env vars are set.
+    Tracks which tool categories/skills have been loaded and stores the
+    converted Anthropic tool definitions. Lives on AgentContext so state
+    is properly scoped per-request and doesn't leak between conversations.
     """
-    if (creds := _rossum_credentials.get()) is not None:
-        return creds
 
-    api_base = os.getenv("ROSSUM_API_BASE_URL")
-    token = os.getenv("ROSSUM_API_TOKEN")
-    if api_base and token:
-        return api_base, token
+    loaded_categories: set[str] = field(default_factory=set)
+    tools: list[ToolParam] = field(default_factory=list)
+    loaded_skills: set[str] = field(default_factory=set)
+    version: int = 0
 
-    return None
-
-
-def require_rossum_credentials() -> tuple[str, str]:
-    """Get Rossum API credentials, raising if unavailable.
-
-    Returns:
-        Tuple of (api_base_url, token).
-
-    Raises:
-        ValueError: If credentials are not available.
-    """
-    if (creds := get_rossum_credentials()) is not None:
-        return creds
-    raise ValueError("Rossum API credentials not available (neither in context nor environment variables)")
+    def reset(self) -> None:
+        """Reset state for a new conversation."""
+        self.loaded_categories.clear()
+        self.tools.clear()
+        self.loaded_skills.clear()
+        self.version += 1
 
 
-def set_task_tracker(tracker: TaskTracker | None) -> None:
-    _task_tracker.set(tracker)
+@dataclass
+class AgentContext:
+    """Per-request state for the agent, replacing 13 individual ContextVars."""
+
+    # MCP
+    mcp_connection: MCPConnection | None = None
+    mcp_event_loop: asyncio.AbstractEventLoop | None = None
+    mcp_mode: str = "read-only"
+    # Credentials & environment
+    rossum_credentials: tuple[str, str] | None = None
+    rossum_environment: str | None = None
+    # State
+    output_dir: Path | None = None
+    commit_store: CommitStore | None = None
+    snapshot_store: SnapshotStore | None = None
+    task_tracker: TaskTracker | None = None
+    dynamic_tools: DynamicToolsState = field(default_factory=DynamicToolsState)
+    # Callbacks
+    progress_callback: SubAgentProgressCallback | None = None
+    text_callback: SubAgentTextCallback | None = None
+    token_callback: SubAgentTokenCallback | None = None
+    task_snapshot_callback: TaskSnapshotCallback | None = None
+
+    @property
+    def is_read_only(self) -> bool:
+        return self.mcp_mode != "read-write"
+
+    def get_output_dir(self) -> Path:
+        """Get the output directory, falling back to ./outputs."""
+        if self.output_dir is not None:
+            return self.output_dir
+        fallback = Path("./outputs")
+        fallback.mkdir(exist_ok=True)
+        return fallback
+
+    def get_rossum_credentials(self) -> tuple[str, str] | None:
+        """Get Rossum API credentials from context or environment.
+
+        Checks context first (set by API service), then falls back to environment variables.
+        """
+        if self.rossum_credentials is not None:
+            return self.rossum_credentials
+
+        api_base = os.getenv("ROSSUM_API_BASE_URL")
+        token = os.getenv("ROSSUM_API_TOKEN")
+        if api_base and token:
+            return api_base, token
+
+        return None
+
+    def require_rossum_credentials(self) -> tuple[str, str]:
+        """Get Rossum API credentials, raising if unavailable."""
+        if (creds := self.get_rossum_credentials()) is not None:
+            return creds
+        raise ValueError("Rossum API credentials not available (neither in context nor environment variables)")
+
+    def report_progress(self, progress: SubAgentProgress) -> None:
+        if self.progress_callback is not None:
+            self.progress_callback(progress)
+
+    def report_token_usage(self, usage: SubAgentTokenUsage) -> None:
+        if self.token_callback is not None:
+            self.token_callback(usage)
+
+    def report_task_snapshot(self, snapshot: list[dict[str, object]]) -> None:
+        if self.task_snapshot_callback is not None:
+            self.task_snapshot_callback(snapshot)
 
 
-def get_task_tracker() -> TaskTracker | None:
-    return _task_tracker.get()
+_agent_context: contextvars.ContextVar[AgentContext | None] = contextvars.ContextVar("agent_context", default=None)
 
 
-def set_task_snapshot_callback(callback: TaskSnapshotCallback | None) -> None:
-    _task_snapshot_callback.set(callback)
+def get_context() -> AgentContext:
+    """Get the current AgentContext, creating a default one if none is set."""
+    if (ctx := _agent_context.get()) is not None:
+        return ctx
+    ctx = AgentContext()
+    _agent_context.set(ctx)
+    return ctx
 
 
-def report_task_snapshot(snapshot: list[dict[str, object]]) -> None:
-    if (callback := _task_snapshot_callback.get()) is not None:
-        callback(snapshot)
+def set_context(ctx: AgentContext) -> contextvars.Token[AgentContext | None]:
+    """Set the AgentContext for the current async/thread context. Returns a reset token."""
+    return _agent_context.set(ctx)
 
 
-def set_commit_store(store: CommitStore | None) -> None:
-    _commit_store.set(store)
-
-
-def get_commit_store() -> CommitStore | None:
-    return _commit_store.get()
-
-
-def set_snapshot_store(store: SnapshotStore | None) -> None:
-    _snapshot_store.set(store)
-
-
-def get_snapshot_store() -> SnapshotStore | None:
-    return _snapshot_store.get()
-
-
-def set_rossum_environment(environment: str | None) -> None:
-    _rossum_environment.set(environment)
-
-
-def get_rossum_environment() -> str | None:
-    return _rossum_environment.get()
+def reset_context(token: contextvars.Token[AgentContext | None]) -> None:
+    """Reset the AgentContext to its previous value using the token from set_context."""
+    _agent_context.reset(token)
