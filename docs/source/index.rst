@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **68 tools** organized into twelve categories:
+The MCP server provides **70 tools** organized into fourteen categories:
 
 **Document Processing**
 
@@ -55,6 +55,7 @@ The MCP server provides **68 tools** organized into twelve categories:
 * **bulk_update_annotation_fields** - Update field values with JSON Patch
 * **confirm_annotation** - Confirm and finalize annotations
 * **copy_annotations** - Copy annotations to another queue
+* **delete_annotation** - Delete an annotation
 
 **Queue Management**
 
@@ -66,6 +67,7 @@ The MCP server provides **68 tools** organized into twelve categories:
 * **create_queue_from_template** - Create queues from predefined templates (EU/US/UK/CZ/CN)
 * **get_queue_template_names** - List available queue template names
 * **update_queue** - Configure automation thresholds
+* **delete_queue** - Delete a queue
 
 **Schema Management**
 
@@ -76,17 +78,21 @@ The MCP server provides **68 tools** organized into twelve categories:
 * **patch_schema** - Add, update, or remove individual schema nodes
 * **get_schema_tree_structure** - Get lightweight tree structure of schema
 * **prune_schema_fields** - Remove multiple fields from schema at once
+* **delete_schema** - Delete a schema
 
 **Workspace Management**
 
 * **get_workspace** - Retrieve workspace details by ID
 * **list_workspaces** - List all workspaces with optional filtering
 * **create_workspace** - Create a new workspace
+* **delete_workspace** - Delete a workspace
 
 **Organization Groups**
 
 * **get_organization_group** - Retrieve organization group (license) details by ID
 * **list_organization_groups** - List organization groups with optional name filter
+* **are_lookup_fields_enabled** - Check if lookup fields are enabled for an organization group
+* **are_reasoning_fields_enabled** - Check if reasoning fields are enabled for an organization group
 
 **Organization Limits**
 
@@ -97,6 +103,8 @@ The MCP server provides **68 tools** organized into twelve categories:
 * **get_user** - Retrieve user details by ID
 * **list_users** - List users with filtering (for finding user URLs for token_owner)
 * **list_user_roles** - List all user roles (permission groups) in the organization
+* **create_user** - Create a new user
+* **update_user** - Update user properties
 
 **Engine Management**
 
@@ -117,6 +125,7 @@ The MCP server provides **68 tools** organized into twelve categories:
 * **create_hook_from_template** - Create hooks from pre-built templates
 * **list_hook_logs** - List hook execution logs for debugging and monitoring
 * **delete_hook** - Delete a hook/extension
+* **test_hook** - Test a hook with sample payloads
 
 **Rules & Actions**
 
@@ -139,6 +148,15 @@ The MCP server provides **68 tools** organized into twelve categories:
 * **get_email_template** - Retrieve email template details
 * **list_email_templates** - List email templates with optional filtering
 * **create_email_template** - Create new email templates
+
+**Tool Discovery**
+
+* **list_tool_categories** - List available tool categories with descriptions and keywords
+
+**MCP Mode**
+
+* **get_mcp_mode** - Get the current MCP operation mode (read-only or read-write)
+* **set_mcp_mode** - Set the MCP operation mode
 
 **Deployment Toolkit**
 

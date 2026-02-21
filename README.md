@@ -283,6 +283,8 @@ The Rossum Agent includes specialized capabilities for complex workflows:
 | `rules-and-actions` | Create validation rules with TxScript conditions and actions |
 | `formula-fields` | Create/configure formula fields with TxScript |
 | `reasoning-fields` | Create AI-powered reasoning fields with prompt + context |
+| `lookup-fields` | Create/configure lookup fields backed by Master Data Hub datasets |
+| `schema-creation` | Create new schemas with sections, datapoints, multivalues, and tuples |
 
 **Sub-Agents** - Opus-powered components for complex iterative tasks:
 
