@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import ToolResultStep
+
 from regression_tests.custom_checks._utils import call_haiku_check
 
 if TYPE_CHECKING:
@@ -33,6 +35,8 @@ def check_serverless_hook_uses_txscript(
     uses Haiku to semantically verify the hook code uses TxScript patterns.
     """
     for step in steps:
+        if not isinstance(step, ToolResultStep):
+            continue
         for tr in step.tool_results:
             if tr.name not in ("create_hook", "create_hook_from_template", "update_hook"):
                 continue
@@ -44,6 +48,8 @@ def check_serverless_hook_uses_txscript(
             return call_haiku_check(_PROMPT.format(hook_code=content[:8000]))
 
     for step in steps:
+        if not isinstance(step, ToolResultStep):
+            continue
         for tc in step.tool_calls:
             if tc.name not in ("create_hook", "create_hook_from_template", "update_hook"):
                 continue

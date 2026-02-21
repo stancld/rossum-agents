@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import ToolResultStep
+
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
 
@@ -15,6 +17,8 @@ def check_net_terms_formula_field_added(
 ) -> tuple[bool, str]:
     """Verify that a formula field for Net Terms was added to the schema."""
     for step in steps:
+        if not isinstance(step, ToolResultStep):
+            continue
         for tr in step.tool_results:
             if tr.name != "suggest_formula_field":
                 continue

@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import ToolResultStep
+
 from regression_tests.custom_checks._utils import create_api_client, extract_datapoints, get_final_answer
 
 if TYPE_CHECKING:
@@ -14,6 +16,8 @@ if TYPE_CHECKING:
 def _extract_schema_id_from_steps(steps: list[AgentStep]) -> int | None:
     """Extract schema_id from create_queue_from_template result or final answer."""
     for step in steps:
+        if not isinstance(step, ToolResultStep):
+            continue
         for tc in step.tool_calls:
             if tc.name == "create_queue_from_template":
                 for tr in step.tool_results:
