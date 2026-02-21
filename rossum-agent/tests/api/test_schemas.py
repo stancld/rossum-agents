@@ -48,6 +48,21 @@ class TestCreateChatRequest:
         with pytest.raises(ValidationError):
             CreateChatRequest(mcp_mode="invalid")
 
+    def test_default_persona(self):
+        """Test default persona is default."""
+        request = CreateChatRequest()
+        assert request.persona == "default"
+
+    def test_persona_cautious(self):
+        """Test cautious persona is accepted."""
+        request = CreateChatRequest(persona="cautious")
+        assert request.persona == "cautious"
+
+    def test_invalid_persona_rejected(self):
+        """Test invalid persona is rejected."""
+        with pytest.raises(ValidationError):
+            CreateChatRequest(persona="fast")
+
 
 class TestChatResponse:
     """Tests for ChatResponse schema."""
@@ -239,6 +254,26 @@ class TestMessageRequest:
         """Test invalid mcp_mode is rejected."""
         with pytest.raises(ValidationError):
             MessageRequest(content="test", mcp_mode="invalid")
+
+    def test_message_request_persona_default_none(self):
+        """Test persona defaults to None."""
+        request = MessageRequest(content="test")
+        assert request.persona is None
+
+    def test_message_request_persona_default(self):
+        """Test persona accepts default."""
+        request = MessageRequest(content="test", persona="default")
+        assert request.persona == "default"
+
+    def test_message_request_persona_cautious(self):
+        """Test persona accepts cautious."""
+        request = MessageRequest(content="test", persona="cautious")
+        assert request.persona == "cautious"
+
+    def test_message_request_persona_invalid(self):
+        """Test invalid persona is rejected."""
+        with pytest.raises(ValidationError):
+            MessageRequest(content="test", persona="fast")
 
 
 class TestImageContent:

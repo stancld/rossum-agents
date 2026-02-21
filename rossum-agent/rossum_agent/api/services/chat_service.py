@@ -44,7 +44,10 @@ class ChatService:
         return self._storage.is_connected()
 
     def create_chat(
-        self, user_id: str | None, mcp_mode: Literal["read-only", "read-write"] = "read-only"
+        self,
+        user_id: str | None,
+        mcp_mode: Literal["read-only", "read-write"] = "read-only",
+        persona: Literal["default", "cautious"] = "default",
     ) -> ChatResponse:
         timestamp = dt.datetime.now(dt.UTC)
         timestamp_str = timestamp.strftime("%Y%m%d%H%M%S")
@@ -52,10 +55,12 @@ class ChatService:
         chat_id = f"chat_{timestamp_str}_{unique_suffix}"
 
         initial_messages: list[dict[str, Any]] = []
-        metadata = ChatMetadata(mcp_mode=mcp_mode)
+        metadata = ChatMetadata(mcp_mode=mcp_mode, persona=persona)
         self._storage.save_chat(user_id, chat_id, initial_messages, metadata=metadata)
 
-        logger.info(f"Created chat {chat_id} for user {user_id or 'shared'} with mcp_mode={mcp_mode}")
+        logger.info(
+            f"Created chat {chat_id} for user {user_id or 'shared'} with mcp_mode={mcp_mode}, persona={persona}"
+        )
         return ChatResponse(chat_id=chat_id, created_at=timestamp)
 
     def list_chats(self, user_id: str | None, limit: int = 50, offset: int = 0) -> ChatListResponse:

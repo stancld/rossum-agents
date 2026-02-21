@@ -24,7 +24,10 @@ export async function createChat(config: Config): Promise<ChatResponse> {
     res = await fetch(`${config.apiUrl}/api/v1/chats`, {
       method: "POST",
       headers: buildHeaders(config),
-      body: JSON.stringify({ mcp_mode: config.mcpMode }),
+      body: JSON.stringify({
+        mcp_mode: config.mcpMode,
+        persona: config.persona,
+      }),
     });
   } catch (err) {
     throw unwrapFetchError(err, `Cannot connect to ${config.apiUrl}`);

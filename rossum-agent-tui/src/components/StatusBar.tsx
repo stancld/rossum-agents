@@ -4,12 +4,14 @@ import type {
   ConnectionStatus,
   InteractionMode,
   McpMode,
+  Persona,
   TokenUsageBreakdown,
 } from "../types.js";
 
 interface StatusBarProps {
   connectionStatus: ConnectionStatus;
   mcpMode: McpMode;
+  persona: Persona;
   chatId: string | null;
   tokenUsage: TokenUsageBreakdown | null;
   mode: InteractionMode;
@@ -32,6 +34,7 @@ function statusColor(status: ConnectionStatus): string {
 export function StatusBar({
   connectionStatus,
   mcpMode,
+  persona,
   chatId,
   tokenUsage,
   mode,
@@ -42,7 +45,7 @@ export function StatusBar({
   const hints =
     mode === "browse"
       ? "j/k:navigate  Enter/Space:expand/collapse  i:input  ^N:new chat"
-      : "Esc:browse  Enter:send  ^N:new chat";
+      : "Esc:browse  Enter:send  M+1:Approve  M+2:Reject  M+3:Chat  ^N:new chat";
 
   return (
     <Box
@@ -61,6 +64,7 @@ export function StatusBar({
         </Text>
         {"  "}
         <Text dimColor>mode: {mcpMode}</Text>
+        <Text dimColor> persona: {persona}</Text>
         {chatId && <Text dimColor> chat: {chatId.slice(0, 8)}</Text>}
       </Text>
       <Text>

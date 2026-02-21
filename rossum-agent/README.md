@@ -75,6 +75,7 @@ uv sync --extra api        # REST API (FastAPI, Redis)
 | `REDIS_HOST` | No | Redis host for chat persistence |
 | `REDIS_PORT` | No | Redis port (default: `6379`) |
 | `ROSSUM_MCP_MODE` | No | MCP mode: `read-only` (default) or `read-write` |
+| `ROSSUM_AGENT_PERSONA` | No | Agent persona: `default` (default) or `cautious` — read by the TUI client, not the server |
 
 ## Usage
 
@@ -248,6 +249,10 @@ API docs: `/api/docs` (Swagger) or `/api/redoc`
 **MCP Mode:** Chat sessions support mode switching via the `mcp_mode` parameter:
 - Set at chat creation: `POST /api/v1/chats` with `{"mcp_mode": "read-write"}`
 - Override per message: `POST /api/v1/chats/{id}/messages` with `{"content": "...", "mcp_mode": "read-write"}`
+
+**Persona:** Chat sessions support persona switching via the `persona` parameter:
+- Set at chat creation: `POST /api/v1/chats` with `{"persona": "cautious"}`
+- Override per message: `POST /api/v1/chats/{id}/messages` with `{"content": "...", "persona": "cautious"}`
 
 </details>
 

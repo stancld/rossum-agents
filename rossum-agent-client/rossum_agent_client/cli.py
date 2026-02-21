@@ -62,6 +62,11 @@ def create_parser() -> argparse.ArgumentParser:
         help="MCP mode for the chat session (env: ROSSUM_MCP_MODE, default: read-only)",
     )
     parser.add_argument(
+        "--persona",
+        choices=["default", "cautious"],
+        help="Agent persona (env: ROSSUM_AGENT_PERSONA, default: default)",
+    )
+    parser.add_argument(
         "--show-thinking",
         action="store_true",
         help="Display thinking steps and tool arguments",
@@ -145,11 +150,12 @@ def run_chat(
     client: RossumAgentClient,
     prompt: str,
     mcp_mode: Literal["read-only", "read-write"],
+    persona: Literal["default", "cautious"] = "default",
     show_thinking: bool = False,
     output_files: dict[str, str] | None = None,
 ) -> str:
     """Run a chat session with the given prompt."""
-    chat = client.create_chat(mcp_mode=mcp_mode)
+    chat = client.create_chat(mcp_mode=mcp_mode, persona=persona)
     print(f"Chat: {chat.chat_id}", file=sys.stderr)
     print(file=sys.stderr)
 
@@ -182,6 +188,7 @@ def run_chat(
 
 
 type McpMode = Literal["read-only", "read-write"]
+type Persona = Literal["default", "cautious"]
 
 
 def _require(value: str | None, name: str) -> str:
@@ -193,7 +200,7 @@ def _require(value: str | None, name: str) -> str:
 
 def _resolve_config(
     args: argparse.Namespace,
-) -> tuple[str, str, str, McpMode]:
+) -> tuple[str, str, str, McpMode, Persona]:
     """Resolve and validate CLI configuration. Exits on validation failure."""
     agent_api_url = _require(
         get_env_or_arg(args.agent_api_url, "ROSSUM_AGENT_API_URL"),
@@ -213,7 +220,13 @@ def _resolve_config(
         sys.exit(f"Error: Invalid MCP mode: {mcp_mode_raw}. Must be 'read-only' or 'read-write'.")
 
     mcp_mode: McpMode = "read-only" if mcp_mode_raw == "read-only" else "read-write"
-    return agent_api_url, rossum_api_base_url, token, mcp_mode
+
+    persona_raw = args.persona or os.environ.get("ROSSUM_AGENT_PERSONA", "default")
+    if persona_raw not in ("default", "cautious"):
+        sys.exit(f"Error: Invalid persona: {persona_raw}. Must be 'default' or 'cautious'.")
+    persona: Persona = "default" if persona_raw == "default" else "cautious"
+
+    return agent_api_url, rossum_api_base_url, token, mcp_mode, persona
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -221,7 +234,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = create_parser()
     args = parser.parse_args(argv)
 
-    agent_api_url, rossum_api_base_url, token, mcp_mode = _resolve_config(args)
+    agent_api_url, rossum_api_base_url, token, mcp_mode, persona = _resolve_config(args)
 
     # Determine the prompt
     if args.execute:
@@ -239,7 +252,7 @@ def main(argv: list[str] | None = None) -> None:
             rossum_api_base_url=rossum_api_base_url,
             token=token,
         ) as client:
-            run_chat(client, prompt, mcp_mode, show_thinking=args.show_thinking)
+            run_chat(client, prompt, mcp_mode, persona=persona, show_thinking=args.show_thinking)
     except RossumAgentError as e:
         if e.response_body:
             sys.exit(f"Error: {e}\n{e.response_body}")

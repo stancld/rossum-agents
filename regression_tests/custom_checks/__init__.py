@@ -11,6 +11,9 @@ from regression_tests.custom_checks.business_validation_hook import (
 from regression_tests.custom_checks.business_validation_rules import (
     check_business_validation_rules,
 )
+from regression_tests.custom_checks.cautious_persona import (
+    check_cautious_persona_asks_clarification,
+)
 from regression_tests.custom_checks.delete_hook_and_revert import (
     check_hook_deleted_and_reverted,
 )
@@ -64,6 +67,7 @@ from regression_tests.custom_checks.serverless_hook_txscript import (
 __all__ = [
     "check_business_validation_hook_settings",
     "check_business_validation_rules",
+    "check_cautious_persona_asks_clarification",
     "check_formula_field_for_table",
     "check_formula_field_updated",
     "check_hook_deleted_and_reverted",

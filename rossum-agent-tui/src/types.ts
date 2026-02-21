@@ -138,12 +138,14 @@ export type SSEEvent =
   | { event: "error"; data: { message: string } };
 
 export type McpMode = "read-only" | "read-write";
+export type Persona = "default" | "cautious";
 
 export interface Config {
   apiUrl: string;
   token: string;
   rossumUrl: string;
   mcpMode: McpMode;
+  persona: Persona;
 }
 
 export type InteractionMode = "input" | "browse";

@@ -141,6 +141,7 @@ class RegressionTestCase:
     api_base_url: str
     prompt: str = ""
     mode: Literal["read-only", "read-write"] = "read-write"
+    persona: Literal["default", "cautious"] = "default"
     api_token: str | None = None
     rossum_url: str | None = None
     sandbox_api_token: str | None = None

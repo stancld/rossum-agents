@@ -7,11 +7,14 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+type Persona = Literal["default", "cautious"]
+
 
 class CreateChatRequest(BaseModel):
     """Request body for creating a new chat session."""
 
     mcp_mode: Literal["read-only", "read-write"] = "read-only"
+    persona: Persona = "default"
 
 
 class ChatResponse(BaseModel):
@@ -142,6 +145,10 @@ class MessageRequest(BaseModel):
     mcp_mode: Literal["read-only", "read-write"] | None = Field(
         default=None,
         description="MCP mode to use for this message and all subsequent messages. If not specified, uses the chat's current mode.",
+    )
+    persona: Persona | None = Field(
+        default=None,
+        description="Agent persona to use for this message and all subsequent messages. If not specified, uses the chat's current persona.",
     )
 
 

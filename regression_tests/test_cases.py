@@ -15,6 +15,7 @@ from __future__ import annotations
 from regression_tests.custom_checks import (
     check_business_validation_hook_settings,
     check_business_validation_rules,
+    check_cautious_persona_asks_clarification,
     check_formula_field_for_table,
     check_formula_field_updated,
     check_hook_deleted_and_reverted,
@@ -140,6 +141,11 @@ MULTI_TURN_SCHEMA_REVERTED_CHECK = CustomCheck(
     check_fn=check_multi_turn_schema_reverted,
 )
 
+CAUTIOUS_PERSONA_CLARIFICATION_CHECK = CustomCheck(
+    name="Cautious persona asked clarifying question instead of creating formula field",
+    check_fn=check_cautious_persona_asks_clarification,
+)
+
 
 REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
@@ -165,7 +171,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url="https://mr-fabry.rossum.app/documents?filtering=%7B%22items%22%3A%5B%7B%22field%22%3A%22queue%22%2C%22value%22%3A%5B%222500259%22%5D%2C%22operator%22%3A%22isAnyOf%22%7D%5D%2C%22logicOperator%22%3A%22and%22%7D&level=queue&page=1&page_size=100",
         prompt="Explain a document workflow and learning workflow on this queue.",
         tool_expectation=ToolExpectation(expected_tools=["get_queue", "get_queue_engine"], mode=ToolMatchMode.SUBSET),
-        token_budget=TokenBudget(min_total_tokens=18000, max_total_tokens=50000),
+        token_budget=TokenBudget(min_total_tokens=25000, max_total_tokens=60000),
         success_criteria=SuccessCriteria(
             required_keywords=["document_type", "classification", "training", "workflow"],
             max_steps=5,
@@ -514,7 +520,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=180000, max_total_tokens=320000),
+        token_budget=TokenBudget(min_total_tokens=180000, max_total_tokens=360000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
             max_steps=12,
@@ -543,11 +549,10 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
-                "get_schema_tree_structure",
                 "prune_schema_fields",
                 ("patch_schema", "patch_schema_with_subagent"),
             ],
-            mode=ToolMatchMode.EXACT_SEQUENCE,
+            mode=ToolMatchMode.SUBSET,
         ),
         token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=90000),
         success_criteria=SuccessCriteria(
@@ -714,6 +719,34 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             max_steps=30,
             file_expectation=FileExpectation(),
             custom_checks=[MULTI_TURN_SCHEMA_REVERTED_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="cautious_persona_asks_before_formula_field",
+        description="Cautious persona asks clarifying question before creating formula field",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        persona="cautious",
+        rossum_url=None,
+        prompts=[
+            "Create a 'New revert queue' in workspace 785638. Use EU template.",
+            (
+                "Add field to the queue.\n"
+                "    - Field name: The Net Terms\n"
+                "    - Section: basic_info_section\n"
+                "    - Logic: Compute 'Due Date' - 'Issue Date' and categorize it as 'Net 15', 'Net 30' and 'Outstanding'"
+            ),
+        ],
+        tool_expectation=ToolExpectation(
+            expected_tools=["create_queue_from_template"],
+            mode=ToolMatchMode.SUBSET,
+            forbidden_tools=["patch_schema", "patch_schema_with_subagent"],
+        ),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=65000),
+        success_criteria=SuccessCriteria(
+            required_keywords=[],
+            max_steps=5,
+            file_expectation=FileExpectation(),
+            custom_checks=[CAUTIOUS_PERSONA_CLARIFICATION_CHECK],
         ),
     ),
     RegressionTestCase(

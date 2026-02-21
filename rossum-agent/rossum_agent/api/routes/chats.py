@@ -33,7 +33,8 @@ async def create_chat(
 ) -> ChatResponse:
     """Create a new chat session."""
     mcp_mode = body.mcp_mode if body else "read-only"
-    return chat_service.create_chat(user_id=credentials.user_id, mcp_mode=mcp_mode)
+    persona = body.persona if body else "default"
+    return chat_service.create_chat(user_id=credentials.user_id, mcp_mode=mcp_mode, persona=persona)
 
 
 @router.get("", response_model=ChatListResponse)

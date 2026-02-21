@@ -87,6 +87,18 @@ class TestChatServiceCreateChat:
 
         assert response1.chat_id != response2.chat_id
 
+    def test_create_chat_persists_persona(self):
+        """Test create_chat stores persona in metadata."""
+        mock_storage = MagicMock()
+        mock_storage.save_chat.return_value = True
+
+        service = ChatService(redis_storage=mock_storage)
+        service.create_chat(user_id="user_123", persona="cautious")
+
+        call_kwargs = mock_storage.save_chat.call_args.kwargs
+        metadata = call_kwargs["metadata"]
+        assert metadata.persona == "cautious"
+
 
 class TestChatServiceListChats:
     """Tests for list_chats method."""

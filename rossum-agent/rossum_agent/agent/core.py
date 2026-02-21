@@ -466,10 +466,7 @@ class RossumAgent:
             yield (None, stream.get_final_message())
 
     def _process_stream_event(
-        self,
-        event: MessageStreamEvent,
-        pending_tools: dict[int, dict[str, str]],
-        tool_calls: list[ToolCall],
+        self, event: MessageStreamEvent, pending_tools: dict[int, dict[str, str]], tool_calls: list[ToolCall]
     ) -> StreamDelta | None:
         """Process a single stream event.
 
