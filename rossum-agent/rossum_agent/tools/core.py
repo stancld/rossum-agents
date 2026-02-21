@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import asyncio
 
+    from anthropic.types import ToolParam
+
     from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
     from rossum_agent.rossum_mcp_integration import MCPConnection
     from rossum_agent.tools.task_tracker import TaskTracker
@@ -62,6 +64,28 @@ TaskSnapshotCallback = Callable[[list[dict[str, object]]], None]
 
 
 @dataclass
+class DynamicToolsState:
+    """Per-conversation state for dynamically loaded MCP tools.
+
+    Tracks which tool categories/skills have been loaded and stores the
+    converted Anthropic tool definitions. Lives on AgentContext so state
+    is properly scoped per-request and doesn't leak between conversations.
+    """
+
+    loaded_categories: set[str] = field(default_factory=set)
+    tools: list[ToolParam] = field(default_factory=list)
+    loaded_skills: set[str] = field(default_factory=set)
+    version: int = 0
+
+    def reset(self) -> None:
+        """Reset state for a new conversation."""
+        self.loaded_categories.clear()
+        self.tools.clear()
+        self.loaded_skills.clear()
+        self.version += 1
+
+
+@dataclass
 class AgentContext:
     """Per-request state for the agent, replacing 13 individual ContextVars."""
 
@@ -77,6 +101,7 @@ class AgentContext:
     commit_store: CommitStore | None = None
     snapshot_store: SnapshotStore | None = None
     task_tracker: TaskTracker | None = None
+    dynamic_tools: DynamicToolsState = field(default_factory=DynamicToolsState)
     # Callbacks
     progress_callback: SubAgentProgressCallback | None = None
     text_callback: SubAgentTextCallback | None = None

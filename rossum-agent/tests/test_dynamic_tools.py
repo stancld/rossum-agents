@@ -4,17 +4,15 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from rossum_agent.tools.core import AgentContext, set_context
+from rossum_agent.tools.core import AgentContext, DynamicToolsState, get_context, set_context
 from rossum_agent.tools.dynamic_tools import (
     DISCOVERY_TOOL_NAME,
     HIDDEN_TOOLS,
     CatalogData,
-    DynamicToolsState,
     _fetch_catalog_from_mcp,
     _filter_mcp_tools_by_names,
     _load_categories_impl,
     get_dynamic_tools,
-    get_global_state,
     get_load_tool_category_definition,
     get_load_tool_definition,
     get_write_tools,
@@ -38,12 +36,12 @@ class TestDynamicToolState:
 
     def test_reset_clears_state(self) -> None:
         reset_dynamic_tools()
-        assert get_global_state().loaded_categories == set()
+        assert get_context().dynamic_tools.loaded_categories == set()
         assert get_dynamic_tools() == []
 
     def test_initial_state_is_empty(self) -> None:
         reset_dynamic_tools()
-        assert len(get_global_state().loaded_categories) == 0
+        assert len(get_context().dynamic_tools.loaded_categories) == 0
         assert len(get_dynamic_tools()) == 0
 
 
@@ -141,8 +139,7 @@ class TestLoadCategoriesImpl:
         reset_dynamic_tools()
         mock_get_catalog.return_value = {"queues": {"get_queue"}}
         # Manually add category to loaded set
-        loaded = get_global_state().loaded_categories
-        loaded.add("queues")
+        get_context().dynamic_tools.loaded_categories.add("queues")
         result = _load_categories_impl(["queues"])
         assert result == "Categories already loaded: ['queues']"
 
@@ -201,7 +198,7 @@ class TestLoadCategoriesImpl:
 
             assert "Loaded" in result
             assert "get_queue" in result or "list_queues" in result
-            assert "queues" in get_global_state().loaded_categories
+            assert "queues" in get_context().dynamic_tools.loaded_categories
             assert len(get_dynamic_tools()) == 1
         finally:
             set_context(AgentContext())
@@ -301,26 +298,23 @@ class TestDynamicToolsState:
         assert len(state.tools) == 1
 
 
-class TestGetGlobalState:
-    """Tests for get_global_state function."""
+class TestContextHoldsDynamicToolsState:
+    """Tests that AgentContext properly holds DynamicToolsState."""
 
-    def test_returns_same_instance(self) -> None:
-        """Test that get_global_state returns the same singleton instance."""
-        state1 = get_global_state()
-        state2 = get_global_state()
-        assert state1 is state2
+    def test_new_context_has_empty_state(self) -> None:
+        ctx = AgentContext()
+        assert ctx.dynamic_tools.loaded_categories == set()
+        assert ctx.dynamic_tools.tools == []
+        assert ctx.dynamic_tools.loaded_skills == set()
+        assert ctx.dynamic_tools.version == 0
 
-    def test_creates_instance_if_none(self) -> None:
-        """Test that get_global_state creates DynamicToolsState if needed."""
-        import rossum_agent.tools.dynamic_tools as dt
+    def test_set_context_isolates_state(self) -> None:
+        """Different contexts have independent DynamicToolsState."""
+        ctx1 = AgentContext()
+        ctx1.dynamic_tools.loaded_categories.add("queues")
 
-        original_state = dt._global_state
-        try:
-            dt._global_state = None
-            state = get_global_state()
-            assert isinstance(state, DynamicToolsState)
-        finally:
-            dt._global_state = original_state
+        ctx2 = AgentContext()
+        assert ctx2.dynamic_tools.loaded_categories == set()
 
 
 class TestFetchCatalogFromMcp:
@@ -583,8 +577,7 @@ class TestLoadTool:
             mock_run_coro.return_value = mock_future
 
             # Manually add tool to loaded state
-            state = get_global_state()
-            state.tools.append({"name": "delete_hook"})
+            get_context().dynamic_tools.tools.append({"name": "delete_hook"})
 
             result = load_tool(["delete_hook"])
             assert result == "Tools already loaded: ['delete_hook']"
