@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
-from rossum_agent.tools.core import get_mcp_connection, get_mcp_event_loop, is_read_only_mode
+from rossum_agent.tools.core import get_context
 
 if TYPE_CHECKING:
     from anthropic.types import ToolParam
@@ -150,17 +150,16 @@ def _fetch_catalog_from_mcp() -> CatalogData:
     if _catalog_cache is not None:
         return _catalog_cache
 
-    mcp_connection = get_mcp_connection()
-    loop = get_mcp_event_loop()
+    ctx = get_context()
 
-    if mcp_connection is None or loop is None:
+    if ctx.mcp_connection is None or ctx.mcp_event_loop is None:
         logger.warning("MCP connection not available, returning empty catalog")
         return CatalogData()
 
     try:
-        result = asyncio.run_coroutine_threadsafe(mcp_connection.call_tool("list_tool_categories", {}), loop).result(
-            timeout=10
-        )
+        result = asyncio.run_coroutine_threadsafe(
+            ctx.mcp_connection.call_tool("list_tool_categories", {}), ctx.mcp_event_loop
+        ).result(timeout=10)
         _catalog_cache = _parse_catalog_result(result)
         logger.info(f"Fetched catalog with {len(_catalog_cache.catalog)} categories from MCP")
         return _catalog_cache
@@ -257,21 +256,21 @@ def _load_categories_impl(
     if not to_load:
         return f"Categories already loaded: {categories}"
 
-    mcp_connection, loop = get_mcp_connection(), get_mcp_event_loop()
-    if mcp_connection is None or loop is None:
+    ctx = get_context()
+    if ctx.mcp_connection is None or ctx.mcp_event_loop is None:
         return "Error: MCP connection not available"
 
     tool_names_to_load: set[str] = set()
     for category in to_load:
         tool_names_to_load.update(catalog[category])
 
-    read_only = is_read_only_mode()
+    read_only = ctx.is_read_only
     if read_only:
         tool_names_to_load -= get_write_tools()
 
     tool_names_to_load -= set(HIDDEN_TOOLS)
 
-    mcp_tools = asyncio.run_coroutine_threadsafe(mcp_connection.get_tools(), loop).result()
+    mcp_tools = asyncio.run_coroutine_threadsafe(ctx.mcp_connection.get_tools(), ctx.mcp_event_loop).result()
     tools_to_add = _filter_mcp_tools_by_names(mcp_tools, tool_names_to_load)
 
     if not tools_to_add:
@@ -357,11 +356,11 @@ def load_tool(tool_names: list[str], state: DynamicToolsState | None = None) -> 
     if state is None:
         state = get_global_state()
 
-    mcp_connection, loop = get_mcp_connection(), get_mcp_event_loop()
-    if mcp_connection is None or loop is None:
+    ctx = get_context()
+    if ctx.mcp_connection is None or ctx.mcp_event_loop is None:
         return "Error: MCP connection not available"
 
-    mcp_tools = asyncio.run_coroutine_threadsafe(mcp_connection.get_tools(), loop).result()
+    mcp_tools = asyncio.run_coroutine_threadsafe(ctx.mcp_connection.get_tools(), ctx.mcp_event_loop).result()
     available_tool_names = {t.name for t in mcp_tools}
 
     hidden = [name for name in tool_names if name in HIDDEN_TOOLS]
@@ -373,7 +372,7 @@ def load_tool(tool_names: list[str], state: DynamicToolsState | None = None) -> 
     if invalid:
         return f"Error: Unknown tools {invalid}"
 
-    read_only = is_read_only_mode()
+    read_only = ctx.is_read_only
     if read_only:
         write_tools = get_write_tools()
         blocked = [name for name in tool_names if name in write_tools]

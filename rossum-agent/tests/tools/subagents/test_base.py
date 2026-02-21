@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from rossum_agent.tools.core import AgentContext, set_context
 from rossum_agent.tools.subagents.base import (
     SubAgent,
     SubAgentConfig,
@@ -158,20 +159,20 @@ class TestSubAgent:
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
 
-        with (
-            patch(
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with patch(
                 "rossum_agent.tools.subagents.base.create_bedrock_client",
                 return_value=mock_client,
-            ),
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-        ):
-            result = agent.run("Test message")
+            ):
+                result = agent.run("Test message")
 
-            assert result.analysis == "Analysis result"
-            assert result.input_tokens == 100
-            assert result.output_tokens == 50
-            assert result.iterations_used == 1
+                assert result.analysis == "Analysis result"
+                assert result.input_tokens == 100
+                assert result.output_tokens == 50
+                assert result.iterations_used == 1
+        finally:
+            set_context(AgentContext())
 
     def test_run_iterates_with_tool_use(self):
         """Test that run iterates when tools are used."""
@@ -208,22 +209,22 @@ class TestSubAgent:
         mock_client = MagicMock()
         mock_client.messages.create.side_effect = [first_response, second_response]
 
-        with (
-            patch(
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with patch(
                 "rossum_agent.tools.subagents.base.create_bedrock_client",
                 return_value=mock_client,
-            ),
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-        ):
-            result = agent.run("Test message")
+            ):
+                result = agent.run("Test message")
 
-            assert result.analysis == "Final result"
-            assert result.input_tokens == 250
-            assert result.output_tokens == 125
-            assert result.iterations_used == 2
-            assert mock_client.messages.create.call_count == 2
-            assert result.tool_calls == [{"tool": "test_tool", "input": {}}]
+                assert result.analysis == "Final result"
+                assert result.input_tokens == 250
+                assert result.output_tokens == 125
+                assert result.iterations_used == 2
+                assert mock_client.messages.create.call_count == 2
+                assert result.tool_calls == [{"tool": "test_tool", "input": {}}]
+        finally:
+            set_context(AgentContext())
 
     def test_run_no_tool_calls_returns_none(self):
         """Test that run returns tool_calls=None when no tools are used."""
@@ -250,17 +251,17 @@ class TestSubAgent:
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
 
-        with (
-            patch(
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with patch(
                 "rossum_agent.tools.subagents.base.create_bedrock_client",
                 return_value=mock_client,
-            ),
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-        ):
-            result = agent.run("Test message")
+            ):
+                result = agent.run("Test message")
 
-            assert result.tool_calls is None
+                assert result.tool_calls is None
+        finally:
+            set_context(AgentContext())
 
     def test_run_reports_token_usage(self):
         """Test that token usage is reported via callback."""
@@ -273,9 +274,6 @@ class TestSubAgent:
 
         token_reports = []
 
-        def capture_tokens(usage):
-            token_reports.append(usage)
-
         mock_response = MagicMock()
         mock_response.content = []
         mock_response.stop_reason = "end_of_turn"
@@ -287,24 +285,26 @@ class TestSubAgent:
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
 
-        with (
-            patch(
+        set_context(
+            AgentContext(
+                progress_callback=MagicMock(),
+                token_callback=lambda usage: token_reports.append(usage),
+            )
+        )
+        try:
+            with patch(
                 "rossum_agent.tools.subagents.base.create_bedrock_client",
                 return_value=mock_client,
-            ),
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch(
-                "rossum_agent.tools.subagents.base.report_token_usage",
-                side_effect=capture_tokens,
-            ),
-        ):
-            agent.run("Test")
+            ):
+                agent.run("Test")
 
-            assert len(token_reports) == 1
-            assert token_reports[0].tool_name == "test"
-            assert token_reports[0].input_tokens == 100
-            assert token_reports[0].output_tokens == 50
-            assert token_reports[0].iteration == 1
+                assert len(token_reports) == 1
+                assert token_reports[0].tool_name == "test"
+                assert token_reports[0].input_tokens == 100
+                assert token_reports[0].output_tokens == 50
+                assert token_reports[0].iteration == 1
+        finally:
+            set_context(AgentContext())
 
     def test_run_handles_tool_execution_error(self):
         """Test that tool execution errors are handled gracefully."""
@@ -348,17 +348,17 @@ class TestSubAgent:
         mock_client = MagicMock()
         mock_client.messages.create.side_effect = [first_response, second_response]
 
-        with (
-            patch(
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with patch(
                 "rossum_agent.tools.subagents.base.create_bedrock_client",
                 return_value=mock_client,
-            ),
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-        ):
-            result = agent.run("Test")
+            ):
+                result = agent.run("Test")
 
-            assert result.analysis == "Handled error"
+                assert result.analysis == "Handled error"
+        finally:
+            set_context(AgentContext())
 
     def test_run_returns_error_on_exception(self):
         """Test that run returns error message on exception."""
@@ -407,22 +407,24 @@ class TestSubAgent:
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
 
-        with (
-            patch(
-                "rossum_agent.tools.subagents.base.create_bedrock_client",
-                return_value=mock_client,
-            ),
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.logger") as mock_logger,
-        ):
-            result = agent.run("Test")
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch(
+                    "rossum_agent.tools.subagents.base.create_bedrock_client",
+                    return_value=mock_client,
+                ),
+                patch("rossum_agent.tools.subagents.base.logger") as mock_logger,
+            ):
+                result = agent.run("Test")
 
-            assert result.iterations_used == 2
-            assert result.input_tokens == 200
-            assert result.output_tokens == 100
-            mock_logger.warning.assert_called()
-            assert "max iterations" in mock_logger.warning.call_args[0][0]
+                assert result.iterations_used == 2
+                assert result.input_tokens == 200
+                assert result.output_tokens == 100
+                mock_logger.warning.assert_called()
+                assert "max iterations" in mock_logger.warning.call_args[0][0]
+        finally:
+            set_context(AgentContext())
 
     def test_run_max_iterations_tracks_tool_calls(self):
         """Test that tool_calls are tracked when max iterations is reached."""
@@ -451,21 +453,23 @@ class TestSubAgent:
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
 
-        with (
-            patch(
-                "rossum_agent.tools.subagents.base.create_bedrock_client",
-                return_value=mock_client,
-            ),
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.base.logger"),
-        ):
-            result = agent.run("Test")
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch(
+                    "rossum_agent.tools.subagents.base.create_bedrock_client",
+                    return_value=mock_client,
+                ),
+                patch("rossum_agent.tools.subagents.base.logger"),
+            ):
+                result = agent.run("Test")
 
-            assert result.tool_calls == [
-                {"tool": "tool", "input": {"q": "test"}},
-                {"tool": "tool", "input": {"q": "test"}},
-            ]
+                assert result.tool_calls == [
+                    {"tool": "tool", "input": {"q": "test"}},
+                    {"tool": "tool", "input": {"q": "test"}},
+                ]
+        finally:
+            set_context(AgentContext())
 
     def test_process_response_block_concrete_impl(self):
         """Test that ConcreteSubAgent's process_response_block returns None."""
@@ -505,22 +509,22 @@ class TestSubAgent:
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-        ):
-            agent.run("Test message")
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client):
+                agent.run("Test message")
 
-            call_kwargs = mock_client.messages.create.call_args[1]
+                call_kwargs = mock_client.messages.create.call_args[1]
 
-            # System should be a list with cache_control
-            assert isinstance(call_kwargs["system"], list)
-            assert call_kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}
+                # System should be a list with cache_control
+                assert isinstance(call_kwargs["system"], list)
+                assert call_kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}
 
-            # Last tool should have cache_control
-            tools = call_kwargs["tools"]
-            assert tools[-1]["cache_control"] == {"type": "ephemeral"}
+                # Last tool should have cache_control
+                tools = call_kwargs["tools"]
+                assert tools[-1]["cache_control"] == {"type": "ephemeral"}
+        finally:
+            set_context(AgentContext())
 
     def test_run_reports_cache_tokens(self):
         """Test that cache token metrics are reported via callback."""
@@ -533,9 +537,6 @@ class TestSubAgent:
 
         token_reports = []
 
-        def capture_tokens(usage):
-            token_reports.append(usage)
-
         mock_response = MagicMock()
         mock_response.content = []
         mock_response.stop_reason = "end_of_turn"
@@ -547,15 +548,20 @@ class TestSubAgent:
         mock_client = MagicMock()
         mock_client.messages.create.return_value = mock_response
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client),
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage", side_effect=capture_tokens),
-        ):
-            agent.run("Test")
+        set_context(
+            AgentContext(
+                progress_callback=MagicMock(),
+                token_callback=lambda usage: token_reports.append(usage),
+            )
+        )
+        try:
+            with patch("rossum_agent.tools.subagents.base.create_bedrock_client", return_value=mock_client):
+                agent.run("Test")
 
-            assert len(token_reports) == 1
-            assert token_reports[0].cache_creation_input_tokens == 30
-            assert token_reports[0].cache_read_input_tokens == 60
+                assert len(token_reports) == 1
+                assert token_reports[0].cache_creation_input_tokens == 30
+                assert token_reports[0].cache_read_input_tokens == 60
+        finally:
+            set_context(AgentContext())
 
     # Unit tests for add_message_cache_breakpoint are in tests/agent/test_core.py::TestCacheBreakpoints

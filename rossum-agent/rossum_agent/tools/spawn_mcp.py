@@ -17,7 +17,7 @@ from anthropic import beta_tool
 from fastmcp import Client
 
 from rossum_agent.rossum_mcp_integration import MCPConnection, create_mcp_transport
-from rossum_agent.tools.core import get_mcp_event_loop
+from rossum_agent.tools.core import get_context
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ def spawn_mcp_connection(connection_id: str, api_token: str, api_base_url: str, 
     Returns:
         Success message with available tools, or error message if failed.
     """
-    if (mcp_event_loop := get_mcp_event_loop()) is None:
+    if (mcp_event_loop := get_context().mcp_event_loop) is None:
         return "Error: MCP event loop not set. Agent not properly initialized."
 
     if not connection_id or not connection_id.strip():
@@ -132,7 +132,7 @@ def call_on_connection(connection_id: str, tool_name: str, arguments: str | dict
     Returns:
         The result of the tool call as a JSON string, or error message.
     """
-    if (mcp_event_loop := get_mcp_event_loop()) is None:
+    if (mcp_event_loop := get_context().mcp_event_loop) is None:
         return "Error: MCP event loop not set."
 
     with _spawned_connections_lock:
@@ -171,7 +171,7 @@ def call_on_connection(connection_id: str, tool_name: str, arguments: str | dict
 @beta_tool
 def close_connection(connection_id: str) -> str:
     """Close a spawned MCP connection."""
-    if (mcp_event_loop := get_mcp_event_loop()) is None:
+    if (mcp_event_loop := get_context().mcp_event_loop) is None:
         return "Error: MCP event loop not set."
 
     with _spawned_connections_lock:

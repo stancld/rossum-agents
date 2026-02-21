@@ -82,10 +82,7 @@ from rossum_agent.tools import execute_internal_tool, execute_tool, get_internal
 from rossum_agent.tools.core import (
     SubAgentProgress,
     SubAgentTokenUsage,
-    get_mcp_mode,
-    set_mcp_connection,
-    set_progress_callback,
-    set_token_callback,
+    get_context,
 )
 from rossum_agent.tools.deploy import DEPLOY_TOOLS, get_deploy_tool_names, get_deploy_tools
 from rossum_agent.tools.dynamic_tools import (
@@ -788,8 +785,9 @@ class RossumAgent:
         try:
             if tool_call.name in get_internal_tool_names():
                 logger.info(f"Calling internal tool {tool_call.name}")
-                set_progress_callback(progress_callback)
-                set_token_callback(token_callback)
+                agent_ctx = get_context()
+                agent_ctx.progress_callback = progress_callback
+                agent_ctx.token_callback = token_callback
 
                 loop = asyncio.get_event_loop()
                 ctx = copy_context()
@@ -820,8 +818,8 @@ class RossumAgent:
                 result = future.result()
                 content = str(result)
                 logger.info(f"Internal tool {tool_call.name} result: {content}")
-                set_progress_callback(None)
-                set_token_callback(None)
+                agent_ctx.progress_callback = None
+                agent_ctx.token_callback = None
             elif tool_call.name in get_deploy_tool_names():
                 logger.info(f"Calling deploy tool {tool_call.name}")
                 loop = asyncio.get_event_loop()
@@ -839,8 +837,9 @@ class RossumAgent:
             yield ToolResult(tool_call_id=tool_call.id, name=tool_call.name, content=content)
 
         except Exception as e:
-            set_progress_callback(None)
-            set_token_callback(None)
+            agent_ctx = get_context()
+            agent_ctx.progress_callback = None
+            agent_ctx.token_callback = None
             error_msg = f"Tool {tool_call.name} failed: {e}"
             logger.warning(f"Tool {tool_call.name} failed: {e}", exc_info=True)
             yield ToolResult(tool_call_id=tool_call.id, name=tool_call.name, content=error_msg, is_error=True)
@@ -883,8 +882,9 @@ class RossumAgent:
         Rate limiting is handled with exponential backoff and jitter.
         """
         loop = asyncio.get_event_loop()
-        mcp_mode = get_mcp_mode()
-        set_mcp_connection(self.mcp_connection, loop, mcp_mode)
+        agent_ctx = get_context()
+        agent_ctx.mcp_connection = self.mcp_connection
+        agent_ctx.mcp_event_loop = loop
 
         # Pre-load tool categories based on keywords in the user's request
         # Run in thread pool to avoid blocking the event loop (preload uses sync MCP calls)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+from rossum_agent.tools.core import AgentContext, set_context
 from rossum_agent.tools.subagents.base import SubAgentResult
 from rossum_agent.tools.subagents.schema_patching import (
     _APPLY_SCHEMA_CHANGES_TOOL,
@@ -421,7 +422,7 @@ class TestBuildFieldNode:
         assert node["formula"] == "field.a + field.b"
 
     def test_lookup_field_strips_rir_field_names(self):
-        """Lookup fields must never have rir_field_names — it causes engine restriction errors."""
+        """Lookup fields must never have rir_field_names -- it causes engine restriction errors."""
         spec = {
             "id": "vendor_match",
             "label": "Vendor Match",
@@ -978,9 +979,6 @@ class TestCallOpusForPatching:
         """Test that progress is reported during patching."""
         progress_calls: list = []
 
-        def capture_progress(progress):
-            progress_calls.append(progress)
-
         mock_response = MagicMock()
         mock_response.stop_reason = "end_of_turn"
         mock_response.content = [MagicMock(text="Patching complete", type="text")]
@@ -988,19 +986,26 @@ class TestCallOpusForPatching:
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress", side_effect=capture_progress),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
-        ):
-            mock_client.return_value.messages.create.return_value = mock_response
+        set_context(
+            AgentContext(
+                progress_callback=lambda p: progress_calls.append(p),
+                token_callback=MagicMock(),
+            )
+        )
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+                patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+            ):
+                mock_client.return_value.messages.create.return_value = mock_response
 
-            changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
-            _call_opus_for_patching("123", changes)
+                changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
+                _call_opus_for_patching("123", changes)
 
-            assert len(progress_calls) >= 1
-            assert progress_calls[0].tool_name == "patch_schema"
+                assert len(progress_calls) >= 1
+                assert progress_calls[0].tool_name == "patch_schema"
+        finally:
+            set_context(AgentContext())
 
     def test_iterates_with_tool_use(self):
         """Test that sub-agent iterates when tools are used."""
@@ -1026,25 +1031,27 @@ class TestCallOpusForPatching:
         second_response.usage.input_tokens = 200
         second_response.usage.output_tokens = 100
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch(
-                "rossum_agent.tools.subagents.schema_patching._execute_opus_tool",
-                return_value='[{"id": "section1"}]',
-            ),
-            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
-        ):
-            mock_client.return_value.messages.create.side_effect = [first_response, second_response]
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+                patch(
+                    "rossum_agent.tools.subagents.schema_patching._execute_opus_tool",
+                    return_value='[{"id": "section1"}]',
+                ),
+                patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+            ):
+                mock_client.return_value.messages.create.side_effect = [first_response, second_response]
 
-            changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
-            result = _call_opus_for_patching("123", changes)
+                changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
+                result = _call_opus_for_patching("123", changes)
 
-            assert "Schema updated successfully" in result.analysis
-            assert result.input_tokens == 300
-            assert result.output_tokens == 150
-            assert mock_client.return_value.messages.create.call_count == 2
+                assert "Schema updated successfully" in result.analysis
+                assert result.input_tokens == 300
+                assert result.output_tokens == 150
+                assert mock_client.return_value.messages.create.call_count == 2
+        finally:
+            set_context(AgentContext())
 
     def test_max_iterations_is_3(self):
         """Test that max iterations is 3 for deterministic workflow."""
@@ -1060,24 +1067,26 @@ class TestCallOpusForPatching:
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch(
-                "rossum_agent.tools.subagents.schema_patching._execute_opus_tool",
-                return_value='[{"id": "section1"}]',
-            ),
-            patch("rossum_agent.tools.subagents.base.logger"),
-            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
-        ):
-            mock_client.return_value.messages.create.return_value = mock_response
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+                patch(
+                    "rossum_agent.tools.subagents.schema_patching._execute_opus_tool",
+                    return_value='[{"id": "section1"}]',
+                ),
+                patch("rossum_agent.tools.subagents.base.logger"),
+                patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+            ):
+                mock_client.return_value.messages.create.return_value = mock_response
 
-            changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
-            result = _call_opus_for_patching("123", changes)
+                changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
+                result = _call_opus_for_patching("123", changes)
 
-            assert result.iterations_used == 3
-            assert mock_client.return_value.messages.create.call_count == 3
+                assert result.iterations_used == 3
+                assert mock_client.return_value.messages.create.call_count == 3
+        finally:
+            set_context(AgentContext())
 
     def test_bedrock_client_exception_returns_error(self):
         """Test that create_bedrock_client exception returns error message."""
@@ -1104,22 +1113,24 @@ class TestCallOpusForPatching:
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
-        ):
-            mock_client.return_value.messages.create.return_value = mock_response
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+                patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+            ):
+                mock_client.return_value.messages.create.return_value = mock_response
 
-            changes = [{"action": "update", "id": "field1", "formula": "new_code"}]
-            _call_opus_for_patching("123", changes)
+                changes = [{"action": "update", "id": "field1", "formula": "new_code"}]
+                _call_opus_for_patching("123", changes)
 
-            call_args = mock_client.return_value.messages.create.call_args
-            user_content = call_args[1]["messages"][0]["content"]
-            user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
-            assert "keep all other fields unchanged" in user_text
-            assert "EXACTLY" not in user_text
+                call_args = mock_client.return_value.messages.create.call_args
+                user_content = call_args[1]["messages"][0]["content"]
+                user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
+                assert "keep all other fields unchanged" in user_text
+                assert "EXACTLY" not in user_text
+        finally:
+            set_context(AgentContext())
 
     def test_mixed_actions_uses_exactly_intro(self):
         """Test that mixed add+update changes use 'EXACTLY' intro."""
@@ -1130,24 +1141,26 @@ class TestCallOpusForPatching:
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
-        ):
-            mock_client.return_value.messages.create.return_value = mock_response
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+                patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+            ):
+                mock_client.return_value.messages.create.return_value = mock_response
 
-            changes = [
-                {"action": "add", "id": "new_f", "parent_section": "s1", "type": "string"},
-                {"action": "update", "id": "old_f", "formula": "code"},
-            ]
-            _call_opus_for_patching("123", changes)
+                changes = [
+                    {"action": "add", "id": "new_f", "parent_section": "s1", "type": "string"},
+                    {"action": "update", "id": "old_f", "formula": "code"},
+                ]
+                _call_opus_for_patching("123", changes)
 
-            call_args = mock_client.return_value.messages.create.call_args
-            user_content = call_args[1]["messages"][0]["content"]
-            user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
-            assert "EXACTLY" in user_text
+                call_args = mock_client.return_value.messages.create.call_args
+                user_content = call_args[1]["messages"][0]["content"]
+                user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
+                assert "EXACTLY" in user_text
+        finally:
+            set_context(AgentContext())
 
     def test_lookup_matching_included_in_user_prompt(self):
         """Test that lookup field matching config is included in the user prompt."""
@@ -1158,37 +1171,39 @@ class TestCallOpusForPatching:
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
-        ):
-            mock_client.return_value.messages.create.return_value = mock_response
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+                patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+            ):
+                mock_client.return_value.messages.create.return_value = mock_response
 
-            matching = {
-                "type": "master_data_hub",
-                "configuration": {"dataset": "Vendors", "queries": "[]", "placeholders": {}},
-            }
-            changes = [
-                {
-                    "action": "add",
-                    "id": "vendor_match",
-                    "type": "enum",
-                    "parent_section": "vendor_section",
-                    "ui_configuration": {"type": "lookup", "edit": "disabled"},
-                    "matching": matching,
+                matching = {
+                    "type": "master_data_hub",
+                    "configuration": {"dataset": "Vendors", "queries": "[]", "placeholders": {}},
                 }
-            ]
-            _call_opus_for_patching("123", changes)
+                changes = [
+                    {
+                        "action": "add",
+                        "id": "vendor_match",
+                        "type": "enum",
+                        "parent_section": "vendor_section",
+                        "ui_configuration": {"type": "lookup", "edit": "disabled"},
+                        "matching": matching,
+                    }
+                ]
+                _call_opus_for_patching("123", changes)
 
-            call_args = mock_client.return_value.messages.create.call_args
-            user_content = call_args[1]["messages"][0]["content"]
-            user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
-            assert "[LOOKUP]" in user_text
-            assert "Lookup Field Specs" in user_text
-            assert "master_data_hub" in user_text
-            assert "matching" in user_text
+                call_args = mock_client.return_value.messages.create.call_args
+                user_content = call_args[1]["messages"][0]["content"]
+                user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
+                assert "[LOOKUP]" in user_text
+                assert "Lookup Field Specs" in user_text
+                assert "master_data_hub" in user_text
+                assert "matching" in user_text
+        finally:
+            set_context(AgentContext())
 
     def test_no_lookup_section_without_matching(self):
         """Test that no lookup section is added for non-lookup fields."""
@@ -1199,21 +1214,23 @@ class TestCallOpusForPatching:
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
-        ):
-            mock_client.return_value.messages.create.return_value = mock_response
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+                patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+            ):
+                mock_client.return_value.messages.create.return_value = mock_response
 
-            changes = [{"action": "add", "id": "plain", "type": "string", "parent_section": "s1"}]
-            _call_opus_for_patching("123", changes)
+                changes = [{"action": "add", "id": "plain", "type": "string", "parent_section": "s1"}]
+                _call_opus_for_patching("123", changes)
 
-            call_args = mock_client.return_value.messages.create.call_args
-            user_content = call_args[1]["messages"][0]["content"]
-            user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
-            assert "Lookup Field Specs" not in user_text
+                call_args = mock_client.return_value.messages.create.call_args
+                user_content = call_args[1]["messages"][0]["content"]
+                user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
+                assert "Lookup Field Specs" not in user_text
+        finally:
+            set_context(AgentContext())
 
     def test_formula_included_in_changes_text(self):
         """Test that formula code appears in the user prompt sent to the sub-agent."""
@@ -1224,21 +1241,23 @@ class TestCallOpusForPatching:
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
-        ):
-            mock_client.return_value.messages.create.return_value = mock_response
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+                patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+            ):
+                mock_client.return_value.messages.create.return_value = mock_response
 
-            changes = [{"action": "update", "id": "calc", "formula": "field.a + field.b"}]
-            _call_opus_for_patching("123", changes)
+                changes = [{"action": "update", "id": "calc", "formula": "field.a + field.b"}]
+                _call_opus_for_patching("123", changes)
 
-            call_args = mock_client.return_value.messages.create.call_args
-            user_content = call_args[1]["messages"][0]["content"]
-            user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
-            assert "formula='field.a + field.b'" in user_text
+                call_args = mock_client.return_value.messages.create.call_args
+                user_content = call_args[1]["messages"][0]["content"]
+                user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
+                assert "formula='field.a + field.b'" in user_text
+        finally:
+            set_context(AgentContext())
 
 
 class TestApplySchemaChanges:

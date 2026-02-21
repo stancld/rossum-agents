@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from rossum_agent.tools.core import AgentContext, set_context
 from rossum_agent.tools.dynamic_tools import (
     DISCOVERY_TOOL_NAME,
     HIDDEN_TOOLS,
@@ -146,66 +147,64 @@ class TestLoadCategoriesImpl:
         assert result == "Categories already loaded: ['queues']"
 
     @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_returns_error_when_no_mcp_connection(
-        self, mock_get_connection: MagicMock, mock_get_catalog: MagicMock
-    ) -> None:
+    def test_returns_error_when_no_mcp_connection(self, mock_get_catalog: MagicMock) -> None:
         reset_dynamic_tools()
         mock_get_catalog.return_value = {"queues": {"get_queue"}}
-        mock_get_connection.return_value = None
-        result = _load_categories_impl(["queues"])
-        assert result == "Error: MCP connection not available"
+        set_context(AgentContext(mcp_connection=None, mcp_event_loop=MagicMock()))
+        try:
+            result = _load_categories_impl(["queues"])
+            assert result == "Error: MCP connection not available"
+        finally:
+            set_context(AgentContext())
 
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
     @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
-    def test_returns_error_when_no_event_loop(
-        self, mock_get_catalog: MagicMock, mock_get_connection: MagicMock, mock_get_loop: MagicMock
-    ) -> None:
+    def test_returns_error_when_no_event_loop(self, mock_get_catalog: MagicMock) -> None:
         reset_dynamic_tools()
         mock_get_catalog.return_value = {"queues": {"get_queue"}}
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = None
-        result = _load_categories_impl(["queues"])
-        assert result == "Error: MCP connection not available"
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=None))
+        try:
+            result = _load_categories_impl(["queues"])
+            assert result == "Error: MCP connection not available"
+        finally:
+            set_context(AgentContext())
 
     @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
     @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
     def test_successful_load_adds_tools_and_marks_category(
         self,
         mock_get_catalog: MagicMock,
-        mock_get_connection: MagicMock,
-        mock_get_loop: MagicMock,
         mock_run_coro: MagicMock,
         mock_convert: MagicMock,
     ) -> None:
         reset_dynamic_tools()
         mock_get_catalog.return_value = {"queues": {"get_queue", "list_queues"}}
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
 
-        # Create mock tools that match the queues category
-        mock_tool1 = MagicMock()
-        mock_tool1.name = "get_queue"
-        mock_tool2 = MagicMock()
-        mock_tool2.name = "list_queues"
-        mock_future = MagicMock()
-        mock_future.result.return_value = [mock_tool1, mock_tool2]
-        mock_run_coro.return_value = mock_future
+        mock_connection = MagicMock()
+        mock_loop = MagicMock()
+        set_context(AgentContext(mcp_connection=mock_connection, mcp_event_loop=mock_loop))
+        try:
+            # Create mock tools that match the queues category
+            mock_tool1 = MagicMock()
+            mock_tool1.name = "get_queue"
+            mock_tool2 = MagicMock()
+            mock_tool2.name = "list_queues"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool1, mock_tool2]
+            mock_run_coro.return_value = mock_future
 
-        # Mock the conversion function
-        mock_anthropic_tool = {"type": "function", "function": {"name": "get_queue"}}
-        mock_convert.return_value = [mock_anthropic_tool]
+            # Mock the conversion function
+            mock_anthropic_tool = {"type": "function", "function": {"name": "get_queue"}}
+            mock_convert.return_value = [mock_anthropic_tool]
 
-        result = _load_categories_impl(["queues"])
+            result = _load_categories_impl(["queues"])
 
-        assert "Loaded" in result
-        assert "get_queue" in result or "list_queues" in result
-        assert "queues" in get_global_state().loaded_categories
-        assert len(get_dynamic_tools()) == 1
+            assert "Loaded" in result
+            assert "get_queue" in result or "list_queues" in result
+            assert "queues" in get_global_state().loaded_categories
+            assert len(get_dynamic_tools()) == 1
+        finally:
+            set_context(AgentContext())
 
 
 class TestLoadToolCategory:
@@ -338,12 +337,10 @@ class TestFetchCatalogFromMcp:
         import rossum_agent.tools.dynamic_tools as dt
 
         dt._catalog_cache = None
+        set_context(AgentContext())
 
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_returns_empty_when_no_connection(self, mock_get_conn: MagicMock, mock_get_loop: MagicMock) -> None:
-        mock_get_conn.return_value = None
-        mock_get_loop.return_value = MagicMock()
+    def test_returns_empty_when_no_connection(self) -> None:
+        set_context(AgentContext(mcp_connection=None, mcp_event_loop=MagicMock()))
 
         result = _fetch_catalog_from_mcp()
 
@@ -351,11 +348,8 @@ class TestFetchCatalogFromMcp:
         assert result.keywords == {}
         assert result.write_tools == set()
 
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_returns_empty_when_no_event_loop(self, mock_get_conn: MagicMock, mock_get_loop: MagicMock) -> None:
-        mock_get_conn.return_value = MagicMock()
-        mock_get_loop.return_value = None
+    def test_returns_empty_when_no_event_loop(self) -> None:
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=None))
 
         result = _fetch_catalog_from_mcp()
 
@@ -364,14 +358,9 @@ class TestFetchCatalogFromMcp:
         assert result.write_tools == set()
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_parses_list_result_directly(
-        self, mock_get_conn: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock
-    ) -> None:
+    def test_parses_list_result_directly(self, mock_run_coro: MagicMock) -> None:
         """Test parsing when MCP returns a list directly."""
-        mock_get_conn.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
 
         mock_future = MagicMock()
         mock_future.result.return_value = [
@@ -391,16 +380,11 @@ class TestFetchCatalogFromMcp:
         assert result.write_tools == set()
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_parses_json_string_result(
-        self, mock_get_conn: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock
-    ) -> None:
+    def test_parses_json_string_result(self, mock_run_coro: MagicMock) -> None:
         """Test parsing when MCP returns a JSON string."""
         import json
 
-        mock_get_conn.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
 
         mock_future = MagicMock()
         mock_future.result.return_value = json.dumps(
@@ -420,14 +404,9 @@ class TestFetchCatalogFromMcp:
         assert result.catalog["schemas"] == {"get_schema"}
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_parses_wrapped_result(
-        self, mock_get_conn: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock
-    ) -> None:
+    def test_parses_wrapped_result(self, mock_run_coro: MagicMock) -> None:
         """Test parsing when MCP wraps list in {'result': [...]}."""
-        mock_get_conn.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
 
         mock_future = MagicMock()
         mock_future.result.return_value = {
@@ -447,16 +426,11 @@ class TestFetchCatalogFromMcp:
         assert result.catalog["hooks"] == {"get_hook"}
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_parses_double_wrapped_json_string(
-        self, mock_get_conn: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock
-    ) -> None:
+    def test_parses_double_wrapped_json_string(self, mock_run_coro: MagicMock) -> None:
         """Test parsing when MCP wraps a JSON string in {'result': json_string}."""
         import json
 
-        mock_get_conn.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
 
         mock_future = MagicMock()
         inner_list = [
@@ -474,14 +448,9 @@ class TestFetchCatalogFromMcp:
         assert "users" in result.catalog
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_handles_missing_keywords(
-        self, mock_get_conn: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock
-    ) -> None:
+    def test_handles_missing_keywords(self, mock_run_coro: MagicMock) -> None:
         """Test that missing keywords defaults to empty list."""
-        mock_get_conn.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
 
         mock_future = MagicMock()
         mock_future.result.return_value = [
@@ -497,12 +466,9 @@ class TestFetchCatalogFromMcp:
         assert result.keywords["rules"] == []
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_caches_result(self, mock_get_conn: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock) -> None:
+    def test_caches_result(self, mock_run_coro: MagicMock) -> None:
         """Test that catalog is cached after first fetch."""
-        mock_get_conn.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
 
         mock_future = MagicMock()
         mock_future.result.return_value = [{"name": "queues", "tools": [{"name": "get_queue"}], "keywords": []}]
@@ -517,14 +483,9 @@ class TestFetchCatalogFromMcp:
         assert mock_run_coro.call_count == 1
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_returns_empty_on_exception(
-        self, mock_get_conn: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock
-    ) -> None:
+    def test_returns_empty_on_exception(self, mock_run_coro: MagicMock) -> None:
         """Test that exceptions return empty catalogs."""
-        mock_get_conn.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
 
         mock_future = MagicMock()
         mock_future.result.side_effect = Exception("Network error")
@@ -551,153 +512,135 @@ class TestGetLoadToolDefinition:
 class TestLoadTool:
     """Tests for load_tool function."""
 
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_returns_error_when_no_mcp_connection(self, mock_get_connection: MagicMock) -> None:
+    def test_returns_error_when_no_mcp_connection(self) -> None:
         reset_dynamic_tools()
-        mock_get_connection.return_value = None
-        result = load_tool(["delete_hook"])
-        assert result == "Error: MCP connection not available"
+        set_context(AgentContext(mcp_connection=None))
+        try:
+            result = load_tool(["delete_hook"])
+            assert result == "Error: MCP connection not available"
+        finally:
+            set_context(AgentContext())
 
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_returns_error_when_no_event_loop(self, mock_get_connection: MagicMock, mock_get_loop: MagicMock) -> None:
+    def test_returns_error_when_no_event_loop(self) -> None:
         reset_dynamic_tools()
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = None
-        result = load_tool(["delete_hook"])
-        assert result == "Error: MCP connection not available"
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=None))
+        try:
+            result = load_tool(["delete_hook"])
+            assert result == "Error: MCP connection not available"
+        finally:
+            set_context(AgentContext())
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_returns_error_for_unknown_tool(
-        self, mock_get_connection: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock
-    ) -> None:
+    def test_returns_error_for_unknown_tool(self, mock_run_coro: MagicMock) -> None:
         reset_dynamic_tools()
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
+        try:
+            mock_tool = MagicMock()
+            mock_tool.name = "get_queue"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool]
+            mock_run_coro.return_value = mock_future
 
-        mock_tool = MagicMock()
-        mock_tool.name = "get_queue"
-        mock_future = MagicMock()
-        mock_future.result.return_value = [mock_tool]
-        mock_run_coro.return_value = mock_future
-
-        result = load_tool(["nonexistent_tool"])
-        assert "Error: Unknown tools" in result
+            result = load_tool(["nonexistent_tool"])
+            assert "Error: Unknown tools" in result
+        finally:
+            set_context(AgentContext())
 
     @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
     def test_loads_tool_by_name(
         self,
-        mock_get_connection: MagicMock,
-        mock_get_loop: MagicMock,
         mock_run_coro: MagicMock,
         mock_convert: MagicMock,
     ) -> None:
         reset_dynamic_tools()
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
+        try:
+            mock_tool = MagicMock()
+            mock_tool.name = "delete_hook"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool]
+            mock_run_coro.return_value = mock_future
 
-        mock_tool = MagicMock()
-        mock_tool.name = "delete_hook"
-        mock_future = MagicMock()
-        mock_future.result.return_value = [mock_tool]
-        mock_run_coro.return_value = mock_future
+            mock_convert.return_value = [{"name": "delete_hook"}]
 
-        mock_convert.return_value = [{"name": "delete_hook"}]
+            result = load_tool(["delete_hook"])
 
-        result = load_tool(["delete_hook"])
-
-        assert "Loaded tools: delete_hook" in result
-        assert len(get_dynamic_tools()) == 1
+            assert "Loaded tools: delete_hook" in result
+            assert len(get_dynamic_tools()) == 1
+        finally:
+            set_context(AgentContext())
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_returns_already_loaded_message(
-        self, mock_get_connection: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock
-    ) -> None:
+    def test_returns_already_loaded_message(self, mock_run_coro: MagicMock) -> None:
         reset_dynamic_tools()
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
+        try:
+            mock_tool = MagicMock()
+            mock_tool.name = "delete_hook"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool]
+            mock_run_coro.return_value = mock_future
 
-        mock_tool = MagicMock()
-        mock_tool.name = "delete_hook"
-        mock_future = MagicMock()
-        mock_future.result.return_value = [mock_tool]
-        mock_run_coro.return_value = mock_future
+            # Manually add tool to loaded state
+            state = get_global_state()
+            state.tools.append({"name": "delete_hook"})
 
-        # Manually add tool to loaded state
-        state = get_global_state()
-        state.tools.append({"name": "delete_hook"})
+            result = load_tool(["delete_hook"])
+            assert result == "Tools already loaded: ['delete_hook']"
+        finally:
+            set_context(AgentContext())
 
-        result = load_tool(["delete_hook"])
-        assert result == "Tools already loaded: ['delete_hook']"
-
-    @patch("rossum_agent.tools.dynamic_tools.is_read_only_mode")
     @patch("rossum_agent.tools.dynamic_tools.get_write_tools")
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
     def test_blocks_write_tools_in_read_only_mode(
         self,
-        mock_get_connection: MagicMock,
-        mock_get_loop: MagicMock,
         mock_run_coro: MagicMock,
         mock_get_write: MagicMock,
-        mock_is_read_only: MagicMock,
     ) -> None:
         reset_dynamic_tools()
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
-        mock_is_read_only.return_value = True
-        mock_get_write.return_value = {"create_schema", "delete_schema"}
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock(), mcp_mode="read-only"))
+        try:
+            mock_get_write.return_value = {"create_schema", "delete_schema"}
 
-        mock_tool1 = MagicMock()
-        mock_tool1.name = "create_schema"
-        mock_tool2 = MagicMock()
-        mock_tool2.name = "get_schema"
-        mock_future = MagicMock()
-        mock_future.result.return_value = [mock_tool1, mock_tool2]
-        mock_run_coro.return_value = mock_future
+            mock_tool1 = MagicMock()
+            mock_tool1.name = "create_schema"
+            mock_tool2 = MagicMock()
+            mock_tool2.name = "get_schema"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool1, mock_tool2]
+            mock_run_coro.return_value = mock_future
 
-        result = load_tool(["create_schema"])
+            result = load_tool(["create_schema"])
 
-        assert "Error: Write tools not available in read-only mode" in result
-        assert "create_schema" in result
+            assert "Error: Write tools not available in read-only mode" in result
+            assert "create_schema" in result
+        finally:
+            set_context(AgentContext())
 
-    @patch("rossum_agent.tools.dynamic_tools.is_read_only_mode")
     @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
     def test_allows_write_tools_in_read_write_mode(
         self,
-        mock_get_connection: MagicMock,
-        mock_get_loop: MagicMock,
         mock_run_coro: MagicMock,
         mock_convert: MagicMock,
-        mock_is_read_only: MagicMock,
     ) -> None:
         reset_dynamic_tools()
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
-        mock_is_read_only.return_value = False
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock(), mcp_mode="read-write"))
+        try:
+            mock_tool = MagicMock()
+            mock_tool.name = "create_schema"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool]
+            mock_run_coro.return_value = mock_future
 
-        mock_tool = MagicMock()
-        mock_tool.name = "create_schema"
-        mock_future = MagicMock()
-        mock_future.result.return_value = [mock_tool]
-        mock_run_coro.return_value = mock_future
+            mock_convert.return_value = [{"name": "create_schema"}]
 
-        mock_convert.return_value = [{"name": "create_schema"}]
+            result = load_tool(["create_schema"])
 
-        result = load_tool(["create_schema"])
-
-        assert "Loaded tools: create_schema" in result
+            assert "Loaded tools: create_schema" in result
+        finally:
+            set_context(AgentContext())
 
 
 class TestGetWriteTools:
@@ -750,15 +693,11 @@ class TestFetchCatalogParsesWriteTools:
         import rossum_agent.tools.dynamic_tools as dt
 
         dt._catalog_cache = None
+        set_context(AgentContext())
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_parses_write_tools_from_read_only_field(
-        self, mock_get_conn: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock
-    ) -> None:
-        mock_get_conn.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+    def test_parses_write_tools_from_read_only_field(self, mock_run_coro: MagicMock) -> None:
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
 
         mock_future = MagicMock()
         mock_future.result.return_value = [
@@ -782,13 +721,8 @@ class TestFetchCatalogParsesWriteTools:
         assert result.write_tools == {"create_schema"}
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_defaults_to_read_only_when_field_missing(
-        self, mock_get_conn: MagicMock, mock_get_loop: MagicMock, mock_run_coro: MagicMock
-    ) -> None:
-        mock_get_conn.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+    def test_defaults_to_read_only_when_field_missing(self, mock_run_coro: MagicMock) -> None:
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
 
         mock_future = MagicMock()
         mock_future.result.return_value = [
@@ -811,97 +745,85 @@ class TestFetchCatalogParsesWriteTools:
 class TestLoadCategoriesImplReadOnlyMode:
     """Tests for _load_categories_impl filtering write tools in read-only mode."""
 
-    @patch("rossum_agent.tools.dynamic_tools.is_read_only_mode")
     @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
     @patch("rossum_agent.tools.dynamic_tools.get_write_tools")
     @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
     def test_excludes_write_tools_in_read_only_mode(
         self,
         mock_get_catalog: MagicMock,
         mock_get_write: MagicMock,
-        mock_get_connection: MagicMock,
-        mock_get_loop: MagicMock,
         mock_run_coro: MagicMock,
         mock_convert: MagicMock,
-        mock_is_read_only: MagicMock,
     ) -> None:
         reset_dynamic_tools()
         mock_get_catalog.return_value = {"schemas": {"get_schema", "list_schemas", "create_schema", "update_queue"}}
         mock_get_write.return_value = {"create_schema", "update_queue"}
-        mock_is_read_only.return_value = True
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock(), mcp_mode="read-only"))
+        try:
+            mock_tool1 = MagicMock()
+            mock_tool1.name = "get_schema"
+            mock_tool2 = MagicMock()
+            mock_tool2.name = "list_schemas"
+            mock_tool3 = MagicMock()
+            mock_tool3.name = "create_schema"
+            mock_tool4 = MagicMock()
+            mock_tool4.name = "update_queue"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool1, mock_tool2, mock_tool3, mock_tool4]
+            mock_run_coro.return_value = mock_future
 
-        mock_tool1 = MagicMock()
-        mock_tool1.name = "get_schema"
-        mock_tool2 = MagicMock()
-        mock_tool2.name = "list_schemas"
-        mock_tool3 = MagicMock()
-        mock_tool3.name = "create_schema"
-        mock_tool4 = MagicMock()
-        mock_tool4.name = "update_queue"
-        mock_future = MagicMock()
-        mock_future.result.return_value = [mock_tool1, mock_tool2, mock_tool3, mock_tool4]
-        mock_run_coro.return_value = mock_future
+            mock_convert.return_value = [{"name": "get_schema"}, {"name": "list_schemas"}]
 
-        mock_convert.return_value = [{"name": "get_schema"}, {"name": "list_schemas"}]
+            result = _load_categories_impl(["schemas"])
 
-        result = _load_categories_impl(["schemas"])
+            assert "Loaded" in result
+            assert "(read-only mode)" in result
+            call_args = mock_convert.call_args[0][0]
+            tool_names_loaded = {t.name for t in call_args}
+            assert "create_schema" not in tool_names_loaded
+            assert "update_queue" not in tool_names_loaded
+            assert "get_schema" in tool_names_loaded
+            assert "list_schemas" in tool_names_loaded
+        finally:
+            set_context(AgentContext())
 
-        assert "Loaded" in result
-        assert "(read-only mode)" in result
-        call_args = mock_convert.call_args[0][0]
-        tool_names_loaded = {t.name for t in call_args}
-        assert "create_schema" not in tool_names_loaded
-        assert "update_queue" not in tool_names_loaded
-        assert "get_schema" in tool_names_loaded
-        assert "list_schemas" in tool_names_loaded
-
-    @patch("rossum_agent.tools.dynamic_tools.is_read_only_mode")
     @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
     @patch("rossum_agent.tools.dynamic_tools.get_write_tools")
     @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
     def test_includes_write_tools_in_read_write_mode(
         self,
         mock_get_catalog: MagicMock,
         mock_get_write: MagicMock,
-        mock_get_connection: MagicMock,
-        mock_get_loop: MagicMock,
         mock_run_coro: MagicMock,
         mock_convert: MagicMock,
-        mock_is_read_only: MagicMock,
     ) -> None:
         reset_dynamic_tools()
         mock_get_catalog.return_value = {"schemas": {"get_schema", "create_schema"}}
         mock_get_write.return_value = {"create_schema"}
-        mock_is_read_only.return_value = False
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock(), mcp_mode="read-write"))
+        try:
+            mock_tool1 = MagicMock()
+            mock_tool1.name = "get_schema"
+            mock_tool2 = MagicMock()
+            mock_tool2.name = "create_schema"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool1, mock_tool2]
+            mock_run_coro.return_value = mock_future
 
-        mock_tool1 = MagicMock()
-        mock_tool1.name = "get_schema"
-        mock_tool2 = MagicMock()
-        mock_tool2.name = "create_schema"
-        mock_future = MagicMock()
-        mock_future.result.return_value = [mock_tool1, mock_tool2]
-        mock_run_coro.return_value = mock_future
+            mock_convert.return_value = [{"name": "get_schema"}, {"name": "create_schema"}]
 
-        mock_convert.return_value = [{"name": "get_schema"}, {"name": "create_schema"}]
+            result = _load_categories_impl(["schemas"])
 
-        result = _load_categories_impl(["schemas"])
-
-        assert "Loaded" in result
-        assert "(read-only mode)" not in result
-        call_args = mock_convert.call_args[0][0]
-        tool_names_loaded = {t.name for t in call_args}
-        assert "create_schema" in tool_names_loaded
-        assert "get_schema" in tool_names_loaded
+            assert "Loaded" in result
+            assert "(read-only mode)" not in result
+            call_args = mock_convert.call_args[0][0]
+            tool_names_loaded = {t.name for t in call_args}
+            assert "create_schema" in tool_names_loaded
+            assert "get_schema" in tool_names_loaded
+        finally:
+            set_context(AgentContext())
 
 
 class TestHiddenTools:
@@ -910,68 +832,56 @@ class TestHiddenTools:
     def test_update_schema_is_hidden(self) -> None:
         assert "update_schema" in HIDDEN_TOOLS
 
-    @patch("rossum_agent.tools.dynamic_tools.is_read_only_mode")
     @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
     @patch("rossum_agent.tools.dynamic_tools.get_write_tools")
     @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
     def test_load_categories_excludes_hidden_tools(
         self,
         mock_get_catalog: MagicMock,
         mock_get_write: MagicMock,
-        mock_get_connection: MagicMock,
-        mock_get_loop: MagicMock,
         mock_run_coro: MagicMock,
         mock_convert: MagicMock,
-        mock_is_read_only: MagicMock,
     ) -> None:
         reset_dynamic_tools()
         mock_get_catalog.return_value = {"schemas": {"get_schema", "update_schema"}}
         mock_get_write.return_value = set()
-        mock_is_read_only.return_value = False
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock(), mcp_mode="read-write"))
+        try:
+            mock_tool1 = MagicMock()
+            mock_tool1.name = "get_schema"
+            mock_tool2 = MagicMock()
+            mock_tool2.name = "update_schema"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool1, mock_tool2]
+            mock_run_coro.return_value = mock_future
 
-        mock_tool1 = MagicMock()
-        mock_tool1.name = "get_schema"
-        mock_tool2 = MagicMock()
-        mock_tool2.name = "update_schema"
-        mock_future = MagicMock()
-        mock_future.result.return_value = [mock_tool1, mock_tool2]
-        mock_run_coro.return_value = mock_future
+            mock_convert.return_value = [{"name": "get_schema"}]
 
-        mock_convert.return_value = [{"name": "get_schema"}]
+            result = _load_categories_impl(["schemas"])
 
-        result = _load_categories_impl(["schemas"])
-
-        assert "Loaded" in result
-        call_args = mock_convert.call_args[0][0]
-        tool_names_loaded = {t.name for t in call_args}
-        assert "update_schema" not in tool_names_loaded
-        assert "get_schema" in tool_names_loaded
+            assert "Loaded" in result
+            call_args = mock_convert.call_args[0][0]
+            tool_names_loaded = {t.name for t in call_args}
+            assert "update_schema" not in tool_names_loaded
+            assert "get_schema" in tool_names_loaded
+        finally:
+            set_context(AgentContext())
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_event_loop")
-    @patch("rossum_agent.tools.dynamic_tools.get_mcp_connection")
-    def test_load_tool_rejects_hidden_tools(
-        self,
-        mock_get_connection: MagicMock,
-        mock_get_loop: MagicMock,
-        mock_run_coro: MagicMock,
-    ) -> None:
+    def test_load_tool_rejects_hidden_tools(self, mock_run_coro: MagicMock) -> None:
         reset_dynamic_tools()
-        mock_get_connection.return_value = MagicMock()
-        mock_get_loop.return_value = MagicMock()
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
+        try:
+            mock_tool = MagicMock()
+            mock_tool.name = "update_schema"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool]
+            mock_run_coro.return_value = mock_future
 
-        mock_tool = MagicMock()
-        mock_tool.name = "update_schema"
-        mock_future = MagicMock()
-        mock_future.result.return_value = [mock_tool]
-        mock_run_coro.return_value = mock_future
+            result = load_tool(["update_schema"])
 
-        result = load_tool(["update_schema"])
-
-        assert "Error" in result
-        assert "update_schema" in result
+            assert "Error" in result
+            assert "update_schema" in result
+        finally:
+            set_context(AgentContext())

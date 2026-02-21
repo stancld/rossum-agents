@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from rossum_agent.tools.core import set_task_snapshot_callback, set_task_tracker
+from rossum_agent.tools.core import AgentContext, get_context, set_context
 from rossum_agent.tools.task_tracker import TaskStatus, TaskTracker, create_task, list_tasks, update_task
 
 
@@ -132,12 +132,10 @@ class TestCreateTaskTool:
     def setup_method(self) -> None:
         self.tracker = TaskTracker()
         self.snapshots: list[list[dict[str, object]]] = []
-        set_task_tracker(self.tracker)
-        set_task_snapshot_callback(self.snapshots.append)
+        set_context(AgentContext(task_tracker=self.tracker, task_snapshot_callback=self.snapshots.append))
 
     def teardown_method(self) -> None:
-        set_task_tracker(None)
-        set_task_snapshot_callback(None)
+        set_context(AgentContext())
 
     def test_create_task_returns_json(self) -> None:
         result = json.loads(create_task(subject="Test task"))
@@ -152,7 +150,7 @@ class TestCreateTaskTool:
         assert self.snapshots[0][0]["subject"] == "Step 1"
 
     def test_create_task_no_tracker(self) -> None:
-        set_task_tracker(None)
+        get_context().task_tracker = None
         result = json.loads(create_task(subject="Test"))
         assert "error" in result
 
@@ -164,12 +162,10 @@ class TestUpdateTaskTool:
         self.tracker = TaskTracker()
         self.tracker.create_task(subject="Existing task")
         self.snapshots: list[list[dict[str, object]]] = []
-        set_task_tracker(self.tracker)
-        set_task_snapshot_callback(self.snapshots.append)
+        set_context(AgentContext(task_tracker=self.tracker, task_snapshot_callback=self.snapshots.append))
 
     def teardown_method(self) -> None:
-        set_task_tracker(None)
-        set_task_snapshot_callback(None)
+        set_context(AgentContext())
 
     def test_update_task_status(self) -> None:
         result = json.loads(update_task(task_id="1", status="in_progress"))
@@ -190,7 +186,7 @@ class TestUpdateTaskTool:
         assert "Invalid status" in result["error"]
 
     def test_update_task_no_tracker(self) -> None:
-        set_task_tracker(None)
+        get_context().task_tracker = None
         result = json.loads(update_task(task_id="1", status="completed"))
         assert "error" in result
 
@@ -201,12 +197,10 @@ class TestListTasksTool:
     def setup_method(self) -> None:
         self.tracker = TaskTracker()
         self.snapshots: list[list[dict[str, object]]] = []
-        set_task_tracker(self.tracker)
-        set_task_snapshot_callback(self.snapshots.append)
+        set_context(AgentContext(task_tracker=self.tracker, task_snapshot_callback=self.snapshots.append))
 
     def teardown_method(self) -> None:
-        set_task_tracker(None)
-        set_task_snapshot_callback(None)
+        set_context(AgentContext())
 
     def test_list_tasks_empty(self) -> None:
         result = json.loads(list_tasks())
@@ -225,6 +219,6 @@ class TestListTasksTool:
         assert len(self.snapshots) == 0
 
     def test_list_tasks_no_tracker(self) -> None:
-        set_task_tracker(None)
+        get_context().task_tracker = None
         result = json.loads(list_tasks())
         assert "error" in result

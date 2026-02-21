@@ -6,6 +6,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 import httpx
+from rossum_agent.tools.core import AgentContext, set_context
 from rossum_agent.tools.lookup import (
     _build_evaluate_computed_fields_url,
     _build_mdh_aggregate_url,
@@ -525,9 +526,8 @@ class TestSuggestLookupField:
         assert parsed["status"] == "no_suggestions"
 
     @patch.dict("os.environ", {}, clear=True)
-    @patch("rossum_agent.tools.core._rossum_credentials")
-    def test_missing_credentials(self, mock_creds: MagicMock) -> None:
-        mock_creds.get.return_value = None
+    def test_missing_credentials(self) -> None:
+        set_context(AgentContext())
         result = suggest_lookup_field(
             label="Test",
             hint="test",
@@ -1070,9 +1070,8 @@ class TestEvaluateLookupField:
         assert mock_client.post.call_count == 2
 
     @patch.dict("os.environ", {}, clear=True)
-    @patch("rossum_agent.tools.core._rossum_credentials")
-    def test_missing_credentials(self, mock_creds: MagicMock) -> None:
-        mock_creds.get.return_value = None
+    def test_missing_credentials(self) -> None:
+        set_context(AgentContext())
         result = evaluate_lookup_field(schema_id=12345, annotation_urls=["/api/v1/annotations/67890"])
 
         parsed = json.loads(result)
@@ -1385,9 +1384,8 @@ class TestGetLookupDatasetRawValues:
         _dataset_cache.clear()
 
     @patch.dict("os.environ", {}, clear=True)
-    @patch("rossum_agent.tools.core._rossum_credentials")
-    def test_missing_credentials(self, mock_creds: MagicMock) -> None:
-        mock_creds.get.return_value = None
+    def test_missing_credentials(self) -> None:
+        set_context(AgentContext())
 
         result = get_lookup_dataset_raw_values(dataset="approved-vendors")
 

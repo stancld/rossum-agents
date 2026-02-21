@@ -15,7 +15,7 @@ from rossum_agent.tools.change_history import (
     show_commit_details,
     show_entity_history,
 )
-from rossum_agent.tools.core import get_commit_store
+from rossum_agent.tools.core import get_context
 from rossum_agent.tools.dynamic_tools import (
     get_load_tool_category_definition,
     get_load_tool_definition,
@@ -85,7 +85,7 @@ _INTERNAL_TOOL_REGISTRY: dict[str, BetaTool[..., str]] = {
 def _get_active_internal_tools() -> list[BetaTool[..., str]]:
     """Get internal tools based on loaded skills."""
     tools = _ALWAYS_INTERNAL_TOOLS
-    if get_commit_store() is not None:
+    if get_context().commit_store is not None:
         tools = tools + _CHANGE_HISTORY_TOOLS
     if is_skill_loaded("rossum-deployment"):
         tools = tools + _DEPLOYMENT_INTERNAL_TOOLS
@@ -148,6 +148,7 @@ __all__ = [
     "INTERNAL_TOOLS",
     "execute_internal_tool",
     "execute_tool",
+    "get_context",
     "get_internal_tool_names",
     "get_internal_tools",
 ]
