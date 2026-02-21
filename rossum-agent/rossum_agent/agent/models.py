@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -8,9 +8,8 @@ from anthropic.types import ThinkingBlockParam
 
 
 class StepType(Enum):
-    """Type of streaming step for distinguishing UI rendering."""
+    """Type of streaming text step for distinguishing intermediate vs final answer."""
 
-    THINKING = "thinking"
     INTERMEDIATE = "intermediate"
     FINAL_ANSWER = "final_answer"
 
@@ -88,33 +87,72 @@ class ThinkingBlockData:
         return cls(thinking=data["thinking"], signature=data["signature"])
 
 
-@dataclass
-class AgentStep:
-    """Represents a single step in the agent's execution (for yielding to caller).
+# --- AgentStep discriminated union variants ---
 
-    This is the public-facing step object yielded during agent.run().
-    Different from MemoryStep which is for internal storage.
-    """
+
+@dataclass
+class ThinkingStep:
+    """Streaming thinking/chain-of-thought tokens."""
 
     step_number: int
+    thinking: str
+    is_streaming: bool = True
+
+
+@dataclass
+class TextDeltaStep:
+    """Streaming text delta (intermediate response or final answer being streamed)."""
+
+    step_number: int
+    step_type: StepType
+    text_delta: str
+    accumulated_text: str
     thinking: str | None = None
-    tool_calls: list[ToolCall] = field(default_factory=list)
-    tool_results: list[ToolResult] = field(default_factory=list)
-    final_answer: str | None = None
-    is_final: bool = False
-    error: str | None = None
-    is_streaming: bool = False
+    is_streaming: bool = True
+
+
+@dataclass
+class ToolStartStep:
+    """Tool execution starting or in progress."""
+
+    step_number: int
+    tool_calls: list[ToolCall]
+    tool_progress: tuple[int, int]
+    current_tool: str | None = None
+    sub_agent_progress: SubAgentProgress | None = None
+    is_streaming: bool = True
+
+
+@dataclass
+class ToolResultStep:
+    """Completed tool execution with results."""
+
+    step_number: int
+    tool_calls: list[ToolCall]
+    tool_results: list[ToolResult]
     input_tokens: int = 0
     output_tokens: int = 0
-    current_tool: str | None = None
-    tool_progress: tuple[int, int] | None = None
-    sub_agent_progress: SubAgentProgress | None = None
-    text_delta: str | None = None
-    accumulated_text: str | None = None
-    step_type: StepType | None = None
 
-    def has_tool_calls(self) -> bool:
-        return bool(self.tool_calls)
+
+@dataclass
+class FinalAnswerStep:
+    """Final answer from the agent (no more tool calls)."""
+
+    step_number: int
+    final_answer: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+
+@dataclass
+class ErrorStep:
+    """Agent execution error."""
+
+    step_number: int
+    error: str
+
+
+AgentStep = ThinkingStep | TextDeltaStep | ToolStartStep | ToolResultStep | FinalAnswerStep | ErrorStep
 
 
 @dataclass

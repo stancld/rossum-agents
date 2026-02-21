@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import ToolResultStep
+
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
 
@@ -17,6 +19,8 @@ if TYPE_CHECKING:
 def _extract_write_file_content(steps: list[AgentStep], filename: str) -> str | None:
     """Extract the content argument from a write_file tool call for a given filename."""
     for step in steps:
+        if not isinstance(step, ToolResultStep):
+            continue
         for tc in step.tool_calls:
             if tc.name != "write_file":
                 continue

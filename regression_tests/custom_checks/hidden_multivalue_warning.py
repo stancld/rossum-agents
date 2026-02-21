@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import ToolResultStep
+
 from regression_tests.custom_checks._utils import call_haiku_check
 
 if TYPE_CHECKING:
@@ -36,6 +38,8 @@ def check_knowledge_base_hidden_multivalue_warning(
         Tuple of (passed, reasoning) where reasoning explains the LLM's evaluation.
     """
     for step in steps:
+        if not isinstance(step, ToolResultStep):
+            continue
         for tr in step.tool_results:
             if tr.name != "search_knowledge_base":
                 continue

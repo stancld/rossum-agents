@@ -5,12 +5,17 @@ from __future__ import annotations
 import pytest
 from rossum_agent.agent.models import (
     AgentConfig,
-    AgentStep,
+    ErrorStep,
+    FinalAnswerStep,
     StepType,
     StreamDelta,
+    TextDeltaStep,
     ThinkingBlockData,
+    ThinkingStep,
     ToolCall,
     ToolResult,
+    ToolResultStep,
+    ToolStartStep,
     truncate_content,
 )
 from rossum_agent.api.models.schemas import TokenUsageBreakdown
@@ -147,67 +152,128 @@ class TestAgentConfig:
         assert config.request_delay == 1.0
 
 
-class TestAgentStep:
-    """Test AgentStep dataclass."""
+class TestThinkingStep:
+    """Test ThinkingStep dataclass."""
 
-    def test_has_tool_calls_returns_true_when_present(self):
-        step = AgentStep(step_number=1, tool_calls=[ToolCall(id="1", name="test_tool", arguments={})])
-        assert step.has_tool_calls() is True
+    def test_creation(self):
+        step = ThinkingStep(step_number=1, thinking="Let me think...")
+        assert step.step_number == 1
+        assert step.thinking == "Let me think..."
+        assert step.is_streaming is True
 
-    def test_has_tool_calls_returns_false_when_empty(self):
-        step = AgentStep(step_number=1)
-        assert step.has_tool_calls() is False
-
-    def test_default_values(self):
-        step = AgentStep(step_number=1)
-        assert step.thinking is None
-        assert step.tool_calls == []
-        assert step.tool_results == []
-        assert step.final_answer is None
-        assert step.is_final is False
-        assert step.error is None
+    def test_custom_is_streaming(self):
+        step = ThinkingStep(step_number=1, thinking="thought", is_streaming=False)
         assert step.is_streaming is False
+
+
+class TestTextDeltaStep:
+    """Test TextDeltaStep dataclass."""
+
+    def test_creation(self):
+        step = TextDeltaStep(
+            step_number=1,
+            step_type=StepType.INTERMEDIATE,
+            text_delta="new text",
+            accumulated_text="all text so far",
+        )
+        assert step.step_number == 1
+        assert step.step_type == StepType.INTERMEDIATE
+        assert step.text_delta == "new text"
+        assert step.accumulated_text == "all text so far"
+        assert step.thinking is None
+        assert step.is_streaming is True
+
+    def test_with_thinking(self):
+        step = TextDeltaStep(
+            step_number=1,
+            step_type=StepType.FINAL_ANSWER,
+            text_delta="delta",
+            accumulated_text="full",
+            thinking="some thought",
+        )
+        assert step.thinking == "some thought"
+
+
+class TestToolStartStep:
+    """Test ToolStartStep dataclass."""
+
+    def test_creation(self):
+        step = ToolStartStep(
+            step_number=1,
+            tool_calls=[ToolCall(id="1", name="search", arguments={})],
+            tool_progress=(2, 5),
+        )
+        assert step.step_number == 1
+        assert len(step.tool_calls) == 1
+        assert step.tool_progress == (2, 5)
+        assert step.current_tool is None
+        assert step.sub_agent_progress is None
+        assert step.is_streaming is True
+
+    def test_with_current_tool(self):
+        step = ToolStartStep(
+            step_number=1,
+            tool_calls=[ToolCall(id="1", name="search", arguments={})],
+            tool_progress=(1, 1),
+            current_tool="search",
+        )
+        assert step.current_tool == "search"
+
+
+class TestToolResultStep:
+    """Test ToolResultStep dataclass."""
+
+    def test_creation(self):
+        step = ToolResultStep(
+            step_number=1,
+            tool_calls=[ToolCall(id="1", name="search", arguments={})],
+            tool_results=[ToolResult(tool_call_id="1", name="search", content="found it")],
+        )
+        assert step.step_number == 1
+        assert len(step.tool_calls) == 1
+        assert len(step.tool_results) == 1
         assert step.input_tokens == 0
         assert step.output_tokens == 0
-        assert step.current_tool is None
-        assert step.tool_progress is None
-        assert step.sub_agent_progress is None
-
-    def test_with_final_answer(self):
-        step = AgentStep(step_number=5, final_answer="The answer is 42", is_final=True)
-        assert step.final_answer == "The answer is 42"
-        assert step.is_final is True
-
-    def test_with_error(self):
-        step = AgentStep(step_number=3, error="Something went wrong", is_final=True)
-        assert step.error == "Something went wrong"
-        assert step.is_final is True
 
     def test_with_token_counts(self):
-        step = AgentStep(step_number=1, input_tokens=100, output_tokens=50)
+        step = ToolResultStep(
+            step_number=1,
+            tool_calls=[],
+            tool_results=[],
+            input_tokens=100,
+            output_tokens=50,
+        )
         assert step.input_tokens == 100
         assert step.output_tokens == 50
 
-    def test_with_tool_progress(self):
-        step = AgentStep(step_number=1, current_tool="search", tool_progress=(2, 5))
-        assert step.current_tool == "search"
-        assert step.tool_progress == (2, 5)
 
-    def test_with_step_type(self):
-        step = AgentStep(step_number=1, step_type=StepType.THINKING)
-        assert step.step_type == StepType.THINKING
+class TestFinalAnswerStep:
+    """Test FinalAnswerStep dataclass."""
 
-    def test_with_text_delta_and_accumulated(self):
-        step = AgentStep(step_number=1, text_delta="new text", accumulated_text="all text so far")
-        assert step.text_delta == "new text"
-        assert step.accumulated_text == "all text so far"
+    def test_creation(self):
+        step = FinalAnswerStep(step_number=5, final_answer="The answer is 42")
+        assert step.step_number == 5
+        assert step.final_answer == "The answer is 42"
+        assert step.input_tokens == 0
+        assert step.output_tokens == 0
+
+    def test_with_token_counts(self):
+        step = FinalAnswerStep(step_number=1, final_answer="answer", input_tokens=100, output_tokens=50)
+        assert step.input_tokens == 100
+        assert step.output_tokens == 50
+
+
+class TestErrorStep:
+    """Test ErrorStep dataclass."""
+
+    def test_creation(self):
+        step = ErrorStep(step_number=3, error="Something went wrong")
+        assert step.step_number == 3
+        assert step.error == "Something went wrong"
 
 
 class TestStepType:
     """Test StepType enum."""
-
-    def test_thinking_value(self):
-        assert StepType.THINKING.value == "thinking"
 
     def test_intermediate_value(self):
         assert StepType.INTERMEDIATE.value == "intermediate"

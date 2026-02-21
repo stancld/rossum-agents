@@ -13,7 +13,18 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from rossum_agent.agent.core import RossumAgent, create_agent
 from rossum_agent.agent.memory import AgentMemory
-from rossum_agent.agent.models import AgentConfig, AgentStep, StepType, ToolResult
+from rossum_agent.agent.models import (
+    AgentConfig,
+    AgentStep,
+    ErrorStep,
+    FinalAnswerStep,
+    StepType,
+    TextDeltaStep,
+    ThinkingStep,
+    ToolResult,
+    ToolResultStep,
+    ToolStartStep,
+)
 from rossum_agent.api.models.schemas import (
     DocumentContent,
     ImageContent,
@@ -41,7 +52,7 @@ from rossum_agent.url_context import extract_url_context, format_context_for_pro
 from rossum_agent.utils import create_session_output_dir, get_display_tool_name
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable
+    from collections.abc import AsyncIterator
     from pathlib import Path
 
     from anthropic.types import ImageBlockParam, TextBlockParam
@@ -95,7 +106,7 @@ def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentP
     )
 
 
-def _create_tool_start_event(step: AgentStep, current_tool: str) -> StepEvent:
+def _create_tool_start_event(step: ToolStartStep, current_tool: str) -> StepEvent:
     current_tool_args = None
     current_tool_call_id = None
     for tc in step.tool_calls:
@@ -133,98 +144,67 @@ def _log_events(events: list[StepEvent]) -> None:
         )
 
 
-def _handle_error(step: AgentStep) -> list[StepEvent] | None:
-    if not step.error:
-        return None
-    return [StepEvent(type="error", step_number=step.step_number, content=step.error, is_final=True)]
-
-
-def _handle_final_answer(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.is_final and step.final_answer):
-        return None
-    return [StepEvent(type="final_answer", step_number=step.step_number, content=step.final_answer, is_final=True)]
-
-
-def _handle_intermediate_text(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.step_type == StepType.INTERMEDIATE and step.accumulated_text is not None):
-        return None
-    return [
-        StepEvent(type="intermediate", step_number=step.step_number, content=step.accumulated_text, is_streaming=True)
-    ]
-
-
-def _handle_streaming_final_answer(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.step_type == StepType.FINAL_ANSWER and step.accumulated_text is not None):
-        return None
-    return [
-        StepEvent(type="final_answer", step_number=step.step_number, content=step.accumulated_text, is_streaming=True)
-    ]
-
-
-def _handle_current_tool(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.current_tool and step.tool_progress):
-        return None
-    return [_create_tool_start_event(step, step.current_tool)]
-
-
-def _handle_streaming_tool_calls(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.tool_calls and step.is_streaming and step.tool_progress):
-        return None
-    total = len(step.tool_calls)
-    events: list[StepEvent] = []
-    for idx, tc in enumerate(step.tool_calls, 1):
-        ev = _create_tool_start_event(step, tc.name)
-        ev.tool_progress = (idx, total)
-        events.append(ev)
-    return events
-
-
-def _handle_tool_results(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.tool_results and not step.is_streaming):
-        return None
-    return [_create_tool_result_event(step.step_number, r) for r in step.tool_results]
-
-
-def _handle_thinking(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.step_type == StepType.THINKING or step.thinking is not None):
-        return None
-    return [
-        StepEvent(type="thinking", step_number=step.step_number, content=step.thinking, is_streaming=step.is_streaming)
-    ]
-
-
-_STEP_HANDLERS: tuple[Callable[[AgentStep], list[StepEvent] | None], ...] = (
-    _handle_error,
-    _handle_final_answer,
-    _handle_intermediate_text,
-    _handle_streaming_final_answer,
-    _handle_current_tool,
-    _handle_streaming_tool_calls,
-    _handle_tool_results,
-    _handle_thinking,
-)
-
-
 def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
     """Convert an AgentStep to StepEvents for SSE streaming.
 
-    Extended thinking mode produces three distinct content types:
-    - "thinking": Model's chain-of-thought reasoning (from thinking blocks)
-    - "intermediate": Model's response text before tool calls
-    - "final_answer": Model's final response (no more tool calls)
-
-    Per Claude's extended thinking API, thinking blocks contain internal reasoning
-    while text blocks contain the actual response. Both are streamed separately.
-
-    Returns a list because a single step may contain multiple tool results.
+    Uses pattern matching on the discriminated union step types.
+    Returns a list because a single ToolResultStep may contain multiple tool results.
     """
-    for handler in _STEP_HANDLERS:
-        events = handler(step)
-        if events is not None:
-            _log_events(events)
-            return events
+    match step:
+        case ErrorStep():
+            events = [StepEvent(type="error", step_number=step.step_number, content=step.error, is_final=True)]
 
-    events = [StepEvent(type="thinking", step_number=step.step_number, content=None, is_streaming=step.is_streaming)]
+        case FinalAnswerStep():
+            events = [
+                StepEvent(type="final_answer", step_number=step.step_number, content=step.final_answer, is_final=True)
+            ]
+
+        case TextDeltaStep(step_type=StepType.INTERMEDIATE):
+            events = [
+                StepEvent(
+                    type="intermediate",
+                    step_number=step.step_number,
+                    content=step.accumulated_text,
+                    is_streaming=True,
+                )
+            ]
+
+        case TextDeltaStep(step_type=StepType.FINAL_ANSWER):
+            events = [
+                StepEvent(
+                    type="final_answer",
+                    step_number=step.step_number,
+                    content=step.accumulated_text,
+                    is_streaming=True,
+                )
+            ]
+
+        case ToolStartStep(current_tool=None):
+            # All tools starting — emit one event per tool call
+            total = len(step.tool_calls)
+            events = []
+            for idx, tc in enumerate(step.tool_calls, 1):
+                ev = _create_tool_start_event(step, tc.name)
+                ev.tool_progress = (idx, total)
+                events.append(ev)
+
+        case ToolStartStep():
+            # Single tool progress update
+            events = [_create_tool_start_event(step, step.current_tool)]
+
+        case ToolResultStep():
+            events = [_create_tool_result_event(step.step_number, r) for r in step.tool_results]
+
+        case ThinkingStep():
+            events = [
+                StepEvent(
+                    type="thinking",
+                    step_number=step.step_number,
+                    content=step.thinking,
+                    is_streaming=step.is_streaming,
+                )
+            ]
+
     _log_events(events)
     return events
 
@@ -470,7 +450,7 @@ class AgentService:
                             for event in convert_step_to_events(step):
                                 yield event
 
-                            if not step.is_streaming:
+                            if isinstance(step, (ToolResultStep, FinalAnswerStep, ErrorStep)):
                                 total_steps = step.step_number
                                 total_input_tokens = agent.tokens.total_input
                                 total_output_tokens = agent.tokens.total_output

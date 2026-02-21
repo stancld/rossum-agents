@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import ToolResultStep
+
 from regression_tests.custom_checks._utils import (
     agent_called_tool,
     create_api_client,
@@ -21,6 +23,8 @@ VALID_TYPES = {"string", "number", "date", "enum", "button"}
 def _extract_schema_id(steps: list[AgentStep]) -> int | None:
     """Extract schema_id from tool call arguments (prune_schema_fields, revert_commit, etc.)."""
     for step in steps:
+        if not isinstance(step, ToolResultStep):
+            continue
         for tc in step.tool_calls:
             if tc.name in ("prune_schema_fields", "get_schema_tree_structure", "get_schema"):
                 args = tc.arguments

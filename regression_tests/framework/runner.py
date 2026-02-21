@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import ErrorStep, FinalAnswerStep, ToolResultStep
+
 from regression_tests.framework.models import RegressionRun
 
 if TYPE_CHECKING:
@@ -31,16 +33,17 @@ async def run_multiturn_regression_test(agent: RossumAgent, prompts: list[str]) 
 
     all_tools: list[str] = []
     for step in all_steps:
-        if not step.is_streaming and step.tool_calls:
+        if isinstance(step, ToolResultStep):
             all_tools.extend(tc.name for tc in step.tool_calls)
 
     total_input_tokens = agent.tokens.total_input
     total_output_tokens = agent.tokens.total_output
 
-    final_steps = [s for s in all_steps if s.is_final]
-    is_successful = bool(final_steps) and not any(s.error for s in all_steps)
+    final_steps = [s for s in all_steps if isinstance(s, FinalAnswerStep)]
+    error_steps = [s for s in all_steps if isinstance(s, ErrorStep)]
+    is_successful = bool(final_steps) and not error_steps
     final_answer = final_steps[-1].final_answer if final_steps else None
-    error = next((s.error for s in all_steps if s.error), None)
+    error = error_steps[0].error if error_steps else None
 
     return RegressionRun(
         steps=all_steps,
@@ -72,16 +75,17 @@ async def run_regression_test(agent: RossumAgent, prompt: str) -> RegressionRun:
 
     all_tools: list[str] = []
     for step in steps:
-        if not step.is_streaming and step.tool_calls:
+        if isinstance(step, ToolResultStep):
             all_tools.extend(tc.name for tc in step.tool_calls)
 
     total_input_tokens = agent.tokens.total_input
     total_output_tokens = agent.tokens.total_output
 
-    final_steps = [s for s in steps if s.is_final]
-    is_successful = bool(final_steps) and not any(s.error for s in steps)
+    final_steps = [s for s in steps if isinstance(s, FinalAnswerStep)]
+    error_steps = [s for s in steps if isinstance(s, ErrorStep)]
+    is_successful = bool(final_steps) and not error_steps
     final_answer = final_steps[-1].final_answer if final_steps else None
-    error = next((s.error for s in steps if s.error), None)
+    error = error_steps[0].error if error_steps else None
 
     return RegressionRun(
         steps=steps,

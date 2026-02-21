@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Literal
 
+from rossum_agent.agent.models import ErrorStep, FinalAnswerStep, ToolResultStep
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
@@ -184,7 +186,7 @@ class RegressionRun:
     @property
     def step_count(self) -> int:
         """Number of non-streaming steps."""
-        return len([s for s in self.steps if not s.is_streaming])
+        return len([s for s in self.steps if isinstance(s, (ToolResultStep, FinalAnswerStep, ErrorStep))])
 
     @property
     def tool_count(self) -> int:

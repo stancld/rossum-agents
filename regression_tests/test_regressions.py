@@ -23,6 +23,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from rossum_agent.agent.models import ErrorStep, FinalAnswerStep, ToolStartStep
 
 from regression_tests.conftest import try_connect_redis
 from regression_tests.framework.assertions import assert_files_created, assert_tokens_within_budget, assert_tools_match
@@ -78,14 +79,14 @@ def _evaluate_criteria(
         "Token budget", lambda: assert_tokens_within_budget(run, case.token_budget), failures
     )
 
-    final_steps = [s for s in run.steps if s.is_final]
+    final_steps = [s for s in run.steps if isinstance(s, FinalAnswerStep)]
     final_step = final_steps[-1] if final_steps else None
     final_answer = final_step.final_answer if final_step else ""
 
     # Always required checks
     all_passed &= _check("Final answer present", bool(final_answer), "No final answer", failures)
 
-    errors = [s.error for s in run.steps if s.error]
+    errors = [s.error for s in run.steps if isinstance(s, ErrorStep)]
     all_passed &= _check("No agent errors", not errors, f"Errors: {errors}", failures)
 
     criteria = case.success_criteria
@@ -105,7 +106,7 @@ def _evaluate_criteria(
             failures,
         )
 
-    used_subagent = any(s.sub_agent_progress is not None for s in run.steps)
+    used_subagent = any(isinstance(s, ToolStartStep) and s.sub_agent_progress is not None for s in run.steps)
     if criteria.require_subagent is None:
         print(f"  - Sub-agent usage: optional (used={used_subagent})")
     elif criteria.require_subagent:
@@ -221,7 +222,7 @@ async def test_agent_regression(case, create_live_agent, show_answer, temp_outpu
         all_passed, failures = _evaluate_criteria(run, case, ctx.api_token, temp_output_dir)
 
         if show_answer:
-            final_steps = [s for s in run.steps if s.is_final]
+            final_steps = [s for s in run.steps if isinstance(s, FinalAnswerStep)]
             final_answer = final_steps[-1].final_answer if final_steps else "(no answer)"
             print("\n--- Final Answer ---")
             print(final_answer)

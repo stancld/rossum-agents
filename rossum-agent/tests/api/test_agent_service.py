@@ -9,7 +9,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from rossum_agent.agent.memory import AgentMemory, MemoryStep, TaskStep
-from rossum_agent.agent.models import AgentStep, StepType, ThinkingBlockData, ToolCall, ToolResult
+from rossum_agent.agent.models import (
+    ErrorStep,
+    FinalAnswerStep,
+    StepType,
+    TextDeltaStep,
+    ThinkingBlockData,
+    ThinkingStep,
+    ToolCall,
+    ToolResult,
+    ToolResultStep,
+    ToolStartStep,
+)
 from rossum_agent.api.models.schemas import (
     ImageContent,
     StepEvent,
@@ -34,7 +45,7 @@ class TestConvertStepToEvents:
 
     def test_convert_error_step(self):
         """Test converting error step."""
-        step = AgentStep(step_number=1, error="Something went wrong")
+        step = ErrorStep(step_number=1, error="Something went wrong")
         events = convert_step_to_events(step)
 
         assert len(events) == 1
@@ -45,11 +56,7 @@ class TestConvertStepToEvents:
 
     def test_convert_final_answer_step(self):
         """Test converting final answer step."""
-        step = AgentStep(
-            step_number=2,
-            final_answer="Here is your answer",
-            is_final=True,
-        )
+        step = FinalAnswerStep(step_number=2, final_answer="Here is your answer")
         events = convert_step_to_events(step)
 
         assert len(events) == 1
@@ -59,12 +66,12 @@ class TestConvertStepToEvents:
         assert events[0].is_final is True
 
     def test_convert_tool_start_step(self):
-        """Test converting tool start step."""
-        step = AgentStep(
+        """Test converting tool start step with current_tool."""
+        step = ToolStartStep(
             step_number=1,
-            current_tool="list_annotations",
             tool_calls=[ToolCall(id="tc_1", name="list_annotations", arguments={"queue_id": 123})],
             tool_progress=(1, 3),
+            current_tool="list_annotations",
         )
         events = convert_step_to_events(step)
 
@@ -77,14 +84,14 @@ class TestConvertStepToEvents:
 
     def test_convert_tool_result_step(self):
         """Test converting tool result step."""
-        step = AgentStep(
+        step = ToolResultStep(
             step_number=1,
+            tool_calls=[ToolCall(id="call_123", name="list_annotations", arguments={})],
             tool_results=[
                 ToolResult(
                     tool_call_id="call_123", name="list_annotations", content='{"annotations": []}', is_error=False
                 ),
             ],
-            is_streaming=False,
         )
         events = convert_step_to_events(step)
 
@@ -98,14 +105,14 @@ class TestConvertStepToEvents:
 
     def test_convert_tool_result_error_step(self):
         """Test converting tool result with error."""
-        step = AgentStep(
+        step = ToolResultStep(
             step_number=1,
+            tool_calls=[ToolCall(id="call_456", name="get_annotation", arguments={})],
             tool_results=[
                 ToolResult(
                     tool_call_id="call_456", name="get_annotation", content="Annotation not found", is_error=True
                 ),
             ],
-            is_streaming=False,
         )
         events = convert_step_to_events(step)
 
@@ -116,7 +123,7 @@ class TestConvertStepToEvents:
 
     def test_convert_thinking_step(self):
         """Test converting thinking step."""
-        step = AgentStep(step_number=1, thinking="I'll help you with that...", is_streaming=True)
+        step = ThinkingStep(step_number=1, thinking="I'll help you with that...")
         events = convert_step_to_events(step)
 
         assert len(events) == 1
@@ -127,7 +134,7 @@ class TestConvertStepToEvents:
 
     def test_convert_thinking_step_not_streaming(self):
         """Test converting thinking step when not streaming."""
-        step = AgentStep(step_number=1, thinking="Complete thought", is_streaming=False)
+        step = ThinkingStep(step_number=1, thinking="Complete thought", is_streaming=False)
         events = convert_step_to_events(step)
 
         assert len(events) == 1
@@ -135,12 +142,12 @@ class TestConvertStepToEvents:
         assert events[0].is_streaming is False
 
     def test_convert_intermediate_text_step(self):
-        """Test converting intermediate text step with accumulated_text."""
-        step = AgentStep(
+        """Test converting intermediate text step."""
+        step = TextDeltaStep(
             step_number=1,
             step_type=StepType.INTERMEDIATE,
+            text_delta="delta",
             accumulated_text="Here is some intermediate text",
-            is_streaming=True,
         )
         events = convert_step_to_events(step)
 
@@ -151,12 +158,12 @@ class TestConvertStepToEvents:
         assert events[0].is_streaming is True
 
     def test_convert_final_answer_streaming_text_step(self):
-        """Test converting final answer streaming text step with accumulated_text."""
-        step = AgentStep(
+        """Test converting final answer streaming text step."""
+        step = TextDeltaStep(
             step_number=2,
             step_type=StepType.FINAL_ANSWER,
+            text_delta="delta",
             accumulated_text="Final response text",
-            is_streaming=True,
         )
         events = convert_step_to_events(step)
 
@@ -166,41 +173,20 @@ class TestConvertStepToEvents:
         assert events[0].content == "Final response text"
         assert events[0].is_streaming is True
 
-    def test_convert_thinking_step_with_step_type(self):
-        """Test converting step with StepType.THINKING."""
-        step = AgentStep(
-            step_number=1,
-            step_type=StepType.THINKING,
-            thinking="Deep reasoning here",
-            is_streaming=True,
-        )
-        events = convert_step_to_events(step)
-
-        assert len(events) == 1
-        assert events[0].type == "thinking"
-        assert events[0].content == "Deep reasoning here"
-        assert events[0].is_streaming is True
-
-    def test_convert_fallback_step(self):
-        """Test converting step that falls through to fallback case."""
-        step = AgentStep(step_number=1, is_streaming=True)
-        events = convert_step_to_events(step)
-
-        assert len(events) == 1
-        assert events[0].type == "thinking"
-        assert events[0].content is None
-        assert events[0].is_streaming is True
-
     def test_convert_multi_tool_result_step(self):
         """Test that multiple tool results produce one event per result."""
-        step = AgentStep(
+        step = ToolResultStep(
             step_number=3,
+            tool_calls=[
+                ToolCall(id="tc_1", name="list_annotations", arguments={}),
+                ToolCall(id="tc_2", name="get_queue", arguments={}),
+                ToolCall(id="tc_3", name="get_annotation", arguments={}),
+            ],
             tool_results=[
                 ToolResult(tool_call_id="tc_1", name="list_annotations", content="result_1", is_error=False),
                 ToolResult(tool_call_id="tc_2", name="get_queue", content="result_2", is_error=False),
                 ToolResult(tool_call_id="tc_3", name="get_annotation", content="error_result", is_error=True),
             ],
-            is_streaming=False,
         )
         events = convert_step_to_events(step)
 
@@ -221,19 +207,39 @@ class TestConvertStepToEvents:
             assert e.type == "tool_result"
             assert e.step_number == 3
 
+    def test_convert_tool_start_all_tools(self):
+        """Test converting tool start step with current_tool=None emits all tools."""
+        step = ToolStartStep(
+            step_number=1,
+            tool_calls=[
+                ToolCall(id="tc_1", name="list_annotations", arguments={}),
+                ToolCall(id="tc_2", name="get_queue", arguments={}),
+            ],
+            tool_progress=(0, 2),
+        )
+        events = convert_step_to_events(step)
+
+        assert len(events) == 2
+        assert events[0].type == "tool_start"
+        assert events[0].tool_name == "list_annotations"
+        assert events[0].tool_progress == (1, 2)
+        assert events[1].type == "tool_start"
+        assert events[1].tool_name == "get_queue"
+        assert events[1].tool_progress == (2, 2)
+
 
 class TestCreateToolStartEvent:
     """Tests for _create_tool_start_event function."""
 
     def test_create_tool_start_event_with_tool_args(self):
         """Test creating tool start event with matching tool call args."""
-        step = AgentStep(
+        step = ToolStartStep(
             step_number=1,
-            current_tool="list_annotations",
             tool_calls=[
                 ToolCall(id="tc_1", name="list_annotations", arguments={"queue_id": 123}),
             ],
             tool_progress=(1, 2),
+            current_tool="list_annotations",
         )
         event = _create_tool_start_event(step, "list_annotations")
 
@@ -246,9 +252,8 @@ class TestCreateToolStartEvent:
 
     def test_create_tool_start_event_expands_call_on_connection(self):
         """Test that call_on_connection tool names are expanded."""
-        step = AgentStep(
+        step = ToolStartStep(
             step_number=1,
-            current_tool="call_on_connection",
             tool_calls=[
                 ToolCall(
                     id="tc_1",
@@ -257,6 +262,7 @@ class TestCreateToolStartEvent:
                 ),
             ],
             tool_progress=(1, 1),
+            current_tool="call_on_connection",
         )
         event = _create_tool_start_event(step, "call_on_connection")
 
@@ -267,13 +273,13 @@ class TestCreateToolStartEvent:
 
     def test_create_tool_start_event_no_matching_tool_call(self):
         """Test creating tool start event when tool call is not found."""
-        step = AgentStep(
+        step = ToolStartStep(
             step_number=1,
-            current_tool="get_annotation",
             tool_calls=[
                 ToolCall(id="tc_1", name="list_annotations", arguments={"queue_id": 123}),
             ],
             tool_progress=(2, 3),
+            current_tool="get_annotation",
         )
         event = _create_tool_start_event(step, "get_annotation")
 
@@ -767,8 +773,8 @@ class TestAgentServiceRunAgent:
         )
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, thinking="Processing...", is_streaming=True)
-            yield AgentStep(step_number=1, final_answer="Done!", is_final=True)
+            yield ThinkingStep(step_number=1, thinking="Processing...")
+            yield FinalAnswerStep(step_number=1, final_answer="Done!")
 
         mock_agent.run = mock_run
 
@@ -854,7 +860,7 @@ class TestAgentServiceRunAgent:
         mock_agent.tokens.total_output = 0
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -906,7 +912,7 @@ class TestAgentServiceRunAgent:
         mock_agent.memory = MagicMock()
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -958,7 +964,7 @@ class TestAgentServiceRunAgent:
         mock_agent.memory = memory
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -1447,7 +1453,7 @@ class TestAgentServiceRunAgentWithImages:
         mock_agent.tokens.total_output = 0
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -1499,7 +1505,7 @@ class TestAgentServiceUrlContext:
         mock_agent.tokens.total_output = 0
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -1609,7 +1615,7 @@ class TestAfterLoopHook:
         mock_agent.memory = MagicMock()
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -1672,7 +1678,7 @@ class TestAfterLoopHook:
         mock_agent.memory = MagicMock()
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 

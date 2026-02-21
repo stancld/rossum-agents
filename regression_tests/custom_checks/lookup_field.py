@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import ToolResultStep
+
 from regression_tests.custom_checks._utils import create_api_client
 
 if TYPE_CHECKING:
@@ -69,6 +71,8 @@ def _find_lookup_field_raw(schema_content: list[dict]) -> dict | None:
 def _find_evaluate_result(steps: list[AgentStep]) -> dict | None:
     """Find the last successful evaluate_lookup_field tool result."""
     for step in reversed(steps):
+        if not isinstance(step, ToolResultStep):
+            continue
         for tc in step.tool_calls:
             if tc.name == "evaluate_lookup_field":
                 for tr in step.tool_results:
@@ -152,6 +156,8 @@ def check_lookup_field_configured(steps: list[AgentStep], api_base_url: str, api
 def _extract_write_file_content(steps: list[AgentStep], filename: str) -> str | dict | None:
     """Extract the content argument from a write_file tool call for a given filename."""
     for step in steps:
+        if not isinstance(step, ToolResultStep):
+            continue
         for tc in step.tool_calls:
             if tc.name == "write_file" and tc.arguments.get("filename", "") == filename:
                 return tc.arguments.get("content")
