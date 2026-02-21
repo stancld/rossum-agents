@@ -6,13 +6,8 @@ import json
 from typing import TYPE_CHECKING
 
 import pytest
-from rossum_agent.tools import (
-    INTERNAL_TOOLS,
-    execute_tool,
-    get_internal_tool_names,
-    get_internal_tools,
-    set_output_dir,
-)
+from rossum_agent.tools import INTERNAL_TOOLS, execute_tool, get_internal_tool_names, get_internal_tools
+from rossum_agent.tools.core import set_output_dir
 
 if TYPE_CHECKING:
     from pathlib import Path

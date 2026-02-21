@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
-from rossum_agent.tools import DEPLOY_TOOLS, execute_tool, set_output_dir
-from rossum_agent.tools.core import require_rossum_credentials
+from rossum_agent.tools import execute_tool
+from rossum_agent.tools.core import require_rossum_credentials, set_output_dir
 from rossum_agent.tools.deploy import (
+    DEPLOY_TOOLS,
     create_workspace,
     deploy_compare_workspaces,
     deploy_copy_org,

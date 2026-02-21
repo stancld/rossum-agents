@@ -13,8 +13,6 @@ from rossum_agent.tools.spawn_mcp import (
     _spawn_connection_async,
     _spawned_connections,
     call_on_connection,
-    cleanup_all_spawned_connections,
-    clear_spawned_connections,
     close_connection,
     spawn_mcp_connection,
 )
@@ -120,7 +118,7 @@ class TestCallOnConnection:
         loop = asyncio.new_event_loop()
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
-        clear_spawned_connections()
+        _spawned_connections.clear()
 
         try:
             result = call_on_connection(
@@ -273,7 +271,7 @@ class TestCloseConnection:
         loop = asyncio.new_event_loop()
         mock_conn = MagicMock()
         set_mcp_connection(mock_conn, loop)
-        clear_spawned_connections()
+        _spawned_connections.clear()
 
         try:
             result = close_connection(connection_id="nonexistent")
@@ -303,62 +301,6 @@ class TestCloseConnection:
 
                 result = close_connection(connection_id="test")
                 assert "Successfully closed" in result
-        finally:
-            spawned.clear()
-            loop.close()
-            set_mcp_connection(None, None)
-
-
-class TestClearSpawnedConnections:
-    """Tests for clear_spawned_connections function."""
-
-    def test_clear_removes_all_connections(self) -> None:
-        """Test that clear removes all spawned connections."""
-        spawned = _spawned_connections
-        spawned["conn1"] = SpawnedConnection(
-            connection=MagicMock(),
-            client=MagicMock(),
-            api_base_url="https://api1.test.com",
-        )
-        spawned["conn2"] = SpawnedConnection(
-            connection=MagicMock(),
-            client=MagicMock(),
-            api_base_url="https://api2.test.com",
-        )
-
-        clear_spawned_connections()
-
-        assert len(spawned) == 0
-
-
-class TestCleanupAllSpawnedConnections:
-    """Tests for cleanup_all_spawned_connections function."""
-
-    def test_cleanup_without_event_loop(self) -> None:
-        """Test that cleanup does nothing without event loop."""
-        set_mcp_connection(None, None)
-        cleanup_all_spawned_connections()
-
-    def test_cleanup_with_connections(self) -> None:
-        """Test cleanup closes all connections."""
-        loop = asyncio.new_event_loop()
-        mock_conn = MagicMock()
-        set_mcp_connection(mock_conn, loop)
-
-        spawned = _spawned_connections
-        spawned["test1"] = SpawnedConnection(
-            connection=MagicMock(),
-            client=MagicMock(),
-            api_base_url="https://api.test.com",
-        )
-
-        try:
-            with patch("rossum_agent.tools.spawn_mcp.asyncio.run_coroutine_threadsafe") as mock_run:
-                future = MagicMock()
-                future.result.return_value = None
-                mock_run.return_value = future
-
-                cleanup_all_spawned_connections()
         finally:
             spawned.clear()
             loop.close()
@@ -646,7 +588,7 @@ class TestAsyncSpawnConnection:
     @pytest.mark.asyncio
     async def test_spawn_connection_success(self) -> None:
         """Test successful connection spawn."""
-        clear_spawned_connections()
+        _spawned_connections.clear()
 
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -690,61 +632,5 @@ class TestAsyncCloseConnection:
     @pytest.mark.asyncio
     async def test_close_nonexistent_connection(self) -> None:
         """Test closing a nonexistent connection does not raise."""
-        clear_spawned_connections()
+        _spawned_connections.clear()
         await _close_spawned_connection_async("nonexistent")
-
-
-class TestCleanupEdgeCases:
-    """Tests for edge cases in cleanup_all_spawned_connections."""
-
-    def test_cleanup_timeout(self) -> None:
-        """Test timeout during cleanup."""
-        from concurrent.futures import TimeoutError as FuturesTimeoutError
-
-        loop = asyncio.new_event_loop()
-        mock_conn = MagicMock()
-        set_mcp_connection(mock_conn, loop)
-
-        spawned = _spawned_connections
-        spawned["test"] = SpawnedConnection(
-            connection=MagicMock(),
-            client=MagicMock(),
-            api_base_url="https://api.test.com",
-        )
-
-        try:
-            with patch("rossum_agent.tools.spawn_mcp.asyncio.run_coroutine_threadsafe") as mock_run:
-                future = MagicMock()
-                future.result.side_effect = FuturesTimeoutError()
-                mock_run.return_value = future
-
-                cleanup_all_spawned_connections()
-        finally:
-            spawned.clear()
-            loop.close()
-            set_mcp_connection(None, None)
-
-    def test_cleanup_exception(self) -> None:
-        """Test exception during cleanup."""
-        loop = asyncio.new_event_loop()
-        mock_conn = MagicMock()
-        set_mcp_connection(mock_conn, loop)
-
-        spawned = _spawned_connections
-        spawned["test"] = SpawnedConnection(
-            connection=MagicMock(),
-            client=MagicMock(),
-            api_base_url="https://api.test.com",
-        )
-
-        try:
-            with patch("rossum_agent.tools.spawn_mcp.asyncio.run_coroutine_threadsafe") as mock_run:
-                future = MagicMock()
-                future.result.side_effect = Exception("Cleanup error")
-                mock_run.return_value = future
-
-                cleanup_all_spawned_connections()
-        finally:
-            spawned.clear()
-            loop.close()
-            set_mcp_connection(None, None)

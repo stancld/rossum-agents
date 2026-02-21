@@ -2486,7 +2486,7 @@ class TestRossumAgentTokenTracking:
 
     def test_accumulate_sub_agent_tokens(self, mock_agent):
         """Test tokens.accumulate_sub accumulates properly."""
-        from rossum_agent.tools import SubAgentTokenUsage
+        from rossum_agent.tools.core import SubAgentTokenUsage
 
         usage1 = SubAgentTokenUsage(tool_name="search_knowledge_base", input_tokens=100, output_tokens=50, iteration=1)
         mock_agent.tokens.accumulate_sub(usage1)
@@ -2510,7 +2510,7 @@ class TestRossumAgentTokenTracking:
 
     def test_accumulate_sub_agent_tokens_multiple_tools(self, mock_agent):
         """Test accumulating tokens from multiple sub-agent tools."""
-        from rossum_agent.tools import SubAgentTokenUsage
+        from rossum_agent.tools.core import SubAgentTokenUsage
 
         usage1 = SubAgentTokenUsage(tool_name="search_knowledge_base", input_tokens=100, output_tokens=50, iteration=1)
         usage2 = SubAgentTokenUsage(
@@ -2574,7 +2574,7 @@ class TestRossumAgentTokenTracking:
 
     def test_accumulate_sub_agent_cache_tokens(self, mock_agent):
         """Test tokens.accumulate_sub accumulates cache metrics."""
-        from rossum_agent.tools import SubAgentTokenUsage
+        from rossum_agent.tools.core import SubAgentTokenUsage
 
         usage = SubAgentTokenUsage(
             tool_name="search_knowledge_base",

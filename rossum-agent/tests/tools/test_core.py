@@ -20,7 +20,6 @@ from rossum_agent.tools.core import (
     is_read_only_mode,
     report_progress,
     report_task_snapshot,
-    report_text,
     report_token_usage,
     set_mcp_connection,
     set_output_dir,
@@ -144,19 +143,6 @@ class TestCallbacks:
         report_progress(progress)
         callback.assert_not_called()
 
-    def test_set_text_callback_and_clear(self) -> None:
-        callback = MagicMock()
-        set_text_callback(callback)
-
-        text = SubAgentText(tool_name="test", text="output")
-        report_text(text)
-        callback.assert_called_once_with(text)
-
-        set_text_callback(None)
-        callback.reset_mock()
-        report_text(text)
-        callback.assert_not_called()
-
     def test_report_progress_calls_callback(self) -> None:
         callback = MagicMock()
         set_progress_callback(callback)
@@ -176,20 +162,6 @@ class TestCallbacks:
         set_progress_callback(None)
         progress = SubAgentProgress(tool_name="test", iteration=1, max_iterations=5)
         report_progress(progress)
-
-    def test_report_text_calls_callback(self) -> None:
-        callback = MagicMock()
-        set_text_callback(callback)
-
-        text = SubAgentText(tool_name="search_knowledge_base", text="Analysis output", is_final=True)
-        report_text(text)
-
-        callback.assert_called_once_with(text)
-
-    def test_report_text_no_callback_no_error(self) -> None:
-        set_text_callback(None)
-        text = SubAgentText(tool_name="test", text="output")
-        report_text(text)
 
     def test_set_token_callback_and_clear(self) -> None:
         callback = MagicMock()

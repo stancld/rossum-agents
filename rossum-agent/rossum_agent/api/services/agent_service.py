@@ -28,11 +28,9 @@ from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.redis_storage import RedisStorage
 from rossum_agent.rossum_mcp_integration import MCPConnection, connect_mcp_server
-from rossum_agent.tools import (
+from rossum_agent.tools.core import (
     SubAgentProgress,
     SubAgentText,
-    TaskTracker,
-    get_write_tools_async,
     set_commit_store,
     set_mcp_connection,
     set_output_dir,
@@ -44,6 +42,8 @@ from rossum_agent.tools import (
     set_task_tracker,
     set_text_callback,
 )
+from rossum_agent.tools.dynamic_tools import get_write_tools_async
+from rossum_agent.tools.task_tracker import TaskTracker
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
 from rossum_agent.utils import create_session_output_dir, get_display_tool_name
 

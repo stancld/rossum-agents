@@ -16,7 +16,6 @@ from rossum_agent.tools.dynamic_tools import (
     get_global_state,
     get_load_tool_category_definition,
     get_load_tool_definition,
-    get_loaded_categories,
     get_write_tools,
     load_tool,
     load_tool_category,
@@ -38,12 +37,12 @@ class TestDynamicToolState:
 
     def test_reset_clears_state(self) -> None:
         reset_dynamic_tools()
-        assert get_loaded_categories() == set()
+        assert get_global_state().loaded_categories == set()
         assert get_dynamic_tools() == []
 
     def test_initial_state_is_empty(self) -> None:
         reset_dynamic_tools()
-        assert len(get_loaded_categories()) == 0
+        assert len(get_global_state().loaded_categories) == 0
         assert len(get_dynamic_tools()) == 0
 
 
@@ -141,7 +140,7 @@ class TestLoadCategoriesImpl:
         reset_dynamic_tools()
         mock_get_catalog.return_value = {"queues": {"get_queue"}}
         # Manually add category to loaded set
-        loaded = get_loaded_categories()
+        loaded = get_global_state().loaded_categories
         loaded.add("queues")
         result = _load_categories_impl(["queues"])
         assert result == "Categories already loaded: ['queues']"
@@ -205,7 +204,7 @@ class TestLoadCategoriesImpl:
 
         assert "Loaded" in result
         assert "get_queue" in result or "list_queues" in result
-        assert "queues" in get_loaded_categories()
+        assert "queues" in get_global_state().loaded_categories
         assert len(get_dynamic_tools()) == 1
 
 

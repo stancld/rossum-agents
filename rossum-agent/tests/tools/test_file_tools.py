@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from rossum_agent.tools import set_output_dir
+from rossum_agent.tools.core import set_output_dir
 from rossum_agent.tools.file_tools import write_file
 
 if TYPE_CHECKING:

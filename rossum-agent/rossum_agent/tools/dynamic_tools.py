@@ -90,11 +90,6 @@ def reset_dynamic_tools() -> None:
     get_global_state().reset()
 
 
-def get_loaded_categories() -> set[str]:
-    """Get the set of currently loaded categories (global state)."""
-    return get_global_state().loaded_categories
-
-
 def get_dynamic_tools() -> list[ToolParam]:
     """Get the list of dynamically loaded tools (global state)."""
     return get_global_state().tools

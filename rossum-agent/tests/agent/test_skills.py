@@ -7,7 +7,8 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from rossum_agent.agent.skills import Skill, SkillRegistry, get_skill, get_skill_registry
-from rossum_agent.tools import INTERNAL_TOOLS, execute_tool, get_internal_tool_names, load_skill
+from rossum_agent.tools import INTERNAL_TOOLS, execute_tool, get_internal_tool_names
+from rossum_agent.tools.skills import load_skill
 
 
 class TestSkill:

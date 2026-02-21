@@ -36,12 +36,6 @@ _spawned_connections: dict[str, SpawnedConnection] = {}
 _spawned_connections_lock = threading.Lock()
 
 
-def clear_spawned_connections() -> None:
-    """Clear all spawned connections. Called when MCP connection is reset."""
-    with _spawned_connections_lock:
-        _spawned_connections.clear()
-
-
 async def _spawn_connection_async(
     connection_id: str, api_token: str, api_base_url: str, mcp_mode: str = "read-write"
 ) -> SpawnedConnection:
@@ -75,28 +69,6 @@ async def _close_spawned_connection_async(connection_id: str) -> None:
 
     if record is not None:
         await record.client.__aexit__(None, None, None)
-
-
-def cleanup_all_spawned_connections() -> None:
-    """Cleanup all spawned connections. Call this when the agent session ends.
-
-    Should only be called once at session teardown, after no more tool calls are expected.
-    """
-    if (mcp_event_loop := get_mcp_event_loop()) is None:
-        return
-
-    with _spawned_connections_lock:
-        conn_ids = list(_spawned_connections.keys())
-
-    for conn_id in conn_ids:
-        try:
-            future = asyncio.run_coroutine_threadsafe(_close_spawned_connection_async(conn_id), mcp_event_loop)
-            future.result(timeout=10)
-        except FuturesTimeoutError:
-            future.cancel()
-            logger.warning(f"Timeout cleaning up connection {conn_id}")
-        except Exception as e:
-            logger.warning(f"Failed to cleanup connection {conn_id}: {e}")
 
 
 @beta_tool

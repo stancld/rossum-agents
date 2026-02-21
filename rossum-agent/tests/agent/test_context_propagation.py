@@ -9,7 +9,8 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 import pytest
-from rossum_agent.tools import INTERNAL_TOOLS, execute_tool, get_output_dir, set_output_dir
+from rossum_agent.tools import INTERNAL_TOOLS, execute_tool
+from rossum_agent.tools.core import get_output_dir, set_output_dir
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -92,11 +92,6 @@ def report_progress(progress: SubAgentProgress) -> None:
         callback(progress)
 
 
-def report_text(text: SubAgentText) -> None:
-    if (callback := _text_callback.get()) is not None:
-        callback(text)
-
-
 def report_token_usage(usage: SubAgentTokenUsage) -> None:
     if (callback := _token_callback.get()) is not None:
         callback(usage)
