@@ -13,7 +13,7 @@ from rossum_api.models.engine import Engine
 from rossum_api.models.queue import Queue
 from rossum_api.models.schema import Schema
 from rossum_mcp.tools import base
-from rossum_mcp.tools.queues import _create_queue_from_template, _get_engine_url, register_queue_tools
+from rossum_mcp.tools.queues import QueueListItem, _create_queue_from_template, _get_engine_url, register_queue_tools
 from rossum_mcp.tools.resource_tracking import TRACKED_RESOURCES_KEY
 
 if TYPE_CHECKING:
@@ -158,6 +158,7 @@ class TestListQueues:
         result = await list_queues()
 
         assert len(result) == 2
+        assert isinstance(result[0], QueueListItem)
         assert result[0].id == 1
         assert result[1].id == 2
 
@@ -245,8 +246,8 @@ class TestListQueues:
         assert len(result) == 0
 
     @pytest.mark.asyncio
-    async def test_list_queues_truncates_verbose_settings(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test that verbose settings fields are truncated in list response."""
+    async def test_list_queues_omits_settings(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that settings are omitted in list response."""
         register_queue_tools(mock_mcp, mock_client)
 
         mock_queue = create_mock_queue(
@@ -269,28 +270,8 @@ class TestListQueues:
         result = await list_queues()
 
         assert len(result) == 1
-        assert result[0].settings["accepted_mime_types"] == "<omitted>"
-        assert result[0].settings["annotation_list_table"] == "<omitted>"
-        assert result[0].settings["columns"] == [{"schema_id": "doc_id"}]
-        assert result[0].settings["ui_upload_enabled"] is True
-
-    @pytest.mark.asyncio
-    async def test_list_queues_handles_empty_settings(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test that empty settings are handled correctly."""
-        register_queue_tools(mock_mcp, mock_client)
-
-        mock_queue = create_mock_queue(id=1, name="Queue 1", settings={})
-
-        async def mock_fetch_all(resource, **filters):
-            yield mock_queue
-
-        mock_client._http_client.fetch_all = mock_fetch_all
-
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues()
-
-        assert len(result) == 1
-        assert result[0].settings == {}
+        assert isinstance(result[0], QueueListItem)
+        assert result[0].settings == "<omitted>"
 
     @pytest.mark.asyncio
     async def test_list_queues_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:

@@ -25,9 +25,6 @@ class GracefulListResult(Generic[T]):  # noqa: UP046 - PEP 695 breaks sphinx-aut
     skipped_ids: list[int | str] = field(default_factory=list)
 
 
-# Marker used to indicate omitted fields in list responses
-TRUNCATED_MARKER = "<omitted>"
-
 VALID_MODES = ("read-only", "read-write")
 
 _base_url: str = ""
@@ -87,21 +84,6 @@ def build_resource_url(resource_type: str, resource_id: int) -> str:
 def build_filters(**kwargs: Any) -> dict[str, Any]:
     """Build a filter dict from kwargs, excluding None values."""
     return {k: v for k, v in kwargs.items() if v is not None}
-
-
-def truncate_dict_fields(data: dict[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
-    """Truncate specified fields in a dictionary to save context.
-
-    Returns a new dictionary with specified fields replaced by TRUNCATED_MARKER.
-    """
-    if not data:
-        return data
-
-    result = dict(data)
-    for field_name in fields:
-        if field_name in result:
-            result[field_name] = TRUNCATED_MARKER
-    return result
 
 
 async def graceful_list(
