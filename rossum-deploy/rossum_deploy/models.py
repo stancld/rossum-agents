@@ -3,6 +3,7 @@ from __future__ import annotations
 import difflib
 import json
 import sys
+from collections import defaultdict
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -14,6 +15,45 @@ _RED = "\033[91m"
 _GREEN = "\033[92m"
 _CYAN = "\033[96m"
 _RESET = "\033[0m"
+
+
+def _type_counts(items: list[tuple]) -> str:
+    """Format type counts from result tuples where first element is ObjectType.
+
+    Returns e.g. '2 queue, 1 schema, 2 hook' or '' if empty.
+    """
+    if not items:
+        return ""
+    counts: dict[str, int] = {}
+    for item in items:
+        type_name = item[0].value
+        counts[type_name] = counts.get(type_name, 0) + 1
+    return ", ".join(f"{count} {name}" for name, count in sorted(counts.items()))
+
+
+def _count_line(label: str, items: list[tuple]) -> str:
+    """Format a summary count line with optional type breakdown."""
+    type_info = _type_counts(items)
+    suffix = f" ({type_info})" if type_info else ""
+    return f"- {label}: {len(items)}{suffix}"
+
+
+def _grouped_detail_lines(items: list[tuple], format_item: str) -> list[str]:
+    """Group items by object type and format detail lines.
+
+    format_item is applied to each item's fields after the ObjectType (item[1:]).
+    """
+    grouped: dict[str, list[tuple]] = defaultdict(list)
+    for item in items:
+        grouped[item[0].value].append(item)
+
+    lines: list[str] = []
+    for type_name in sorted(grouped):
+        type_items = grouped[type_name]
+        lines.append(f"\n**{type_name}** ({len(type_items)})")
+        for item in type_items:
+            lines.append(format_item.format(*item[1:]))
+    return lines
 
 
 def _format_unified_diff(
@@ -209,24 +249,21 @@ class PushResult(BaseModel):
     def summary(self) -> str:
         """Human-readable summary of the push."""
         lines = ["# Push Summary", ""]
-        lines.append(f"- Pushed: {len(self.pushed)}")
-        lines.append(f"- Skipped: {len(self.skipped)}")
-        lines.append(f"- Failed: {len(self.failed)}")
+        lines.append(_count_line("Pushed", self.pushed))
+        lines.append(_count_line("Skipped", self.skipped))
+        lines.append(_count_line("Failed", self.failed))
 
         if self.pushed:
             lines.append("\n## Pushed")
-            for obj_type, obj_id, name in self.pushed:
-                lines.append(f"- {obj_type.value}: {name} ({obj_id})")
+            lines.extend(_grouped_detail_lines(self.pushed, "- {1} ({0})"))
 
         if self.skipped:
             lines.append("\n## Skipped")
-            for obj_type, obj_id, name, reason in self.skipped:
-                lines.append(f"- {obj_type.value}: {name} ({obj_id}) - {reason}")
+            lines.extend(_grouped_detail_lines(self.skipped, "- {1} ({0}) - {2}"))
 
         if self.failed:
             lines.append("\n## Failed")
-            for obj_type, obj_id, name, error in self.failed:
-                lines.append(f"- {obj_type.value}: {name} ({obj_id}) - {error}")
+            lines.extend(_grouped_detail_lines(self.failed, "- {1} ({0}) - {2}"))
 
         return "\n".join(lines)
 
@@ -246,13 +283,12 @@ class PullResult(BaseModel):
             lines.append(f"- Organization: {self.organization_name}")
         if self.workspace_name:
             lines.append(f"- Workspace: {self.workspace_name}")
-        lines.append(f"- Pulled: {len(self.pulled)}")
-        lines.append(f"- Skipped: {len(self.skipped)}")
+        lines.append(_count_line("Pulled", self.pulled))
+        lines.append(_count_line("Skipped", self.skipped))
 
         if self.pulled:
             lines.append("\n## Pulled")
-            for obj_type, obj_id, name in self.pulled:
-                lines.append(f"- {obj_type.value}: {name} ({obj_id})")
+            lines.extend(_grouped_detail_lines(self.pulled, "- {1} ({0})"))
 
         return "\n".join(lines)
 
@@ -303,24 +339,21 @@ class CopyResult(BaseModel):
     def summary(self) -> str:
         """Human-readable summary of the copy operation."""
         lines = ["# Copy Summary", ""]
-        lines.append(f"- Created: {len(self.created)}")
-        lines.append(f"- Skipped: {len(self.skipped)}")
-        lines.append(f"- Failed: {len(self.failed)}")
+        lines.append(_count_line("Created", self.created))
+        lines.append(_count_line("Skipped", self.skipped))
+        lines.append(_count_line("Failed", self.failed))
 
         if self.created:
             lines.append("\n## Created")
-            for obj_type, source_id, target_id, name in self.created:
-                lines.append(f"- {obj_type.value}: {name} (source: {source_id} → target: {target_id})")
+            lines.extend(_grouped_detail_lines(self.created, "- {2} (source: {0} → target: {1})"))
 
         if self.skipped:
             lines.append("\n## Skipped")
-            for obj_type, obj_id, name, reason in self.skipped:
-                lines.append(f"- {obj_type.value}: {name} ({obj_id}) - {reason}")
+            lines.extend(_grouped_detail_lines(self.skipped, "- {1} ({0}) - {2}"))
 
         if self.failed:
             lines.append("\n## Failed")
-            for obj_type, obj_id, name, error in self.failed:
-                lines.append(f"- {obj_type.value}: {name} ({obj_id}) - {error}")
+            lines.extend(_grouped_detail_lines(self.failed, "- {1} ({0}) - {2}"))
 
         return "\n".join(lines)
 
@@ -336,30 +369,26 @@ class DeployResult(BaseModel):
     def summary(self) -> str:
         """Human-readable summary of the deploy."""
         lines = ["# Deploy Summary", ""]
-        lines.append(f"- Created: {len(self.created)}")
-        lines.append(f"- Updated: {len(self.updated)}")
-        lines.append(f"- Skipped: {len(self.skipped)}")
-        lines.append(f"- Failed: {len(self.failed)}")
+        lines.append(_count_line("Created", self.created))
+        lines.append(_count_line("Updated", self.updated))
+        lines.append(_count_line("Skipped", self.skipped))
+        lines.append(_count_line("Failed", self.failed))
 
         if self.created:
             lines.append("\n## Created")
-            for obj_type, obj_id, name in self.created:
-                lines.append(f"- {obj_type.value}: {name} ({obj_id})")
+            lines.extend(_grouped_detail_lines(self.created, "- {1} ({0})"))
 
         if self.updated:
             lines.append("\n## Updated")
-            for obj_type, obj_id, name in self.updated:
-                lines.append(f"- {obj_type.value}: {name} ({obj_id})")
+            lines.extend(_grouped_detail_lines(self.updated, "- {1} ({0})"))
 
         if self.skipped:
             lines.append("\n## Skipped")
-            for obj_type, obj_id, name, reason in self.skipped:
-                lines.append(f"- {obj_type.value}: {name} ({obj_id}) - {reason}")
+            lines.extend(_grouped_detail_lines(self.skipped, "- {1} ({0}) - {2}"))
 
         if self.failed:
             lines.append("\n## Failed")
-            for obj_type, obj_id, name, error in self.failed:
-                lines.append(f"- {obj_type.value}: {name} ({obj_id}) - {error}")
+            lines.extend(_grouped_detail_lines(self.failed, "- {1} ({0}) - {2}"))
 
         return "\n".join(lines)
 
