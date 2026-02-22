@@ -17,6 +17,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from rossum_agent.agent.memory import AgentMemory
+from rossum_agent.api.commands import CommandContext, execute_command, parse_command
 from rossum_agent.api.dependencies import (
     RossumCredentials,
     get_agent_service,
@@ -37,7 +38,8 @@ from rossum_agent.api.models.schemas import (
 )
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
-from rossum_agent.redis_storage import ChatData
+from rossum_agent.change_tracking.store import CommitStore
+from rossum_agent.redis_storage import ChatData, RedisStorage
 
 # To prevent (legacy) proxy servers from dropping connections during long periods of thinking,
 # we are sending SSE_KEEPALIVE_COMMENT every SSE_KEEPALIVE_INTERVAL as per recommendation:
@@ -201,6 +203,47 @@ async def _with_sse_keepalive(
                 await pending
 
 
+def _get_commit_store() -> CommitStore | None:
+    """Create a CommitStore if Redis is available."""
+    try:
+        storage = RedisStorage()
+        if storage.is_connected():
+            return CommitStore(storage.client)
+    except Exception as e:
+        logger.warning(f"Commit store is unavailable: {e}")
+    return None
+
+
+def _handle_slash_command(
+    command_name: str,
+    chat_id: str,
+    credentials: RossumCredentials,
+    chat_service: ChatService,
+) -> StreamingResponse:
+    """Execute a slash command and return its result as an SSE stream."""
+    commit_store = _get_commit_store() if command_name == "/list-commits" else None
+    ctx = CommandContext(
+        chat_id=chat_id,
+        user_id=credentials.user_id,
+        credentials_api_url=credentials.api_url,
+        chat_service=chat_service,
+        commit_store=commit_store,
+    )
+
+    async def command_event_generator() -> Iterator[str]:  # type: ignore[misc]
+        result_text = await execute_command(command_name, ctx)
+        step = StepEvent(type="final_answer", step_number=1, content=result_text, is_final=True)
+        yield _format_sse_event("step", step.model_dump_json())
+        done = StreamDoneEvent(total_steps=1, input_tokens=0, output_tokens=0)
+        yield _format_sse_event("done", done.model_dump_json())
+
+    return StreamingResponse(
+        command_event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.post(
     "/{chat_id}/messages",
     response_class=StreamingResponse,
@@ -211,7 +254,7 @@ async def _with_sse_keepalive(
     },
 )
 @limiter.limit("10/minute")
-async def send_message(
+async def send_message(  # noqa: C901 - endpoint handler with slash command interception
     request: Request,
     chat_id: str,
     message: MessageRequest,
@@ -228,6 +271,11 @@ async def send_message(
     chat_data = chat_service.get_chat_data(credentials.user_id, chat_id)
     if chat_data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
+
+    # Intercept slash commands — bypass the agent entirely
+    command_name = parse_command(message.content)
+    if command_name is not None:
+        return _handle_slash_command(command_name, chat_id, credentials, chat_service)
 
     history = chat_data.messages
     mcp_mode = _resolve_mcp_mode(message, chat_data)

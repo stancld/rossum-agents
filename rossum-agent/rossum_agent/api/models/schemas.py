@@ -438,3 +438,16 @@ class FileListResponse(BaseModel):
 
     files: list[FileInfo]
     total: int
+
+
+class CommandInfo(BaseModel):
+    """Information about an available slash command."""
+
+    name: str
+    description: str
+
+
+class CommandListResponse(BaseModel):
+    """Response for listing available slash commands."""
+
+    commands: list[CommandInfo]

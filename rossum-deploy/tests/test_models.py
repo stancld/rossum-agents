@@ -21,7 +21,36 @@ from rossum_deploy.models import (
     ObjectType,
     PullResult,
     PushResult,
+    _count_line,
+    _type_counts,
 )
+
+
+class TestTypeCounts:
+    def test_empty_list(self):
+        assert _type_counts([]) == ""
+
+    def test_single_type(self):
+        items = [(ObjectType.QUEUE, 1, "Q1"), (ObjectType.QUEUE, 2, "Q2")]
+        assert _type_counts(items) == "2 queue"
+
+    def test_multiple_types_sorted(self):
+        items = [
+            (ObjectType.SCHEMA, 1, "S1"),
+            (ObjectType.QUEUE, 2, "Q1"),
+            (ObjectType.HOOK, 3, "H1"),
+            (ObjectType.QUEUE, 4, "Q2"),
+        ]
+        assert _type_counts(items) == "1 hook, 2 queue, 1 schema"
+
+
+class TestCountLine:
+    def test_empty(self):
+        assert _count_line("Updated", []) == "- Updated: 0"
+
+    def test_with_items(self):
+        items = [(ObjectType.QUEUE, 1, "Q1"), (ObjectType.HOOK, 2, "H1")]
+        assert _count_line("Pushed", items) == "- Pushed: 2 (1 hook, 1 queue)"
 
 
 class TestObjectMeta:
@@ -177,16 +206,29 @@ class TestPushResult:
             pushed=[(ObjectType.QUEUE, 1, "Queue 1")], skipped=[(ObjectType.HOOK, 2, "Hook 1", "conflict")]
         )
         summary = result.summary()
-        assert "Pushed: 1" in summary
-        assert "Skipped: 1" in summary
+        assert "Pushed: 1 (1 queue)" in summary
+        assert "Skipped: 1 (1 hook)" in summary
         assert "Queue 1" in summary
+
+    def test_summary_type_grouping(self):
+        result = PushResult(
+            pushed=[
+                (ObjectType.QUEUE, 1, "Queue 1"),
+                (ObjectType.QUEUE, 2, "Queue 2"),
+                (ObjectType.SCHEMA, 3, "Schema 1"),
+            ]
+        )
+        summary = result.summary()
+        assert "Pushed: 3 (2 queue, 1 schema)" in summary
+        assert "**queue** (2)" in summary
+        assert "**schema** (1)" in summary
 
 
 class TestPullResult:
     def test_summary(self):
         result = PullResult(pulled=[(ObjectType.WORKSPACE, 1, "WS 1"), (ObjectType.QUEUE, 2, "Queue 1")])
         summary = result.summary()
-        assert "Pulled: 2" in summary
+        assert "Pulled: 2 (1 queue, 1 workspace)" in summary
         assert "WS 1" in summary
 
 
@@ -221,9 +263,9 @@ class TestCopyResult:
             failed=[(ObjectType.SCHEMA, 4, "Schema 1", "API error")],
         )
         summary = result.summary()
-        assert "Created: 2" in summary
-        assert "Skipped: 1" in summary
-        assert "Failed: 1" in summary
+        assert "Created: 2 (1 queue, 1 workspace)" in summary
+        assert "Skipped: 1 (1 hook)" in summary
+        assert "Failed: 1 (1 schema)" in summary
         assert "WS 1" in summary
         assert "source: 1 → target: 10" in summary
 
@@ -236,18 +278,33 @@ class TestDeployResult:
             skipped=[(ObjectType.SCHEMA, 300, "Schema 1", "no target mapping")],
         )
         summary = result.summary()
-        assert "Created: 1" in summary
-        assert "Updated: 1" in summary
-        assert "Skipped: 1" in summary
+        assert "Created: 1 (1 queue)" in summary
+        assert "Updated: 1 (1 hook)" in summary
+        assert "Skipped: 1 (1 schema)" in summary
         assert "New Queue" in summary
         assert "Updated Hook" in summary
 
     def test_summary_with_failed(self):
         result = DeployResult(failed=[(ObjectType.HOOK, 100, "Hook 1", "API error")])
         summary = result.summary()
-        assert "Failed: 1" in summary
+        assert "Failed: 1 (1 hook)" in summary
         assert "Hook 1" in summary
         assert "API error" in summary
+
+    def test_summary_groups_by_type(self):
+        result = DeployResult(
+            updated=[
+                (ObjectType.QUEUE, 100, "Queue 1"),
+                (ObjectType.QUEUE, 101, "Queue 2"),
+                (ObjectType.SCHEMA, 200, "Schema 1"),
+                (ObjectType.HOOK, 300, "Hook 1"),
+            ]
+        )
+        summary = result.summary()
+        assert "Updated: 4 (1 hook, 2 queue, 1 schema)" in summary
+        assert "**hook** (1)" in summary
+        assert "**queue** (2)" in summary
+        assert "**schema** (1)" in summary
 
 
 class TestDiffResultToMarkdown:
@@ -274,7 +331,7 @@ class TestPushResultEdgeCases:
     def test_summary_with_failed(self):
         result = PushResult(failed=[(ObjectType.QUEUE, 1, "Queue 1", "Connection error")])
         summary = result.summary()
-        assert "Failed: 1" in summary
+        assert "Failed: 1 (1 queue)" in summary
         assert "Queue 1" in summary
         assert "Connection error" in summary
 
@@ -287,6 +344,7 @@ class TestPullResultEdgeCases:
         summary = result.summary()
         assert "Organization: Test Org" in summary
         assert "Workspace: Test Workspace" in summary
+        assert "Pulled: 1 (1 queue)" in summary
 
 
 class TestCompareResultToMarkdown:

@@ -171,6 +171,11 @@ def get_write_tools() -> set[str]:
     return _fetch_catalog_from_mcp().write_tools
 
 
+def get_cached_category_tool_names() -> dict[str, set[str]] | None:
+    """Get cached category→tool mapping, or None if catalog not yet fetched."""
+    return _catalog_cache.catalog if _catalog_cache is not None else None
+
+
 async def get_write_tools_async(mcp_connection: MCPConnection) -> set[str]:
     return (await _fetch_catalog_async(mcp_connection)).write_tools
 
