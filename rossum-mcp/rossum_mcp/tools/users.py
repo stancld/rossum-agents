@@ -29,6 +29,9 @@ async def _list_users(
     is_active: bool | None = None,
     is_organization_group_admin: bool | None = None,
 ) -> list[User]:
+    logger.info(
+        f"Listing users: username={username}, email={email}, first_name={first_name}, last_name={last_name}, is_active={is_active}, is_organization_group_admin={is_organization_group_admin}"
+    )
     filters = build_filters(
         username=username, email=email, first_name=first_name, last_name=last_name, is_active=is_active
     )
@@ -120,6 +123,7 @@ async def _update_user(
 
 
 async def _list_user_roles(client: AsyncRossumAPIClient) -> list[Group]:
+    logger.info("Listing user roles")
     result = await graceful_list(client, Resource.Group, "user_role")
     return result.items
 

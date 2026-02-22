@@ -178,6 +178,55 @@ class TestListWorkspaces:
 
         assert len(result) == 2
 
+    @pytest.mark.asyncio
+    async def test_list_workspaces_with_regex_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that use_regex=True filters workspaces client-side by regex pattern."""
+        from rossum_mcp.tools.workspaces import register_workspace_tools
+
+        register_workspace_tools(mock_mcp, mock_client)
+
+        mock_workspaces = [
+            create_mock_workspace(id=1, name="Production EU"),
+            create_mock_workspace(id=2, name="Staging US"),
+            create_mock_workspace(id=3, name="production-backup"),
+        ]
+        received_filters: dict = {}
+
+        async def mock_fetch_all(resource, **filters):
+            received_filters.update(filters)
+            for ws in mock_workspaces:
+                yield ws
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_workspaces = mock_mcp._tools["list_workspaces"]
+        result = await list_workspaces(name="production", use_regex=True)
+
+        assert len(result) == 2
+        assert result[0].name == "Production EU"
+        assert result[1].name == "production-backup"
+        assert "name" not in received_filters
+
+    @pytest.mark.asyncio
+    async def test_list_workspaces_with_regex_no_match(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that use_regex=True returns empty list when no workspaces match pattern."""
+        from rossum_mcp.tools.workspaces import register_workspace_tools
+
+        register_workspace_tools(mock_mcp, mock_client)
+
+        mock_workspaces = [create_mock_workspace(id=1, name="Staging US")]
+
+        async def mock_fetch_all(resource, **filters):
+            for ws in mock_workspaces:
+                yield ws
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_workspaces = mock_mcp._tools["list_workspaces"]
+        result = await list_workspaces(name="^production$", use_regex=True)
+
+        assert len(result) == 0
+
 
 @pytest.mark.unit
 class TestCreateWorkspace:

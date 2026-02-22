@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import replace
+import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, cast, get_args
 
 from rossum_api import APIClientError
@@ -18,7 +19,6 @@ from rossum_mcp.tools.base import (
     delete_resource,
     extract_id_from_url,
     graceful_list,
-    truncate_dict_fields,
 )
 from rossum_mcp.tools.resource_tracking import embed_tracked_resources, track_resource
 
@@ -28,21 +28,39 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Fields to truncate in queue.settings for list responses
-_QUEUE_SETTINGS_TRUNCATE_FIELDS = (
-    "accepted_mime_types",
-    "annotation_list_table",
-    "users",
-    "dashboard_customization",
-    "email_notifications",
-)
+
+@dataclass
+class QueueListItem:
+    """Queue summary for list responses (settings omitted to save context)."""
+
+    id: int
+    name: str
+    url: str
+    workspace: str | None = None
+    schema: str | None = None
+    inbox: str | None = None
+    connector: str | None = None
+    automation_enabled: bool = False
+    automation_level: str = "never"
+    status: str | None = None
+    counts: dict[str, int] | None = None
+    settings: str = "<omitted>"
 
 
-def _truncate_queue_for_list(queue: Queue) -> Queue:
-    """Truncate verbose fields in queue settings to save context in list responses."""
-    if not queue.settings:
-        return queue
-    return replace(queue, settings=truncate_dict_fields(queue.settings, _QUEUE_SETTINGS_TRUNCATE_FIELDS))
+def _queue_to_list_item(queue: Queue) -> QueueListItem:
+    return QueueListItem(
+        id=queue.id,
+        name=queue.name,
+        url=queue.url,
+        workspace=queue.workspace,
+        schema=queue.schema,
+        inbox=queue.inbox,
+        connector=queue.connector,
+        automation_enabled=queue.automation_enabled,
+        automation_level=queue.automation_level,
+        status=queue.status,
+        counts=queue.counts or None,
+    )
 
 
 async def _get_queue(client: AsyncRossumAPIClient, queue_id: int) -> Queue:
@@ -56,11 +74,15 @@ async def _list_queues(
     id: str | None = None,
     workspace_id: int | None = None,
     name: str | None = None,
-) -> list[Queue]:
+    use_regex: bool = False,
+) -> list[QueueListItem]:
     logger.debug(f"Listing queues: id={id}, workspace_id={workspace_id}, name={name}")
-    filters = build_filters(id=id, workspace=workspace_id, name=name)
+    filters = build_filters(id=id, workspace=workspace_id, name=None if use_regex else name)
     result = await graceful_list(client, Resource.Queue, "queue", **filters)
-    return [_truncate_queue_for_list(queue) for queue in result.items]
+    items = [_queue_to_list_item(queue) for queue in result.items]
+    if use_regex and name is not None:
+        items = [item for item in items if re.search(name, item.name, re.IGNORECASE)]
+    return items
 
 
 async def _get_queue_schema(client: AsyncRossumAPIClient, queue_id: int) -> Schema:
@@ -309,14 +331,17 @@ def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await _get_queue(client, queue_id)
 
     @mcp.tool(
-        description="List queues with filters; id supports comma-separated values.",
+        description="List queues with filters; id supports comma-separated values. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
         tags={"queues"},
         annotations={"readOnlyHint": True},
     )
     async def list_queues(
-        id: str | None = None, workspace_id: int | None = None, name: str | None = None
-    ) -> list[Queue]:
-        return await _list_queues(client, id, workspace_id, name)
+        id: str | None = None,
+        workspace_id: int | None = None,
+        name: str | None = None,
+        use_regex: bool = False,
+    ) -> list[QueueListItem]:
+        return await _list_queues(client, id, workspace_id, name, use_regex)
 
     @mcp.tool(
         description="Retrieve queue schema.",

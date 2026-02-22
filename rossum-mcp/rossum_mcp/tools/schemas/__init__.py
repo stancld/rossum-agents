@@ -83,12 +83,14 @@ def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await ops.get_schema(client, schema_id)
 
     @mcp.tool(
-        description="List all schemas with optional filters.",
+        description="List all schemas with optional filters. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
         tags={"schemas"},
         annotations={"readOnlyHint": True},
     )
-    async def list_schemas(name: str | None = None, queue_id: int | None = None) -> list[SchemaListItem]:
-        return await ops.list_schemas(client, name, queue_id)
+    async def list_schemas(
+        name: str | None = None, queue_id: int | None = None, use_regex: bool = False
+    ) -> list[SchemaListItem]:
+        return await ops.list_schemas(client, name, queue_id, use_regex)
 
     @mcp.tool(
         description="Update schema settings; requires full schema.",

@@ -13,7 +13,7 @@ from rossum_api.models.engine import Engine
 from rossum_api.models.queue import Queue
 from rossum_api.models.schema import Schema
 from rossum_mcp.tools import base
-from rossum_mcp.tools.queues import _create_queue_from_template, _get_engine_url, register_queue_tools
+from rossum_mcp.tools.queues import QueueListItem, _create_queue_from_template, _get_engine_url, register_queue_tools
 from rossum_mcp.tools.resource_tracking import TRACKED_RESOURCES_KEY
 
 if TYPE_CHECKING:
@@ -158,6 +158,7 @@ class TestListQueues:
         result = await list_queues()
 
         assert len(result) == 2
+        assert isinstance(result[0], QueueListItem)
         assert result[0].id == 1
         assert result[1].id == 2
 
@@ -245,8 +246,8 @@ class TestListQueues:
         assert len(result) == 0
 
     @pytest.mark.asyncio
-    async def test_list_queues_truncates_verbose_settings(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test that verbose settings fields are truncated in list response."""
+    async def test_list_queues_omits_settings(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that settings are omitted in list response."""
         register_queue_tools(mock_mcp, mock_client)
 
         mock_queue = create_mock_queue(
@@ -269,28 +270,8 @@ class TestListQueues:
         result = await list_queues()
 
         assert len(result) == 1
-        assert result[0].settings["accepted_mime_types"] == "<omitted>"
-        assert result[0].settings["annotation_list_table"] == "<omitted>"
-        assert result[0].settings["columns"] == [{"schema_id": "doc_id"}]
-        assert result[0].settings["ui_upload_enabled"] is True
-
-    @pytest.mark.asyncio
-    async def test_list_queues_handles_empty_settings(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test that empty settings are handled correctly."""
-        register_queue_tools(mock_mcp, mock_client)
-
-        mock_queue = create_mock_queue(id=1, name="Queue 1", settings={})
-
-        async def mock_fetch_all(resource, **filters):
-            yield mock_queue
-
-        mock_client._http_client.fetch_all = mock_fetch_all
-
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues()
-
-        assert len(result) == 1
-        assert result[0].settings == {}
+        assert isinstance(result[0], QueueListItem)
+        assert result[0].settings == "<omitted>"
 
     @pytest.mark.asyncio
     async def test_list_queues_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -315,6 +296,70 @@ class TestListQueues:
 
         list_queues = mock_mcp._tools["list_queues"]
         result = await list_queues()
+
+        assert len(result) == 2
+
+    @pytest.mark.asyncio
+    async def test_list_queues_with_regex_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that use_regex=True filters queues client-side by regex pattern."""
+        register_queue_tools(mock_mcp, mock_client)
+
+        mock_queues = [
+            create_mock_queue(id=1, name="Invoice Queue"),
+            create_mock_queue(id=2, name="Receipt Queue"),
+            create_mock_queue(id=3, name="invoice_training"),
+        ]
+        received_filters: dict = {}
+
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
+            for queue in mock_queues:
+                yield queue
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_queues = mock_mcp._tools["list_queues"]
+        result = await list_queues(name="invoice", use_regex=True)
+
+        assert len(result) == 2
+        assert result[0].name == "Invoice Queue"
+        assert result[1].name == "invoice_training"
+        assert "name" not in received_filters
+
+    @pytest.mark.asyncio
+    async def test_list_queues_with_regex_no_match(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that use_regex=True returns empty list when no queues match pattern."""
+        register_queue_tools(mock_mcp, mock_client)
+
+        mock_queues = [create_mock_queue(id=1, name="Receipt Queue")]
+
+        async def mock_fetch_all(resource, **filters):
+            for queue in mock_queues:
+                yield queue
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_queues = mock_mcp._tools["list_queues"]
+        result = await list_queues(name="^invoice$", use_regex=True)
+
+        assert len(result) == 0
+
+    @pytest.mark.asyncio
+    async def test_list_queues_with_regex_no_name_returns_all(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that use_regex=True without name returns all queues."""
+        register_queue_tools(mock_mcp, mock_client)
+
+        mock_queues = [create_mock_queue(id=1, name="Queue A"), create_mock_queue(id=2, name="Queue B")]
+
+        async def mock_fetch_all(resource, **filters):
+            for queue in mock_queues:
+                yield queue
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_queues = mock_mcp._tools["list_queues"]
+        result = await list_queues(use_regex=True)
 
         assert len(result) == 2
 

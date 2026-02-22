@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any, Literal
 
 from rossum_api.domain_logic.resources import Resource
@@ -27,10 +28,15 @@ async def _list_email_templates(
     type: EmailTemplateType | None = None,
     name: str | None = None,
     first_n: int | None = None,
+    use_regex: bool = False,
 ) -> list[EmailTemplate]:
-    filters = build_filters(queue=queue_id, type=type, name=name)
+    logger.info(f"Listing email templates: queue_id={queue_id}, type={type}, name={name}, first_n={first_n}")
+    filters = build_filters(queue=queue_id, type=type, name=None if use_regex else name)
     result = await graceful_list(client, Resource.EmailTemplate, "email_template", max_items=first_n, **filters)
-    return result.items
+    items = result.items
+    if use_regex and name is not None:
+        items = [t for t in items if re.search(name, t.name, re.IGNORECASE)]
+    return items
 
 
 async def _create_email_template(
@@ -80,7 +86,7 @@ def register_email_template_tools(mcp: FastMCP, client: AsyncRossumAPIClient) ->
         return await _get_email_template(client, email_template_id)
 
     @mcp.tool(
-        description="List email templates (filterable). Types: rejection, rejection_default, email_with_no_processable_attachments, custom.",
+        description="List email templates (filterable). Types: rejection, rejection_default, email_with_no_processable_attachments, custom. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
         tags={"email_templates"},
         annotations={"readOnlyHint": True},
     )
@@ -89,8 +95,9 @@ def register_email_template_tools(mcp: FastMCP, client: AsyncRossumAPIClient) ->
         type: EmailTemplateType | None = None,
         name: str | None = None,
         first_n: int | None = None,
+        use_regex: bool = False,
     ) -> list[EmailTemplate]:
-        return await _list_email_templates(client, queue_id, type, name, first_n)
+        return await _list_email_templates(client, queue_id, type, name, first_n, use_regex)
 
     @mcp.tool(
         description="Create an email template; set automate=true for automatic sending. to/cc/bcc are recipient objects {type: annotator|constant|datapoint, value: ...}.",

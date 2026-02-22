@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING
 
 from rossum_api.domain_logic.resources import Resource
@@ -21,11 +22,17 @@ async def _get_workspace(client: AsyncRossumAPIClient, workspace_id: int) -> Wor
 
 
 async def _list_workspaces(
-    client: AsyncRossumAPIClient, organization_id: int | None = None, name: str | None = None
+    client: AsyncRossumAPIClient,
+    organization_id: int | None = None,
+    name: str | None = None,
+    use_regex: bool = False,
 ) -> list[Workspace]:
     logger.debug(f"Listing workspaces: organization_id={organization_id}, name={name}")
-    filters = build_filters(organization=organization_id, name=name)
-    return (await graceful_list(client, Resource.Workspace, "workspace", **filters)).items
+    filters = build_filters(organization=organization_id, name=None if use_regex else name)
+    items = (await graceful_list(client, Resource.Workspace, "workspace", **filters)).items
+    if use_regex and name is not None:
+        items = [w for w in items if re.search(name, w.name, re.IGNORECASE)]
+    return items
 
 
 async def _create_workspace(
@@ -56,12 +63,16 @@ def register_workspace_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None
         return await _get_workspace(client, workspace_id)
 
     @mcp.tool(
-        description="List all workspaces with optional filters.",
+        description="List all workspaces with optional filters. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
         tags={"workspaces"},
         annotations={"readOnlyHint": True},
     )
-    async def list_workspaces(organization_id: int | None = None, name: str | None = None) -> list[Workspace]:
-        return await _list_workspaces(client, organization_id, name)
+    async def list_workspaces(
+        organization_id: int | None = None,
+        name: str | None = None,
+        use_regex: bool = False,
+    ) -> list[Workspace]:
+        return await _list_workspaces(client, organization_id, name, use_regex)
 
     @mcp.tool(
         description="Create a new workspace.",

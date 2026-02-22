@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING
 
 from rossum_api.domain_logic.resources import Resource
@@ -20,10 +21,15 @@ async def _get_organization_group(client: AsyncRossumAPIClient, organization_gro
     return await client.retrieve_organization_group(organization_group_id)
 
 
-async def _list_organization_groups(client: AsyncRossumAPIClient, name: str | None = None) -> list[OrganizationGroup]:
+async def _list_organization_groups(
+    client: AsyncRossumAPIClient, name: str | None = None, use_regex: bool = False
+) -> list[OrganizationGroup]:
     logger.debug(f"Listing organization groups: name={name}")
-    filters = build_filters(name=name)
-    return (await graceful_list(client, Resource.OrganizationGroup, "organization_group", **filters)).items
+    filters = build_filters(name=None if use_regex else name)
+    items = (await graceful_list(client, Resource.OrganizationGroup, "organization_group", **filters)).items
+    if use_regex and name is not None:
+        items = [g for g in items if re.search(name, g.name, re.IGNORECASE)]
+    return items
 
 
 def _is_feature_enabled(features: dict, key: str) -> bool:
@@ -58,12 +64,12 @@ def register_organization_group_tools(mcp: FastMCP, client: AsyncRossumAPIClient
         return await _get_organization_group(client, organization_group_id)
 
     @mcp.tool(
-        description="List organization groups with optional name filter.",
+        description="List organization groups with optional name filter. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
         tags={"organization_groups"},
         annotations={"readOnlyHint": True},
     )
-    async def list_organization_groups(name: str | None = None) -> list[OrganizationGroup]:
-        return await _list_organization_groups(client, name)
+    async def list_organization_groups(name: str | None = None, use_regex: bool = False) -> list[OrganizationGroup]:
+        return await _list_organization_groups(client, name, use_regex)
 
     @mcp.tool(
         description="Check if lookup fields are enabled. Both 'datasets' and 'lookup_fields' features must be enabled in an organization group.",
