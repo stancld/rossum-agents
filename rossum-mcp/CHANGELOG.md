@@ -12,7 +12,8 @@ All notable changes to this project will be documented in this file.
 - Read-only mode enforcement rewritten: `mcp.disable(tags={"write"})` replaces per-tool `is_read_write_mode()` checks, making read-only enforcement more reliable [#201](https://github.com/stancld/rossum-agents/pull/201)
 - All 70 tools now declare `readOnlyHint` and `destructiveHint` MCP annotations; MCP clients can use these for UI hints and safety checks [#201](https://github.com/stancld/rossum-agents/pull/201)
 - `list_tool_categories` and `list_tools_by_category` now use dynamic tag-based discovery via FastMCP instead of the static `TOOL_CATALOG` dict [#201](https://github.com/stancld/rossum-agents/pull/201)
-- `list_queues` now returns `QueueListItem` summary objects instead of truncated `Queue` objects — `settings` is omitted entirely (`"<omitted>"`) rather than field-truncated
+- `list_queues` now returns `QueueListItem` summary objects instead of truncated `Queue` objects — `settings` is omitted entirely (`"<omitted>"`) rather than field-truncated [#206](https://github.com/stancld/rossum-agents/pull/206)
+- `list_queues`, `list_workspaces`, `list_schemas`, `list_email_templates`, and `list_organization_groups` now accept regex patterns in the `name` filter parameter [#206](https://github.com/stancld/rossum-agents/pull/206)
 
 ## [1.3.0] - 2026-02-18
 

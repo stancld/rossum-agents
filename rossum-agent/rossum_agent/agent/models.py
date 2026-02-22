@@ -171,7 +171,7 @@ class AgentConfig:
             raise ValueError(msg)
 
 
-MAX_TOOL_OUTPUT_LENGTH = 20000
+MAX_TOOL_OUTPUT_LENGTH = 30000
 
 
 def truncate_content(content: str, max_length: int = MAX_TOOL_OUTPUT_LENGTH) -> str:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, cast, get_args
 
@@ -39,7 +40,6 @@ class QueueListItem:
     schema: str | None = None
     inbox: str | None = None
     connector: str | None = None
-    hooks: list[str] | None = None
     automation_enabled: bool = False
     automation_level: str = "never"
     status: str | None = None
@@ -56,7 +56,6 @@ def _queue_to_list_item(queue: Queue) -> QueueListItem:
         schema=queue.schema,
         inbox=queue.inbox,
         connector=queue.connector,
-        hooks=queue.hooks or None,
         automation_enabled=queue.automation_enabled,
         automation_level=queue.automation_level,
         status=queue.status,
@@ -75,11 +74,15 @@ async def _list_queues(
     id: str | None = None,
     workspace_id: int | None = None,
     name: str | None = None,
+    use_regex: bool = False,
 ) -> list[QueueListItem]:
     logger.debug(f"Listing queues: id={id}, workspace_id={workspace_id}, name={name}")
-    filters = build_filters(id=id, workspace=workspace_id, name=name)
+    filters = build_filters(id=id, workspace=workspace_id, name=None if use_regex else name)
     result = await graceful_list(client, Resource.Queue, "queue", **filters)
-    return [_queue_to_list_item(queue) for queue in result.items]
+    items = [_queue_to_list_item(queue) for queue in result.items]
+    if use_regex and name is not None:
+        items = [item for item in items if re.search(name, item.name, re.IGNORECASE)]
+    return items
 
 
 async def _get_queue_schema(client: AsyncRossumAPIClient, queue_id: int) -> Schema:
@@ -328,14 +331,17 @@ def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await _get_queue(client, queue_id)
 
     @mcp.tool(
-        description="List queues with filters; id supports comma-separated values.",
+        description="List queues with filters; id supports comma-separated values. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
         tags={"queues"},
         annotations={"readOnlyHint": True},
     )
     async def list_queues(
-        id: str | None = None, workspace_id: int | None = None, name: str | None = None
+        id: str | None = None,
+        workspace_id: int | None = None,
+        name: str | None = None,
+        use_regex: bool = False,
     ) -> list[QueueListItem]:
-        return await _list_queues(client, id, workspace_id, name)
+        return await _list_queues(client, id, workspace_id, name, use_regex)
 
     @mcp.tool(
         description="Retrieve queue schema.",

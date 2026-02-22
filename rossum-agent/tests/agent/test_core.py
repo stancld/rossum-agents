@@ -1358,14 +1358,14 @@ class TestExecuteTool:
     async def test_truncates_long_content(self):
         """Test that long tool output is truncated."""
         agent = self._create_agent()
-        long_output = "A" * 30000
+        long_output = "A" * 50000
         agent.mcp_connection.call_tool.return_value = long_output
 
         tool_call = ToolCall(id="tc_1", name="verbose_tool", arguments={})
 
         result = await self._get_final_result(agent, tool_call)
 
-        assert len(result.content) < 30000
+        assert len(result.content) < 50000
         assert "truncated" in result.content.lower()
 
     @pytest.mark.asyncio

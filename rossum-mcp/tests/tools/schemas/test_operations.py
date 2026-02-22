@@ -237,6 +237,52 @@ class TestListSchemas:
 
         assert len(result) == 2
 
+    @pytest.mark.asyncio
+    async def test_list_schemas_with_regex_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that use_regex=True filters schemas client-side by regex pattern."""
+        register_schema_tools(mock_mcp, mock_client)
+
+        mock_schemas = [
+            create_mock_schema(id=1, name="Invoice Schema"),
+            create_mock_schema(id=2, name="Receipt Schema"),
+            create_mock_schema(id=3, name="invoice_v2"),
+        ]
+        filters_received = {}
+
+        async def mock_fetch_all(resource, **filters):
+            nonlocal filters_received
+            filters_received = filters
+            for schema in mock_schemas:
+                yield schema
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_schemas = mock_mcp._tools["list_schemas"]
+        result = await list_schemas(name="invoice", use_regex=True)
+
+        assert len(result) == 2
+        assert result[0].name == "Invoice Schema"
+        assert result[1].name == "invoice_v2"
+        assert "name" not in filters_received
+
+    @pytest.mark.asyncio
+    async def test_list_schemas_with_regex_no_match(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that use_regex=True returns empty list when no schemas match pattern."""
+        register_schema_tools(mock_mcp, mock_client)
+
+        mock_schemas = [create_mock_schema(id=1, name="Receipt Schema")]
+
+        async def mock_fetch_all(resource, **filters):
+            for schema in mock_schemas:
+                yield schema
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_schemas = mock_mcp._tools["list_schemas"]
+        result = await list_schemas(name="^invoice$", use_regex=True)
+
+        assert len(result) == 0
+
 
 @pytest.mark.unit
 class TestUpdateSchema:

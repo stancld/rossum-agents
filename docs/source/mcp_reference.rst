@@ -797,7 +797,7 @@ list_organization_groups
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 **MCP Tool:**
-  ``list_organization_groups(name: str | None)``
+  ``list_organization_groups(name: str | None, use_regex: bool = False)``
 
 **Rossum SDK Method:**
   ``AsyncRossumAPIClient.list_organization_groups(**filters)``

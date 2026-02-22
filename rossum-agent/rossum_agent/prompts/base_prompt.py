@@ -52,6 +52,7 @@ CRITICAL_REQUIREMENTS = """
 - IDs are integers: `queue_id=12345` not `"12345"`
 - `score_threshold` cannot be null (default `0.8`) - API rejects null values
 - Annotation updates use numeric `id`, not `schema_id` string
+- List tools `name` filter is exact API-side match by default; pass `use_regex=True` for regex pattern matching (client-side)
 
 **Engine training**: Inbox queues cannot train classification engines - they contain unsplit documents without `document_type`. Only typed documents in training_queues contribute."""
 

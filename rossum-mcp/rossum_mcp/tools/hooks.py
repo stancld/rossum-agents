@@ -45,6 +45,7 @@ async def _list_hooks(
     active: bool | None = None,
     first_n: int | None = None,
 ) -> list[Hook]:
+    logger.info(f"Listing hooks: queue_id={queue_id}, active={active}, first_n={first_n}")
     filters = build_filters(queue=queue_id, active=active)
     result = await graceful_list(client, Resource.Hook, "hook", max_items=first_n, **filters)
     return result.items
@@ -140,6 +141,9 @@ async def _list_hook_logs(
     search: str | None = None,
     page_size: int | None = None,
 ) -> list[HookRunData]:
+    logger.info(
+        f"Listing hook logs: hook_id={hook_id}, queue_id={queue_id}, annotation_id={annotation_id}, email_id={email_id}, log_level={log_level}, status={status}, status_code={status_code}, request_id={request_id}, timestamp_before={timestamp_before}, timestamp_after={timestamp_after}, start_before={start_before}, start_after={start_after}, end_before={end_before}, end_after={end_after}, search={search}, page_size={page_size}"
+    )
     filters = build_filters(
         hook=hook_id,
         queue=queue_id,
@@ -183,6 +187,7 @@ def _truncate_hook_template_for_list(template: HookTemplate) -> HookTemplate:
 
 
 async def _list_hook_templates(client: AsyncRossumAPIClient) -> list[HookTemplate]:
+    logger.info("Listing hook templates")
     result = await graceful_list(client, Resource.HookTemplate, "hook_template")
     return [_truncate_hook_template_for_list(t) for t in result.items]
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import re
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -105,12 +106,15 @@ async def get_schema(client: AsyncRossumAPIClient, schema_id: int) -> Schema | d
 
 
 async def list_schemas(
-    client: AsyncRossumAPIClient, name: str | None = None, queue_id: int | None = None
+    client: AsyncRossumAPIClient, name: str | None = None, queue_id: int | None = None, use_regex: bool = False
 ) -> list[SchemaListItem]:
     logger.debug(f"Listing schemas: name={name}, queue_id={queue_id}")
-    filters = build_filters(name=name, queue=queue_id)
+    filters = build_filters(name=None if use_regex else name, queue=queue_id)
     result = await graceful_list(client, Resource.Schema, "schema", **filters)
-    return [_truncate_schema_for_list(schema) for schema in result.items]
+    items = [_truncate_schema_for_list(schema) for schema in result.items]
+    if use_regex and name is not None:
+        items = [s for s in items if s.name and re.search(name, s.name, re.IGNORECASE)]
+    return items
 
 
 async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_data: dict) -> Schema | dict:
