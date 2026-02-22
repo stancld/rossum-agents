@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - `create_queue_from_template` now fetches the schema and engine created as side effects and embeds them in the return value as `_tracked_resources` for rossum-agent's change tracking and point-in-time restore [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Upgraded FastMCP dependency to `>=3.0.0` — changes transitive dependencies and may affect MCP client compatibility [#201](https://github.com/stancld/rossum-agents/pull/201)
+- Read-only mode enforcement rewritten: `mcp.disable(tags={"write"})` replaces per-tool `is_read_write_mode()` checks, making read-only enforcement more reliable [#201](https://github.com/stancld/rossum-agents/pull/201)
+- All 70 tools now declare `readOnlyHint` and `destructiveHint` MCP annotations; MCP clients can use these for UI hints and safety checks [#201](https://github.com/stancld/rossum-agents/pull/201)
+- `list_tool_categories` and `list_tools_by_category` now use dynamic tag-based discovery via FastMCP instead of the static `TOOL_CATALOG` dict [#201](https://github.com/stancld/rossum-agents/pull/201)
 
 ## [1.3.0] - 2026-02-18
 
