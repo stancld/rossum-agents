@@ -148,6 +148,11 @@ export interface Config {
   persona: Persona;
 }
 
+export interface CommandInfo {
+  name: string;
+  description: string;
+}
+
 export type InteractionMode = "input" | "browse";
 
 export type ChatItem =

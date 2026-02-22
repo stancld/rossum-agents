@@ -11,6 +11,8 @@ from rossum_agent.tools import execute_tool
 from rossum_agent.tools.core import AgentContext, get_context, set_context
 from rossum_agent.tools.deploy import (
     DEPLOY_TOOLS,
+    _count_line,
+    _type_counts,
     create_workspace,
     deploy_compare_workspaces,
     deploy_copy_org,
@@ -19,6 +21,10 @@ from rossum_agent.tools.deploy import (
     deploy_pull,
     deploy_push,
     deploy_to_org,
+    format_copy_summary,
+    format_deploy_summary,
+    format_pull_summary,
+    format_push_summary,
     get_deploy_tool_names,
     get_deploy_tools,
 )
@@ -35,6 +41,138 @@ from rossum_deploy.models import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+class TestTypeCounts:
+    def test_empty_list(self):
+        assert _type_counts([]) == ""
+
+    def test_single_type(self):
+        items = [(ObjectType.QUEUE, 1, "Q1"), (ObjectType.QUEUE, 2, "Q2")]
+        assert _type_counts(items) == "2 queue"
+
+    def test_multiple_types_sorted(self):
+        items = [
+            (ObjectType.SCHEMA, 1, "S1"),
+            (ObjectType.QUEUE, 2, "Q1"),
+            (ObjectType.HOOK, 3, "H1"),
+            (ObjectType.QUEUE, 4, "Q2"),
+        ]
+        assert _type_counts(items) == "1 hook, 2 queue, 1 schema"
+
+
+class TestCountLine:
+    def test_empty(self):
+        assert _count_line("Updated", []) == "- Updated: 0"
+
+    def test_with_items(self):
+        items = [(ObjectType.QUEUE, 1, "Q1"), (ObjectType.HOOK, 2, "H1")]
+        assert _count_line("Pushed", items) == "- Pushed: 2 (1 hook, 1 queue)"
+
+
+class TestFormatPushSummary:
+    def test_basic(self):
+        result = PushResult(
+            pushed=[(ObjectType.QUEUE, 1, "Queue 1")],
+            skipped=[(ObjectType.HOOK, 2, "Hook 1", "conflict")],
+        )
+        summary = format_push_summary(result)
+        assert "Pushed: 1 (1 queue)" in summary
+        assert "Skipped: 1 (1 hook)" in summary
+        assert "Queue 1" in summary
+
+    def test_type_grouping(self):
+        result = PushResult(
+            pushed=[
+                (ObjectType.QUEUE, 1, "Queue 1"),
+                (ObjectType.QUEUE, 2, "Queue 2"),
+                (ObjectType.SCHEMA, 3, "Schema 1"),
+            ]
+        )
+        summary = format_push_summary(result)
+        assert "Pushed: 3 (2 queue, 1 schema)" in summary
+        assert "**queue** (2)" in summary
+        assert "**schema** (1)" in summary
+
+    def test_with_failed(self):
+        result = PushResult(failed=[(ObjectType.QUEUE, 1, "Queue 1", "Connection error")])
+        summary = format_push_summary(result)
+        assert "Failed: 1 (1 queue)" in summary
+        assert "Queue 1" in summary
+        assert "Connection error" in summary
+
+
+class TestFormatPullSummary:
+    def test_basic(self):
+        result = PullResult(pulled=[(ObjectType.WORKSPACE, 1, "WS 1"), (ObjectType.QUEUE, 2, "Queue 1")])
+        summary = format_pull_summary(result)
+        assert "Pulled: 2 (1 queue, 1 workspace)" in summary
+        assert "WS 1" in summary
+
+    def test_with_org_info(self):
+        result = PullResult(
+            organization_name="Test Org",
+            workspace_name="Test Workspace",
+            pulled=[(ObjectType.QUEUE, 1, "Q1")],
+        )
+        summary = format_pull_summary(result)
+        assert "Organization: Test Org" in summary
+        assert "Workspace: Test Workspace" in summary
+        assert "Pulled: 1 (1 queue)" in summary
+
+
+class TestFormatCopySummary:
+    def test_basic(self):
+        result = CopyResult(
+            created=[
+                (ObjectType.WORKSPACE, 1, 10, "WS 1"),
+                (ObjectType.QUEUE, 2, 20, "Queue 1"),
+            ],
+            skipped=[(ObjectType.HOOK, 3, "Hook 1", "exists")],
+            failed=[(ObjectType.SCHEMA, 4, "Schema 1", "API error")],
+        )
+        summary = format_copy_summary(result)
+        assert "Created: 2 (1 queue, 1 workspace)" in summary
+        assert "Skipped: 1 (1 hook)" in summary
+        assert "Failed: 1 (1 schema)" in summary
+        assert "source: 1 → target: 10" in summary
+
+
+class TestFormatDeploySummary:
+    def test_basic(self):
+        result = DeployResult(
+            created=[(ObjectType.QUEUE, 100, "New Queue")],
+            updated=[(ObjectType.HOOK, 200, "Updated Hook")],
+            skipped=[(ObjectType.SCHEMA, 300, "Schema 1", "no target mapping")],
+        )
+        summary = format_deploy_summary(result)
+        assert "Created: 1 (1 queue)" in summary
+        assert "Updated: 1 (1 hook)" in summary
+        assert "Skipped: 1 (1 schema)" in summary
+        assert "New Queue" in summary
+        assert "Updated Hook" in summary
+
+    def test_groups_by_type(self):
+        result = DeployResult(
+            updated=[
+                (ObjectType.QUEUE, 100, "Queue 1"),
+                (ObjectType.QUEUE, 101, "Queue 2"),
+                (ObjectType.SCHEMA, 200, "Schema 1"),
+                (ObjectType.HOOK, 300, "Hook 1"),
+            ]
+        )
+        summary = format_deploy_summary(result)
+        assert "Updated: 4 (1 hook, 2 queue, 1 schema)" in summary
+        assert "**hook** (1)" in summary
+        assert "**queue** (2)" in summary
+        assert "**schema** (1)" in summary
+
+    def test_with_failed(self):
+        result = DeployResult(failed=[(ObjectType.HOOK, 100, "Hook 1", "API error")])
+        summary = format_deploy_summary(result)
+        assert "Failed: 1 (1 hook)" in summary
+        assert "Hook 1" in summary
+        assert "API error" in summary
 
 
 class TestDeployToolsRegistration:

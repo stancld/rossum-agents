@@ -145,6 +145,22 @@ Using with AI Agents
 The Rossum Agent is built with Anthropic Claude for intelligent document processing.
 The agent includes file system tools, plotting capabilities, and seamless Rossum integration.
 
+Slash Commands
+^^^^^^^^^^^^^^
+
+The REST API supports slash commands — messages starting with ``/`` that are intercepted
+before reaching the agent. They return instant responses without consuming tokens.
+
+.. code-block:: text
+
+   /list-commands    List all available slash commands
+   /list-commits     List configuration commits made in this chat
+   /list-skills      List available agent skills
+   /list-mcp-tools   List MCP tools by category
+   /list-agent-tools List built-in agent tools
+
+Available commands can be discovered via ``GET /api/v1/commands``.
+
 Available Tools
 ---------------
 

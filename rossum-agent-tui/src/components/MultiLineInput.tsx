@@ -1,21 +1,56 @@
-import { useState, useEffect, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useImperativeHandle,
+  useRef,
+  forwardRef,
+} from "react";
 import { Box, Text, useInput, useStdin } from "ink";
 
 interface MultiLineInputProps {
   onSubmit: (value: string) => void;
   isActive: boolean;
   placeholder?: string;
+  onChange?: (text: string) => void;
 }
 
-export function MultiLineInput({
-  onSubmit,
-  isActive,
-  placeholder,
-}: MultiLineInputProps) {
+export interface MultiLineInputHandle {
+  setText: (text: string) => void;
+}
+
+export const MultiLineInput = forwardRef<
+  MultiLineInputHandle,
+  MultiLineInputProps
+>(function MultiLineInput({ onSubmit, isActive, placeholder, onChange }, ref) {
   const [lines, setLines] = useState<string[]>([""]);
   const [cursorRow, setCursorRow] = useState(0);
   const [cursorCol, setCursorCol] = useState(0);
-  const { stdin, setRawMode } = useStdin();
+  const { stdin } = useStdin();
+
+  // Notify parent when text changes via useEffect (React 18 batches setState
+  // updaters, so capturing values from inside setLines is unreliable).
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const text = lines.join("\n");
+  useEffect(() => {
+    onChangeRef.current?.(text);
+  }, [text]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      setText: (newText: string) => {
+        const newLines = newText.split("\n");
+        setLines(newLines);
+        const lastRow = newLines.length - 1;
+        setCursorRow(lastRow);
+        setCursorCol(newLines[lastRow]!.length);
+      },
+    }),
+    [],
+  );
 
   const reset = useCallback(() => {
     setLines([""]);
@@ -96,9 +131,9 @@ export function MultiLineInput({
   }, [isActive, stdin, handleMultiLinePaste, handleSingleLinePaste]);
 
   const handleSubmit = useCallback(() => {
-    const text = lines.join("\n").trim();
-    if (!text) return;
-    onSubmit(text);
+    const trimmed = lines.join("\n").trim();
+    if (!trimmed) return;
+    onSubmit(trimmed);
     reset();
   }, [lines, onSubmit, reset]);
 
@@ -259,4 +294,4 @@ export function MultiLineInput({
       )}
     </Box>
   );
-}
+});

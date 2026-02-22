@@ -11,6 +11,7 @@ import { InputArea } from "./components/InputArea.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { TaskList } from "./components/TaskList.js";
 import { useChat } from "./hooks/useChat.js";
+import { useCommands } from "./hooks/useCommands.js";
 import { useTerminalSize } from "./hooks/useTerminalSize.js";
 import { buildChatItems } from "./utils/buildChatItems.js";
 import type { Config, ExpandState, InteractionMode } from "./types.js";
@@ -25,12 +26,14 @@ function isExpandable(kind: string): boolean {
 
 export function App({ config }: AppProps) {
   const { state, sendMessage, resetChat } = useChat(config);
+  const { commands } = useCommands(config);
   const { rows } = useTerminalSize();
 
   const [mode, setMode] = useState<InteractionMode>("input");
   const [expandState, setExpandState] = useState<ExpandState>({});
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [suggestionRows, setSuggestionRows] = useState(0);
 
   const items = useMemo(() => buildChatItems(state), [state]);
   const prevItemsLenRef = useRef(items.length);
@@ -163,9 +166,10 @@ export function App({ config }: AppProps) {
     }
   });
 
-  // Layout: ChatView (flex) + InputArea (1 row) + TaskList (N rows) + StatusBar (3 rows with border)
+  // Layout: ChatView (flex) + InputArea (1+ rows) + TaskList (N rows) + StatusBar (3 rows with border)
   const taskListHeight = state.tasks.length;
-  const fixedHeight = 3 + 1 + taskListHeight; // statusBar + input + taskList
+  const inputHeight = 1 + suggestionRows;
+  const fixedHeight = 3 + inputHeight + taskListHeight; // statusBar + input + taskList
   const chatAreaHeight = Math.max(rows - fixedHeight, 3);
 
   return (
@@ -181,6 +185,8 @@ export function App({ config }: AppProps) {
         onSubmit={handleSendMessage}
         connectionStatus={state.connectionStatus}
         mode={mode}
+        commands={commands}
+        onSuggestionRowsChange={setSuggestionRows}
       />
       {state.tasks.length > 0 && <TaskList tasks={state.tasks} />}
       <StatusBar

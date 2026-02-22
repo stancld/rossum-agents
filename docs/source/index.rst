@@ -182,7 +182,7 @@ The ``rossum_agent`` package provides additional capabilities:
 * Skills system for domain-specific workflows (deployment, TxScript, formula fields, reasoning fields)
 * File output for saving reports, documentation, and analysis results
 * Integration with AI agent frameworks (Anthropic Claude via AWS Bedrock)
-* REST API interface
+* REST API interface with slash commands for quick introspection (``/list-skills``, ``/list-mcp-tools``, etc.)
 * See the :doc:`examples` section for complete workflows
 
 **Deployment Tools**
