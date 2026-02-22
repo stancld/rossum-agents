@@ -34,6 +34,7 @@ from rossum_agent.agent.models import (
     ErrorStep,
     FinalAnswerStep,
     StepType,
+    TextDeltaStep,
     ThinkingStep,
     ToolResultStep,
     ToolStartStep,
@@ -989,9 +990,9 @@ class TestStreamModelResponse:
                 steps.append(step)
 
         # Text after elapsed thinking time should be streamed as intermediate step
-        streaming_intermediate = [s for s in steps if s.is_streaming and s.text_delta]
+        streaming_intermediate = [s for s in steps if isinstance(s, TextDeltaStep) and s.is_streaming]
         assert len(streaming_intermediate) >= 1
-        assert any("Here is the answer." in (s.text_delta or "") for s in streaming_intermediate)
+        assert any("Here is the answer." in s.text_delta for s in streaming_intermediate)
 
 
 class TestAgentRun:
