@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
     from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
     from rossum_agent.rossum_mcp_integration import MCPConnection
+    from rossum_agent.storage.artifact_store import ArtifactStore
     from rossum_agent.tools.task_tracker import TaskTracker
 
 
@@ -100,6 +101,7 @@ class AgentContext:
     output_dir: Path | None = None
     commit_store: CommitStore | None = None
     snapshot_store: SnapshotStore | None = None
+    artifact_store: ArtifactStore | None = None
     task_tracker: TaskTracker | None = None
     dynamic_tools: DynamicToolsState = field(default_factory=DynamicToolsState)
     # Callbacks
@@ -174,3 +176,18 @@ def set_context(ctx: AgentContext) -> contextvars.Token[AgentContext | None]:
 def reset_context(token: contextvars.Token[AgentContext | None]) -> None:
     """Reset the AgentContext to its previous value using the token from set_context."""
     _agent_context.reset(token)
+
+
+def set_artifact_store(store: ArtifactStore | None) -> None:
+    """Set the artifact store on the current AgentContext."""
+    get_context().artifact_store = store
+
+
+def get_artifact_store() -> ArtifactStore | None:
+    """Get the artifact store from the current AgentContext."""
+    return get_context().artifact_store
+
+
+def get_rossum_environment() -> str | None:
+    """Get the Rossum environment from the current AgentContext."""
+    return get_context().rossum_environment

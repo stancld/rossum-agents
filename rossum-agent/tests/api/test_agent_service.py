@@ -1634,6 +1634,7 @@ class TestAfterLoopHook:
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
             patch.object(AgentService, "_try_create_config_commit", return_value=fake_commit),
+            patch.object(AgentService, "_inject_active_artifacts", side_effect=lambda sp, *a: sp),
             patch.object(
                 AgentService,
                 "_setup_change_tracking",
@@ -1687,6 +1688,7 @@ class TestAfterLoopHook:
             patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
             patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
             patch.object(AgentService, "_try_create_config_commit", return_value=None),
+            patch.object(AgentService, "_inject_active_artifacts", side_effect=lambda sp, *a: sp),
             patch.object(
                 AgentService,
                 "_setup_change_tracking",

@@ -39,11 +39,14 @@ from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.redis_storage import RedisStorage
 from rossum_agent.rossum_mcp_integration import MCPConnection, connect_mcp_server
+from rossum_agent.storage.artifact_store import ArtifactStore
+from rossum_agent.storage.handles import PlanHandle, SoWHandle
 from rossum_agent.tools.core import (
     AgentContext,
     SubAgentProgress,
     SubAgentText,
     reset_context,
+    set_artifact_store,
     set_context,
 )
 from rossum_agent.tools.dynamic_tools import get_write_tools_async
@@ -242,6 +245,30 @@ class AgentService:
             mcp_connection.chat_id = chat_id
         return commit_store, snapshot_store, environment
 
+    @staticmethod
+    def _inject_active_artifacts(system_prompt: str, artifact_store: ArtifactStore | None, environment: str) -> str:
+        """Append active SoW/plan summaries to the system prompt."""
+        if not artifact_store or not environment:
+            return system_prompt
+        active_parts: list[str] = []
+        latest_sow = artifact_store.load_latest(SoWHandle, environment)
+        if latest_sow is not None:
+            _, sow = latest_sow
+            if sow.status in ("approved", "draft"):
+                active_parts.append(sow.render_summary())
+        latest_plan = artifact_store.load_latest(PlanHandle, environment)
+        if latest_plan is not None:
+            _, plan = latest_plan
+            if plan.status in ("approved", "executing", "draft"):
+                active_parts.append(plan.render_summary())
+        all_sows = artifact_store.list_artifacts(SoWHandle, environment, limit=10)
+        calibration_lines = [line for _, sow in all_sows if (line := sow.render_calibration()) is not None]
+        if calibration_lines:
+            active_parts.append("[Estimation Calibration — recent projects]\n" + "\n".join(calibration_lines[:5]))
+        if active_parts:
+            return system_prompt + "\n\n---\n" + "\n".join(active_parts)
+        return system_prompt
+
     def _get_context(self) -> _RequestContext:
         """Get the current request context, creating if needed."""
         try:
@@ -423,6 +450,9 @@ class AgentService:
                         mcp_connection, chat_id, rossum_api_base_url
                     )
 
+                    artifact_store = ArtifactStore(commit_store.client) if commit_store is not None else None
+                    system_prompt = self._inject_active_artifacts(system_prompt, artifact_store, environment)
+
                     agent = await create_agent(
                         mcp_connection=mcp_connection, system_prompt=system_prompt, config=AgentConfig()
                     )
@@ -433,6 +463,8 @@ class AgentService:
                     agent_ctx.commit_store = commit_store
                     agent_ctx.snapshot_store = snapshot_store
                     agent_ctx.rossum_environment = environment
+
+                    set_artifact_store(artifact_store)
 
                     self._restore_conversation_history(agent, conversation_history)
 

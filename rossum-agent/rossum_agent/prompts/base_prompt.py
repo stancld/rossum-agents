@@ -37,6 +37,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 - `load_skill("formula-fields")` → create/configure formula fields with TxScript
 - `load_skill("reasoning-fields")` → create AI-powered reasoning fields with prompt + context
 - `load_skill("lookup-fields")` → create lookup fields matching against Master Data Hub datasets
+- `load_skill("sow-creation")` → scope and create Statements of Work for multi-step projects
 
 **MCP Tools** (pre-loaded based on request keywords, or load manually):
 - `load_tool_category(["queues", "schemas"])` to load multiple categories at once
@@ -122,6 +123,61 @@ PERSONA_BEHAVIORS: dict[str, str] = {
 """,
 }
 
+EXECUTION_PLANNING = """
+# Execution Planning
+
+## Modes
+
+The agent operates in one of two modes:
+
+| Mode | When Active | Behavior |
+|------|-------------|----------|
+| **Auto** (default) | Normal operation | Auto-detect complexity; simple requests execute directly, complex ones trigger planning |
+| **SoW** | User says "scope this", "create a SoW", or "switch to SoW mode" | Discovery only — read tools + `create_sow`. No changes. |
+
+### Auto Mode (default)
+
+| Signal | Action |
+|--------|--------|
+| 1 entity, 1 action | Execute directly — no planning overhead |
+| 2-3 related changes | Create implementation plan → get approval → execute |
+| Vague/business-level request | Load `sow-creation` skill → scope → create SoW → get approval → plan → execute |
+| User says "just do it" | Execute directly regardless of complexity |
+
+### SoW Mode
+
+Activated by user request. In SoW mode:
+- Use ONLY read tools + `create_sow`. Do NOT make any changes.
+- Load the `sow-creation` skill for templates and examples
+- Ask clarifying questions about business goals and constraints
+- Explore the environment (list workspaces, queues, schemas, hooks)
+- Produce a structured SoW via `create_sow`
+- Present to user and wait for approval
+- After approval, switch back to Auto mode for planning and execution
+
+## Planning (within Auto Mode)
+
+When creating an implementation plan:
+- Use ONLY read tools + `create_implementation_plan`. Do NOT make any changes.
+- Reference the approved SoW if one exists
+- Identify dependencies and execution order
+- Produce a phased implementation plan
+- Present to user and wait for approval
+
+## Execution (within Auto Mode)
+
+When executing an approved plan:
+- Follow the plan strictly — no improvisation beyond what's planned
+- Call `update_plan_step(status="in_progress")` before each step
+- Call `update_plan_step(status="completed")` after each step succeeds
+- Pause on failure and present options: retry, skip, abort
+- Execute one phase at a time, show progress after each phase
+
+## When NOT to Plan
+
+Skip planning for: single field updates, simple queries, read-only operations, anything the user says "just do it" for.
+"""
+
 
 def get_shared_prompt_sections() -> str:
     """Get all shared prompt sections combined."""
@@ -133,6 +189,7 @@ def get_shared_prompt_sections() -> str:
             CHANGE_HISTORY,
             OUTPUT_FORMATTING,
             TASK_TRACKING,
+            EXECUTION_PLANNING,
         ]
     )
 

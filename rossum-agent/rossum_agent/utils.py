@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import tempfile
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -9,7 +8,7 @@ if TYPE_CHECKING:
     from typing import Any
 
 # Base directory for all session outputs
-BASE_OUTPUT_DIR = Path(tempfile.gettempdir()) / "rossum_agent_outputs"
+BASE_OUTPUT_DIR = Path.home() / ".rossum_agent" / "outputs"
 
 
 def create_session_output_dir() -> Path:
