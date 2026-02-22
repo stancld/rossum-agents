@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Fixed schema revert failing under concurrent modifications — now retries with backoff on HTTP 412 (up to 5 attempts) using fetch-then-patch to register current state before each write [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Fixed Bedrock 400 errors silently hanging the agent — producer exceptions are now propagated through the event queue so the client receives a proper error response
 
 ## [1.2.1] - 2026-02-18
 

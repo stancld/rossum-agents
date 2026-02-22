@@ -535,7 +535,7 @@ class RossumAgent:
     async def _process_stream_events(
         self,
         step_num: int,
-        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | None],
+        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | Exception | None],
         state: _StreamState,
     ) -> AsyncIterator[AgentStep]:
         """Process stream events and yield AgentSteps.
@@ -561,6 +561,9 @@ class RossumAgent:
                     yield step
                 continue
 
+            if isinstance(item, Exception):
+                raise item
+
             if item is None:
                 # Yield #2: Stream ended - flush any remaining buffered text
                 if step := state.flush_buffer(step_num, state.get_step_type()):
@@ -581,13 +584,12 @@ class RossumAgent:
 
             if delta.kind == "thinking":
                 state.thinking_text += delta.content
+                state.first_text_token_time = state.first_text_token_time or time.monotonic()
                 # Yield #3: Streaming thinking tokens (extended thinking / chain-of-thought)
                 yield ThinkingStep(
                     step_number=step_num,
                     thinking=state.thinking_text,
                 )
-                if state.first_text_token_time is None:
-                    state.first_text_token_time = time.monotonic()
                 continue
 
             # Yield #4: Text delta - immediate flush after initial buffer period or when tool calls detected
@@ -609,21 +611,25 @@ class RossumAgent:
         model_id = get_model_id()
         state = _StreamState()
 
-        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | None] = queue.Queue()
+        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | Exception | None] = queue.Queue()
 
         def producer() -> None:
-            for item in self._sync_stream_events(model_id, messages, tools):
-                event_queue.put(item)
-            event_queue.put(None)
+            try:
+                for item in self._sync_stream_events(model_id, messages, tools):
+                    event_queue.put(item)
+                event_queue.put(None)
+            except Exception as e:
+                event_queue.put(e)
 
         ctx = copy_context()
         producer_task = asyncio.get_event_loop().run_in_executor(None, partial(ctx.run, producer))
 
-        # Yield #5: Forward all streaming steps from _process_stream_events (yields #1-4)
-        async for step in self._process_stream_events(step_num, event_queue, state):
-            yield step
-
-        await producer_task
+        try:
+            # Yield #5: Forward all streaming steps from _process_stream_events (yields #1-4)
+            async for step in self._process_stream_events(step_num, event_queue, state):
+                yield step
+        finally:
+            await producer_task
 
         if state.final_message is None:
             raise RuntimeError("Stream ended without final message")

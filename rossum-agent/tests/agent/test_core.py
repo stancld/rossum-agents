@@ -920,6 +920,79 @@ class TestStreamModelResponse:
         assert len(thinking_steps) >= 1
         assert "Let me analyze this..." in thinking_steps[-1].thinking
 
+    @pytest.mark.asyncio
+    async def test_producer_exception_propagates(self):
+        """Exceptions raised during streaming propagate to the caller.
+
+        The producer thread catches exceptions and puts them on the queue so
+        _process_stream_events re-raises them instead of silently swallowing them.
+        """
+        agent = self._create_agent()
+        agent.memory.add_task("Test")
+
+        error = ValueError("Stream failed mid-response")
+        mock_stream = MagicMock()
+        mock_stream.__enter__ = MagicMock(return_value=mock_stream)
+        mock_stream.__exit__ = MagicMock(return_value=False)
+        mock_stream.__iter__ = MagicMock(side_effect=error)
+
+        with patch.object(agent.client.messages, "stream", return_value=mock_stream):
+            with pytest.raises(ValueError, match="Stream failed mid-response"):
+                async for _ in agent._stream_model_response(1):
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_thinking_delta_starts_buffer_timer(self):
+        """Thinking deltas start the initial buffer timer before yielding.
+
+        When thinking tokens arrive before text, first_text_token_time is set
+        at the thinking token, so subsequent text tokens measure elapsed time
+        from the thinking arrival. Text arriving after INITIAL_TEXT_BUFFER_DELAY
+        since the first thinking token is streamed immediately.
+        """
+        from anthropic.types import ThinkingBlock, ThinkingDelta
+
+        agent = self._create_agent()
+        agent.memory.add_task("Test")
+
+        thinking_block = ThinkingBlock(type="thinking", thinking="", signature="sig")
+        thinking_start = RawContentBlockStartEvent(type="content_block_start", index=0, content_block=thinking_block)
+        thinking_delta = RawContentBlockDeltaEvent(
+            type="content_block_delta",
+            index=0,
+            delta=ThinkingDelta(type="thinking_delta", thinking="Analyzing..."),
+        )
+        thinking_stop = ContentBlockStopEvent(type="content_block_stop", index=0)
+        text_delta = RawContentBlockDeltaEvent(
+            type="content_block_delta",
+            index=1,
+            delta=TextDelta(type="text_delta", text="Here is the answer."),
+        )
+
+        final_message = self._create_final_message()
+        mock_stream = self._create_mock_stream(
+            [thinking_start, thinking_delta, thinking_stop, text_delta], final_message
+        )
+
+        # Simulate: thinking token arrives at T=0, text token arrives at T=2.0
+        # (past INITIAL_TEXT_BUFFER_DELAY=1.5), so text should be flushed immediately.
+        t0 = 1000.0
+        time_calls = iter([t0, t0 + 2.0, t0 + 2.0])
+
+        with (
+            patch.object(agent.client.messages, "stream", return_value=mock_stream),
+            patch("rossum_agent.agent.core.time") as mock_time,
+        ):
+            mock_time.monotonic.side_effect = time_calls
+            steps = []
+            async for step in agent._stream_model_response(1):
+                steps.append(step)
+
+        # Text after elapsed thinking time should be streamed as intermediate step
+        streaming_intermediate = [s for s in steps if s.is_streaming and s.text_delta]
+        assert len(streaming_intermediate) >= 1
+        assert any("Here is the answer." in (s.text_delta or "") for s in streaming_intermediate)
+
 
 class TestAgentRun:
     """Test RossumAgent.run() method with various scenarios."""
