@@ -29,7 +29,7 @@ from rossum_agent.agent import (
     ToolResult,
     truncate_content,
 )
-from rossum_agent.agent.core import _parse_json_encoded_strings, _StreamState
+from rossum_agent.agent.core import _parse_json_encoded_strings, _StreamState, create_agent
 from rossum_agent.agent.models import (
     ErrorStep,
     FinalAnswerStep,
@@ -39,6 +39,7 @@ from rossum_agent.agent.models import (
     ToolResultStep,
     ToolStartStep,
 )
+from rossum_agent.tools.core import SubAgentTokenUsage
 from rossum_agent.utils import add_message_cache_breakpoint
 
 
@@ -1881,7 +1882,6 @@ class TestCreateAgentFactory:
     @pytest.mark.asyncio
     async def test_creates_agent_with_default_config(self):
         """Test that create_agent creates an agent with proper setup."""
-        from rossum_agent.agent.core import create_agent
 
         mock_mcp = AsyncMock()
 
@@ -1900,7 +1900,6 @@ class TestCreateAgentFactory:
     @pytest.mark.asyncio
     async def test_creates_agent_with_custom_config(self):
         """Test that create_agent respects custom config."""
-        from rossum_agent.agent.core import create_agent
 
         mock_mcp = AsyncMock()
         config = AgentConfig(max_steps=10)
@@ -2045,18 +2044,12 @@ class TestStreamState:
 
     def test_flush_buffer_returns_none_when_empty(self):
         """Test that flush_buffer returns None when buffer is empty."""
-        from rossum_agent.agent.core import _StreamState
-        from rossum_agent.agent.models import StepType
-
         state = _StreamState()
         result = state.flush_buffer(step_num=1, step_type=StepType.FINAL_ANSWER)
         assert result is None
 
     def test_flush_buffer_returns_step_with_content(self):
         """Test that flush_buffer returns TextDeltaStep with accumulated content."""
-        from rossum_agent.agent.core import _StreamState
-        from rossum_agent.agent.models import StepType
-
         state = _StreamState()
         state.text_buffer = ["Hello", " ", "world"]
         state.thinking_text = "I'm thinking"
@@ -2073,9 +2066,6 @@ class TestStreamState:
 
     def test_flush_buffer_clears_buffer(self):
         """Test that flush_buffer clears the text_buffer."""
-        from rossum_agent.agent.core import _StreamState
-        from rossum_agent.agent.models import StepType
-
         state = _StreamState()
         state.text_buffer = ["some", "text"]
 
@@ -2085,9 +2075,6 @@ class TestStreamState:
 
     def test_flush_buffer_accumulates_response_text(self):
         """Test that flush_buffer accumulates into response_text."""
-        from rossum_agent.agent.core import _StreamState
-        from rossum_agent.agent.models import StepType
-
         state = _StreamState()
         state.response_text = "Previous "
         state.text_buffer = ["new text"]
@@ -2099,9 +2086,6 @@ class TestStreamState:
 
     def test_flush_buffer_with_empty_thinking(self):
         """Test that thinking is None when thinking_text is empty."""
-        from rossum_agent.agent.core import _StreamState
-        from rossum_agent.agent.models import StepType
-
         state = _StreamState()
         state.text_buffer = ["text"]
         state.thinking_text = ""
@@ -2112,8 +2096,6 @@ class TestStreamState:
 
     def test_stream_state_initial_values(self):
         """Test _StreamState has correct initial values."""
-        from rossum_agent.agent.core import _StreamState
-
         state = _StreamState()
         assert state.thinking_text == ""
         assert state.response_text == ""
@@ -2542,7 +2524,6 @@ class TestRossumAgentTokenTracking:
 
     def test_accumulate_sub_agent_tokens(self, mock_agent):
         """Test tokens.accumulate_sub accumulates properly."""
-        from rossum_agent.tools.core import SubAgentTokenUsage
 
         usage1 = SubAgentTokenUsage(tool_name="search_knowledge_base", input_tokens=100, output_tokens=50, iteration=1)
         mock_agent.tokens.accumulate_sub(usage1)
@@ -2566,7 +2547,6 @@ class TestRossumAgentTokenTracking:
 
     def test_accumulate_sub_agent_tokens_multiple_tools(self, mock_agent):
         """Test accumulating tokens from multiple sub-agent tools."""
-        from rossum_agent.tools.core import SubAgentTokenUsage
 
         usage1 = SubAgentTokenUsage(tool_name="search_knowledge_base", input_tokens=100, output_tokens=50, iteration=1)
         usage2 = SubAgentTokenUsage(
@@ -2630,7 +2610,6 @@ class TestRossumAgentTokenTracking:
 
     def test_accumulate_sub_agent_cache_tokens(self, mock_agent):
         """Test tokens.accumulate_sub accumulates cache metrics."""
-        from rossum_agent.tools.core import SubAgentTokenUsage
 
         usage = SubAgentTokenUsage(
             tool_name="search_knowledge_base",
