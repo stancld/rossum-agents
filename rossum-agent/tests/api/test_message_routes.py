@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import anthropic
 import pytest
 from rossum_agent.api.models.schemas import (
     FileCreatedEvent,
@@ -19,6 +20,7 @@ from rossum_agent.api.routes.messages import (
     SSE_KEEPALIVE_INTERVAL,
     ProcessedEvent,
     _format_sse_event,
+    _generate_chat_summary,
     _process_agent_event,
     _with_sse_keepalive,
     _yield_file_events,
@@ -413,3 +415,48 @@ class TestWithSSEKeepalive:
     async def test_keepalive_interval_is_reasonable(self):
         """The keepalive interval should be well below common proxy timeouts (60s)."""
         assert SSE_KEEPALIVE_INTERVAL < 60
+
+
+class TestGenerateChatSummary:
+    """Tests for _generate_chat_summary function."""
+
+    @pytest.mark.asyncio
+    async def test_returns_summary_on_success(self):
+        """Returns stripped text from the first TextBlock in the response."""
+        mock_response = MagicMock()
+        mock_text_block = MagicMock(spec=anthropic.types.TextBlock)
+        mock_text_block.text = "  User asked about deployments.  "
+        mock_response.content = [mock_text_block]
+
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+        with patch("rossum_agent.api.routes.messages.anthropic.AsyncAnthropic", return_value=mock_client):
+            result = await _generate_chat_summary("How do I deploy a queue?")
+
+        assert result == "User asked about deployments."
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_no_text_block(self):
+        """Returns None when the response contains no TextBlock."""
+        mock_response = MagicMock()
+        mock_response.content = []
+
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+        with patch("rossum_agent.api.routes.messages.anthropic.AsyncAnthropic", return_value=mock_client):
+            result = await _generate_chat_summary("What is Rossum?")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_api_error(self):
+        """Returns None and logs a warning when the Anthropic call raises."""
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(side_effect=Exception("API unavailable"))
+
+        with patch("rossum_agent.api.routes.messages.anthropic.AsyncAnthropic", return_value=mock_client):
+            result = await _generate_chat_summary("Trigger an error")
+
+        assert result is None

@@ -32,6 +32,7 @@ class ChatSummary(BaseModel):
     message_count: int
     first_message: str
     preview: str | None = None
+    summary: str | None = None
 
 
 class ChatListResponse(BaseModel):
