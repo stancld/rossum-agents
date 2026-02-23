@@ -83,7 +83,8 @@ async def _handle_list_commits(ctx: CommandContext) -> str:
             lines.append(f"- `{h}` - (expired or unavailable)")
             continue
         ts = commit.timestamp.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
-        lines.append(f"- `{commit.hash}` ({ts}) - {commit.message} ({len(commit.changes)} changes)")
+        badge = " **[REVERTED]**" if commit.reverted else ""
+        lines.append(f"- `{commit.hash}` ({ts}) - {commit.message}{badge} ({len(commit.changes)} changes)")
         for change in commit.changes:
             lines.append(f'  - {change.entity_type} "{change.entity_name}" [{change.operation}]')
     return "\n".join(lines)

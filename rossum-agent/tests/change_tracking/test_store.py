@@ -239,6 +239,38 @@ class TestCommitStoreListCommits:
         assert result[0].hash == "str_hash"
 
 
+class TestCommitStoreMarkReverted:
+    """Test mark_reverted."""
+
+    def test_mark_reverted_sets_flag_and_persists(self):
+        client = _make_mock_client()
+        store = CommitStore(client)
+        commit = _make_commit()
+        env = commit.environment
+
+        client.get.return_value = commit.model_dump_json().encode()
+
+        store.mark_reverted(env, commit.hash)
+
+        # Verify setex was called with reverted=True in the serialized data
+        client.setex.assert_called_once()
+        key, ttl, data = client.setex.call_args.args
+        assert key == f"config_commit:{env}:{commit.hash}"
+        assert ttl == DEFAULT_COMMIT_TTL_SECONDS
+        saved = ConfigCommit.model_validate_json(data)
+        assert saved.reverted is True
+
+    def test_mark_reverted_noop_when_commit_not_found(self):
+        client = _make_mock_client()
+        store = CommitStore(client)
+
+        client.get.return_value = None
+
+        store.mark_reverted("https://example.rossum.app/api/v1", "nonexistent")
+
+        client.setex.assert_not_called()
+
+
 class TestCommitStoreCustomTTL:
     """Test custom TTL configuration."""
 

@@ -26,6 +26,7 @@ class ConfigCommit(BaseModel):
     user_request: str  # Original user prompt
     environment: str  # "{base_url}" identifier
     changes: list[EntityChange] = Field(default_factory=list)
+    reverted: bool = False
 
 
 def compute_commit_hash(changes: list[EntityChange], timestamp: datetime) -> str:

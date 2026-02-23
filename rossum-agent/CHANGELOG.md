@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Added `restore_entity_version` tool — restores an entity to a specific historical version by commit hash [#200](https://github.com/stancld/rossum-agents/pull/200)
 - Added `diff_objects` tool — computes unified diff between two JSON objects for explicit comparison requests [#200](https://github.com/stancld/rossum-agents/pull/200)
 - Added slash commands — intercepted in the message endpoint before reaching the agent, with `GET /commands` endpoint for TUI discovery [#207](https://github.com/stancld/rossum-agents/pull/207): `/list-commands` (list all slash commands), `/list-commits` (list configuration commits in current chat), `/list-skills` (list loadable agent skills with slugs), `/list-mcp-tools` (list MCP tools grouped by category from cached catalog), `/list-agent-tools` (list built-in agent tools with descriptions)
+- Reverted commits are now marked with a `[REVERTED]` badge in `/list-commits` output; `show_change_history` also exposes a `reverted` field per commit [#210](https://github.com/stancld/rossum-agents/pull/210)
 
 ### Changed
 - `revert_commit` no longer restricted to the latest commit — any historical commit can now be reverted [#200](https://github.com/stancld/rossum-agents/pull/200)
