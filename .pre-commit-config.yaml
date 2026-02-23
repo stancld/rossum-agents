@@ -41,6 +41,13 @@ repos:
         pass_filenames: false
         types: [python]
 
+      - id: tui-eslint
+        name: tui-eslint
+        entry: npx --prefix rossum-agent-tui eslint
+        language: system
+        files: ^rossum-agent-tui/src/.*\.(ts|tsx)$
+        pass_filenames: true
+
       - id: tui-prettier
         name: tui-prettier
         entry: npx --prefix rossum-agent-tui prettier --check

@@ -17,7 +17,6 @@ import type {
   SubAgentProgressEvent,
   TaskItem,
   TokenUsageBreakdown,
-  UserMessage,
 } from "../types.js";
 import type {
   ImageAttachment,
@@ -57,6 +56,20 @@ function isDifferentStep(a: StepEvent, b: StepEvent): boolean {
   return a.step_number !== b.step_number || a.type !== b.type;
 }
 
+function shouldCommitPrevious(
+  prev: StepEvent | null,
+  current: StepEvent,
+): prev is StepEvent {
+  return prev !== null && isDifferentStep(prev, current);
+}
+
+function resolveFinalAnswer(
+  step: StepEvent,
+  prev: string | null,
+): string | null {
+  return step.type === "final_answer" ? step.content || prev : prev;
+}
+
 function handleStepEvent(prev: ChatState, step: StepEvent): ChatState {
   if (step.type === "error") {
     return {
@@ -67,16 +80,13 @@ function handleStepEvent(prev: ChatState, step: StepEvent): ChatState {
   }
 
   if (step.is_streaming) {
-    const finalAnswer =
-      step.type === "final_answer"
-        ? step.content || prev.finalAnswer
-        : prev.finalAnswer;
+    const finalAnswer = resolveFinalAnswer(step, prev.finalAnswer);
 
     // If we're switching to a different step while the previous one was still
     // streaming, commit the previous streaming step to completedSteps so it
     // doesn't get lost (e.g. thinking block replaced by tool_start).
     const prevStream = prev.currentStreaming;
-    if (prevStream && isDifferentStep(prevStream, step)) {
+    if (shouldCommitPrevious(prevStream, step)) {
       return {
         ...prev,
         completedSteps: [...prev.completedSteps, stepToCompleted(prevStream)],
@@ -88,10 +98,9 @@ function handleStepEvent(prev: ChatState, step: StepEvent): ChatState {
   }
 
   const prevStream = prev.currentStreaming;
-  const extraSteps: CompletedStep[] =
-    prevStream && isDifferentStep(prevStream, step)
-      ? [stepToCompleted(prevStream)]
-      : [];
+  const extraSteps: CompletedStep[] = shouldCommitPrevious(prevStream, step)
+    ? [stepToCompleted(prevStream)]
+    : [];
 
   return {
     ...prev,
@@ -101,10 +110,9 @@ function handleStepEvent(prev: ChatState, step: StepEvent): ChatState {
       stepToCompleted(step),
     ],
     currentStreaming: null,
-    finalAnswer:
-      step.type === "final_answer" && step.is_final
-        ? step.content || prev.finalAnswer
-        : prev.finalAnswer,
+    finalAnswer: step.is_final
+      ? resolveFinalAnswer(step, prev.finalAnswer)
+      : prev.finalAnswer,
   };
 }
 

@@ -20,6 +20,27 @@ export interface MultiLineInputHandle {
   setText: (text: string) => void;
 }
 
+function isArrowKey(key: {
+  leftArrow: boolean;
+  rightArrow: boolean;
+  upArrow: boolean;
+  downArrow: boolean;
+}): boolean {
+  return key.leftArrow || key.rightArrow || key.upArrow || key.downArrow;
+}
+
+function isModifierKey(key: {
+  tab: boolean;
+  ctrl: boolean;
+  meta: boolean;
+}): boolean {
+  return key.tab || key.ctrl || key.meta;
+}
+
+function getLineLen(lines: string[], row: number): number {
+  return (lines[row] ?? "").length;
+}
+
 export const MultiLineInput = forwardRef<
   MultiLineInputHandle,
   MultiLineInputProps
@@ -196,13 +217,11 @@ export const MultiLineInput = forwardRef<
         if (cursorCol > 0) {
           setCursorCol((c) => c - 1);
         } else if (cursorRow > 0) {
-          const prevLineLen = (lines[cursorRow - 1] ?? "").length;
           setCursorRow((r) => r - 1);
-          setCursorCol(prevLineLen);
+          setCursorCol(getLineLen(lines, cursorRow - 1));
         }
       } else if (key.rightArrow) {
-        const lineLen = (lines[cursorRow] ?? "").length;
-        if (cursorCol < lineLen) {
+        if (cursorCol < getLineLen(lines, cursorRow)) {
           setCursorCol((c) => c + 1);
         } else if (cursorRow < lines.length - 1) {
           setCursorRow((r) => r + 1);
@@ -211,14 +230,12 @@ export const MultiLineInput = forwardRef<
       } else if (key.upArrow) {
         if (cursorRow > 0) {
           setCursorRow((r) => r - 1);
-          const prevLineLen = (lines[cursorRow - 1] ?? "").length;
-          setCursorCol(Math.min(cursorCol, prevLineLen));
+          setCursorCol(Math.min(cursorCol, getLineLen(lines, cursorRow - 1)));
         }
       } else if (key.downArrow) {
         if (cursorRow < lines.length - 1) {
           setCursorRow((r) => r + 1);
-          const nextLineLen = (lines[cursorRow + 1] ?? "").length;
-          setCursorCol(Math.min(cursorCol, nextLineLen));
+          setCursorCol(Math.min(cursorCol, getLineLen(lines, cursorRow + 1)));
         }
       }
     },
@@ -241,12 +258,10 @@ export const MultiLineInput = forwardRef<
 
   useInput(
     (input, key) => {
-      if (key.return && !key.shift) return handleSubmit();
-      if (key.return && key.shift) return handleNewLine();
+      if (key.return) return key.shift ? handleNewLine() : handleSubmit();
       if (key.backspace || key.delete) return handleBackspace();
-      if (key.leftArrow || key.rightArrow || key.upArrow || key.downArrow)
-        return handleArrowKeys(key);
-      if (key.tab || key.ctrl || key.meta) return;
+      if (isArrowKey(key)) return handleArrowKeys(key);
+      if (isModifierKey(key)) return;
       if (input.length === 1) handleCharInput(input);
     },
     { isActive },

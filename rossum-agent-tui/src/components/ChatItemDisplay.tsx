@@ -4,7 +4,7 @@ import { ThinkingBlock } from "./ThinkingBlock.js";
 import { ToolCall } from "./ToolCall.js";
 import { StreamingIndicator } from "./StreamingIndicator.js";
 import { applyTerminalLinks } from "../utils/format.js";
-import type { ChatItem } from "../types.js";
+import type { ChatItem, ConfigCommitInfo } from "../types.js";
 
 interface ChatItemDisplayProps {
   item: ChatItem;
@@ -57,6 +57,20 @@ function IntermediateBlock({
   );
 }
 
+function ConfigCommitItem({ commit }: { commit: ConfigCommitInfo }) {
+  const suffix = commit.changesCount !== 1 ? "s" : "";
+  return (
+    <Text color="cyan">
+      {"  ✓ "}
+      <Text bold>Committed</Text> <Text dimColor>[{commit.hash}]</Text>{" "}
+      {commit.message}{" "}
+      <Text dimColor>
+        ({commit.changesCount} change{suffix})
+      </Text>
+    </Text>
+  );
+}
+
 export const ChatItemDisplay = React.memo(function ChatItemDisplay({
   item,
   expanded,
@@ -70,7 +84,7 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
             {"❯ "}
             {item.text}
           </Text>
-          {item.attachments && item.attachments.length > 0 && (
+          {!!item.attachments?.length && (
             <Box paddingLeft={2} gap={1}>
               {item.attachments.map((att, i) => (
                 <Text key={i} dimColor>
@@ -136,17 +150,7 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
       );
 
     case "config_commit":
-      return (
-        <Text color="cyan">
-          {"  ✓ "}
-          <Text bold>Committed</Text> <Text dimColor>[{item.commit.hash}]</Text>{" "}
-          {item.commit.message}{" "}
-          <Text dimColor>
-            ({item.commit.changesCount} change
-            {item.commit.changesCount !== 1 ? "s" : ""})
-          </Text>
-        </Text>
-      );
+      return <ConfigCommitItem commit={item.commit} />;
 
     case "streaming":
       return (
