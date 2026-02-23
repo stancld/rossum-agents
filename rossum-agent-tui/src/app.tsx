@@ -14,7 +14,19 @@ import { useChat } from "./hooks/useChat.js";
 import { useCommands } from "./hooks/useCommands.js";
 import { useTerminalSize } from "./hooks/useTerminalSize.js";
 import { buildChatItems } from "./utils/buildChatItems.js";
-import type { Config, ExpandState, InteractionMode } from "./types.js";
+import {
+  parseAtTokens,
+  readAttachment,
+  type ImageAttachment,
+  type DocumentAttachment,
+  type TextAttachment,
+} from "./utils/fileAttachments.js";
+import type {
+  AttachmentInfo,
+  Config,
+  ExpandState,
+  InteractionMode,
+} from "./types.js";
 
 interface AppProps {
   config: Config;
@@ -64,9 +76,80 @@ export function App({ config }: AppProps) {
   }, [items]);
 
   const handleSendMessage = useCallback(
-    (message: string) => {
+    async (message: string) => {
       setAutoScroll(true);
-      sendMessage(message);
+
+      const paths = parseAtTokens(message);
+      if (paths.length === 0) {
+        sendMessage(message);
+        return;
+      }
+
+      const images: ImageAttachment[] = [];
+      const documents: DocumentAttachment[] = [];
+      const textFiles: TextAttachment[] = [];
+      const attachmentInfos: AttachmentInfo[] = [];
+      const errors: string[] = [];
+
+      for (const filePath of paths) {
+        try {
+          const attachment = readAttachment(filePath);
+          if (attachment.type === "image") {
+            if (images.length < 5) {
+              images.push(attachment);
+              attachmentInfos.push({
+                filename: filePath.split("/").pop() ?? filePath,
+                type: "image",
+              });
+            }
+          } else if (attachment.type === "text") {
+            textFiles.push(attachment);
+            attachmentInfos.push({
+              filename: attachment.filename,
+              type: "text",
+            });
+          } else {
+            if (documents.length < 5) {
+              documents.push(attachment);
+              attachmentInfos.push({
+                filename: attachment.filename,
+                type: "document",
+              });
+            }
+          }
+        } catch (err) {
+          errors.push(
+            `${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+
+      let content = message.replace(/\s+/g, " ").trim();
+      if (!content && textFiles.length === 0) {
+        content = "See attached files.";
+      }
+
+      // Inline text file contents into the message
+      if (textFiles.length > 0) {
+        const inlined = textFiles
+          .map(
+            (f) =>
+              `<file_content path="${f.filename}">\n${f.content}\n</file_content>`,
+          )
+          .join("\n\n");
+        content = content ? `${content}\n\n${inlined}` : inlined;
+      }
+
+      if (errors.length > 0) {
+        content += "\n\n[Attachment errors: " + errors.join("; ") + "]";
+      }
+
+      sendMessage(content, {
+        images: images.length > 0 ? images : undefined,
+        documents: documents.length > 0 ? documents : undefined,
+        attachmentInfos:
+          attachmentInfos.length > 0 ? attachmentInfos : undefined,
+      });
     },
     [sendMessage],
   );

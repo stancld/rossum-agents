@@ -157,7 +157,7 @@ export interface CommandInfo {
 export type InteractionMode = "input" | "browse";
 
 export type ChatItem =
-  | { kind: "user_message"; text: string }
+  | { kind: "user_message"; text: string; attachments?: AttachmentInfo[] }
   | { kind: "thinking"; stepNumber: number; content: string }
   | {
       kind: "tool_call";
@@ -180,9 +180,15 @@ export interface ExpandState {
   [itemIndex: number]: boolean;
 }
 
+export interface AttachmentInfo {
+  filename: string;
+  type: "image" | "document" | "text";
+}
+
 export interface UserMessage {
   text: string;
   stepIndexBefore: number;
+  attachments?: AttachmentInfo[];
 }
 
 export type ConnectionStatus =

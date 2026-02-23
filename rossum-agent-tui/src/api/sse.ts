@@ -1,11 +1,17 @@
 import { createParser, type EventSourceMessage } from "eventsource-parser";
 import { buildHeaders } from "./client.js";
 import type { Config, SSEEvent } from "../types.js";
+import type {
+  ImageAttachment,
+  DocumentAttachment,
+} from "../utils/fileAttachments.js";
 
 export interface StreamOptions {
   config: Config;
   chatId: string;
   message: string;
+  images?: ImageAttachment[];
+  documents?: DocumentAttachment[];
   onEvent: (event: SSEEvent) => void;
   onError: (error: Error) => void;
   onDone: () => void;
@@ -13,14 +19,31 @@ export interface StreamOptions {
 }
 
 export async function streamMessage(opts: StreamOptions): Promise<void> {
-  const { config, chatId, message, onEvent, onError, onDone, signal } = opts;
+  const {
+    config,
+    chatId,
+    message,
+    images,
+    documents,
+    onEvent,
+    onError,
+    onDone,
+    signal,
+  } = opts;
+
+  const body: Record<string, unknown> = {
+    content: message,
+    persona: config.persona,
+  };
+  if (images && images.length > 0) body.images = images;
+  if (documents && documents.length > 0) body.documents = documents;
 
   let res: Response;
   try {
     res = await fetch(`${config.apiUrl}/api/v1/chats/${chatId}/messages`, {
       method: "POST",
       headers: buildHeaders(config),
-      body: JSON.stringify({ content: message, persona: config.persona }),
+      body: JSON.stringify(body),
       signal,
     });
   } catch (err) {
