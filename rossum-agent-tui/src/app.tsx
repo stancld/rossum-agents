@@ -28,6 +28,84 @@ import type {
   InteractionMode,
 } from "./types.js";
 
+interface ProcessedAttachments {
+  images: ImageAttachment[];
+  documents: DocumentAttachment[];
+  textFiles: TextAttachment[];
+  attachmentInfos: AttachmentInfo[];
+  errors: string[];
+}
+
+function processAttachments(paths: string[]): ProcessedAttachments {
+  const images: ImageAttachment[] = [];
+  const documents: DocumentAttachment[] = [];
+  const textFiles: TextAttachment[] = [];
+  const attachmentInfos: AttachmentInfo[] = [];
+  const errors: string[] = [];
+
+  for (const filePath of paths) {
+    try {
+      const attachment = readAttachment(filePath);
+      if (attachment.type === "image") {
+        if (images.length < 5) {
+          images.push(attachment);
+          attachmentInfos.push({
+            filename: filePath.split("/").pop() ?? filePath,
+            type: "image",
+          });
+        }
+      } else if (attachment.type === "text") {
+        textFiles.push(attachment);
+        attachmentInfos.push({
+          filename: attachment.filename,
+          type: "text",
+        });
+      } else {
+        if (documents.length < 5) {
+          documents.push(attachment);
+          attachmentInfos.push({
+            filename: attachment.filename,
+            type: "document",
+          });
+        }
+      }
+    } catch (err) {
+      errors.push(
+        `${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  return { images, documents, textFiles, attachmentInfos, errors };
+}
+
+function buildMessageContent(
+  message: string,
+  textFiles: TextAttachment[],
+  errors: string[],
+): string {
+  let content = message.replace(/\s+/g, " ").trim();
+  if (!content && textFiles.length === 0) {
+    content = "See attached files.";
+  }
+
+  if (textFiles.length > 0) {
+    const inlined = textFiles
+      .map(
+        (f) =>
+          `<file_content path="${f.filename}">\n${f.content}\n</file_content>`,
+      )
+      .join("\n\n");
+    content = content ? `${content}\n\n${inlined}` : inlined;
+  }
+
+  if (errors.length > 0) {
+    content += "\n\n[Attachment errors: " + errors.join("; ") + "]";
+  }
+
+  return content;
+}
+
 interface AppProps {
   config: Config;
 }
@@ -85,64 +163,9 @@ export function App({ config }: AppProps) {
         return;
       }
 
-      const images: ImageAttachment[] = [];
-      const documents: DocumentAttachment[] = [];
-      const textFiles: TextAttachment[] = [];
-      const attachmentInfos: AttachmentInfo[] = [];
-      const errors: string[] = [];
-
-      for (const filePath of paths) {
-        try {
-          const attachment = readAttachment(filePath);
-          if (attachment.type === "image") {
-            if (images.length < 5) {
-              images.push(attachment);
-              attachmentInfos.push({
-                filename: filePath.split("/").pop() ?? filePath,
-                type: "image",
-              });
-            }
-          } else if (attachment.type === "text") {
-            textFiles.push(attachment);
-            attachmentInfos.push({
-              filename: attachment.filename,
-              type: "text",
-            });
-          } else {
-            if (documents.length < 5) {
-              documents.push(attachment);
-              attachmentInfos.push({
-                filename: attachment.filename,
-                type: "document",
-              });
-            }
-          }
-        } catch (err) {
-          errors.push(
-            `${filePath}: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-      }
-
-      let content = message.replace(/\s+/g, " ").trim();
-      if (!content && textFiles.length === 0) {
-        content = "See attached files.";
-      }
-
-      // Inline text file contents into the message
-      if (textFiles.length > 0) {
-        const inlined = textFiles
-          .map(
-            (f) =>
-              `<file_content path="${f.filename}">\n${f.content}\n</file_content>`,
-          )
-          .join("\n\n");
-        content = content ? `${content}\n\n${inlined}` : inlined;
-      }
-
-      if (errors.length > 0) {
-        content += "\n\n[Attachment errors: " + errors.join("; ") + "]";
-      }
+      const { images, documents, textFiles, attachmentInfos, errors } =
+        processAttachments(paths);
+      const content = buildMessageContent(message, textFiles, errors);
 
       sendMessage(content, {
         images: images.length > 0 ? images : undefined,
