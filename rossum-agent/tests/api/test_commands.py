@@ -196,6 +196,72 @@ class TestListCommitsHandler:
         assert "expired1" in result
         assert "expired or unavailable" in result
 
+    @pytest.mark.asyncio
+    async def test_reverted_commit_shows_badge(self):
+        chat_service = MagicMock()
+        metadata = ChatMetadata(config_commits=["abc123"])
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=metadata)
+
+        commit = ConfigCommit(
+            hash="abc123",
+            chat_id="chat_123",
+            timestamp=datetime(2026, 1, 15, 10, 30, tzinfo=UTC),
+            message="Updated queue settings",
+            user_request="Change queue",
+            environment="https://api.rossum.ai",
+            reverted=True,
+            changes=[
+                EntityChange(
+                    entity_type="queue",
+                    entity_id="123",
+                    entity_name="My Queue",
+                    operation="update",
+                    before={},
+                    after={},
+                )
+            ],
+        )
+        commit_store = MagicMock()
+        commit_store.get_commit.return_value = commit
+
+        ctx = _make_ctx(chat_service=chat_service, commit_store=commit_store)
+        result = await execute_command("/list-commits", ctx)
+
+        assert "[REVERTED]" in result
+        assert "abc123" in result
+
+    @pytest.mark.asyncio
+    async def test_non_reverted_commit_has_no_badge(self):
+        chat_service = MagicMock()
+        metadata = ChatMetadata(config_commits=["abc123"])
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=metadata)
+
+        commit = ConfigCommit(
+            hash="abc123",
+            chat_id="chat_123",
+            timestamp=datetime(2026, 1, 15, 10, 30, tzinfo=UTC),
+            message="Updated queue settings",
+            user_request="Change queue",
+            environment="https://api.rossum.ai",
+            changes=[
+                EntityChange(
+                    entity_type="queue",
+                    entity_id="123",
+                    entity_name="My Queue",
+                    operation="update",
+                    before={},
+                    after={},
+                )
+            ],
+        )
+        commit_store = MagicMock()
+        commit_store.get_commit.return_value = commit
+
+        ctx = _make_ctx(chat_service=chat_service, commit_store=commit_store)
+        result = await execute_command("/list-commits", ctx)
+
+        assert "[REVERTED]" not in result
+
 
 class TestListSkillsHandler:
     @pytest.mark.asyncio

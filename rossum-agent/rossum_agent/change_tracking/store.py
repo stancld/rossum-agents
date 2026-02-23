@@ -55,6 +55,14 @@ class CommitStore:
             return None
         return result.decode() if isinstance(result, bytes) else str(result)
 
+    def mark_reverted(self, environment: str, commit_hash: str) -> None:
+        commit = self.get_commit(environment, commit_hash)
+        if commit is None:
+            return  # expired or not found, nothing to do
+        commit.reverted = True
+        key = f"config_commit:{environment}:{commit_hash}"
+        self.client.setex(key, self._ttl, commit.model_dump_json())
+
     def list_commits(self, environment: str, limit: int = 10) -> list[ConfigCommit]:
         """List recent commits for an environment, newest first."""
         index_key = f"config_commits:{environment}"

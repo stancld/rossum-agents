@@ -98,7 +98,20 @@ class TestShowChangeHistory:
             assert result[0]["message"] == "Updated queue settings"
             assert result[0]["changes"] == 1
             assert result[0]["user_request"] == "Change queue timeout"
+            assert result[0]["reverted"] is False
             store.list_commits.assert_called_once_with("https://api.elis.rossum.ai/v1", limit=10)
+        finally:
+            set_context(AgentContext())
+
+    def test_reverted_commit_shows_reverted_true(self) -> None:
+        store = MagicMock()
+        commit = _make_commit(changes=[_ec("queue", "123", "My Queue", "update", {"timeout": 60}, {"timeout": 120})])
+        commit.reverted = True
+        store.list_commits.return_value = [commit]
+        set_context(AgentContext(commit_store=store, rossum_environment="https://api.elis.rossum.ai/v1"))
+        try:
+            result = json.loads(show_change_history())
+            assert result[0]["reverted"] is True
         finally:
             set_context(AgentContext())
 
@@ -147,6 +160,28 @@ class TestRevertCommit:
             result = json.loads(revert_commit(commit_hash="nonexistent"))
             assert "error" in result
             assert "not found" in result["error"].lower()
+        finally:
+            set_context(AgentContext())
+
+    def test_calls_mark_reverted_after_revert(self) -> None:
+        store = MagicMock()
+        store.get_commit.return_value = _make_commit(
+            changes=[_ec("queue", "123", "My Queue", "update", {"timeout": 60}, {"timeout": 120})]
+        )
+        set_context(AgentContext(commit_store=store, rossum_environment="https://api.elis.rossum.ai/v1"))
+        try:
+            revert_commit(commit_hash="abc123")
+            store.mark_reverted.assert_called_once_with("https://api.elis.rossum.ai/v1", "abc123")
+        finally:
+            set_context(AgentContext())
+
+    def test_mark_reverted_not_called_when_commit_not_found(self) -> None:
+        store = MagicMock()
+        store.get_commit.return_value = None
+        set_context(AgentContext(commit_store=store, rossum_environment="https://api.elis.rossum.ai/v1"))
+        try:
+            revert_commit(commit_hash="nonexistent")
+            store.mark_reverted.assert_not_called()
         finally:
             set_context(AgentContext())
 

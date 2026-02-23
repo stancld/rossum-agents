@@ -219,6 +219,7 @@ def show_change_history(limit: int = 10) -> str:
                 "timestamp": c.timestamp.isoformat(),
                 "changes": len(c.changes),
                 "user_request": c.user_request[:100],
+                "reverted": c.reverted,
             }
             for c in commits
         ]
@@ -409,6 +410,8 @@ def revert_commit(commit_hash: str) -> str:
         else:
             if action := _build_plan_action(change):
                 plan_actions.append(action)
+
+    ctx.commit_store.mark_reverted(ctx.rossum_environment, commit_hash)
 
     response: dict = {
         "status": "completed" if not plan_actions and not errors else "partial",
