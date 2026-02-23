@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import logging
 import os
 
 import boto3
 from botocore.exceptions import ClientError
 
 from rossum_agent.storage.backend import StorageBackend
-
-logger = logging.getLogger(__name__)
 
 
 class S3StorageBackend(StorageBackend):
@@ -51,11 +48,11 @@ class S3StorageBackend(StorageBackend):
 
     def list_keys(self, prefix: str) -> list[str]:
         paginator = self._client.get_paginator("list_objects_v2")
-        keys: list[str] = []
-        for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
-            for obj in page.get("Contents", []):
-                keys.append(obj["Key"])
-        return keys
+        return [
+            obj["Key"]
+            for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix)
+            for obj in page.get("Contents", [])
+        ]
 
     def delete(self, key: str) -> None:
         self._client.delete_object(Bucket=self._bucket, Key=key)

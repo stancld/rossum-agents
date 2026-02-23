@@ -20,7 +20,7 @@ class ArtifactHandle[T: BaseModel](BaseModel):
     def from_key(cls, key: str) -> Self:
         # key = "artifacts/{org_id}/{artifact_type}/{timestamp}_{artifact_id}.json"
         parts = key.split("/")
-        stem = parts[3][:-5]  # strip ".json"
+        stem = parts[3].removesuffix(".json")
         timestamp_str, artifact_id = stem.split("_", 1)
         return cls(
             org_id=parts[1],
