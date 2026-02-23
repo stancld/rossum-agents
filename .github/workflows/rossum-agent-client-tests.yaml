@@ -24,7 +24,7 @@ jobs:
 
       - name: Run tests
         run: |
-          uv run coverage run --source=rossum_agent_client -m pytest tests -v --junitxml=report.xml || echo "No tests found yet"
+          uv run coverage run --source=rossum_agent_client -m pytest tests -v --junitxml=report.xml
         shell: bash
         working-directory: rossum-agent-client
 
