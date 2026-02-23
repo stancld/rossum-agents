@@ -4,6 +4,38 @@ import { Spinner } from "@inkjs/ui";
 import { getDisplayToolName } from "../utils/format.js";
 import type { StepEvent, SubAgentProgressEvent } from "../types.js";
 
+function ToolStartIndicator({
+  streaming,
+  subAgentProgress,
+}: {
+  streaming: StepEvent;
+  subAgentProgress: SubAgentProgressEvent | null;
+}) {
+  const displayName = getDisplayToolName(
+    streaming.tool_name!,
+    streaming.tool_arguments,
+  );
+  const progress = streaming.tool_progress
+    ? ` (${streaming.tool_progress[0]}/${streaming.tool_progress[1]})`
+    : "";
+
+  return (
+    <Box flexDirection="column">
+      <Spinner label={` Running: ${displayName}${progress}`} />
+      {subAgentProgress && (
+        <Text color="blue" dimColor>
+          {"    "}Sub-agent ({subAgentProgress.tool_name}): iteration{" "}
+          {subAgentProgress.iteration}/{subAgentProgress.max_iterations},{" "}
+          {subAgentProgress.status}
+          {subAgentProgress.current_tool
+            ? ` [${subAgentProgress.current_tool}]`
+            : ""}
+        </Text>
+      )}
+    </Box>
+  );
+}
+
 interface StreamingIndicatorProps {
   streaming: StepEvent;
   subAgentProgress: SubAgentProgressEvent | null;
@@ -27,29 +59,12 @@ export function StreamingIndicator({
     );
   }
 
-  if (streaming.type === "tool_start" && streaming.tool_name) {
-    const displayName = getDisplayToolName(
-      streaming.tool_name,
-      streaming.tool_arguments,
-    );
-    const progress = streaming.tool_progress
-      ? ` (${streaming.tool_progress[0]}/${streaming.tool_progress[1]})`
-      : "";
-
+  if (streaming.type === "tool_start") {
     return (
-      <Box flexDirection="column">
-        <Spinner label={` Running: ${displayName}${progress}`} />
-        {subAgentProgress && (
-          <Text color="blue" dimColor>
-            {"    "}Sub-agent ({subAgentProgress.tool_name}): iteration{" "}
-            {subAgentProgress.iteration}/{subAgentProgress.max_iterations},{" "}
-            {subAgentProgress.status}
-            {subAgentProgress.current_tool
-              ? ` [${subAgentProgress.current_tool}]`
-              : ""}
-          </Text>
-        )}
-      </Box>
+      <ToolStartIndicator
+        streaming={streaming}
+        subAgentProgress={subAgentProgress}
+      />
     );
   }
 

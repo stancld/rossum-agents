@@ -71,6 +71,14 @@ const TEXT_EXTENSIONS = new Set([
   ".log",
 ]);
 
+function isSupportedFileExtension(ext: string): boolean {
+  return (
+    ext in IMAGE_EXTENSIONS ||
+    ext in DOCUMENT_EXTENSIONS ||
+    TEXT_EXTENSIONS.has(ext)
+  );
+}
+
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_TEXT_SIZE = 1 * 1024 * 1024; // 1MB
@@ -125,12 +133,7 @@ export function listDirectory(partialPath: string): FileEntry[] {
         if (e.name.startsWith(".")) return false;
         if (prefix && !e.name.toLowerCase().startsWith(prefix)) return false;
         if (!e.isDirectory()) {
-          const ext = path.extname(e.name).toLowerCase();
-          if (
-            !(ext in IMAGE_EXTENSIONS) &&
-            !(ext in DOCUMENT_EXTENSIONS) &&
-            !TEXT_EXTENSIONS.has(ext)
-          ) {
+          if (!isSupportedFileExtension(path.extname(e.name).toLowerCase())) {
             return false;
           }
         }
@@ -222,7 +225,7 @@ export function searchFiles(query: string, maxDepth: number = 4): FileEntry[] {
   const cwd = process.cwd();
 
   function walk(dir: string, depth: number, relPath: string) {
-    if (depth > maxDepth || results.length >= 20) return;
+    if (depth > maxDepth) return;
 
     let entries: fs.Dirent[];
     try {
@@ -244,12 +247,7 @@ export function searchFiles(query: string, maxDepth: number = 4): FileEntry[] {
         }
         walk(path.join(dir, entry.name), depth + 1, entryRelPath);
       } else if (entry.name.toLowerCase().startsWith(lowerQuery)) {
-        const ext = path.extname(entry.name).toLowerCase();
-        if (
-          ext in IMAGE_EXTENSIONS ||
-          ext in DOCUMENT_EXTENSIONS ||
-          TEXT_EXTENSIONS.has(ext)
-        ) {
+        if (isSupportedFileExtension(path.extname(entry.name).toLowerCase())) {
           results.push({ name: entryRelPath, isDirectory: false });
         }
       }

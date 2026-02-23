@@ -18,6 +18,16 @@ interface InputAreaProps {
   onSuggestionRowsChange?: (rows: number) => void;
 }
 
+function getSuggestionRows(visible: boolean, count: number): number {
+  if (!visible) return 0;
+  return Math.max(count, 1);
+}
+
+function getFileSuggestionRows(visible: boolean, entryCount: number): number {
+  if (!visible) return 0;
+  return Math.max(Math.min(entryCount, 8), 1) + (entryCount > 8 ? 1 : 0);
+}
+
 export function InputArea({
   onSubmit,
   connectionStatus,
@@ -33,12 +43,12 @@ export function InputArea({
 
   const isDisabled =
     connectionStatus === "connecting" || connectionStatus === "streaming";
+  const canSuggest = mode === "input" && !isDisabled;
 
   // Command suggestions (/ prefix)
   const isSingleLineSlash =
     !currentText.includes("\n") && currentText.trimStart().startsWith("/");
-  const showCommandSuggestions =
-    mode === "input" && !isDisabled && isSingleLineSlash;
+  const showCommandSuggestions = canSuggest && isSingleLineSlash;
 
   const filteredCommands = showCommandSuggestions
     ? getFilteredCommands(commands, currentText.trimStart())
@@ -47,20 +57,12 @@ export function InputArea({
   // File suggestions (@ prefix with path)
   const fileSuggest = useFileSuggest(currentText, cursorRow, cursorCol);
   const showFileSuggestions =
-    mode === "input" &&
-    !isDisabled &&
-    !showCommandSuggestions &&
-    fileSuggest.visible;
+    canSuggest && !showCommandSuggestions && fileSuggest.visible;
 
   // Notify parent of suggestion row count changes for layout calculation
-  const commandSuggestionRows = showCommandSuggestions
-    ? Math.max(filteredCommands.length, 1)
-    : 0;
-  const fileSuggestionRows = showFileSuggestions
-    ? Math.max(Math.min(fileSuggest.entries.length, 8), 1) +
-      (fileSuggest.entries.length > 8 ? 1 : 0)
-    : 0;
-  const suggestionRows = commandSuggestionRows + fileSuggestionRows;
+  const suggestionRows =
+    getSuggestionRows(showCommandSuggestions, filteredCommands.length) +
+    getFileSuggestionRows(showFileSuggestions, fileSuggest.entries.length);
 
   useEffect(() => {
     onSuggestionRowsChange?.(suggestionRows);
@@ -132,7 +134,7 @@ export function InputArea({
         return;
       }
     },
-    { isActive: showCommandSuggestions && filteredCommands.length > 0 },
+    { isActive: filteredCommands.length > 0 },
   );
 
   // Handle Tab and arrow keys for file suggestion navigation
@@ -154,7 +156,7 @@ export function InputArea({
         return;
       }
     },
-    { isActive: showFileSuggestions && fileSuggest.entries.length > 0 },
+    { isActive: showFileSuggestions },
   );
 
   if (mode === "browse") {

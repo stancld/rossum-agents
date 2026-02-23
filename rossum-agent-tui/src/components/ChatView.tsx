@@ -11,36 +11,40 @@ interface ChatViewProps {
   browseMode: boolean;
 }
 
+function estimateToolCallHeight(
+  item: Extract<ChatItem, { kind: "tool_call" }>,
+  expanded: boolean,
+): number {
+  if (!expanded) return item.resultStep?.result ? 2 : 1;
+  let h = 1;
+  if (item.step.toolArguments) {
+    h += Object.keys(item.step.toolArguments).filter(
+      (k) => k !== "connection_id" && k !== "tool_name",
+    ).length;
+  }
+  if (item.resultStep?.result) {
+    h += 1 + item.resultStep.result.split("\n").length;
+  }
+  return h;
+}
+
 function estimateItemHeight(item: ChatItem, expanded: boolean): number {
-  if (item.kind === "user_message") {
-    const base = 1;
-    return item.attachments && item.attachments.length > 0 ? base + 1 : base;
-  }
-  if (item.kind === "thinking") {
-    return expanded ? Math.max(1, item.content.split("\n").length + 1) : 1;
-  }
-  if (item.kind === "tool_call") {
-    if (!expanded) return item.resultStep?.result ? 2 : 1;
-    let h = 1;
-    if (item.step.toolArguments) {
-      h += Object.keys(item.step.toolArguments).filter(
-        (k) => k !== "connection_id" && k !== "tool_name",
-      ).length;
+  switch (item.kind) {
+    case "user_message":
+      return item.attachments?.length ? 2 : 1;
+    case "thinking":
+      return expanded ? Math.max(1, item.content.split("\n").length + 1) : 1;
+    case "tool_call":
+      return estimateToolCallHeight(item, expanded);
+    case "intermediate": {
+      const lines = item.content.split("\n").length;
+      return lines <= 5 ? lines : expanded ? lines + 1 : 2;
     }
-    if (item.resultStep?.result) {
-      h += 1 + item.resultStep.result.split("\n").length;
-    }
-    return h;
+    case "final_answer":
+      return Math.max(1, item.content.split("\n").length);
+    case "streaming":
+      return 2;
   }
-  if (item.kind === "intermediate") {
-    const lines = item.content.split("\n").length;
-    if (lines <= 5) return lines;
-    return expanded ? lines + 1 : 2;
-  }
-  if (item.kind === "final_answer") {
-    return Math.max(1, item.content.split("\n").length);
-  }
-  if (item.kind === "streaming") return 2;
   return 1;
 }
 
