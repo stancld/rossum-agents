@@ -438,3 +438,41 @@ class FileListResponse(BaseModel):
 
     files: list[FileInfo]
     total: int
+
+
+class EntityChangeInfo(BaseModel):
+    """A single entity change within a config commit."""
+
+    entity_type: str
+    entity_id: str
+    entity_name: str
+    operation: Literal["create", "update", "delete"]
+
+
+class CommitInfo(BaseModel):
+    """A configuration commit with its changes."""
+
+    hash: str
+    timestamp: datetime
+    message: str
+    user_request: str
+    changes: list[EntityChangeInfo]
+
+
+class CommitListResponse(BaseModel):
+    """Response for listing config commits in a chat."""
+
+    commits: list[CommitInfo]
+
+
+class CommandInfo(BaseModel):
+    """Information about an available slash command."""
+
+    name: str
+    description: str
+
+
+class CommandListResponse(BaseModel):
+    """Response for listing available slash commands."""
+
+    commands: list[CommandInfo]

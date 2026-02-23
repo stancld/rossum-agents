@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { ThinkingBlock } from "./ThinkingBlock.js";
 import { ToolCall } from "./ToolCall.js";
 import { StreamingIndicator } from "./StreamingIndicator.js";
+import { applyTerminalLinks } from "../utils/format.js";
 import type { ChatItem } from "../types.js";
 
 interface ChatItemDisplayProps {
@@ -104,7 +105,7 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
           <Text color="green" bold>
             {"● "}
           </Text>
-          {item.content}
+          {applyTerminalLinks(item.content)}
         </Text>
       );
 

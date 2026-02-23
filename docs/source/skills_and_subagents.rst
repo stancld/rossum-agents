@@ -215,6 +215,55 @@ When the user sends their first message, the agent scans for keywords and automa
 This ensures relevant tools are available without requiring explicit loading while keeping context usage minimal.
 
 
+Slash Commands
+--------------
+
+Slash commands provide instant introspection into the agent's capabilities without consuming tokens or invoking the agent. Messages starting with ``/`` sent via the ``POST /api/v1/chats/{id}/messages`` endpoint are intercepted and return a direct response as an SSE stream.
+
+Available Commands
+^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Command
+     - Description
+   * - ``/list-commands``
+     - List all available slash commands
+   * - ``/list-commits``
+     - List configuration commits made in the current chat (requires Redis)
+   * - ``/list-skills``
+     - List available agent skills with their slugs and goal descriptions
+   * - ``/list-mcp-tools``
+     - List MCP tools grouped by category from the cached catalog
+   * - ``/list-agent-tools``
+     - List built-in agent tools with descriptions
+
+Discovery Endpoint
+^^^^^^^^^^^^^^^^^^
+
+Available commands can be fetched programmatically:
+
+.. code-block:: bash
+
+   GET /api/v1/commands
+
+.. code-block:: json
+
+   {
+     "commands": [
+       {"name": "/list-commands", "description": "List all available slash commands"},
+       {"name": "/list-commits", "description": "List configuration commits made in this chat"},
+       {"name": "/list-skills", "description": "List available agent skills"},
+       {"name": "/list-mcp-tools", "description": "List MCP tools by category"},
+       {"name": "/list-agent-tools", "description": "List built-in agent tools"}
+     ]
+   }
+
+The TUI uses this endpoint to provide autocomplete suggestions when the user types ``/``.
+
+
 Sub-Agents
 ----------
 

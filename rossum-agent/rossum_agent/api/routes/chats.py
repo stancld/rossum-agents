@@ -13,10 +13,14 @@ from rossum_agent.api.models.schemas import (
     ChatDetail,
     ChatListResponse,
     ChatResponse,
+    CommitInfo,
+    CommitListResponse,
     CreateChatRequest,
     DeleteResponse,
+    EntityChangeInfo,
 )
 from rossum_agent.api.services.chat_service import ChatService
+from rossum_agent.change_tracking.store import CommitStore
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -63,6 +67,48 @@ async def get_chat(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
 
     return chat
+
+
+@router.get("/{chat_id}/commits", response_model=CommitListResponse)
+async def list_chat_commits(
+    request: Request,
+    chat_id: str,
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
+    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
+) -> CommitListResponse:
+    """List configuration commits made in a chat session."""
+    chat_data = chat_service.get_chat_data(user_id=credentials.user_id, chat_id=chat_id)
+    if chat_data is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
+
+    commit_hashes = chat_data.metadata.config_commits
+    if not commit_hashes or not chat_service.storage.is_connected():
+        return CommitListResponse(commits=[])
+
+    commit_store = CommitStore(chat_service.storage.client)
+    commits = []
+    for h in commit_hashes:
+        commit = commit_store.get_commit(credentials.api_url, h)
+        if commit is None:
+            continue
+        commits.append(
+            CommitInfo(
+                hash=commit.hash,
+                timestamp=commit.timestamp,
+                message=commit.message,
+                user_request=commit.user_request,
+                changes=[
+                    EntityChangeInfo(
+                        entity_type=c.entity_type,
+                        entity_id=c.entity_id,
+                        entity_name=c.entity_name,
+                        operation=c.operation,
+                    )
+                    for c in commit.changes
+                ],
+            )
+        )
+    return CommitListResponse(commits=commits)
 
 
 @router.delete("/{chat_id}", response_model=DeleteResponse)

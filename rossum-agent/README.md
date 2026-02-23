@@ -231,8 +231,21 @@ flowchart TB
 | `POST /api/v1/chats/{id}/messages` | Send message (SSE) |
 | `GET /api/v1/chats/{id}/files` | List files |
 | `GET /api/v1/chats/{id}/files/{name}` | Download file |
+| `GET /api/v1/commands` | List available slash commands |
 
 API docs: `/api/docs` (Swagger) or `/api/redoc`
+
+**Slash Commands:** Messages starting with `/` are intercepted before reaching the agent and return instant responses via SSE. Available commands:
+
+| Command | Description |
+|---------|-------------|
+| `/list-commands` | List all available slash commands |
+| `/list-commits` | List configuration commits made in this chat |
+| `/list-skills` | List available agent skills with slugs |
+| `/list-mcp-tools` | List MCP tools grouped by category |
+| `/list-agent-tools` | List built-in agent tools with descriptions |
+
+The TUI provides autocomplete suggestions when typing `/`. Commands can also be discovered programmatically via `GET /api/v1/commands`.
 
 **SSE Events:** The message endpoint streams these SSE event types:
 

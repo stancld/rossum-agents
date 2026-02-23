@@ -8,9 +8,16 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from rossum_agent.api.main import app
 from rossum_agent.api.models.schemas import StepEvent, StreamDoneEvent
+from rossum_agent.api.routes.messages import limiter
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter() -> None:
+    """Reset rate limiter storage before each test to prevent cross-test rate limit bleed."""
+    limiter._storage.reset()
 
 
 @pytest.fixture(autouse=True)
