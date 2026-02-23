@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
+- Added `summary` field to chat list response (`GET /api/v1/chats`) — auto-generated one-line summary via Claude Haiku after each turn, persisted in chat metadata [#208](https://github.com/stancld/rossum-agents/pull/208)
 - Added agent persona support (`default`, `cautious`) — settable at chat creation (`POST /api/v1/chats`) and overridable per message; persisted in chat metadata
 - Added `SnapshotStore` — Redis-backed store (7-day TTL) that indexes full entity snapshots by `(entity_type, entity_id, commit_hash)` for point-in-time restore [#200](https://github.com/stancld/rossum-agents/pull/200)
 - Added `show_entity_history` tool — lists all historical versions of a specific entity [#200](https://github.com/stancld/rossum-agents/pull/200)

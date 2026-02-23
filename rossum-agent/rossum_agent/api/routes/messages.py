@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
+import anthropic
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
@@ -57,6 +58,27 @@ router = APIRouter(prefix="/chats", tags=["messages"])
 def _format_sse_event(event_type: str, data: str) -> str:
     """Format an SSE event string."""
     return f"event: {event_type}\ndata: {data}\n\n"
+
+
+async def _generate_chat_summary(user_prompt: str) -> str | None:
+    """Generate a one-line summary of the chat turn via Claude Haiku. Returns None on failure."""
+    try:
+        client = anthropic.AsyncAnthropic()
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=50,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Summarize this in one sentence (max 10 words): {user_prompt[:500]}",
+                }
+            ],
+        )
+        text_block = next((b for b in response.content if isinstance(b, anthropic.types.TextBlock)), None)
+        return text_block.text.strip() if text_block else None
+    except Exception as e:
+        logger.warning(f"Failed to generate chat summary: {e}")
+        return None
 
 
 type AgentEvent = StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | StepEvent
@@ -114,10 +136,12 @@ def _save_chat_history(
     output_dir: Path | None,
     memory: AgentMemory | None,
     done_event: StreamDoneEvent | None = None,
+    summary: str | None = None,
 ) -> None:
     """Persist updated conversation history after a successful agent run."""
     if done_event and done_event.config_commit_hash:
         chat_data.metadata.config_commits.append(done_event.config_commit_hash)
+    chat_data.metadata.summary = summary
 
     updated_history = agent_service.build_updated_history(
         existing_history=history,
@@ -331,6 +355,7 @@ async def send_message(  # noqa: C901 - endpoint handler with slash command inte
 
         output_dir = agent_service.get_output_dir(chat_id)
         memory = agent_service.pop_last_memory(chat_id)
+        summary = await _generate_chat_summary(user_prompt)
 
         _save_chat_history(
             chat_service=chat_service,
@@ -346,6 +371,7 @@ async def send_message(  # noqa: C901 - endpoint handler with slash command inte
             output_dir=output_dir,
             memory=memory,
             done_event=done_event,
+            summary=summary,
         )
 
         for file_event in _yield_file_events(output_dir, chat_id):

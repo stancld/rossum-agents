@@ -111,6 +111,7 @@ class TestChatMetadata:
             "mcp_mode": "read-only",
             "persona": "default",
             "config_commits": [],
+            "summary": None,
         }
 
     def test_from_dict(self):

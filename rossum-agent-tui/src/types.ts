@@ -17,6 +17,7 @@ export interface ChatSummary {
   message_count: number;
   first_message: string;
   preview: string | null;
+  summary: string | null;
 }
 
 export interface ChatListResponse {

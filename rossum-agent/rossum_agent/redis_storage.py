@@ -41,6 +41,7 @@ class ChatMetadata:
     mcp_mode: str = "read-only"
     persona: str = "default"
     config_commits: list[str] = field(default_factory=list)
+    summary: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -52,6 +53,7 @@ class ChatMetadata:
             "mcp_mode": self.mcp_mode,
             "persona": self.persona,
             "config_commits": self.config_commits,
+            "summary": self.summary,
         }
 
     @classmethod
@@ -65,6 +67,7 @@ class ChatMetadata:
             mcp_mode=data.get("mcp_mode", "read-only"),
             persona=data.get("persona", "default"),
             config_commits=data.get("config_commits", []),
+            summary=data.get("summary"),
         )
 
 
@@ -221,6 +224,7 @@ class RedisStorage:
                             "total_output_tokens": chat_data.metadata.total_output_tokens,
                             "total_tool_calls": chat_data.metadata.total_tool_calls,
                             "total_steps": chat_data.metadata.total_steps,
+                            "summary": chat_data.metadata.summary,
                         }
                     )
 
