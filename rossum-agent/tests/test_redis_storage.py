@@ -112,6 +112,7 @@ class TestChatMetadata:
             "persona": "default",
             "config_commits": [],
             "summary": None,
+            "sow_mode": False,
         }
 
     def test_from_dict(self):

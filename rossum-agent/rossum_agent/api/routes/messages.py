@@ -305,6 +305,7 @@ async def send_message(  # noqa: C901 - endpoint handler with slash command inte
     history = chat_data.messages
     mcp_mode = _resolve_mcp_mode(message, chat_data)
     persona = _resolve_persona(message, chat_data)
+    sow_mode = chat_data.metadata.sow_mode
     user_prompt = message.content
     images: list[ImageContent] | None = message.images
     documents: list[DocumentContent] | None = message.documents
@@ -327,6 +328,7 @@ async def send_message(  # noqa: C901 - endpoint handler with slash command inte
                 rossum_url=message.rossum_url,
                 mcp_mode=mcp_mode,
                 persona=persona,
+                sow_mode=sow_mode,
             )
             async for event, is_keepalive in _with_sse_keepalive(agent_events):
                 if is_keepalive:

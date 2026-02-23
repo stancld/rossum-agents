@@ -13,10 +13,10 @@ class ArtifactStore:
     def __init__(self, backend: StorageBackend) -> None:
         self._backend = backend
 
-    def save(self, handle: ArtifactHandle, artifact: BaseModel) -> None:  # type: ignore[type-arg]
+    def save(self, handle: ArtifactHandle, artifact: BaseModel) -> None:
         self._backend.save(handle.s3_key, handle.serialize(artifact))
 
-    def load(self, handle: ArtifactHandle) -> BaseModel | None:  # type: ignore[type-arg]
+    def load(self, handle: ArtifactHandle) -> BaseModel | None:
         data = self._backend.load(handle.s3_key)
         return handle.deserialize(data) if data is not None else None
 
@@ -46,5 +46,5 @@ class ArtifactStore:
                 result.append(artifact)
         return result
 
-    def delete(self, handle: ArtifactHandle) -> None:  # type: ignore[type-arg]
+    def delete(self, handle: ArtifactHandle) -> None:
         self._backend.delete(handle.s3_key)

@@ -5,6 +5,9 @@ from typing import Literal, Self
 
 from pydantic import BaseModel
 
+from rossum_agent.context.models import EnvironmentContext
+from rossum_agent.planning.models import ImplementationPlan, StatementOfWork
+
 
 class ArtifactHandle[T: BaseModel](BaseModel):
     org_id: str
@@ -37,46 +40,26 @@ class ArtifactHandle[T: BaseModel](BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Artifact models
-# ---------------------------------------------------------------------------
-
-
-class SoW(BaseModel):
-    title: str
-    content: str
-
-
-class Plan(BaseModel):
-    title: str
-    steps: list[str]
-
-
-class Context(BaseModel):
-    summary: str
-    data: dict[str, str]
-
-
-# ---------------------------------------------------------------------------
 # Concrete handles
 # ---------------------------------------------------------------------------
 
 
-class SoWHandle(ArtifactHandle[SoW]):
+class SoWHandle(ArtifactHandle[StatementOfWork]):
     artifact_type: Literal["sow"] = "sow"
 
-    def deserialize(self, data: bytes) -> SoW:
-        return SoW.model_validate_json(data)
+    def deserialize(self, data: bytes) -> StatementOfWork:
+        return StatementOfWork.model_validate_json(data)
 
 
-class PlanHandle(ArtifactHandle[Plan]):
+class PlanHandle(ArtifactHandle[ImplementationPlan]):
     artifact_type: Literal["plan"] = "plan"
 
-    def deserialize(self, data: bytes) -> Plan:
-        return Plan.model_validate_json(data)
+    def deserialize(self, data: bytes) -> ImplementationPlan:
+        return ImplementationPlan.model_validate_json(data)
 
 
-class ContextHandle(ArtifactHandle[Context]):
+class ContextHandle(ArtifactHandle[EnvironmentContext]):
     artifact_type: Literal["context"] = "context"
 
-    def deserialize(self, data: bytes) -> Context:
-        return Context.model_validate_json(data)
+    def deserialize(self, data: bytes) -> EnvironmentContext:
+        return EnvironmentContext.model_validate_json(data)

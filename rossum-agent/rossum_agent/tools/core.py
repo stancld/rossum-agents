@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
     from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
     from rossum_agent.rossum_mcp_integration import MCPConnection
+    from rossum_agent.storage.artifact_store import ArtifactStore
     from rossum_agent.tools.task_tracker import TaskTracker
 
 
@@ -101,6 +102,7 @@ class AgentContext:
     commit_store: CommitStore | None = None
     snapshot_store: SnapshotStore | None = None
     task_tracker: TaskTracker | None = None
+    artifact_store: ArtifactStore | None = None
     dynamic_tools: DynamicToolsState = field(default_factory=DynamicToolsState)
     # Callbacks
     progress_callback: SubAgentProgressCallback | None = None
@@ -152,6 +154,11 @@ class AgentContext:
     def report_task_snapshot(self, snapshot: list[dict[str, object]]) -> None:
         if self.task_snapshot_callback is not None:
             self.task_snapshot_callback(snapshot)
+
+
+def url_to_org_id(url: str) -> str:
+    """Derive a filesystem-safe org identifier from a Rossum API base URL."""
+    return url.rstrip("/").removeprefix("https://").removeprefix("http://").replace("/", "_")
 
 
 _agent_context: contextvars.ContextVar[AgentContext | None] = contextvars.ContextVar("agent_context", default=None)

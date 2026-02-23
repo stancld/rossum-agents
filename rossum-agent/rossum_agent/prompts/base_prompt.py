@@ -38,6 +38,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 - `load_skill("reasoning-fields")` → create AI-powered reasoning fields with prompt + context
 - `load_skill("lookup-fields")` → create lookup fields matching against Master Data Hub datasets
 - `load_skill("document-testing")` → generate mock PDFs, upload, verify extraction, test hooks
+- `load_skill("sow-creation")` → scope proposals, SoW creation, estimation guidelines
 
 **MCP Tools** (pre-loaded based on request keywords, or load manually):
 - `load_tool_category(["queues", "schemas"])` to load multiple categories at once
@@ -111,6 +112,24 @@ TASK_TRACKING = """
 
 For complex multi-step operations (3+ steps), call `create_task` for each step (subject prefixed with `1. ...`, `2. ...`). Skip for simple requests. Do not call `update_task` — focus on executing the work."""
 
+EXECUTION_PLANNING = """
+# Execution Planning
+
+Use these tools to scope, plan, and track complex multi-step implementations:
+
+| Tool | Purpose |
+|------|---------|
+| `create_sow` | Draft a Statement of Work before implementing |
+| `create_implementation_plan` | Break an approved SoW into tracked phases and steps |
+| `update_plan_step` | Mark steps done/in_progress/failed as you execute |
+| `get_active_plan` | Check current plan status and progress |
+| `record_sow_outcome` | Record actual operations performed (calibrates future estimates) |
+
+| Condition | Action |
+|-----------|--------|
+| SoW mode active (shown at top of system prompt) | Load `sow-creation` skill before scoping work |
+| Scope unclear (general vs. specific entity) | Ask the user before drafting the SoW |"""
+
 PERSONA_BEHAVIORS: dict[str, str] = {
     "default": "# Persona: default",
     "cautious": """
@@ -135,6 +154,7 @@ def get_shared_prompt_sections() -> str:
             CHANGE_HISTORY,
             OUTPUT_FORMATTING,
             TASK_TRACKING,
+            EXECUTION_PLANNING,
         ]
     )
 

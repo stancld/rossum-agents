@@ -34,6 +34,13 @@ from rossum_agent.tools.lookup import (
     suggest_lookup_field,
 )
 from rossum_agent.tools.mock_pdf import generate_mock_pdf
+from rossum_agent.tools.planning import (
+    create_implementation_plan,
+    create_sow,
+    get_active_plan,
+    record_sow_outcome,
+    update_plan_step,
+)
 from rossum_agent.tools.skills import load_skill
 from rossum_agent.tools.spawn_mcp import call_on_connection, close_connection, spawn_mcp_connection
 from rossum_agent.tools.subagents import patch_schema_with_subagent, search_elis_docs, search_knowledge_base
@@ -63,6 +70,11 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     kb_grep,
     kb_get_article,
     generate_mock_pdf,
+    create_sow,
+    create_implementation_plan,
+    update_plan_step,
+    get_active_plan,
+    record_sow_outcome,
 ]
 
 _CHANGE_HISTORY_TOOLS: list[BetaTool[..., str]] = [

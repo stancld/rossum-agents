@@ -3,14 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from rossum_agent.storage.handles import (
-    Context,
-    ContextHandle,
-    Plan,
-    PlanHandle,
-    SoW,
-    SoWHandle,
-)
+from rossum_agent.context.models import EnvironmentContext
+from rossum_agent.planning.models import ImplementationPlan, StatementOfWork
+from rossum_agent.storage.handles import ContextHandle, PlanHandle, SoWHandle
 
 TIMESTAMP = datetime(2026, 2, 23, 10, 30, 0, tzinfo=UTC)
 
@@ -81,7 +76,7 @@ def test_from_key_artifact_id_with_underscore():
 
 def test_sow_serialize_deserialize():
     handle = SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TIMESTAMP)
-    sow = SoW(title="My SoW", content="Do the thing")
+    sow = StatementOfWork(sow_id="sow-1", title="My SoW", description="Do the thing", created_at=TIMESTAMP)
     data = handle.serialize(sow)
     restored = handle.deserialize(data)
     assert restored == sow
@@ -89,7 +84,7 @@ def test_sow_serialize_deserialize():
 
 def test_plan_serialize_deserialize():
     handle = PlanHandle(org_id="org1", artifact_id="plan-1", timestamp=TIMESTAMP)
-    plan = Plan(title="My Plan", steps=["step 1", "step 2"])
+    plan = ImplementationPlan(plan_id="plan-1", sow_id="sow-1", created_at=TIMESTAMP)
     data = handle.serialize(plan)
     restored = handle.deserialize(data)
     assert restored == plan
@@ -97,7 +92,7 @@ def test_plan_serialize_deserialize():
 
 def test_context_serialize_deserialize():
     handle = ContextHandle(org_id="org1", artifact_id="ctx-1", timestamp=TIMESTAMP)
-    ctx = Context(summary="some context", data={"key": "value"})
+    ctx = EnvironmentContext(org_id="org1", fetched_at=TIMESTAMP)
     data = handle.serialize(ctx)
     restored = handle.deserialize(data)
     assert restored == ctx
@@ -105,7 +100,7 @@ def test_context_serialize_deserialize():
 
 def test_serialize_produces_json_bytes():
     handle = SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TIMESTAMP)
-    sow = SoW(title="T", content="C")
+    sow = StatementOfWork(sow_id="sow-1", title="T", description="D", created_at=TIMESTAMP)
     data = handle.serialize(sow)
     assert isinstance(data, bytes)
     assert b'"title"' in data

@@ -160,7 +160,7 @@ The agent provides internal tools and access to 70 MCP tools via dynamic loading
 - `close_connection` - Close spawned connection
 
 **Skills:**
-- `load_skill` - Load domain-specific workflows (`rossum-deployment`, `schema-patching`, `schema-pruning`, `organization-setup`, `schema-creation`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
+- `load_skill` - Load domain-specific workflows (`rossum-deployment`, `schema-patching`, `schema-pruning`, `organization-setup`, `schema-creation`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`, `sow-creation`)
 
 **Document Testing:**
 - `generate_mock_pdf` - Generate schema-aware mock PDFs with realistic field values for end-to-end extraction testing
@@ -169,6 +169,13 @@ The agent provides internal tools and access to 70 MCP tools via dynamic loading
 - `create_task` - Create a task to track progress on multi-step operations
 - `update_task` - Update a task's status (`pending`, `in_progress`, `completed`) or subject
 - `list_tasks` - List all tracked tasks with current status
+
+**Execution Planning (S3-backed, requires `S3_ARTIFACT_BUCKET`):**
+- `create_sow` - Draft a Statement of Work for user review before implementing
+- `create_implementation_plan` - Break an approved SoW into trackable phases and steps
+- `update_plan_step` - Mark a step `pending`/`in_progress`/`done`/`failed` as execution proceeds
+- `get_active_plan` - Retrieve the current active plan and progress summary
+- `record_sow_outcome` - Record actual operation counts after completion (calibrates future estimates)
 
 </details>
 
@@ -247,6 +254,7 @@ API docs: `/api/docs` (Swagger) or `/api/redoc`
 | `/list-skills` | List available agent skills with slugs |
 | `/list-mcp-tools` | List MCP tools grouped by category |
 | `/list-agent-tools` | List built-in agent tools with descriptions |
+| `/sow-mode on\|off` | Enable or disable Statement of Work mode for the current chat |
 
 The TUI provides autocomplete suggestions when typing `/`. Commands can also be discovered programmatically via `GET /api/v1/commands`.
 

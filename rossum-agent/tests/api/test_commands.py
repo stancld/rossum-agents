@@ -417,6 +417,81 @@ class TestPersonaHandler:
         assert "not found" in result
 
 
+class TestSowModeHandler:
+    @pytest.mark.asyncio
+    async def test_enable_sow_mode(self):
+        chat_service = MagicMock()
+        metadata = ChatMetadata(sow_mode=False)
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=metadata)
+        ctx = _make_ctx(chat_service=chat_service, args=["on"])
+        result = await execute_command("/sow-mode", ctx)
+        assert "enabled" in result
+        chat_service.save_messages.assert_called_once()
+        saved_metadata = chat_service.save_messages.call_args.kwargs["metadata"]
+        assert saved_metadata.sow_mode is True
+
+    @pytest.mark.asyncio
+    async def test_disable_sow_mode(self):
+        chat_service = MagicMock()
+        metadata = ChatMetadata(sow_mode=True)
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=metadata)
+        ctx = _make_ctx(chat_service=chat_service, args=["off"])
+        result = await execute_command("/sow-mode", ctx)
+        assert "disabled" in result
+        saved_metadata = chat_service.save_messages.call_args.kwargs["metadata"]
+        assert saved_metadata.sow_mode is False
+
+    @pytest.mark.asyncio
+    async def test_no_argument_shows_current_state_disabled(self):
+        chat_service = MagicMock()
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=ChatMetadata(sow_mode=False))
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/sow-mode", ctx)
+        assert "currently" in result
+        assert "disabled" in result
+        chat_service.save_messages.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_argument_shows_current_state_enabled(self):
+        chat_service = MagicMock()
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=ChatMetadata(sow_mode=True))
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/sow-mode", ctx)
+        assert "currently" in result
+        assert "enabled" in result
+        chat_service.save_messages.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_invalid_argument_shows_usage(self):
+        ctx = _make_ctx(args=["maybe"])
+        result = await execute_command("/sow-mode", ctx)
+        assert "Usage" in result
+
+    @pytest.mark.asyncio
+    async def test_already_enabled_no_save(self):
+        chat_service = MagicMock()
+        metadata = ChatMetadata(sow_mode=True)
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=metadata)
+        ctx = _make_ctx(chat_service=chat_service, args=["on"])
+        result = await execute_command("/sow-mode", ctx)
+        assert "already" in result
+        chat_service.save_messages.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_chat_not_found(self):
+        chat_service = MagicMock()
+        chat_service.get_chat_data.return_value = None
+        ctx = _make_ctx(chat_service=chat_service, args=["on"])
+        result = await execute_command("/sow-mode", ctx)
+        assert "not found" in result
+
+    @pytest.mark.asyncio
+    async def test_sow_mode_registered(self):
+        from rossum_agent.api.commands import COMMANDS
+
+        assert "/sow-mode" in COMMANDS
+
+
 class TestExecuteUnknownCommand:
     @pytest.mark.asyncio
     async def test_unknown_command(self):

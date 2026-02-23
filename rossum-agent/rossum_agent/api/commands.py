@@ -222,6 +222,47 @@ async def _handle_persona(ctx: CommandContext) -> str:
     return "\n".join(parts)
 
 
+# -- /sow-mode ---------------------------------------------------------------
+
+_register("/sow-mode", "Show, enable, or disable SoW mode: /sow-mode [on|off]")
+
+
+async def _handle_sow_mode(ctx: CommandContext) -> str:
+    arg = ctx.args[0].lower() if ctx.args else ""
+    if arg not in ("on", "off", ""):
+        return "Usage: `/sow-mode on` or `/sow-mode off`"
+
+    chat_data = ctx.chat_service.get_chat_data(ctx.user_id, ctx.chat_id)
+    if chat_data is None:
+        return "Chat not found."
+
+    if not arg:
+        state = "enabled" if chat_data.metadata.sow_mode else "disabled"
+        return f"SoW mode is currently {state}."
+
+    enabled = arg == "on"
+    if chat_data.metadata.sow_mode == enabled:
+        state = "enabled" if enabled else "disabled"
+        return f"SoW mode is already {state}."
+
+    chat_data.metadata.sow_mode = enabled
+    ctx.chat_service.save_messages(
+        ctx.user_id,
+        ctx.chat_id,
+        chat_data.messages,
+        metadata=chat_data.metadata,
+    )
+
+    if enabled:
+        return (
+            "**SoW mode enabled.** Before any significant implementation I will:\n"
+            "1. Clarify whether the work targets a specific context (queue, workspace, etc.) or is general\n"
+            "2. Create a Statement of Work for your approval\n"
+            "3. Create an implementation plan and track each step"
+        )
+    return "**SoW mode disabled.** I will execute tasks directly without a formal SoW."
+
+
 # -- Handler dispatch --------------------------------------------------------
 
 _HANDLERS: dict[str, Callable[[CommandContext], Awaitable[str]]] = {
@@ -231,6 +272,7 @@ _HANDLERS: dict[str, Callable[[CommandContext], Awaitable[str]]] = {
     "/list-mcp-tools": _handle_list_mcp_tools,
     "/list-agent-tools": _handle_list_agent_tools,
     "/persona": _handle_persona,
+    "/sow-mode": _handle_sow_mode,
 }
 
 

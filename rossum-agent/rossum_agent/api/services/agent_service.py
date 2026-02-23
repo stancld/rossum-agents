@@ -36,15 +36,20 @@ from rossum_agent.api.models.schemas import (
 )
 from rossum_agent.change_tracking.commit_service import CommitService
 from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
+from rossum_agent.planning.models import ImplementationPlan, StatementOfWork
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.redis_storage import RedisStorage
 from rossum_agent.rossum_mcp_integration import MCPConnection, connect_mcp_server
+from rossum_agent.storage.artifact_store import ArtifactStore
+from rossum_agent.storage.handles import PlanHandle, SoWHandle
+from rossum_agent.storage.s3_backend import S3StorageBackend
 from rossum_agent.tools.core import (
     AgentContext,
     SubAgentProgress,
     SubAgentText,
     reset_context,
     set_context,
+    url_to_org_id,
 )
 from rossum_agent.tools.dynamic_tools import get_write_tools_async
 from rossum_agent.tools.task_tracker import TaskTracker
@@ -61,6 +66,19 @@ if TYPE_CHECKING:
     from rossum_agent.change_tracking.models import ConfigCommit
 
 logger = logging.getLogger(__name__)
+
+_SOW_MODE_BANNER = """\
+# SoW Mode: ACTIVE
+
+SoW (Statement of Work) mode is enabled for this chat.
+
+Before implementing anything significant, load the SoW skill and follow it:
+  `load_skill("sow-creation")`
+
+Key constraint: clarify whether the work is **general** (applies to all/many \
+entities) or **context-specific** (targets a particular queue, workspace, or \
+schema). If unclear from the user's message, ask explicitly before proceeding.\
+"""
 
 
 async def _log_commit_hook(commit: ConfigCommit) -> str | None:
@@ -227,6 +245,35 @@ class AgentService:
         logger.warning("Redis unavailable — change tracking disabled for this run")
         return None, None
 
+    @staticmethod
+    def _get_artifact_store() -> ArtifactStore | None:
+        try:
+            return ArtifactStore(S3StorageBackend.from_env())
+        except KeyError:
+            logger.debug("S3_ARTIFACT_BUCKET not set — artifact store disabled")
+            return None
+        except Exception as e:
+            logger.warning(f"Artifact store unavailable: {e}")
+            return None
+
+    @staticmethod
+    def _inject_active_artifacts(org_id: str, artifact_store: ArtifactStore | None, system_prompt: str) -> str:
+        if artifact_store is None:
+            return system_prompt
+        try:
+            sections = []
+            latest_sow = artifact_store.load_latest(org_id, "sow", SoWHandle)
+            if isinstance(latest_sow, StatementOfWork) and latest_sow.status != "completed":
+                sections.append(f"**Active SoW**: {latest_sow.render_summary()}")
+            latest_plan = artifact_store.load_latest(org_id, "plan", PlanHandle)
+            if isinstance(latest_plan, ImplementationPlan) and latest_plan.status not in ("completed", "failed"):
+                sections.append(f"**Active Plan**: {latest_plan.render_progress()}")
+            if sections:
+                system_prompt = system_prompt + "\n\n---\n# Active Work Context\n" + "\n".join(sections)
+        except Exception as e:
+            logger.warning(f"Failed to inject active artifacts: {e}")
+        return system_prompt
+
     async def _setup_change_tracking(
         self, mcp_connection: MCPConnection, chat_id: str, rossum_api_base_url: str
     ) -> tuple[CommitStore | None, SnapshotStore | None, str]:
@@ -369,6 +416,7 @@ class AgentService:
         rossum_url: str | None = None,
         images: list[ImageContent] | None = None,
         documents: list[DocumentContent] | None = None,
+        sow_mode: bool = False,
     ) -> AsyncIterator[StepEvent | StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent]:
         """Run the agent with a new prompt.
 
@@ -400,6 +448,7 @@ class AgentService:
         req_ctx.event_queue = asyncio.Queue(maxsize=100)
         req_ctx.event_loop = asyncio.get_running_loop()
 
+        artifact_store = self._get_artifact_store()
         agent_ctx = AgentContext(
             output_dir=output_dir,
             rossum_credentials=(rossum_api_base_url, rossum_api_token),
@@ -407,10 +456,13 @@ class AgentService:
             text_callback=self._on_sub_agent_text,
             task_tracker=TaskTracker(),
             task_snapshot_callback=self._on_task_snapshot,
+            artifact_store=artifact_store,
         )
         ctx_token = set_context(agent_ctx)
 
-        system_prompt = self._build_system_prompt(rossum_url, persona)
+        org_id = url_to_org_id(rossum_api_base_url)
+        system_prompt = self._build_system_prompt(rossum_url, persona, sow_mode=sow_mode)
+        system_prompt = self._inject_active_artifacts(org_id, artifact_store, system_prompt)
 
         try:
             try:
@@ -491,12 +543,18 @@ class AgentService:
             await self._clear_run(chat_id, run_id)
 
     @staticmethod
-    def _build_system_prompt(rossum_url: str | None, persona: Literal["default", "cautious"] = "default") -> str:
+    def _build_system_prompt(
+        rossum_url: str | None,
+        persona: Literal["default", "cautious"] = "default",
+        sow_mode: bool = False,
+    ) -> str:
         system_prompt = get_system_prompt(persona)
         url_context = extract_url_context(rossum_url)
         if not url_context.is_empty():
             context_section = format_context_for_prompt(url_context)
             system_prompt = system_prompt + "\n\n---\n" + context_section
+        if sow_mode:
+            system_prompt = system_prompt + "\n\n---\n" + _SOW_MODE_BANNER
         return system_prompt
 
     async def _stream_finalization(

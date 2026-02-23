@@ -42,6 +42,7 @@ class ChatMetadata:
     persona: str = "default"
     config_commits: list[str] = field(default_factory=list)
     summary: str | None = None
+    sow_mode: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -54,6 +55,7 @@ class ChatMetadata:
             "persona": self.persona,
             "config_commits": self.config_commits,
             "summary": self.summary,
+            "sow_mode": self.sow_mode,
         }
 
     @classmethod
@@ -68,6 +70,7 @@ class ChatMetadata:
             persona=data.get("persona", "default"),
             config_commits=data.get("config_commits", []),
             summary=data.get("summary"),
+            sow_mode=data.get("sow_mode", False),
         )
 
 

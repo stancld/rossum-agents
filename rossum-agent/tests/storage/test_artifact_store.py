@@ -5,21 +5,28 @@ from datetime import UTC, datetime
 import boto3
 import pytest
 from moto import mock_aws
+from rossum_agent.context.models import EnvironmentContext
+from rossum_agent.planning.models import ImplementationPlan, StatementOfWork
 from rossum_agent.storage.artifact_store import ArtifactStore
-from rossum_agent.storage.handles import (
-    Context,
-    ContextHandle,
-    Plan,
-    PlanHandle,
-    SoW,
-    SoWHandle,
-)
+from rossum_agent.storage.handles import ContextHandle, PlanHandle, SoWHandle
 from rossum_agent.storage.s3_backend import S3StorageBackend
 
 BUCKET = "test-bucket"
 TS1 = datetime(2026, 2, 23, 10, 0, 0, tzinfo=UTC)
 TS2 = datetime(2026, 2, 23, 11, 0, 0, tzinfo=UTC)
 TS3 = datetime(2026, 2, 23, 12, 0, 0, tzinfo=UTC)
+
+
+def _make_sow(sow_id: str, title: str) -> StatementOfWork:
+    return StatementOfWork(sow_id=sow_id, title=title, description="desc", created_at=TS1)
+
+
+def _make_plan(plan_id: str, sow_id: str = "sow-1") -> ImplementationPlan:
+    return ImplementationPlan(plan_id=plan_id, sow_id=sow_id, created_at=TS1)
+
+
+def _make_context(org_id: str = "org1") -> EnvironmentContext:
+    return EnvironmentContext(org_id=org_id, fetched_at=TS1)
 
 
 @pytest.fixture
@@ -42,7 +49,7 @@ def artifact_store():
 
 def test_save_and_load_sow(artifact_store):
     handle = SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TS1)
-    sow = SoW(title="Initial SoW", content="Build the thing")
+    sow = _make_sow("sow-1", "Initial SoW")
     artifact_store.save(handle, sow)
     result = artifact_store.load(handle)
     assert result == sow
@@ -50,7 +57,7 @@ def test_save_and_load_sow(artifact_store):
 
 def test_save_and_load_plan(artifact_store):
     handle = PlanHandle(org_id="org1", artifact_id="plan-1", timestamp=TS1)
-    plan = Plan(title="Phase 1", steps=["research", "implement", "test"])
+    plan = _make_plan("plan-1")
     artifact_store.save(handle, plan)
     result = artifact_store.load(handle)
     assert result == plan
@@ -58,7 +65,7 @@ def test_save_and_load_plan(artifact_store):
 
 def test_save_and_load_context(artifact_store):
     handle = ContextHandle(org_id="org1", artifact_id="ctx-1", timestamp=TS1)
-    ctx = Context(summary="Project context", data={"env": "prod", "queue": "42"})
+    ctx = _make_context("org1")
     artifact_store.save(handle, ctx)
     result = artifact_store.load(handle)
     assert result == ctx
@@ -81,16 +88,16 @@ def test_load_latest_empty(artifact_store):
 
 def test_load_latest_single(artifact_store):
     handle = SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TS1)
-    sow = SoW(title="Only one", content="content")
+    sow = _make_sow("sow-1", "Only one")
     artifact_store.save(handle, sow)
     result = artifact_store.load_latest("org1", "sow", SoWHandle)
     assert result == sow
 
 
 def test_load_latest_returns_most_recent(artifact_store):
-    sow_old = SoW(title="Old SoW", content="old content")
-    sow_mid = SoW(title="Mid SoW", content="mid content")
-    sow_new = SoW(title="New SoW", content="new content")
+    sow_old = _make_sow("sow-1", "Old SoW")
+    sow_mid = _make_sow("sow-2", "Mid SoW")
+    sow_new = _make_sow("sow-3", "New SoW")
 
     artifact_store.save(SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TS1), sow_old)
     artifact_store.save(SoWHandle(org_id="org1", artifact_id="sow-2", timestamp=TS2), sow_mid)
@@ -101,8 +108,8 @@ def test_load_latest_returns_most_recent(artifact_store):
 
 
 def test_load_latest_isolated_by_org(artifact_store):
-    sow_org1 = SoW(title="Org1 SoW", content="org1")
-    sow_org2 = SoW(title="Org2 SoW", content="org2")
+    sow_org1 = _make_sow("sow-1", "Org1 SoW")
+    sow_org2 = _make_sow("sow-1", "Org2 SoW")
 
     artifact_store.save(SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TS1), sow_org1)
     artifact_store.save(SoWHandle(org_id="org2", artifact_id="sow-1", timestamp=TS2), sow_org2)
@@ -112,8 +119,8 @@ def test_load_latest_isolated_by_org(artifact_store):
 
 
 def test_load_latest_isolated_by_artifact_type(artifact_store):
-    sow = SoW(title="SoW", content="content")
-    plan = Plan(title="Plan", steps=["step"])
+    sow = _make_sow("sow-1", "SoW")
+    plan = _make_plan("plan-1")
 
     artifact_store.save(SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TS1), sow)
     artifact_store.save(PlanHandle(org_id="org1", artifact_id="plan-1", timestamp=TS2), plan)
@@ -133,16 +140,16 @@ def test_list_artifacts_empty(artifact_store):
 
 
 def test_list_artifacts_single(artifact_store):
-    sow = SoW(title="My SoW", content="content")
+    sow = _make_sow("sow-1", "My SoW")
     artifact_store.save(SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TS1), sow)
     result = artifact_store.list_artifacts("org1", "sow", SoWHandle)
     assert result == [sow]
 
 
 def test_list_artifacts_multiple_in_chronological_order(artifact_store):
-    sow1 = SoW(title="First", content="first")
-    sow2 = SoW(title="Second", content="second")
-    sow3 = SoW(title="Third", content="third")
+    sow1 = _make_sow("sow-1", "First")
+    sow2 = _make_sow("sow-2", "Second")
+    sow3 = _make_sow("sow-3", "Third")
 
     # Save out of order to verify sorting
     artifact_store.save(SoWHandle(org_id="org1", artifact_id="sow-3", timestamp=TS3), sow3)
@@ -154,8 +161,8 @@ def test_list_artifacts_multiple_in_chronological_order(artifact_store):
 
 
 def test_list_artifacts_isolated_by_org(artifact_store):
-    sow_org1 = SoW(title="Org1", content="org1")
-    sow_org2 = SoW(title="Org2", content="org2")
+    sow_org1 = _make_sow("sow-1", "Org1")
+    sow_org2 = _make_sow("sow-1", "Org2")
 
     artifact_store.save(SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TS1), sow_org1)
     artifact_store.save(SoWHandle(org_id="org2", artifact_id="sow-1", timestamp=TS1), sow_org2)
@@ -171,7 +178,7 @@ def test_list_artifacts_isolated_by_org(artifact_store):
 
 def test_delete(artifact_store):
     handle = SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TS1)
-    sow = SoW(title="To be deleted", content="content")
+    sow = _make_sow("sow-1", "To be deleted")
     artifact_store.save(handle, sow)
     artifact_store.delete(handle)
     assert artifact_store.load(handle) is None
@@ -180,8 +187,8 @@ def test_delete(artifact_store):
 def test_delete_does_not_affect_other_artifacts(artifact_store):
     h1 = SoWHandle(org_id="org1", artifact_id="sow-1", timestamp=TS1)
     h2 = SoWHandle(org_id="org1", artifact_id="sow-2", timestamp=TS2)
-    sow1 = SoW(title="Keep", content="keep")
-    sow2 = SoW(title="Delete", content="delete")
+    sow1 = _make_sow("sow-1", "Keep")
+    sow2 = _make_sow("sow-2", "Delete")
 
     artifact_store.save(h1, sow1)
     artifact_store.save(h2, sow2)
