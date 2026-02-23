@@ -1,4 +1,22 @@
 services:
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: rossum-rustfs
+    ports:
+      - 127.0.0.1:9100:9000
+      - 127.0.0.1:9101:9001
+    environment:
+      - RUSTFS_ACCESS_KEY=rustfsadmin
+      - RUSTFS_SECRET_KEY=rustfsadmin
+      - RUSTFS_VOLUMES=/data
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9000 | grep -qE '^[0-9]'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:8-alpine
     container_name: rossum-redis
@@ -26,6 +44,10 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - ROSSUM_KB_DATA_PATH=/app/rossum-agent/data/rossum-kb.json
+      - S3_ENDPOINT_URL=http://rustfs:9000
+      - S3_ARTIFACT_BUCKET=rossum-agent
+      - S3_ACCESS_KEY_ID=rustfsadmin
+      - S3_SECRET_ACCESS_KEY=rustfsadmin
     ports:
       - 127.0.0.1:8000:8000
     volumes:
@@ -33,7 +55,11 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      rustfs:
+        condition: service_healthy
 
 volumes:
   redis-data:
+    driver: local
+  rustfs-data:
     driver: local
