@@ -65,10 +65,21 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
   switch (item.kind) {
     case "user_message":
       return (
-        <Text color="green" bold wrap="wrap">
-          {"❯ "}
-          {item.text}
-        </Text>
+        <Box flexDirection="column">
+          <Text color="green" bold wrap="wrap">
+            {"❯ "}
+            {item.text}
+          </Text>
+          {item.attachments && item.attachments.length > 0 && (
+            <Box paddingLeft={2} gap={1}>
+              {item.attachments.map((att, i) => (
+                <Text key={i} dimColor>
+                  [{att.type === "image" ? "img" : "doc"}] {att.filename}
+                </Text>
+              ))}
+            </Box>
+          )}
+        </Box>
       );
 
     case "thinking":

@@ -6,6 +6,7 @@ import {
   savePersistedState,
 } from "../utils/persistence.js";
 import type {
+  AttachmentInfo,
   ChatState,
   CompletedStep,
   Config,
@@ -18,6 +19,10 @@ import type {
   TokenUsageBreakdown,
   UserMessage,
 } from "../types.js";
+import type {
+  ImageAttachment,
+  DocumentAttachment,
+} from "../utils/fileAttachments.js";
 
 const INITIAL_STATE: ChatState = {
   chatId: null,
@@ -179,7 +184,14 @@ export function useChat(config: Config) {
   }, []);
 
   const sendMessage = useCallback(
-    async (message: string) => {
+    async (
+      message: string,
+      attachments?: {
+        images?: ImageAttachment[];
+        documents?: DocumentAttachment[];
+        attachmentInfos?: AttachmentInfo[];
+      },
+    ) => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -197,7 +209,11 @@ export function useChat(config: Config) {
         error: null,
         userMessages: [
           ...prev.userMessages,
-          { text: message, stepIndexBefore: prev.completedSteps.length },
+          {
+            text: message,
+            stepIndexBefore: prev.completedSteps.length,
+            attachments: attachments?.attachmentInfos,
+          },
         ],
       }));
 
@@ -216,6 +232,8 @@ export function useChat(config: Config) {
           config,
           chatId,
           message,
+          images: attachments?.images,
+          documents: attachments?.documents,
           onEvent: dispatch,
           onError: (err) => {
             setState((prev) => ({

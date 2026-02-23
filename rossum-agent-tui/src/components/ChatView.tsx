@@ -12,7 +12,10 @@ interface ChatViewProps {
 }
 
 function estimateItemHeight(item: ChatItem, expanded: boolean): number {
-  if (item.kind === "user_message") return 1;
+  if (item.kind === "user_message") {
+    const base = 1;
+    return item.attachments && item.attachments.length > 0 ? base + 1 : base;
+  }
   if (item.kind === "thinking") {
     return expanded ? Math.max(1, item.content.split("\n").length + 1) : 1;
   }

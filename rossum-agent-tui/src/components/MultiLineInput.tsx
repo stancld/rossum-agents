@@ -13,6 +13,7 @@ interface MultiLineInputProps {
   isActive: boolean;
   placeholder?: string;
   onChange?: (text: string) => void;
+  onCursorChange?: (row: number, col: number) => void;
 }
 
 export interface MultiLineInputHandle {
@@ -22,7 +23,10 @@ export interface MultiLineInputHandle {
 export const MultiLineInput = forwardRef<
   MultiLineInputHandle,
   MultiLineInputProps
->(function MultiLineInput({ onSubmit, isActive, placeholder, onChange }, ref) {
+>(function MultiLineInput(
+  { onSubmit, isActive, placeholder, onChange, onCursorChange },
+  ref,
+) {
   const [lines, setLines] = useState<string[]>([""]);
   const [cursorRow, setCursorRow] = useState(0);
   const [cursorCol, setCursorCol] = useState(0);
@@ -37,6 +41,13 @@ export const MultiLineInput = forwardRef<
   useEffect(() => {
     onChangeRef.current?.(text);
   }, [text]);
+
+  const onCursorChangeRef = useRef(onCursorChange);
+  onCursorChangeRef.current = onCursorChange;
+
+  useEffect(() => {
+    onCursorChangeRef.current?.(cursorRow, cursorCol);
+  }, [cursorRow, cursorCol]);
 
   useImperativeHandle(
     ref,
