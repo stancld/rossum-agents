@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [1.4.0] - 2026-02-24
 
 ### Changed
 - `create_queue_from_template` now fetches the schema and engine created as side effects and embeds them in the return value as `_tracked_resources` for rossum-agent's change tracking and point-in-time restore [#200](https://github.com/stancld/rossum-agents/pull/200)
