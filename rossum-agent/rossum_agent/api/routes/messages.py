@@ -18,7 +18,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from rossum_agent.agent.memory import AgentMemory
-from rossum_agent.api.commands import CommandContext, execute_command, parse_command
+from rossum_agent.api.commands import CommandContext, ParsedCommand, execute_command, parse_command
 from rossum_agent.api.dependencies import (
     RossumCredentials,
     get_agent_service,
@@ -239,23 +239,24 @@ def _get_commit_store() -> CommitStore | None:
 
 
 def _handle_slash_command(
-    command_name: str,
+    command: ParsedCommand,
     chat_id: str,
     credentials: RossumCredentials,
     chat_service: ChatService,
 ) -> StreamingResponse:
     """Execute a slash command and return its result as an SSE stream."""
-    commit_store = _get_commit_store() if command_name == "/list-commits" else None
+    commit_store = _get_commit_store() if command.name == "/list-commits" else None
     ctx = CommandContext(
         chat_id=chat_id,
         user_id=credentials.user_id,
         credentials_api_url=credentials.api_url,
         chat_service=chat_service,
         commit_store=commit_store,
+        args=command.args,
     )
 
     async def command_event_generator() -> AsyncIterator[str]:
-        result_text = await execute_command(command_name, ctx)
+        result_text = await execute_command(command.name, ctx)
         step = StepEvent(type="final_answer", step_number=1, content=result_text, is_final=True)
         yield _format_sse_event("step", step.model_dump_json())
         done = StreamDoneEvent(total_steps=1, input_tokens=0, output_tokens=0)
@@ -297,9 +298,9 @@ async def send_message(  # noqa: C901 - endpoint handler with slash command inte
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
 
     # Intercept slash commands — bypass the agent entirely
-    command_name = parse_command(message.content)
-    if command_name is not None:
-        return _handle_slash_command(command_name, chat_id, credentials, chat_service)
+    command = parse_command(message.content)
+    if command is not None:
+        return _handle_slash_command(command, chat_id, credentials, chat_service)
 
     history = chat_data.messages
     mcp_mode = _resolve_mcp_mode(message, chat_data)

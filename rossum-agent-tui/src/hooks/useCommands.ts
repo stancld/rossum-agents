@@ -11,6 +11,22 @@ const FALLBACK_COMMANDS: CommandInfo[] = [
   { name: "/list-skills", description: "List available agent skills" },
   { name: "/list-mcp-tools", description: "List MCP tools by category" },
   { name: "/list-agent-tools", description: "List built-in agent tools" },
+  {
+    name: "/persona",
+    description: "Get or switch the agent persona (e.g. `/persona cautious`)",
+    argument_suggestions: [
+      {
+        value: "default",
+        description:
+          "Balanced mode — acts autonomously, asks only when truly ambiguous",
+      },
+      {
+        value: "cautious",
+        description:
+          "Plans first, asks before writes, verifies before and after changes",
+      },
+    ],
+  },
 ];
 
 export function useCommands(config: Config): { commands: CommandInfo[] } {

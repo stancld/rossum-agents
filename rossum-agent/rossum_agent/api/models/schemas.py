@@ -466,11 +466,19 @@ class CommitListResponse(BaseModel):
     commits: list[CommitInfo]
 
 
+class ArgumentSuggestion(BaseModel):
+    """A suggested value for a slash command argument."""
+
+    value: str
+    description: str
+
+
 class CommandInfo(BaseModel):
     """Information about an available slash command."""
 
     name: str
     description: str
+    argument_suggestions: list[ArgumentSuggestion] = []
 
 
 class CommandListResponse(BaseModel):

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, get_args
 
 from rossum_agent.agent.skills import get_all_skills
+from rossum_agent.api.models.schemas import Persona
+from rossum_agent.prompts.base_prompt import PERSONA_BEHAVIORS
 from rossum_agent.tools import INTERNAL_TOOLS
 from rossum_agent.tools.dynamic_tools import (
     get_cached_category_tool_names,
@@ -23,11 +25,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+VALID_PERSONAS: tuple[str, ...] = get_args(Persona.__value__)
+
+PERSONA_DESCRIPTIONS: dict[str, str] = {
+    "default": "Balanced mode — acts autonomously, asks only when truly ambiguous",
+    "cautious": "Plans first, asks before writes, verifies before and after changes",
+}
+
 
 @dataclass
 class CommandDefinition:
     name: str
     description: str
+    argument_suggestions: list[tuple[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -37,13 +47,22 @@ class CommandContext:
     credentials_api_url: str
     chat_service: ChatService
     commit_store: CommitStore | None
+    args: list[str] = field(default_factory=list)
 
 
 COMMANDS: dict[str, CommandDefinition] = {}
 
 
-def _register(name: str, description: str) -> None:
-    COMMANDS[name] = CommandDefinition(name=name, description=description)
+def _register(
+    name: str,
+    description: str,
+    argument_suggestions: list[tuple[str, str]] | None = None,
+) -> None:
+    COMMANDS[name] = CommandDefinition(
+        name=name,
+        description=description,
+        argument_suggestions=argument_suggestions or [],
+    )
 
 
 # -- /list-commands ----------------------------------------------------------
@@ -161,6 +180,48 @@ async def _handle_list_agent_tools(ctx: CommandContext) -> str:
     return "\n".join(lines)
 
 
+# -- /persona ----------------------------------------------------------------
+
+_register(
+    "/persona",
+    "Get or switch the agent persona (e.g. `/persona cautious`)",
+    argument_suggestions=[(p, PERSONA_DESCRIPTIONS[p]) for p in VALID_PERSONAS],
+)
+
+
+async def _handle_persona(ctx: CommandContext) -> str:
+    chat_data = ctx.chat_service.get_chat_data(user_id=ctx.user_id, chat_id=ctx.chat_id)
+    if chat_data is None:
+        return "Chat not found."
+
+    if not ctx.args:
+        current = chat_data.metadata.persona
+        lines = [f"Current persona: **{current}**", "", "Available personas:"]
+        for p in VALID_PERSONAS:
+            desc = PERSONA_DESCRIPTIONS.get(p, "")
+            marker = " (active)" if p == current else ""
+            lines.append(f"- `{p}`{marker} — {desc}" if desc else f"- `{p}`{marker}")
+        return "\n".join(lines)
+
+    requested = ctx.args[0].lower()
+    if requested not in VALID_PERSONAS:
+        available = ", ".join(f"`{p}`" for p in VALID_PERSONAS)
+        return f"Unknown persona `{requested}`. Available personas: {available}"
+
+    chat_data.metadata.persona = requested
+    ctx.chat_service.save_messages(
+        user_id=ctx.user_id,
+        chat_id=ctx.chat_id,
+        messages=chat_data.messages,
+        metadata=chat_data.metadata,
+    )
+    behavior = PERSONA_BEHAVIORS.get(requested, "")
+    parts = [f"Persona switched to **{requested}**."]
+    if behavior:
+        parts.append(f"\n{behavior.strip()}")
+    return "\n".join(parts)
+
+
 # -- Handler dispatch --------------------------------------------------------
 
 _HANDLERS: dict[str, Callable[[CommandContext], Awaitable[str]]] = {
@@ -169,15 +230,25 @@ _HANDLERS: dict[str, Callable[[CommandContext], Awaitable[str]]] = {
     "/list-skills": _handle_list_skills,
     "/list-mcp-tools": _handle_list_mcp_tools,
     "/list-agent-tools": _handle_list_agent_tools,
+    "/persona": _handle_persona,
 }
 
 
-def parse_command(text: str) -> str | None:
-    """Extract the command name from user input, or None if not a command."""
+@dataclass
+class ParsedCommand:
+    """Result of parsing a slash command from user input."""
+
+    name: str
+    args: list[str]
+
+
+def parse_command(text: str) -> ParsedCommand | None:
+    """Extract the command name and arguments from user input, or None if not a command."""
     stripped = text.strip()
     if not stripped.startswith("/"):
         return None
-    return stripped.split()[0].lower()
+    parts = stripped.split()
+    return ParsedCommand(name=parts[0].lower(), args=[p for p in parts[1:] if p])
 
 
 async def execute_command(name: str, ctx: CommandContext) -> str:
