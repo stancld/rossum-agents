@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.2.1] - 2026-02-18
+## [1.3.0] - 2026-02-24
 
 ### Added
 - Added `summary` field to chat list response (`GET /api/v1/chats`) — auto-generated one-line summary via Claude Haiku after each turn, persisted in chat metadata [#208](https://github.com/stancld/rossum-agents/pull/208)
