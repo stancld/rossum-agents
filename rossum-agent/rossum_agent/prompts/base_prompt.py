@@ -37,6 +37,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 - `load_skill("formula-fields")` → create/configure formula fields with TxScript
 - `load_skill("reasoning-fields")` → create AI-powered reasoning fields with prompt + context
 - `load_skill("lookup-fields")` → create lookup fields matching against Master Data Hub datasets
+- `load_skill("document-testing")` → generate mock PDFs, upload, verify extraction, test hooks
 
 **MCP Tools** (pre-loaded based on request keywords, or load manually):
 - `load_tool_category(["queues", "schemas"])` to load multiple categories at once
