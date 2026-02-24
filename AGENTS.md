@@ -19,6 +19,7 @@
 | Tests | `pytest` or `pytest path/to/test.py` |
 | rossum-deploy tests | `cd rossum-deploy && pytest tests/` (required when modifying `workspace.py`) |
 | Lint | `pre-commit run --all-files` |
+| TUI lint | `cd rossum-agent-tui && npm run lint && npm run format:check && npm run typecheck` |
 
 ## Architecture
 

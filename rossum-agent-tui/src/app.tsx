@@ -100,12 +100,22 @@ function buildMessageContent(
   return content;
 }
 
+function buildDisplayMessage(message: string): string {
+  const cleaned = message.replace(/\s+/g, " ").trim();
+  return cleaned || "See attached files.";
+}
+
 interface AppProps {
   config: Config;
 }
 
 function isExpandable(kind: string): boolean {
-  return kind === "thinking" || kind === "tool_call" || kind === "intermediate";
+  return (
+    kind === "thinking" ||
+    kind === "tool_call" ||
+    kind === "intermediate" ||
+    kind === "final_answer"
+  );
 }
 
 export function App({ config }: AppProps) {
@@ -135,12 +145,21 @@ export function App({ config }: AppProps) {
   }, [items, autoScroll]);
 
   useEffect(() => {
+    let latestFinalAnswerIndex = -1;
+    for (let i = items.length - 1; i >= 0; i--) {
+      if (items[i]?.kind === "final_answer") {
+        latestFinalAnswerIndex = i;
+        break;
+      }
+    }
+
     setExpandState((prev) => {
       let changed = false;
       const next = { ...prev };
       items.forEach((item, i) => {
         if (isExpandable(item.kind) && !(i in next)) {
-          next[i] = false;
+          next[i] =
+            item.kind === "final_answer" && i === latestFinalAnswerIndex;
           changed = true;
         }
       });
@@ -151,6 +170,7 @@ export function App({ config }: AppProps) {
   const handleSendMessage = useCallback(
     async (message: string) => {
       setAutoScroll(true);
+      setExpandState({});
 
       const paths = parseAtTokens(message);
       if (paths.length === 0) {
@@ -161,8 +181,10 @@ export function App({ config }: AppProps) {
       const { images, documents, textFiles, attachmentInfos, errors } =
         processAttachments(paths);
       const content = buildMessageContent(message, textFiles, errors);
+      const displayMessage = buildDisplayMessage(message);
 
       sendMessage(content, {
+        displayMessage,
         images: images.length > 0 ? images : undefined,
         documents: documents.length > 0 ? documents : undefined,
         attachmentInfos:

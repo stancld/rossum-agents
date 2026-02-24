@@ -194,10 +194,11 @@ export function useChat(config: Config) {
   const sendMessage = useCallback(
     async (
       message: string,
-      attachments?: {
+      options?: {
         images?: ImageAttachment[];
         documents?: DocumentAttachment[];
         attachmentInfos?: AttachmentInfo[];
+        displayMessage?: string;
       },
     ) => {
       abortRef.current?.abort();
@@ -218,9 +219,9 @@ export function useChat(config: Config) {
         userMessages: [
           ...prev.userMessages,
           {
-            text: message,
+            text: options?.displayMessage ?? message,
             stepIndexBefore: prev.completedSteps.length,
-            attachments: attachments?.attachmentInfos,
+            attachments: options?.attachmentInfos,
           },
         ],
       }));
@@ -240,8 +241,8 @@ export function useChat(config: Config) {
           config,
           chatId,
           message,
-          images: attachments?.images,
-          documents: attachments?.documents,
+          images: options?.images,
+          documents: options?.documents,
           onEvent: dispatch,
           onError: (err) => {
             setState((prev) => ({
