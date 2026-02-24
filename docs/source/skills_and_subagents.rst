@@ -60,6 +60,8 @@ Available Skills
      - Hook templates, token_owner, testing, debugging
    * - ``txscript``
      - TxScript language reference for formula fields, serverless functions, and rule trigger conditions
+   * - ``document-testing``
+     - Generate mock PDFs, upload to queues, verify extraction, test hooks end-to-end
 
 Hooks Skill
 """"""""""""
@@ -133,6 +135,49 @@ UI Settings Skill
 **Goal**: Update queue UI settings (``settings.annotation_list_table.columns``) without corrupting structure.
 
 Workflow: Fetch current settings → Modify only ``columns`` array → Patch via ``update_queue``.
+
+Document Testing Skill
+""""""""""""""""""""""
+
+**Goal**: Test document processing end-to-end — generate a schema-aware mock PDF, upload it, verify extraction, optionally trigger hooks.
+
+Workflow: ``get_schema`` → extract fields → ``generate_mock_pdf(fields=[...])`` → ``upload_document`` → poll ``list_annotations`` → ``get_annotation`` with sideloads → compare expected vs extracted values.
+
+``generate_mock_pdf`` tool parameters:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 15 65
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``fields``
+     - ``list[dict]``
+     - Schema field descriptors: ``[{id, label, type, rir_field_names?, options?}]``
+   * - ``document_type``
+     - ``str``
+     - ``invoice``, ``purchase_order``, ``receipt``, ``delivery_note``, ``credit_note``
+   * - ``line_item_count``
+     - ``int``
+     - Number of line item rows (default 3)
+   * - ``overrides``
+     - ``dict[str, str]``
+     - Force specific field values: ``{field_id: value}``
+   * - ``filename``
+     - ``str``
+     - Output filename (auto-generated if omitted)
+
+Returns JSON:
+
+.. code-block:: json
+
+   {
+     "status": "success",
+     "file_path": "/path/to/mock.pdf",
+     "expected_values": {"invoice_id": "INV-2026-00142", "date_issue": "2026-02-10"},
+     "line_items": [{"item_description": "Office supplies", "item_amount_total": "150.00"}]
+   }
 
 Dynamic Tool Loading
 --------------------
