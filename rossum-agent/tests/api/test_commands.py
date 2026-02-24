@@ -9,6 +9,7 @@ import pytest
 from rossum_agent.api.commands import (
     COMMANDS,
     CommandContext,
+    ParsedCommand,
     execute_command,
     parse_command,
 )
@@ -22,6 +23,7 @@ def _make_ctx(
     credentials_api_url: str = "https://api.rossum.ai",
     chat_service: MagicMock | None = None,
     commit_store: MagicMock | None = None,
+    args: list[str] | None = None,
 ) -> CommandContext:
     return CommandContext(
         chat_id=chat_id,
@@ -29,18 +31,19 @@ def _make_ctx(
         credentials_api_url=credentials_api_url,
         chat_service=chat_service or MagicMock(),
         commit_store=commit_store,
+        args=args or [],
     )
 
 
 class TestParseCommand:
     def test_slash_command(self):
-        assert parse_command("/list-commands") == "/list-commands"
+        assert parse_command("/list-commands") == ParsedCommand(name="/list-commands", args=[])
 
     def test_slash_command_with_trailing_whitespace(self):
-        assert parse_command("  /list-commands  ") == "/list-commands"
+        assert parse_command("  /list-commands  ") == ParsedCommand(name="/list-commands", args=[])
 
     def test_slash_command_with_args(self):
-        assert parse_command("/list-commits extra args") == "/list-commits"
+        assert parse_command("/list-commits extra args") == ParsedCommand(name="/list-commits", args=["extra", "args"])
 
     def test_non_command(self):
         assert parse_command("hello world") is None
@@ -52,10 +55,10 @@ class TestParseCommand:
         assert parse_command("   ") is None
 
     def test_case_insensitive(self):
-        assert parse_command("/LIST-COMMANDS") == "/list-commands"
+        assert parse_command("/LIST-COMMANDS") == ParsedCommand(name="/list-commands", args=[])
 
     def test_slash_only(self):
-        assert parse_command("/") == "/"
+        assert parse_command("/") == ParsedCommand(name="/", args=[])
 
 
 class TestCommandRegistry:
@@ -74,10 +77,28 @@ class TestCommandRegistry:
     def test_list_agent_tools_registered(self):
         assert "/list-agent-tools" in COMMANDS
 
+    def test_persona_registered(self):
+        assert "/persona" in COMMANDS
+
     def test_commands_have_descriptions(self):
         for cmd in COMMANDS.values():
             assert cmd.description
             assert cmd.name
+
+    def test_persona_has_argument_suggestions(self):
+        cmd = COMMANDS["/persona"]
+        assert len(cmd.argument_suggestions) == 2
+        values = [v for v, _ in cmd.argument_suggestions]
+        assert "default" in values
+        assert "cautious" in values
+        # Each suggestion has a description
+        for _, desc in cmd.argument_suggestions:
+            assert desc
+
+    def test_other_commands_have_no_argument_suggestions(self):
+        for name, cmd in COMMANDS.items():
+            if name != "/persona":
+                assert cmd.argument_suggestions == []
 
 
 class TestListCommandsHandler:
@@ -332,6 +353,70 @@ class TestListAgentToolsHandler:
         assert names == sorted(names)
 
 
+class TestPersonaHandler:
+    @pytest.mark.asyncio
+    async def test_get_current_persona_default(self):
+        chat_service = MagicMock()
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=ChatMetadata())
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/persona", ctx)
+        assert "Current persona: **default**" in result
+        assert "`default` (active)" in result
+        assert "`cautious`" in result
+        # Descriptions are shown
+        assert "Balanced mode" in result
+        assert "Plans first" in result
+
+    @pytest.mark.asyncio
+    async def test_get_current_persona_cautious(self):
+        chat_service = MagicMock()
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=ChatMetadata(persona="cautious"))
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/persona", ctx)
+        assert "Current persona: **cautious**" in result
+        assert "`cautious` (active)" in result
+
+    @pytest.mark.asyncio
+    async def test_switch_persona(self):
+        chat_service = MagicMock()
+        metadata = ChatMetadata(persona="default")
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=metadata)
+        ctx = _make_ctx(chat_service=chat_service, args=["cautious"])
+        result = await execute_command("/persona", ctx)
+        assert "Persona switched to **cautious**" in result
+        assert "Persona: cautious" in result
+        chat_service.save_messages.assert_called_once()
+        saved_metadata = chat_service.save_messages.call_args.kwargs["metadata"]
+        assert saved_metadata.persona == "cautious"
+
+    @pytest.mark.asyncio
+    async def test_switch_persona_case_insensitive(self):
+        chat_service = MagicMock()
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=ChatMetadata())
+        ctx = _make_ctx(chat_service=chat_service, args=["CAUTIOUS"])
+        result = await execute_command("/persona", ctx)
+        assert "Persona switched to **cautious**" in result
+
+    @pytest.mark.asyncio
+    async def test_invalid_persona(self):
+        chat_service = MagicMock()
+        chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=ChatMetadata())
+        ctx = _make_ctx(chat_service=chat_service, args=["nonexistent"])
+        result = await execute_command("/persona", ctx)
+        assert "Unknown persona" in result
+        assert "`nonexistent`" in result
+        assert "`default`" in result
+        assert "`cautious`" in result
+
+    @pytest.mark.asyncio
+    async def test_chat_not_found(self):
+        chat_service = MagicMock()
+        chat_service.get_chat_data.return_value = None
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/persona", ctx)
+        assert "not found" in result
+
+
 class TestExecuteUnknownCommand:
     @pytest.mark.asyncio
     async def test_unknown_command(self):
@@ -339,3 +424,35 @@ class TestExecuteUnknownCommand:
         result = await execute_command("/nonexistent", ctx)
         assert "Unknown command" in result
         assert "/list-commands" in result
+
+
+class TestCommandsRoute:
+    def test_commands_endpoint_includes_argument_suggestions(self):
+        from fastapi.testclient import TestClient
+        from rossum_agent.api.main import app
+
+        with TestClient(app) as client:
+            response = client.get("/api/v1/commands")
+
+        assert response.status_code == 200
+        data = response.json()
+        persona_cmd = next(c for c in data["commands"] if c["name"] == "/persona")
+        suggestions = persona_cmd["argument_suggestions"]
+        assert len(suggestions) == 2
+        values = [s["value"] for s in suggestions]
+        assert "default" in values
+        assert "cautious" in values
+        for s in suggestions:
+            assert s["description"]
+
+    def test_commands_without_suggestions_have_empty_list(self):
+        from fastapi.testclient import TestClient
+        from rossum_agent.api.main import app
+
+        with TestClient(app) as client:
+            response = client.get("/api/v1/commands")
+
+        data = response.json()
+        for cmd in data["commands"]:
+            if cmd["name"] != "/persona":
+                assert cmd["argument_suggestions"] == []

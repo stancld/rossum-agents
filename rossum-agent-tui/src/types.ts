@@ -149,9 +149,15 @@ export interface Config {
   persona: Persona;
 }
 
+export interface ArgumentSuggestion {
+  value: string;
+  description: string;
+}
+
 export interface CommandInfo {
   name: string;
   description: string;
+  argument_suggestions?: ArgumentSuggestion[];
 }
 
 export type InteractionMode = "input" | "browse";

@@ -42,6 +42,58 @@ function computeInputAreaHeight(
   return suggestionRows + mainInputRows;
 }
 
+interface CommandSuggestionState {
+  show: boolean;
+  filtered: CommandInfo[];
+  matchedCommand: CommandInfo | undefined;
+  trimmedText: string;
+}
+
+function getCommandSuggestionState(
+  commands: CommandInfo[],
+  currentText: string,
+  canSuggest: boolean,
+): CommandSuggestionState {
+  const isSingleLineSlash =
+    !currentText.includes("\n") && currentText.trimStart().startsWith("/");
+  const show = canSuggest && isSingleLineSlash;
+
+  if (!show) {
+    return {
+      show: false,
+      filtered: [],
+      matchedCommand: undefined,
+      trimmedText: "",
+    };
+  }
+
+  const trimmedText = currentText.trimStart();
+  const spaceIdx = trimmedText.indexOf(" ");
+  const matchedCommand =
+    spaceIdx !== -1
+      ? commands.find(
+          (c) =>
+            c.name === trimmedText.slice(0, spaceIdx) &&
+            (c.argument_suggestions?.length ?? 0) > 0,
+        )
+      : undefined;
+
+  if (matchedCommand) {
+    const argPartial = trimmedText.slice(spaceIdx + 1).toLowerCase();
+    const filtered = (matchedCommand.argument_suggestions ?? [])
+      .filter((s) => s.value.startsWith(argPartial))
+      .map((s) => ({ name: s.value, description: s.description }));
+    return { show: true, filtered, matchedCommand, trimmedText };
+  }
+
+  return {
+    show: true,
+    filtered: getFilteredCommands(commands, trimmedText),
+    matchedCommand: undefined,
+    trimmedText,
+  };
+}
+
 export function InputArea({
   onSubmit,
   connectionStatus,
@@ -59,14 +111,10 @@ export function InputArea({
     connectionStatus === "connecting" || connectionStatus === "streaming";
   const canSuggest = mode === "input" && !isDisabled;
 
-  // Command suggestions (/ prefix)
-  const isSingleLineSlash =
-    !currentText.includes("\n") && currentText.trimStart().startsWith("/");
-  const showCommandSuggestions = canSuggest && isSingleLineSlash;
-
-  const filteredCommands = showCommandSuggestions
-    ? getFilteredCommands(commands, currentText.trimStart())
-    : [];
+  // Command / argument suggestions (/ prefix)
+  const cmdState = getCommandSuggestionState(commands, currentText, canSuggest);
+  const showCommandSuggestions = cmdState.show;
+  const filteredCommands = cmdState.filtered;
 
   // File suggestions (@ prefix with path)
   const fileSuggest = useFileSuggest(currentText, cursorRow, cursorCol);
@@ -139,7 +187,13 @@ export function InputArea({
       if (key.tab && filteredCommands.length > 0) {
         const selected = filteredCommands[selectedSuggestion];
         if (selected) {
-          inputRef.current?.setText(selected.name + " ");
+          if (cmdState.matchedCommand) {
+            inputRef.current?.setText(
+              cmdState.matchedCommand.name + " " + selected.name,
+            );
+          } else {
+            inputRef.current?.setText(selected.name + " ");
+          }
         }
         return;
       }
@@ -190,8 +244,8 @@ export function InputArea({
   return (
     <Box flexDirection="column">
       <CommandSuggest
-        commands={commands}
-        filter={currentText.trimStart()}
+        commands={cmdState.matchedCommand ? filteredCommands : commands}
+        filter={cmdState.matchedCommand ? "" : cmdState.trimmedText}
         selectedIndex={selectedSuggestion}
         visible={showCommandSuggestions}
       />
