@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Box } from "ink";
 import { ChatItemDisplay } from "./ChatItemDisplay.js";
 import type { ChatItem, ExpandState } from "../types.js";
+import stripAnsi from "strip-ansi";
 import { getDisplayToolName, truncate } from "../utils/format.js";
 
 interface ChatViewProps {
@@ -19,7 +20,8 @@ function countWrappedLines(text: string, width: number): number {
   const effectiveWidth = Math.max(1, width);
   const lines = text.split("\n");
   return lines.reduce(
-    (sum, line) => sum + Math.max(1, Math.ceil(line.length / effectiveWidth)),
+    (sum, line) =>
+      sum + Math.max(1, Math.ceil(stripAnsi(line).length / effectiveWidth)),
     0,
   );
 }
@@ -124,6 +126,76 @@ function estimateStreamingHeight(
   return 1;
 }
 
+function estimateUserMessageHeight(
+  item: Extract<ChatItem, { kind: "user_message" }>,
+  w: Widths,
+): number {
+  const messageHeight = countWrappedLines(`❯ ${item.text}`, w.content);
+  const attachmentsHeight =
+    item.attachments && item.attachments.length > 0
+      ? countWrappedLines(
+          item.attachments
+            .map(
+              (att) =>
+                `[${att.type === "image" ? "img" : "doc"}] ${att.filename}`,
+            )
+            .join(" "),
+          w.indented,
+        )
+      : 0;
+  return messageHeight + attachmentsHeight;
+}
+
+function estimateThinkingHeight(
+  item: Extract<ChatItem, { kind: "thinking" }>,
+  expanded: boolean,
+  w: Widths,
+): number {
+  return expanded ? 1 + countWrappedLines(item.content, w.indented) : 1;
+}
+
+function estimateIntermediateHeight(
+  item: Extract<ChatItem, { kind: "intermediate" }>,
+  expanded: boolean,
+  w: Widths,
+): number {
+  const rawLines = item.content.split("\n");
+  const lines = rawLines.length;
+  if (!expanded) {
+    const preview = truncate(
+      rawLines
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .slice(0, 2)
+        .join(" "),
+      100,
+    );
+    const suffix = lines > 1 ? ` ... (${lines} lines)` : "";
+    return countWrappedLines(`▸ ${preview || "(empty)"}${suffix}`, w.content);
+  }
+  return 1 + countWrappedLines(item.content, w.indented);
+}
+
+function estimateFinalAnswerHeight(
+  item: Extract<ChatItem, { kind: "final_answer" }>,
+  expanded: boolean,
+  w: Widths,
+): number {
+  const lines = item.content.split("\n");
+  if (!expanded) {
+    const firstLine = truncate(
+      lines.map((line) => line.trim()).find((line) => line.length > 0) || "",
+      80,
+    );
+    const suffix = lines.length > 1 ? ` ... (${lines.length} lines)` : "";
+    return countWrappedLines(
+      `▸ ● ${firstLine || "(empty)"}${suffix}`,
+      w.content,
+    );
+  }
+  return 1 + countWrappedLines(item.content, w.indented);
+}
+
 function estimateItemHeight(
   item: ChatItem,
   expanded: boolean,
@@ -135,44 +207,22 @@ function estimateItemHeight(
     deepIndented: Math.max(10, width - 4),
   };
 
-  if (item.kind === "user_message") {
-    const messageHeight = countWrappedLines(`❯ ${item.text}`, w.content);
-    const attachmentsHeight =
-      item.attachments && item.attachments.length > 0
-        ? countWrappedLines(
-            item.attachments
-              .map(
-                (att) =>
-                  `[${att.type === "image" ? "img" : "doc"}] ${att.filename}`,
-              )
-              .join(" "),
-            w.indented,
-          )
-        : 0;
-    return messageHeight + attachmentsHeight;
+  switch (item.kind) {
+    case "user_message":
+      return estimateUserMessageHeight(item, w);
+    case "thinking":
+      return estimateThinkingHeight(item, expanded, w);
+    case "tool_call":
+      return estimateToolCallHeight(item, expanded, w);
+    case "intermediate":
+      return estimateIntermediateHeight(item, expanded, w);
+    case "final_answer":
+      return estimateFinalAnswerHeight(item, expanded, w);
+    case "streaming":
+      return estimateStreamingHeight(item, w);
+    default:
+      return 1;
   }
-  if (item.kind === "thinking") {
-    return expanded ? 1 + countWrappedLines(item.content, w.indented) : 1;
-  }
-  if (item.kind === "tool_call") {
-    return estimateToolCallHeight(item, expanded, w);
-  }
-  if (item.kind === "intermediate") {
-    const lines = item.content.split("\n").length;
-    if (lines <= 5) return countWrappedLines(`  ${item.content}`, w.content);
-    if (!expanded) {
-      const preview = item.content.split("\n").slice(0, 3).join("\n");
-      return countWrappedLines(`▸ ${preview} ... (${lines} lines)`, w.content);
-    }
-    return 1 + countWrappedLines(item.content, w.indented);
-  }
-  if (item.kind === "final_answer") {
-    return countWrappedLines(`● ${item.content}`, w.content);
-  }
-  if (item.kind === "streaming") {
-    return estimateStreamingHeight(item, w);
-  }
-  return 1;
 }
 
 function computeScrollOffset(

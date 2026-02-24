@@ -2,6 +2,7 @@ import React from "react";
 import { Text, Box } from "ink";
 import { Spinner } from "@inkjs/ui";
 import { getDisplayToolName } from "../utils/format.js";
+import { renderMarkdown } from "../utils/markdown.js";
 import type { StepEvent, SubAgentProgressEvent } from "../types.js";
 
 function ToolStartIndicator({
@@ -52,7 +53,7 @@ export function StreamingIndicator({
           <Text color="green" bold>
             {"● "}
           </Text>
-          {streaming.content}
+          {renderMarkdown(streaming.content)}
         </Text>
         <Spinner label=" Writing..." />
       </Box>

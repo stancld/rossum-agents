@@ -3,7 +3,8 @@ import { Box, Text } from "ink";
 import { ThinkingBlock } from "./ThinkingBlock.js";
 import { ToolCall } from "./ToolCall.js";
 import { StreamingIndicator } from "./StreamingIndicator.js";
-import { applyTerminalLinks } from "../utils/format.js";
+import { renderMarkdown } from "../utils/markdown.js";
+import { truncate } from "../utils/format.js";
 import type { ChatItem, ConfigCommitInfo } from "../types.js";
 
 interface ChatItemDisplayProps {
@@ -22,23 +23,22 @@ function IntermediateBlock({
   selected: boolean;
 }) {
   const lines = content.split("\n");
-  const isLong = lines.length > 5;
+  const lineCount = lines.length;
   const arrow = expanded ? "▾" : "▸";
-
-  if (!isLong) {
-    return (
-      <Text wrap="wrap" dimColor>
-        {"  "}
-        {content}
-      </Text>
-    );
-  }
+  const preview = truncate(
+    lines
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .slice(0, 2)
+      .join(" "),
+    100,
+  );
 
   if (!expanded) {
-    const preview = lines.slice(0, 3).join("\n");
     return (
       <Text inverse={selected} dimColor>
-        {arrow} {preview} ... ({lines.length} lines)
+        {arrow} {preview || "(empty)"}
+        {lineCount > 1 ? ` ... (${lineCount} lines)` : ""}
       </Text>
     );
   }
@@ -46,7 +46,7 @@ function IntermediateBlock({
   return (
     <Box flexDirection="column">
       <Text inverse={selected} dimColor>
-        {arrow} Content ({lines.length} lines)
+        {arrow} Draft response ({lineCount} lines)
       </Text>
       <Box marginLeft={2}>
         <Text dimColor wrap="wrap">
@@ -68,6 +68,51 @@ function ConfigCommitItem({ commit }: { commit: ConfigCommitInfo }) {
         ({commit.changesCount} change{suffix})
       </Text>
     </Text>
+  );
+}
+
+function FinalAnswerBlock({
+  content,
+  expanded,
+  selected,
+}: {
+  content: string;
+  expanded: boolean;
+  selected: boolean;
+}) {
+  const lines = content.split("\n");
+  const lineCount = lines.length;
+
+  if (!expanded) {
+    const firstLine = truncate(
+      lines.map((line) => line.trim()).find((line) => line.length > 0) || "",
+      80,
+    );
+    return (
+      <Text inverse={selected}>
+        {"▸ "}
+        <Text color="green" bold>
+          {"● "}
+        </Text>
+        {firstLine || "(empty)"}
+        {lineCount > 1 ? ` ... (${lineCount} lines)` : ""}
+      </Text>
+    );
+  }
+
+  return (
+    <Box flexDirection="column">
+      <Text inverse={selected}>
+        {"▾ "}
+        <Text color="green" bold>
+          {"● "}
+        </Text>
+        Response
+      </Text>
+      <Box marginLeft={2}>
+        <Text wrap="wrap">{renderMarkdown(content)}</Text>
+      </Box>
+    </Box>
   );
 }
 
@@ -126,12 +171,11 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
 
     case "final_answer":
       return (
-        <Text wrap="wrap">
-          <Text color="green" bold>
-            {"● "}
-          </Text>
-          {applyTerminalLinks(item.content)}
-        </Text>
+        <FinalAnswerBlock
+          content={item.content}
+          expanded={expanded}
+          selected={selected}
+        />
       );
 
     case "error":
