@@ -1,51 +1,207 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Box } from "ink";
 import { ChatItemDisplay } from "./ChatItemDisplay.js";
 import type { ChatItem, ExpandState } from "../types.js";
+import { getDisplayToolName, truncate } from "../utils/format.js";
 
 interface ChatViewProps {
   items: ChatItem[];
   expandState: ExpandState;
   selectedIndex: number;
   height: number;
+  width: number;
   browseMode: boolean;
+  autoScrollToBottom: boolean;
+  scrollNudge: number;
+}
+
+function countWrappedLines(text: string, width: number): number {
+  const effectiveWidth = Math.max(1, width);
+  const lines = text.split("\n");
+  return lines.reduce(
+    (sum, line) => sum + Math.max(1, Math.ceil(line.length / effectiveWidth)),
+    0,
+  );
+}
+
+interface Widths {
+  content: number;
+  indented: number;
+  deepIndented: number;
 }
 
 function estimateToolCallHeight(
   item: Extract<ChatItem, { kind: "tool_call" }>,
   expanded: boolean,
+  w: Widths,
 ): number {
-  if (!expanded) return item.resultStep?.result ? 2 : 1;
-  let h = 1;
+  const displayName = getDisplayToolName(
+    item.step.toolName || "",
+    item.step.toolArguments,
+  );
+  const progress = item.step.toolProgress
+    ? ` [${item.step.toolProgress[0]}/${item.step.toolProgress[1]}]`
+    : "";
+
+  if (!expanded) {
+    const argsSummary = item.step.toolArguments
+      ? truncate(
+          Object.entries(item.step.toolArguments)
+            .filter(([k]) => k !== "connection_id" && k !== "tool_name")
+            .map(
+              ([k, v]) =>
+                `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`,
+            )
+            .join(", "),
+          80,
+        )
+      : "";
+    const header = `▸ ${displayName}${progress}${argsSummary ? ` (${argsSummary})` : ""}`;
+    const preview = item.resultStep?.result
+      ? truncate(item.resultStep.result.replace(/\n/g, " "), 100)
+      : "";
+    return (
+      countWrappedLines(header, w.content) +
+      (preview ? countWrappedLines(preview, w.deepIndented) : 0)
+    );
+  }
+
+  let h = countWrappedLines(`▾ ${displayName}${progress}`, w.content);
   if (item.step.toolArguments) {
-    h += Object.keys(item.step.toolArguments).filter(
-      (k) => k !== "connection_id" && k !== "tool_name",
-    ).length;
+    h += Object.entries(item.step.toolArguments)
+      .filter(([k]) => k !== "connection_id" && k !== "tool_name")
+      .reduce((sum, [k, v]) => {
+        const value = typeof v === "string" ? v : JSON.stringify(v);
+        return sum + countWrappedLines(`${k}: ${value}`, w.indented);
+      }, 0);
   }
   if (item.resultStep?.result) {
-    h += 1 + item.resultStep.result.split("\n").length;
+    h += 1 + countWrappedLines(item.resultStep.result, w.indented);
   }
   return h;
 }
 
-function estimateItemHeight(item: ChatItem, expanded: boolean): number {
-  switch (item.kind) {
-    case "user_message":
-      return item.attachments?.length ? 2 : 1;
-    case "thinking":
-      return expanded ? Math.max(1, item.content.split("\n").length + 1) : 1;
-    case "tool_call":
-      return estimateToolCallHeight(item, expanded);
-    case "intermediate": {
-      const lines = item.content.split("\n").length;
-      return lines <= 5 ? lines : expanded ? lines + 1 : 2;
-    }
-    case "final_answer":
-      return Math.max(1, item.content.split("\n").length);
-    case "streaming":
-      return 2;
+function estimateStreamingToolStartHeight(
+  item: Extract<ChatItem, { kind: "streaming" }>,
+  w: Widths,
+): number {
+  const displayName = getDisplayToolName(
+    item.streaming.tool_name!,
+    item.streaming.tool_arguments,
+  );
+  const progress = item.streaming.tool_progress
+    ? ` (${item.streaming.tool_progress[0]}/${item.streaming.tool_progress[1]})`
+    : "";
+  let h = countWrappedLines(`Running: ${displayName}${progress}`, w.content);
+  if (item.subAgentProgress) {
+    const p = item.subAgentProgress;
+    const suffix = p.current_tool ? ` [${p.current_tool}]` : "";
+    const line = `Sub-agent (${p.tool_name}): iteration ${p.iteration}/${p.max_iterations}, ${p.status}${suffix}`;
+    h += countWrappedLines(line, w.content);
+  }
+  return h;
+}
+
+function estimateStreamingHeight(
+  item: Extract<ChatItem, { kind: "streaming" }>,
+  w: Widths,
+): number {
+  if (item.streaming.type === "final_answer" && item.streaming.content) {
+    return countWrappedLines(`● ${item.streaming.content}`, w.content) + 1;
+  }
+  if (item.streaming.type === "tool_start" && item.streaming.tool_name) {
+    return estimateStreamingToolStartHeight(item, w);
+  }
+  if (item.streaming.type === "thinking") {
+    const preview = item.streaming.content
+      ? item.streaming.content.split("\n").slice(-3).join("\n")
+      : "";
+    return 1 + (preview ? countWrappedLines(preview, w.indented) : 0);
+  }
+  if (item.streaming.type === "intermediate" && item.streaming.content) {
+    return countWrappedLines(`  ${item.streaming.content}`, w.content) + 1;
   }
   return 1;
+}
+
+function estimateItemHeight(
+  item: ChatItem,
+  expanded: boolean,
+  width: number,
+): number {
+  const w: Widths = {
+    content: Math.max(10, width),
+    indented: Math.max(10, width - 2),
+    deepIndented: Math.max(10, width - 4),
+  };
+
+  if (item.kind === "user_message") {
+    const messageHeight = countWrappedLines(`❯ ${item.text}`, w.content);
+    const attachmentsHeight =
+      item.attachments && item.attachments.length > 0
+        ? countWrappedLines(
+            item.attachments
+              .map(
+                (att) =>
+                  `[${att.type === "image" ? "img" : "doc"}] ${att.filename}`,
+              )
+              .join(" "),
+            w.indented,
+          )
+        : 0;
+    return messageHeight + attachmentsHeight;
+  }
+  if (item.kind === "thinking") {
+    return expanded ? 1 + countWrappedLines(item.content, w.indented) : 1;
+  }
+  if (item.kind === "tool_call") {
+    return estimateToolCallHeight(item, expanded, w);
+  }
+  if (item.kind === "intermediate") {
+    const lines = item.content.split("\n").length;
+    if (lines <= 5) return countWrappedLines(`  ${item.content}`, w.content);
+    if (!expanded) {
+      const preview = item.content.split("\n").slice(0, 3).join("\n");
+      return countWrappedLines(`▸ ${preview} ... (${lines} lines)`, w.content);
+    }
+    return 1 + countWrappedLines(item.content, w.indented);
+  }
+  if (item.kind === "final_answer") {
+    return countWrappedLines(`● ${item.content}`, w.content);
+  }
+  if (item.kind === "streaming") {
+    return estimateStreamingHeight(item, w);
+  }
+  return 1;
+}
+
+function computeScrollOffset(
+  prev: number,
+  opts: {
+    topOfSelected: number;
+    bottomOfSelected: number;
+    selectedHeight: number;
+    height: number;
+    totalHeight: number;
+    autoScrollToBottom: boolean;
+    movedUp: boolean;
+  },
+): number {
+  const { topOfSelected, bottomOfSelected, height, totalHeight } = opts;
+  let next = prev;
+
+  if (opts.selectedHeight > height && opts.autoScrollToBottom) {
+    next = bottomOfSelected - height;
+  } else if (opts.selectedHeight > height && opts.movedUp) {
+    // When moving up into a tall item, align to its top
+    if (topOfSelected < next) next = topOfSelected;
+    else if (bottomOfSelected > next + height) next = bottomOfSelected - height;
+  } else {
+    if (bottomOfSelected > next + height) next = bottomOfSelected - height;
+    if (topOfSelected < next) next = topOfSelected;
+  }
+
+  return Math.max(0, Math.min(next, totalHeight - height));
 }
 
 export const ChatView = React.memo(function ChatView({
@@ -53,13 +209,19 @@ export const ChatView = React.memo(function ChatView({
   expandState,
   selectedIndex,
   height,
+  width,
   browseMode,
+  autoScrollToBottom,
+  scrollNudge,
 }: ChatViewProps) {
   const [scrollOffset, setScrollOffset] = useState(0);
+  const prevSelectedRef = useRef(selectedIndex);
+  const prevScrollNudgeRef = useRef(scrollNudge);
 
   const heights = useMemo(
-    () => items.map((item, i) => estimateItemHeight(item, !!expandState[i])),
-    [items, expandState],
+    () =>
+      items.map((item, i) => estimateItemHeight(item, !!expandState[i], width)),
+    [items, expandState, width],
   );
 
   const totalHeight = useMemo(
@@ -70,26 +232,41 @@ export const ChatView = React.memo(function ChatView({
   useEffect(() => {
     if (totalHeight <= height) {
       setScrollOffset(0);
+      prevSelectedRef.current = selectedIndex;
       return;
     }
 
+    const movedUp = selectedIndex < prevSelectedRef.current;
     let topOfSelected = 0;
     for (let i = 0; i < selectedIndex; i++) {
       topOfSelected += heights[i] ?? 1;
     }
-    const bottomOfSelected = topOfSelected + (heights[selectedIndex] ?? 1);
+    const selectedHeight = heights[selectedIndex] ?? 1;
+    const bottomOfSelected = topOfSelected + selectedHeight;
 
-    setScrollOffset((prev) => {
-      let next = prev;
-      if (bottomOfSelected > next + height) {
-        next = bottomOfSelected - height;
-      }
-      if (topOfSelected < next) {
-        next = topOfSelected;
-      }
-      return Math.max(0, Math.min(next, totalHeight - height));
-    });
-  }, [heights, totalHeight, selectedIndex, height]);
+    setScrollOffset((prev) =>
+      computeScrollOffset(prev, {
+        topOfSelected,
+        bottomOfSelected,
+        selectedHeight,
+        height,
+        totalHeight,
+        autoScrollToBottom,
+        movedUp,
+      }),
+    );
+    prevSelectedRef.current = selectedIndex;
+  }, [heights, totalHeight, selectedIndex, height, autoScrollToBottom]);
+
+  useEffect(() => {
+    const delta = scrollNudge - prevScrollNudgeRef.current;
+    prevScrollNudgeRef.current = scrollNudge;
+    if (delta === 0) return;
+
+    setScrollOffset((prev) =>
+      Math.max(0, Math.min(prev + delta, Math.max(totalHeight - height, 0))),
+    );
+  }, [scrollNudge, totalHeight, height]);
 
   const { startIdx, endIdx } = useMemo(() => {
     let cumulative = 0;

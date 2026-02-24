@@ -44,7 +44,7 @@ export function StatusBar({
   const modeColor = mode === "browse" ? "yellow" : "green";
   const hints =
     mode === "browse"
-      ? "j/k:navigate  Enter/Space:expand/collapse  i:input  ^N:new chat"
+      ? "j/k:navigate  ^D/^U:scroll  Enter/Space:expand/collapse  i:input  ^N:new chat"
       : "Esc:browse  Enter:send  M+1:Approve  M+2:Reject  M+3:Chat  ^N:new chat";
 
   return (

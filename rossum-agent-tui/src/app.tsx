@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  useMemo,
-} from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Box, useInput } from "ink";
 import { ChatView } from "./components/ChatView.js";
 import { InputArea } from "./components/InputArea.js";
@@ -117,27 +111,28 @@ function isExpandable(kind: string): boolean {
 export function App({ config }: AppProps) {
   const { state, sendMessage, resetChat } = useChat(config);
   const { commands } = useCommands(config);
-  const { rows } = useTerminalSize();
+  const { rows, columns } = useTerminalSize();
 
   const [mode, setMode] = useState<InteractionMode>("input");
   const [expandState, setExpandState] = useState<ExpandState>({});
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [autoScroll, setAutoScroll] = useState(true);
-  const [suggestionRows, setSuggestionRows] = useState(0);
+  const [inputAreaRows, setInputAreaRows] = useState(1);
+  const [scrollNudge, setScrollNudge] = useState(0);
 
   const items = useMemo(() => buildChatItems(state), [state]);
-  const prevItemsLenRef = useRef(items.length);
+
+  // Layout: ChatView (flex) + InputArea (1+ rows) + TaskList (N rows) + StatusBar (3 rows with border)
+  const taskListHeight = state.tasks.length;
+  const fixedHeight = 3 + inputAreaRows + taskListHeight; // statusBar + input + taskList
+  const chatAreaHeight = Math.max(rows - fixedHeight, 1);
 
   useEffect(() => {
-    if (
-      autoScroll &&
-      items.length > 0 &&
-      items.length !== prevItemsLenRef.current
-    ) {
-      setSelectedIndex(items.length - 1);
+    if (autoScroll && items.length > 0) {
+      const lastIndex = items.length - 1;
+      setSelectedIndex((prev) => (prev === lastIndex ? prev : lastIndex));
     }
-    prevItemsLenRef.current = items.length;
-  }, [items.length, autoScroll]);
+  }, [items, autoScroll]);
 
   useEffect(() => {
     setExpandState((prev) => {
@@ -191,29 +186,60 @@ export function App({ config }: AppProps) {
     [handleSendMessage, mode, state.connectionStatus],
   );
 
-  useInput(
-    (input, key) => {
-      if (input === "i" || key.tab) {
-        setMode("input");
-        return;
-      }
-
+  const handleBrowseNavigation = useCallback(
+    (input: string, key: { downArrow: boolean; upArrow: boolean }) => {
       if (input === "j" || key.downArrow) {
         setSelectedIndex((prev) => {
           const next = Math.min(prev + 1, items.length - 1);
           if (next === items.length - 1) setAutoScroll(true);
           return next;
         });
-        return;
+        return true;
       }
-
       if (input === "k" || key.upArrow) {
         setSelectedIndex((prev) => {
           if (prev > 0) setAutoScroll(false);
           return Math.max(prev - 1, 0);
         });
+        return true;
+      }
+      if (input === "G") {
+        setSelectedIndex(Math.max(items.length - 1, 0));
+        setAutoScroll(true);
+        return true;
+      }
+      return false;
+    },
+    [items.length],
+  );
+
+  const handleBrowseScroll = useCallback(
+    (input: string, key: { ctrl: boolean }) => {
+      if (!key.ctrl) return false;
+      const half = Math.max(Math.floor(chatAreaHeight / 2), 1);
+      if (input === "d") {
+        setAutoScroll(false);
+        setScrollNudge((prev) => prev + half);
+        return true;
+      }
+      if (input === "u") {
+        setAutoScroll(false);
+        setScrollNudge((prev) => prev - half);
+        return true;
+      }
+      return false;
+    },
+    [chatAreaHeight],
+  );
+
+  useInput(
+    (input, key) => {
+      if (input === "i" || key.tab) {
+        setMode("input");
         return;
       }
+      if (handleBrowseNavigation(input, key)) return;
+      if (handleBrowseScroll(input, key)) return;
 
       if (key.return || input === " ") {
         const item = items[selectedIndex];
@@ -223,13 +249,6 @@ export function App({ config }: AppProps) {
             [selectedIndex]: !prev[selectedIndex],
           }));
         }
-        return;
-      }
-
-      if (input === "G") {
-        setSelectedIndex(Math.max(items.length - 1, 0));
-        setAutoScroll(true);
-        return;
       }
     },
     { isActive: mode === "browse" },
@@ -272,12 +291,6 @@ export function App({ config }: AppProps) {
     }
   });
 
-  // Layout: ChatView (flex) + InputArea (1+ rows) + TaskList (N rows) + StatusBar (3 rows with border)
-  const taskListHeight = state.tasks.length;
-  const inputHeight = 1 + suggestionRows;
-  const fixedHeight = 3 + inputHeight + taskListHeight; // statusBar + input + taskList
-  const chatAreaHeight = Math.max(rows - fixedHeight, 3);
-
   return (
     <Box flexDirection="column" height={rows} overflow="hidden">
       <ChatView
@@ -285,14 +298,17 @@ export function App({ config }: AppProps) {
         expandState={expandState}
         selectedIndex={selectedIndex}
         height={chatAreaHeight}
+        width={columns}
         browseMode={mode === "browse"}
+        autoScrollToBottom={autoScroll && selectedIndex === items.length - 1}
+        scrollNudge={scrollNudge}
       />
       <InputArea
         onSubmit={handleSendMessage}
         connectionStatus={state.connectionStatus}
         mode={mode}
         commands={commands}
-        onSuggestionRowsChange={setSuggestionRows}
+        onHeightChange={setInputAreaRows}
       />
       {state.tasks.length > 0 && <TaskList tasks={state.tasks} />}
       <StatusBar

@@ -15,7 +15,7 @@ interface InputAreaProps {
   connectionStatus: ConnectionStatus;
   mode: InteractionMode;
   commands: CommandInfo[];
-  onSuggestionRowsChange?: (rows: number) => void;
+  onHeightChange?: (rows: number) => void;
 }
 
 function getSuggestionRows(visible: boolean, count: number): number {
@@ -28,12 +28,26 @@ function getFileSuggestionRows(visible: boolean, entryCount: number): number {
   return Math.max(Math.min(entryCount, 8), 1) + (entryCount > 8 ? 1 : 0);
 }
 
+function computeInputAreaHeight(
+  mode: InteractionMode,
+  isDisabled: boolean,
+  suggestionRows: number,
+  currentText: string,
+): number {
+  if (mode === "browse") return 1;
+  const inputLineCount = currentText ? currentText.split("\n").length : 1;
+  const visibleInputRows = Math.min(inputLineCount, 10);
+  const inputFooterRows = inputLineCount > 1 ? 1 : 0;
+  const mainInputRows = isDisabled ? 1 : visibleInputRows + inputFooterRows;
+  return suggestionRows + mainInputRows;
+}
+
 export function InputArea({
   onSubmit,
   connectionStatus,
   mode,
   commands,
-  onSuggestionRowsChange,
+  onHeightChange,
 }: InputAreaProps) {
   const [currentText, setCurrentText] = useState("");
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
@@ -59,14 +73,20 @@ export function InputArea({
   const showFileSuggestions =
     canSuggest && !showCommandSuggestions && fileSuggest.visible;
 
-  // Notify parent of suggestion row count changes for layout calculation
+  // Notify parent of total rendered height for layout calculation
   const suggestionRows =
     getSuggestionRows(showCommandSuggestions, filteredCommands.length) +
     getFileSuggestionRows(showFileSuggestions, fileSuggest.entries.length);
+  const totalRows = computeInputAreaHeight(
+    mode,
+    isDisabled,
+    suggestionRows,
+    currentText,
+  );
 
   useEffect(() => {
-    onSuggestionRowsChange?.(suggestionRows);
-  }, [suggestionRows, onSuggestionRowsChange]);
+    onHeightChange?.(totalRows);
+  }, [totalRows, onHeightChange]);
 
   const handleTextChange = useCallback((text: string) => {
     setCurrentText(text);

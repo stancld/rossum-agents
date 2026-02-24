@@ -6,7 +6,7 @@ import {
   useRef,
   forwardRef,
 } from "react";
-import { Box, Text, useInput, useStdin } from "ink";
+import { Box, Text, useInput, useStdin, useStdout } from "ink";
 
 interface MultiLineInputProps {
   onSubmit: (value: string) => void;
@@ -52,6 +52,7 @@ export const MultiLineInput = forwardRef<
   const [cursorRow, setCursorRow] = useState(0);
   const [cursorCol, setCursorCol] = useState(0);
   const { stdin } = useStdin();
+  const { stdout } = useStdout();
 
   // Notify parent when text changes via useEffect (React 18 batches setState
   // updaters, so capturing values from inside setLines is unreliable).
@@ -279,6 +280,29 @@ export const MultiLineInput = forwardRef<
     ),
   );
   const visibleLines = lines.slice(scrollOffset, scrollOffset + visibleCount);
+  const visibleWidth = Math.max((stdout?.columns ?? 80) - 4, 20);
+
+  function truncateForDisplay(line: string): string {
+    if (line.length <= visibleWidth) return line;
+    if (visibleWidth <= 3) return line.slice(0, visibleWidth);
+    return line.slice(0, visibleWidth - 3) + "...";
+  }
+
+  function cursorWindow(
+    line: string,
+    col: number,
+  ): { segment: string; start: number } {
+    if (line.length <= visibleWidth) {
+      return { segment: line, start: 0 };
+    }
+    const maxStart = Math.max(0, line.length - visibleWidth);
+    const preferredStart = Math.max(col - Math.floor(visibleWidth * 0.7), 0);
+    const start = Math.min(preferredStart, maxStart);
+    return {
+      segment: line.slice(start, start + visibleWidth),
+      start,
+    };
+  }
 
   return (
     <Box flexDirection="column">
@@ -294,13 +318,23 @@ export const MultiLineInput = forwardRef<
           if (!isCursorRow) {
             return (
               <Text key={rowIdx} wrap="truncate">
-                {line}
+                {truncateForDisplay(line)}
               </Text>
             );
           }
-          const before = line.slice(0, cursorCol);
-          const cursorChar = line[cursorCol] ?? " ";
-          const after = line.slice(cursorCol + 1);
+
+          const { segment, start } = cursorWindow(line, cursorCol);
+          const hasCharAtCursor = cursorCol < line.length;
+          const localCursor = Math.min(
+            Math.max(cursorCol - start, 0),
+            segment.length,
+          );
+          const before = segment.slice(0, localCursor);
+          const cursorChar = hasCharAtCursor ? (line[cursorCol] ?? " ") : " ";
+          const after = hasCharAtCursor
+            ? segment.slice(localCursor + 1)
+            : segment.slice(localCursor);
+
           return (
             <Text key={rowIdx} wrap="truncate">
               {before}
