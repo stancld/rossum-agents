@@ -8,7 +8,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Added `summary` field to chat list response (`GET /api/v1/chats`) — auto-generated one-line summary via Claude Haiku after each turn, persisted in chat metadata [#208](https://github.com/stancld/rossum-agents/pull/208)
-- Added agent persona support (`default`, `cautious`) — settable at chat creation (`POST /api/v1/chats`) and overridable per message; persisted in chat metadata
+- Added agent persona support (`default`, `cautious`) — settable at chat creation (`POST /api/v1/chats`) and overridable per message; persisted in chat metadata [#199](https://github.com/stancld/rossum-agents/pull/199)
+- Added `/persona` slash command with argument suggestions for dynamic persona switching [#213](https://github.com/stancld/rossum-agents/pull/213)
 - Added `SnapshotStore` — Redis-backed store (7-day TTL) that indexes full entity snapshots by `(entity_type, entity_id, commit_hash)` for point-in-time restore [#200](https://github.com/stancld/rossum-agents/pull/200)
 - Added `show_entity_history` tool — lists all historical versions of a specific entity [#200](https://github.com/stancld/rossum-agents/pull/200)
 - Added `restore_entity_version` tool — restores an entity to a specific historical version by commit hash [#200](https://github.com/stancld/rossum-agents/pull/200)
@@ -19,7 +20,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - `revert_commit` no longer restricted to the latest commit — any historical commit can now be reverted [#200](https://github.com/stancld/rossum-agents/pull/200)
-- Increased max tool result length from 20 000 to 30 000 characters [#206](https://github.com/stancld/rossum-agents/pull/206)
+- Increased max tool result length from 20 000 to 30 000 characters
+- Upgraded FastMCP dependency from 2.x to 3.0 [#201](https://github.com/stancld/rossum-agents/pull/201)
 
 ### Fixed
 - Fixed schema revert failing under concurrent modifications — now retries with backoff on HTTP 412 (up to 5 attempts) using fetch-then-patch to register current state before each write [#200](https://github.com/stancld/rossum-agents/pull/200)

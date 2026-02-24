@@ -60,6 +60,8 @@ Available Skills
      - Hook templates, token_owner, testing, debugging
    * - ``txscript``
      - TxScript language reference for formula fields, serverless functions, and rule trigger conditions
+   * - ``lookup-fields``
+     - Create lookup fields matching against Master Data Hub datasets
    * - ``document-testing``
      - Generate mock PDFs, upload to queues, verify extraction, test hooks end-to-end
 
