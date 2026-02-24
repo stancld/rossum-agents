@@ -15,6 +15,7 @@ const cli = meow(
     --token        Rossum API token (env: ROSSUM_API_TOKEN)
     --rossum-url   Rossum API base URL (env: ROSSUM_API_BASE_URL)
     --mcp-mode     MCP mode: read-only | read-write (default: read-only)
+    --persona      Agent persona: default | cautious (default: default)
 
   Examples
     $ rossum-agent-tui --api-url http://localhost:8000
@@ -27,6 +28,7 @@ const cli = meow(
       token: { type: "string" },
       rossumUrl: { type: "string" },
       mcpMode: { type: "string" },
+      persona: { type: "string" },
     },
   },
 );

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from anthropic import beta_tool
 
-from rossum_agent.tools.core import get_output_dir
+from rossum_agent.tools.core import get_context
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def write_file(filename: str, content: str | dict | list) -> str:
         content = json.dumps(content, indent=2, ensure_ascii=False)
 
     try:
-        output_dir = get_output_dir()
+        output_dir = get_context().get_output_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
 
         safe_filename = Path(filename).name

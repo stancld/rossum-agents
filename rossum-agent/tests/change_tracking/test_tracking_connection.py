@@ -19,6 +19,7 @@ from rossum_agent.rossum_mcp_integration import (
     unwrap,
 )
 from rossum_agent.tools.change_history import revert_commit
+from rossum_agent.tools.core import AgentContext, set_context
 
 
 @pytest.fixture
@@ -982,7 +983,7 @@ class TestSchemaRewriteAndRevert:
         # 4. Create commit from tracked changes
         mock_store = MagicMock()
         mock_store.get_latest_hash.return_value = None
-        commit_service = CommitService(store=mock_store)
+        commit_service = CommitService(store=mock_store, snapshot_store=MagicMock())
         with patch(
             "rossum_agent.change_tracking.commit_service.generate_commit_message",
             return_value="Clear Invoice Schema content",
@@ -1001,11 +1002,11 @@ class TestSchemaRewriteAndRevert:
         assert not schema_conn.has_changes()  # cleared after commit
 
         # 5. Revert the commit
-        mock_store.get_latest_hash.return_value = commit.hash
         mock_store.get_commit.return_value = commit
 
         mock_http_client = MagicMock()
         mock_http_client.update = AsyncMock()
+        mock_http_client.request_json = AsyncMock(return_value={"content": []})
         mock_api_client = MagicMock()
         mock_api_client._http_client = mock_http_client
 
@@ -1013,22 +1014,19 @@ class TestSchemaRewriteAndRevert:
         thread = threading.Thread(target=revert_loop.run_forever)
         thread.start()
 
+        set_context(
+            AgentContext(
+                commit_store=mock_store,
+                rossum_environment="https://api.elis.rossum.ai/v1",
+                rossum_credentials=("https://api.elis.rossum.ai/v1", "test-token"),
+                mcp_event_loop=revert_loop,
+            )
+        )
         try:
-            with (
-                patch("rossum_agent.tools.change_history.get_commit_store", return_value=mock_store),
-                patch(
-                    "rossum_agent.tools.change_history.get_rossum_environment",
-                    return_value="https://api.elis.rossum.ai/v1",
-                ),
-                patch(
-                    "rossum_agent.tools.change_history.get_rossum_credentials",
-                    return_value=("https://api.elis.rossum.ai/v1", "test-token"),
-                ),
-                patch("rossum_agent.tools.change_history.get_mcp_event_loop", return_value=revert_loop),
-                patch("rossum_agent.tools.change_history.AsyncRossumAPIClient", return_value=mock_api_client),
-            ):
+            with patch("rossum_agent.tools.change_history.AsyncRossumAPIClient", return_value=mock_api_client):
                 result = json.loads(revert_commit(commit_hash=commit.hash))
         finally:
+            set_context(AgentContext())
             revert_loop.call_soon_threadsafe(revert_loop.stop)
             thread.join()
             revert_loop.close()

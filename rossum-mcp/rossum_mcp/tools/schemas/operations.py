@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import re
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -13,10 +14,10 @@ from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.schema import Schema
 
 from rossum_mcp.tools.base import (
+    build_filters,
     delete_resource,
     extract_id_from_url,
     graceful_list,
-    is_read_write_mode,
 )
 from rossum_mcp.tools.schemas.models import (
     SchemaListItem,
@@ -105,23 +106,18 @@ async def get_schema(client: AsyncRossumAPIClient, schema_id: int) -> Schema | d
 
 
 async def list_schemas(
-    client: AsyncRossumAPIClient, name: str | None = None, queue_id: int | None = None
+    client: AsyncRossumAPIClient, name: str | None = None, queue_id: int | None = None, use_regex: bool = False
 ) -> list[SchemaListItem]:
     logger.debug(f"Listing schemas: name={name}, queue_id={queue_id}")
-    filters: dict = {}
-    if name is not None:
-        filters["name"] = name
-    if queue_id is not None:
-        filters["queue"] = queue_id
-
+    filters = build_filters(name=None if use_regex else name, queue=queue_id)
     result = await graceful_list(client, Resource.Schema, "schema", **filters)
-    return [_truncate_schema_for_list(schema) for schema in result.items]
+    items = [_truncate_schema_for_list(schema) for schema in result.items]
+    if use_regex and name is not None:
+        items = [s for s in items if s.name and re.search(name, s.name, re.IGNORECASE)]
+    return items
 
 
 async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_data: dict) -> Schema | dict:
-    if not is_read_write_mode():
-        return {"error": "update_schema is not available in read-only mode"}
-
     logger.debug(f"Updating schema: schema_id={schema_id}")
     if "content" in schema_data and isinstance(schema_data["content"], list):
         schema_data = {**schema_data, "content": sanitize_schema_content(schema_data["content"])}
@@ -131,9 +127,6 @@ async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_dat
 
 
 async def create_schema(client: AsyncRossumAPIClient, name: str, content: list[dict]) -> Schema | dict:
-    if not is_read_write_mode():
-        return {"error": "create_schema is not available in read-only mode"}
-
     if not content:
         return {"error": "Cannot create schema with empty content"}
 
@@ -153,9 +146,6 @@ async def patch_schema(
     parent_id: str | None = None,
     position: int | None = None,
 ) -> dict:
-    if not is_read_write_mode():
-        return {"error": "patch_schema is not available in read-only mode"}
-
     if operation not in ("add", "update", "remove"):
         return {"error": f"Invalid operation '{operation}'. Must be 'add', 'update', or 'remove'."}
 
@@ -223,9 +213,6 @@ async def prune_schema_fields(
     fields_to_keep: list[str] | None = None,
     fields_to_remove: list[str] | None = None,
 ) -> dict:
-    if not is_read_write_mode():
-        return {"error": "prune_schema_fields is not available in read-only mode"}
-
     if fields_to_keep is not None and fields_to_remove is not None:
         return {"error": "Specify fields_to_keep OR fields_to_remove, not both"}
     if fields_to_keep is None and fields_to_remove is None:

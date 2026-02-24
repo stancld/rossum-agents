@@ -22,7 +22,6 @@ from anthropic.types import (
 from rossum_agent.agent import (
     AgentConfig,
     AgentMemory,
-    AgentStep,
     MemoryStep,
     RossumAgent,
     TaskStep,
@@ -30,8 +29,17 @@ from rossum_agent.agent import (
     ToolResult,
     truncate_content,
 )
-from rossum_agent.agent.core import _parse_json_encoded_strings, _StreamState
-from rossum_agent.agent.models import StepType
+from rossum_agent.agent.core import _parse_json_encoded_strings, _StreamState, create_agent
+from rossum_agent.agent.models import (
+    ErrorStep,
+    FinalAnswerStep,
+    StepType,
+    TextDeltaStep,
+    ThinkingStep,
+    ToolResultStep,
+    ToolStartStep,
+)
+from rossum_agent.tools.core import SubAgentTokenUsage
 from rossum_agent.utils import add_message_cache_breakpoint
 
 
@@ -158,21 +166,22 @@ class TestAgentConfig:
         assert config.temperature == 1.0  # Must be 1.0 for extended thinking
 
 
-class TestAgentStep:
-    """Test AgentStep dataclass."""
+class TestAgentStepTypes:
+    """Test AgentStep discriminated union types."""
 
-    def test_has_tool_calls_returns_true_when_present(self):
-        """Test has_tool_calls returns True when tool_calls is non-empty."""
-        step = AgentStep(
+    def test_tool_result_step_has_tool_calls(self):
+        """Test ToolResultStep always has tool_calls."""
+        step = ToolResultStep(
             step_number=1,
             tool_calls=[ToolCall(id="1", name="test_tool", arguments={})],
+            tool_results=[],
         )
-        assert step.has_tool_calls() is True
+        assert len(step.tool_calls) == 1
 
-    def test_has_tool_calls_returns_false_when_empty(self):
-        """Test has_tool_calls returns False when tool_calls is empty."""
-        step = AgentStep(step_number=1)
-        assert step.has_tool_calls() is False
+    def test_thinking_step_has_no_tool_calls(self):
+        """Test ThinkingStep has no tool_calls attribute."""
+        step = ThinkingStep(step_number=1, thinking="thought")
+        assert not hasattr(step, "tool_calls")
 
 
 class TestMemoryStep:
@@ -733,9 +742,8 @@ class TestStreamModelResponse:
 
         assert len(steps) >= 1
         final_step = steps[-1]
-        assert final_step.is_final is True
+        assert isinstance(final_step, FinalAnswerStep)
         assert final_step.final_answer == "Hello, how can I help you?"
-        assert final_step.tool_calls == []
         assert final_step.input_tokens == 100
         assert final_step.output_tokens == 50
 
@@ -782,7 +790,7 @@ class TestStreamModelResponse:
                 steps.append(step)
 
         final_step = steps[-1]
-        assert final_step.is_final is False
+        assert isinstance(final_step, ToolResultStep)
         assert len(final_step.tool_calls) == 1
         assert final_step.tool_calls[0].name == "list_queues"
         assert final_step.tool_calls[0].arguments == {"workspace_url": "https://example.com"}
@@ -907,8 +915,85 @@ class TestStreamModelResponse:
                 steps.append(step)
 
         final_step = steps[-1]
-        assert final_step.thinking == "Let me analyze this..."
+        assert isinstance(final_step, ToolResultStep)
         assert len(final_step.tool_calls) == 1
+        # Thinking is yielded as a separate ThinkingStep earlier in the stream
+        thinking_steps = [s for s in steps if isinstance(s, ThinkingStep)]
+        assert len(thinking_steps) >= 1
+        assert "Let me analyze this..." in thinking_steps[-1].thinking
+
+    @pytest.mark.asyncio
+    async def test_producer_exception_propagates(self):
+        """Exceptions raised during streaming propagate to the caller.
+
+        The producer thread catches exceptions and puts them on the queue so
+        _process_stream_events re-raises them instead of silently swallowing them.
+        """
+        agent = self._create_agent()
+        agent.memory.add_task("Test")
+
+        error = ValueError("Stream failed mid-response")
+        mock_stream = MagicMock()
+        mock_stream.__enter__ = MagicMock(return_value=mock_stream)
+        mock_stream.__exit__ = MagicMock(return_value=False)
+        mock_stream.__iter__ = MagicMock(side_effect=error)
+
+        with patch.object(agent.client.messages, "stream", return_value=mock_stream):
+            with pytest.raises(ValueError, match="Stream failed mid-response"):
+                async for _ in agent._stream_model_response(1):
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_thinking_delta_starts_buffer_timer(self):
+        """Thinking deltas start the initial buffer timer before yielding.
+
+        When thinking tokens arrive before text, first_text_token_time is set
+        at the thinking token, so subsequent text tokens measure elapsed time
+        from the thinking arrival. Text arriving after INITIAL_TEXT_BUFFER_DELAY
+        since the first thinking token is streamed immediately.
+        """
+        from anthropic.types import ThinkingBlock, ThinkingDelta
+
+        agent = self._create_agent()
+        agent.memory.add_task("Test")
+
+        thinking_block = ThinkingBlock(type="thinking", thinking="", signature="sig")
+        thinking_start = RawContentBlockStartEvent(type="content_block_start", index=0, content_block=thinking_block)
+        thinking_delta = RawContentBlockDeltaEvent(
+            type="content_block_delta",
+            index=0,
+            delta=ThinkingDelta(type="thinking_delta", thinking="Analyzing..."),
+        )
+        thinking_stop = ContentBlockStopEvent(type="content_block_stop", index=0)
+        text_delta = RawContentBlockDeltaEvent(
+            type="content_block_delta",
+            index=1,
+            delta=TextDelta(type="text_delta", text="Here is the answer."),
+        )
+
+        final_message = self._create_final_message()
+        mock_stream = self._create_mock_stream(
+            [thinking_start, thinking_delta, thinking_stop, text_delta], final_message
+        )
+
+        # Simulate: thinking token arrives at T=0, text token arrives at T=2.0
+        # (past INITIAL_TEXT_BUFFER_DELAY=1.5), so text should be flushed immediately.
+        t0 = 1000.0
+        time_calls = iter([t0, t0 + 2.0, t0 + 2.0])
+
+        with (
+            patch.object(agent.client.messages, "stream", return_value=mock_stream),
+            patch("rossum_agent.agent.core.time") as mock_time,
+        ):
+            mock_time.monotonic.side_effect = time_calls
+            steps = []
+            async for step in agent._stream_model_response(1):
+                steps.append(step)
+
+        # Text after elapsed thinking time should be streamed as intermediate step
+        streaming_intermediate = [s for s in steps if isinstance(s, TextDeltaStep) and s.is_streaming]
+        assert len(streaming_intermediate) >= 1
+        assert any("Here is the answer." in s.text_delta for s in streaming_intermediate)
 
 
 class TestAgentRun:
@@ -928,15 +1013,11 @@ class TestAgentRun:
         )
 
     @pytest.mark.asyncio
-    async def test_stops_when_is_final_true(self):
-        """Test that run() stops when step.is_final is True."""
+    async def test_stops_when_final_answer_step(self):
+        """Test that run() stops when FinalAnswerStep is yielded."""
         agent = self._create_agent()
 
-        final_step = AgentStep(
-            step_number=1,
-            final_answer="Done!",
-            is_final=True,
-        )
+        final_step = FinalAnswerStep(step_number=1, final_answer="Done!")
 
         async def mock_stream_response(step_num):
             yield final_step
@@ -947,7 +1028,7 @@ class TestAgentRun:
                 steps.append(step)
 
         assert len(steps) == 1
-        assert steps[0].is_final is True
+        assert isinstance(steps[0], FinalAnswerStep)
         assert steps[0].final_answer == "Done!"
 
     @pytest.mark.asyncio
@@ -960,24 +1041,20 @@ class TestAgentRun:
         async def mock_stream_response(step_num):
             call_count[0] += 1
             if call_count[0] < 2:
-                yield AgentStep(
+                yield ToolStartStep(
                     step_number=step_num,
                     tool_calls=[ToolCall(id="tc1", name="tool", arguments={})],
-                    is_streaming=True,
+                    tool_progress=(0, 1),
                 )
-                yield AgentStep(
+                yield ToolResultStep(
                     step_number=step_num,
                     tool_calls=[ToolCall(id="tc1", name="tool", arguments={})],
                     tool_results=[ToolResult(tool_call_id="tc1", name="tool", content="result")],
-                    is_final=False,
-                    is_streaming=False,
                 )
             else:
-                yield AgentStep(
+                yield FinalAnswerStep(
                     step_number=step_num,
                     final_answer="All done!",
-                    is_final=True,
-                    is_streaming=False,
                 )
 
         with (
@@ -988,9 +1065,9 @@ class TestAgentRun:
             async for step in agent.run("Test prompt"):
                 steps.append(step)
 
-        final_steps = [s for s in steps if not s.is_streaming]
-        assert len(final_steps) == 2
-        assert final_steps[-1].is_final is True
+        finalized_steps = [s for s in steps if isinstance(s, (ToolResultStep, FinalAnswerStep, ErrorStep))]
+        assert len(finalized_steps) == 2
+        assert isinstance(finalized_steps[-1], FinalAnswerStep)
 
     @pytest.mark.asyncio
     async def test_max_steps_reached(self):
@@ -998,12 +1075,10 @@ class TestAgentRun:
         agent = self._create_agent()
 
         async def mock_stream_response(step_num):
-            yield AgentStep(
+            yield ToolResultStep(
                 step_number=step_num,
                 tool_calls=[ToolCall(id="tc1", name="tool", arguments={})],
                 tool_results=[ToolResult(tool_call_id="tc1", name="tool", content="result")],
-                is_final=False,
-                is_streaming=False,
             )
 
         with (
@@ -1014,7 +1089,7 @@ class TestAgentRun:
             async for step in agent.run("Test prompt"):
                 steps.append(step)
 
-        assert steps[-1].is_final is True
+        assert isinstance(steps[-1], ErrorStep)
         assert "Maximum steps" in steps[-1].error
         assert "3" in steps[-1].error
 
@@ -1042,9 +1117,8 @@ class TestAgentRun:
             async for step in agent.run("Test prompt"):
                 steps.append(step)
 
-        final_steps = [s for s in steps if s.is_final]
+        final_steps = [s for s in steps if isinstance(s, ErrorStep)]
         assert len(final_steps) == 1
-        assert final_steps[0].is_final is True
         assert "Rate limit" in final_steps[0].error
         assert "5 retries" in final_steps[0].error
         assert call_count[0] == 6  # Initial attempt + 5 retries
@@ -1064,7 +1138,7 @@ class TestAgentRun:
                     response=MagicMock(status_code=429),
                     body=None,
                 )
-            yield AgentStep(step_number=step_num, final_answer="Success!", is_final=True)
+            yield FinalAnswerStep(step_number=step_num, final_answer="Success!")
 
         with (
             patch.object(agent, "_stream_model_response", side_effect=mock_stream_response),
@@ -1076,7 +1150,7 @@ class TestAgentRun:
 
         assert call_count[0] == 3  # 2 failures + 1 success
         assert mock_sleep.await_count == 2  # Called for each retry wait
-        final_steps = [s for s in steps if s.is_final]
+        final_steps = [s for s in steps if isinstance(s, FinalAnswerStep)]
         assert len(final_steps) == 1
         assert final_steps[0].final_answer == "Success!"
 
@@ -1095,7 +1169,7 @@ class TestAgentRun:
                     response=MagicMock(status_code=429),
                     body=None,
                 )
-            yield AgentStep(step_number=step_num, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=step_num, final_answer="Done")
 
         with (
             patch.object(agent, "_stream_model_response", side_effect=mock_stream_response),
@@ -1105,10 +1179,10 @@ class TestAgentRun:
             async for step in agent.run("Test prompt"):
                 steps.append(step)
 
-        streaming_steps = [s for s in steps if s.is_streaming and s.thinking]
-        assert len(streaming_steps) >= 1
-        assert "Rate limited" in streaming_steps[0].thinking
-        assert "waiting" in streaming_steps[0].thinking.lower()
+        thinking_steps = [s for s in steps if isinstance(s, ThinkingStep)]
+        assert len(thinking_steps) >= 1
+        assert "Rate limited" in thinking_steps[0].thinking
+        assert "waiting" in thinking_steps[0].thinking.lower()
 
     @pytest.mark.asyncio
     async def test_rate_limit_exponential_backoff_delay(self):
@@ -1125,7 +1199,7 @@ class TestAgentRun:
                     response=MagicMock(status_code=429),
                     body=None,
                 )
-            yield AgentStep(step_number=step_num, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=step_num, final_answer="Done")
 
         sleep_durations = []
 
@@ -1162,7 +1236,7 @@ class TestAgentRun:
                 steps.append(step)
 
         assert len(steps) == 1
-        assert steps[0].is_final is True
+        assert isinstance(steps[0], ErrorStep)
         assert "timed out" in steps[0].error
 
     @pytest.mark.asyncio
@@ -1184,7 +1258,7 @@ class TestAgentRun:
                 steps.append(step)
 
         assert len(steps) == 1
-        assert steps[0].is_final is True
+        assert isinstance(steps[0], ErrorStep)
         assert "API error" in steps[0].error
 
     @pytest.mark.asyncio
@@ -1284,14 +1358,14 @@ class TestExecuteTool:
     async def test_truncates_long_content(self):
         """Test that long tool output is truncated."""
         agent = self._create_agent()
-        long_output = "A" * 30000
+        long_output = "A" * 50000
         agent.mcp_connection.call_tool.return_value = long_output
 
         tool_call = ToolCall(id="tc_1", name="verbose_tool", arguments={})
 
         result = await self._get_final_result(agent, tool_call)
 
-        assert len(result.content) < 30000
+        assert len(result.content) < 50000
         assert "truncated" in result.content.lower()
 
     @pytest.mark.asyncio
@@ -1350,14 +1424,11 @@ class TestExecuteToolsInParallel:
             ToolCall(id="tc_3", name="tool_c", arguments={}),
         ]
 
-        step = AgentStep(step_number=1, tool_calls=tool_calls)
-
         steps = []
         async for s in agent._execute_tools_with_progress(
             step_num=1,
-            thinking_text="",
+            response_text="",
             tool_calls=tool_calls,
-            step=step,
             input_tokens=100,
             output_tokens=50,
         ):
@@ -1388,14 +1459,11 @@ class TestExecuteToolsInParallel:
             ToolCall(id="tc_3", name="medium_tool", arguments={}),
         ]
 
-        step = AgentStep(step_number=1, tool_calls=tool_calls)
-
         final_step = None
         async for s in agent._execute_tools_with_progress(
             step_num=1,
-            thinking_text="",
+            response_text="",
             tool_calls=tool_calls,
-            step=step,
             input_tokens=100,
             output_tokens=50,
         ):
@@ -1426,14 +1494,11 @@ class TestExecuteToolsInParallel:
             ToolCall(id="tc_3", name="another_good_tool", arguments={}),
         ]
 
-        step = AgentStep(step_number=1, tool_calls=tool_calls)
-
         final_step = None
         async for s in agent._execute_tools_with_progress(
             step_num=1,
-            thinking_text="",
+            response_text="",
             tool_calls=tool_calls,
-            step=step,
             input_tokens=100,
             output_tokens=50,
         ):
@@ -1459,16 +1524,13 @@ class TestExecuteToolsInParallel:
             ToolCall(id="tc_2", name="tool_b", arguments={}),
         ]
 
-        step = AgentStep(step_number=1, tool_calls=tool_calls)
-
         agent.mcp_connection.call_tool.return_value = "result"
 
         steps = []
         async for s in agent._execute_tools_with_progress(
             step_num=1,
-            thinking_text="Test thinking",
+            response_text="Test thinking",
             tool_calls=tool_calls,
-            step=step,
             input_tokens=100,
             output_tokens=50,
         ):
@@ -1477,7 +1539,7 @@ class TestExecuteToolsInParallel:
         # Should have at least the initial progress step and final step
         assert len(steps) >= 2
         # First step should be progress indicator
-        assert steps[0].is_streaming is True
+        assert isinstance(steps[0], ToolStartStep)
         assert steps[0].tool_progress == (0, 2)
 
     @pytest.mark.asyncio
@@ -1504,14 +1566,11 @@ class TestExecuteToolsInParallel:
             ToolCall(id="tc_2", name="tool_b", arguments={}),
         ]
 
-        step = AgentStep(step_number=1, tool_calls=tool_calls)
-
         async def consume_generator():
             async for _ in agent._execute_tools_with_progress(
                 step_num=1,
-                thinking_text="",
+                response_text="",
                 tool_calls=tool_calls,
-                step=step,
                 input_tokens=100,
                 output_tokens=50,
             ):
@@ -1716,15 +1775,13 @@ class TestAgentRunRequestDelay:
         async def mock_stream_response(step_num):
             call_count[0] += 1
             if call_count[0] < 3:
-                yield AgentStep(
+                yield ToolResultStep(
                     step_number=step_num,
                     tool_calls=[ToolCall(id="tc1", name="tool", arguments={})],
                     tool_results=[ToolResult(tool_call_id="tc1", name="tool", content="result")],
-                    is_final=False,
-                    is_streaming=False,
                 )
             else:
-                yield AgentStep(step_number=step_num, final_answer="Done", is_final=True, is_streaming=False)
+                yield FinalAnswerStep(step_number=step_num, final_answer="Done")
 
         async def capture_sleep(duration):
             sleep_calls.append(duration)
@@ -1825,7 +1882,6 @@ class TestCreateAgentFactory:
     @pytest.mark.asyncio
     async def test_creates_agent_with_default_config(self):
         """Test that create_agent creates an agent with proper setup."""
-        from rossum_agent.agent.core import create_agent
 
         mock_mcp = AsyncMock()
 
@@ -1844,7 +1900,6 @@ class TestCreateAgentFactory:
     @pytest.mark.asyncio
     async def test_creates_agent_with_custom_config(self):
         """Test that create_agent respects custom config."""
-        from rossum_agent.agent.core import create_agent
 
         mock_mcp = AsyncMock()
         config = AgentConfig(max_steps=10)
@@ -1989,18 +2044,12 @@ class TestStreamState:
 
     def test_flush_buffer_returns_none_when_empty(self):
         """Test that flush_buffer returns None when buffer is empty."""
-        from rossum_agent.agent.core import _StreamState
-        from rossum_agent.agent.models import StepType
-
         state = _StreamState()
         result = state.flush_buffer(step_num=1, step_type=StepType.FINAL_ANSWER)
         assert result is None
 
     def test_flush_buffer_returns_step_with_content(self):
-        """Test that flush_buffer returns AgentStep with accumulated content."""
-        from rossum_agent.agent.core import _StreamState
-        from rossum_agent.agent.models import StepType
-
+        """Test that flush_buffer returns TextDeltaStep with accumulated content."""
         state = _StreamState()
         state.text_buffer = ["Hello", " ", "world"]
         state.thinking_text = "I'm thinking"
@@ -2017,9 +2066,6 @@ class TestStreamState:
 
     def test_flush_buffer_clears_buffer(self):
         """Test that flush_buffer clears the text_buffer."""
-        from rossum_agent.agent.core import _StreamState
-        from rossum_agent.agent.models import StepType
-
         state = _StreamState()
         state.text_buffer = ["some", "text"]
 
@@ -2029,9 +2075,6 @@ class TestStreamState:
 
     def test_flush_buffer_accumulates_response_text(self):
         """Test that flush_buffer accumulates into response_text."""
-        from rossum_agent.agent.core import _StreamState
-        from rossum_agent.agent.models import StepType
-
         state = _StreamState()
         state.response_text = "Previous "
         state.text_buffer = ["new text"]
@@ -2043,9 +2086,6 @@ class TestStreamState:
 
     def test_flush_buffer_with_empty_thinking(self):
         """Test that thinking is None when thinking_text is empty."""
-        from rossum_agent.agent.core import _StreamState
-        from rossum_agent.agent.models import StepType
-
         state = _StreamState()
         state.text_buffer = ["text"]
         state.thinking_text = ""
@@ -2056,8 +2096,6 @@ class TestStreamState:
 
     def test_stream_state_initial_values(self):
         """Test _StreamState has correct initial values."""
-        from rossum_agent.agent.core import _StreamState
-
         state = _StreamState()
         assert state.thinking_text == ""
         assert state.response_text == ""
@@ -2200,7 +2238,7 @@ class TestPreloadInjection:
         agent = self._create_agent()
 
         async def mock_stream_response(step_num):
-            yield AgentStep(step_number=step_num, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=step_num, final_answer="Done")
 
         with (
             patch.object(agent, "_stream_model_response", side_effect=mock_stream_response),
@@ -2224,7 +2262,7 @@ class TestPreloadInjection:
         agent = self._create_agent()
 
         async def mock_stream_response(step_num):
-            yield AgentStep(step_number=step_num, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=step_num, final_answer="Done")
 
         with (
             patch.object(agent, "_stream_model_response", side_effect=mock_stream_response),
@@ -2251,7 +2289,7 @@ class TestPreloadInjection:
         agent = self._create_agent()
 
         async def mock_stream_response(step_num):
-            yield AgentStep(step_number=step_num, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=step_num, final_answer="Done")
 
         with (
             patch.object(agent, "_stream_model_response", side_effect=mock_stream_response),
@@ -2486,7 +2524,6 @@ class TestRossumAgentTokenTracking:
 
     def test_accumulate_sub_agent_tokens(self, mock_agent):
         """Test tokens.accumulate_sub accumulates properly."""
-        from rossum_agent.tools import SubAgentTokenUsage
 
         usage1 = SubAgentTokenUsage(tool_name="search_knowledge_base", input_tokens=100, output_tokens=50, iteration=1)
         mock_agent.tokens.accumulate_sub(usage1)
@@ -2510,7 +2547,6 @@ class TestRossumAgentTokenTracking:
 
     def test_accumulate_sub_agent_tokens_multiple_tools(self, mock_agent):
         """Test accumulating tokens from multiple sub-agent tools."""
-        from rossum_agent.tools import SubAgentTokenUsage
 
         usage1 = SubAgentTokenUsage(tool_name="search_knowledge_base", input_tokens=100, output_tokens=50, iteration=1)
         usage2 = SubAgentTokenUsage(
@@ -2574,7 +2610,6 @@ class TestRossumAgentTokenTracking:
 
     def test_accumulate_sub_agent_cache_tokens(self, mock_agent):
         """Test tokens.accumulate_sub accumulates cache metrics."""
-        from rossum_agent.tools import SubAgentTokenUsage
 
         usage = SubAgentTokenUsage(
             tool_name="search_knowledge_base",

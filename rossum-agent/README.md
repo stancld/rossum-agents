@@ -26,7 +26,7 @@
 
 | Capability | Description |
 |------------|-------------|
-| **Rossum MCP Integration** | Full access to 67 MCP tools for document processing |
+| **Rossum MCP Integration** | Full access to 70 MCP tools for document processing |
 | **Hook Debugging** | Test hooks via native Rossum API endpoints |
 | **Deployment Tools** | Pull, push, diff, copy configs across environments |
 | **Knowledge Base Search** | AI-powered Rossum documentation search |
@@ -75,6 +75,7 @@ uv sync --extra api        # REST API (FastAPI, Redis)
 | `REDIS_HOST` | No | Redis host for chat persistence |
 | `REDIS_PORT` | No | Redis port (default: `6379`) |
 | `ROSSUM_MCP_MODE` | No | MCP mode: `read-only` (default) or `read-write` |
+| `ROSSUM_AGENT_PERSONA` | No | Agent persona: `default` (default) or `cautious` — read by the TUI client, not the server |
 
 ## Usage
 
@@ -116,7 +117,7 @@ asyncio.run(main())
 
 ## Available Tools
 
-The agent provides internal tools and access to 67 MCP tools via dynamic loading.
+The agent provides internal tools and access to 70 MCP tools via dynamic loading.
 
 <details>
 <summary><strong>Internal Tools</strong></summary>
@@ -159,7 +160,10 @@ The agent provides internal tools and access to 67 MCP tools via dynamic loading
 - `close_connection` - Close spawned connection
 
 **Skills:**
-- `load_skill` - Load domain-specific workflows (`rossum-deployment`, `schema-patching`, `schema-pruning`, `organization-setup`, `schema-creation`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`)
+- `load_skill` - Load domain-specific workflows (`rossum-deployment`, `schema-patching`, `schema-pruning`, `organization-setup`, `schema-creation`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
+
+**Document Testing:**
+- `generate_mock_pdf` - Generate schema-aware mock PDFs with realistic field values for end-to-end extraction testing
 
 **Task Tracking:**
 - `create_task` - Create a task to track progress on multi-step operations
@@ -207,7 +211,7 @@ flowchart TB
     end
 
     subgraph MCP["Rossum MCP Server"]
-        Tools[67 MCP Tools]
+        Tools[70 MCP Tools]
     end
 
     API[Rossum API]
@@ -230,8 +234,21 @@ flowchart TB
 | `POST /api/v1/chats/{id}/messages` | Send message (SSE) |
 | `GET /api/v1/chats/{id}/files` | List files |
 | `GET /api/v1/chats/{id}/files/{name}` | Download file |
+| `GET /api/v1/commands` | List available slash commands |
 
 API docs: `/api/docs` (Swagger) or `/api/redoc`
+
+**Slash Commands:** Messages starting with `/` are intercepted before reaching the agent and return instant responses via SSE. Available commands:
+
+| Command | Description |
+|---------|-------------|
+| `/list-commands` | List all available slash commands |
+| `/list-commits` | List configuration commits made in this chat |
+| `/list-skills` | List available agent skills with slugs |
+| `/list-mcp-tools` | List MCP tools grouped by category |
+| `/list-agent-tools` | List built-in agent tools with descriptions |
+
+The TUI provides autocomplete suggestions when typing `/`. Commands can also be discovered programmatically via `GET /api/v1/commands`.
 
 **SSE Events:** The message endpoint streams these SSE event types:
 
@@ -248,6 +265,10 @@ API docs: `/api/docs` (Swagger) or `/api/redoc`
 **MCP Mode:** Chat sessions support mode switching via the `mcp_mode` parameter:
 - Set at chat creation: `POST /api/v1/chats` with `{"mcp_mode": "read-write"}`
 - Override per message: `POST /api/v1/chats/{id}/messages` with `{"content": "...", "mcp_mode": "read-write"}`
+
+**Persona:** Chat sessions support persona switching via the `persona` parameter:
+- Set at chat creation: `POST /api/v1/chats` with `{"persona": "cautious"}`
+- Override per message: `POST /api/v1/chats/{id}/messages` with `{"content": "...", "persona": "cautious"}`
 
 </details>
 

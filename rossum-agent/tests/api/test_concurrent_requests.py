@@ -6,7 +6,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from rossum_agent.agent.models import AgentStep
+from rossum_agent.agent.models import FinalAnswerStep
 from rossum_agent.api.models.schemas import StepEvent
 from rossum_agent.api.services.agent_service import AgentService, _request_context
 
@@ -45,7 +45,7 @@ class TestConcurrentAgentService:
                     "queue_id": id(ctx.event_queue) if ctx.event_queue else None,
                 }
                 await asyncio.sleep(delay)
-                yield AgentStep(step_number=1, final_answer=f"Response for {request_id}", is_final=True)
+                yield FinalAnswerStep(step_number=1, final_answer=f"Response for {request_id}")
 
             mock_agent.run = mock_run
 
@@ -62,7 +62,7 @@ class TestConcurrentAgentService:
                     AgentService,
                     "_setup_change_tracking",
                     new_callable=AsyncMock,
-                    return_value=(None, "https://api.rossum.ai"),
+                    return_value=(None, None, "https://api.rossum.ai"),
                 ),
             ):
                 mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -126,7 +126,7 @@ class TestConcurrentAgentService:
                 if ctx.event_queue is None:
                     errors.append(f"{request_id}: Queue was None!")
                     raise AttributeError("'NoneType' object has no attribute 'empty'")
-                yield AgentStep(step_number=1, final_answer=f"Done: {request_id}", is_final=True)
+                yield FinalAnswerStep(step_number=1, final_answer=f"Done: {request_id}")
 
             mock_agent.run = mock_run
 
@@ -143,7 +143,7 @@ class TestConcurrentAgentService:
                     AgentService,
                     "_setup_change_tracking",
                     new_callable=AsyncMock,
-                    return_value=(None, "https://api.rossum.ai"),
+                    return_value=(None, None, "https://api.rossum.ai"),
                 ),
             ):
                 mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -197,7 +197,7 @@ class TestConcurrentAgentService:
 
             async def mock_run(prompt):
                 output_dirs_observed[request_id] = str(agent_service.get_output_dir(request_id))
-                yield AgentStep(step_number=1, final_answer="done", is_final=True)
+                yield FinalAnswerStep(step_number=1, final_answer="done")
 
             mock_agent.run = mock_run
 
@@ -214,7 +214,7 @@ class TestConcurrentAgentService:
                     AgentService,
                     "_setup_change_tracking",
                     new_callable=AsyncMock,
-                    return_value=(None, "https://api.rossum.ai"),
+                    return_value=(None, None, "https://api.rossum.ai"),
                 ),
             ):
                 mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)

@@ -1,21 +1,89 @@
-import { useState, useEffect, useCallback } from "react";
-import { Box, Text, useInput, useStdin } from "ink";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useImperativeHandle,
+  useRef,
+  forwardRef,
+} from "react";
+import { Box, Text, useInput, useStdin, useStdout } from "ink";
 
 interface MultiLineInputProps {
   onSubmit: (value: string) => void;
   isActive: boolean;
   placeholder?: string;
+  onChange?: (text: string) => void;
+  onCursorChange?: (row: number, col: number) => void;
 }
 
-export function MultiLineInput({
-  onSubmit,
-  isActive,
-  placeholder,
-}: MultiLineInputProps) {
+export interface MultiLineInputHandle {
+  setText: (text: string) => void;
+}
+
+function isArrowKey(key: {
+  leftArrow: boolean;
+  rightArrow: boolean;
+  upArrow: boolean;
+  downArrow: boolean;
+}): boolean {
+  return key.leftArrow || key.rightArrow || key.upArrow || key.downArrow;
+}
+
+function isModifierKey(key: {
+  tab: boolean;
+  ctrl: boolean;
+  meta: boolean;
+}): boolean {
+  return key.tab || key.ctrl || key.meta;
+}
+
+function getLineLen(lines: string[], row: number): number {
+  return (lines[row] ?? "").length;
+}
+
+export const MultiLineInput = forwardRef<
+  MultiLineInputHandle,
+  MultiLineInputProps
+>(function MultiLineInput(
+  { onSubmit, isActive, placeholder, onChange, onCursorChange },
+  ref,
+) {
   const [lines, setLines] = useState<string[]>([""]);
   const [cursorRow, setCursorRow] = useState(0);
   const [cursorCol, setCursorCol] = useState(0);
-  const { stdin, setRawMode } = useStdin();
+  const { stdin } = useStdin();
+  const { stdout } = useStdout();
+
+  // Notify parent when text changes via useEffect (React 18 batches setState
+  // updaters, so capturing values from inside setLines is unreliable).
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const text = lines.join("\n");
+  useEffect(() => {
+    onChangeRef.current?.(text);
+  }, [text]);
+
+  const onCursorChangeRef = useRef(onCursorChange);
+  onCursorChangeRef.current = onCursorChange;
+
+  useEffect(() => {
+    onCursorChangeRef.current?.(cursorRow, cursorCol);
+  }, [cursorRow, cursorCol]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      setText: (newText: string) => {
+        const newLines = newText.split("\n");
+        setLines(newLines);
+        const lastRow = newLines.length - 1;
+        setCursorRow(lastRow);
+        setCursorCol(newLines[lastRow]!.length);
+      },
+    }),
+    [],
+  );
 
   const reset = useCallback(() => {
     setLines([""]);
@@ -96,9 +164,9 @@ export function MultiLineInput({
   }, [isActive, stdin, handleMultiLinePaste, handleSingleLinePaste]);
 
   const handleSubmit = useCallback(() => {
-    const text = lines.join("\n").trim();
-    if (!text) return;
-    onSubmit(text);
+    const trimmed = lines.join("\n").trim();
+    if (!trimmed) return;
+    onSubmit(trimmed);
     reset();
   }, [lines, onSubmit, reset]);
 
@@ -150,13 +218,11 @@ export function MultiLineInput({
         if (cursorCol > 0) {
           setCursorCol((c) => c - 1);
         } else if (cursorRow > 0) {
-          const prevLineLen = (lines[cursorRow - 1] ?? "").length;
           setCursorRow((r) => r - 1);
-          setCursorCol(prevLineLen);
+          setCursorCol(getLineLen(lines, cursorRow - 1));
         }
       } else if (key.rightArrow) {
-        const lineLen = (lines[cursorRow] ?? "").length;
-        if (cursorCol < lineLen) {
+        if (cursorCol < getLineLen(lines, cursorRow)) {
           setCursorCol((c) => c + 1);
         } else if (cursorRow < lines.length - 1) {
           setCursorRow((r) => r + 1);
@@ -165,14 +231,12 @@ export function MultiLineInput({
       } else if (key.upArrow) {
         if (cursorRow > 0) {
           setCursorRow((r) => r - 1);
-          const prevLineLen = (lines[cursorRow - 1] ?? "").length;
-          setCursorCol(Math.min(cursorCol, prevLineLen));
+          setCursorCol(Math.min(cursorCol, getLineLen(lines, cursorRow - 1)));
         }
       } else if (key.downArrow) {
         if (cursorRow < lines.length - 1) {
           setCursorRow((r) => r + 1);
-          const nextLineLen = (lines[cursorRow + 1] ?? "").length;
-          setCursorCol(Math.min(cursorCol, nextLineLen));
+          setCursorCol(Math.min(cursorCol, getLineLen(lines, cursorRow + 1)));
         }
       }
     },
@@ -195,12 +259,10 @@ export function MultiLineInput({
 
   useInput(
     (input, key) => {
-      if (key.return && !key.shift) return handleSubmit();
-      if (key.return && key.shift) return handleNewLine();
+      if (key.return) return key.shift ? handleNewLine() : handleSubmit();
       if (key.backspace || key.delete) return handleBackspace();
-      if (key.leftArrow || key.rightArrow || key.upArrow || key.downArrow)
-        return handleArrowKeys(key);
-      if (key.tab || key.ctrl || key.meta) return;
+      if (isArrowKey(key)) return handleArrowKeys(key);
+      if (isModifierKey(key)) return;
       if (input.length === 1) handleCharInput(input);
     },
     { isActive },
@@ -218,6 +280,29 @@ export function MultiLineInput({
     ),
   );
   const visibleLines = lines.slice(scrollOffset, scrollOffset + visibleCount);
+  const visibleWidth = Math.max((stdout?.columns ?? 80) - 4, 20);
+
+  function truncateForDisplay(line: string): string {
+    if (line.length <= visibleWidth) return line;
+    if (visibleWidth <= 3) return line.slice(0, visibleWidth);
+    return line.slice(0, visibleWidth - 3) + "...";
+  }
+
+  function cursorWindow(
+    line: string,
+    col: number,
+  ): { segment: string; start: number } {
+    if (line.length <= visibleWidth) {
+      return { segment: line, start: 0 };
+    }
+    const maxStart = Math.max(0, line.length - visibleWidth);
+    const preferredStart = Math.max(col - Math.floor(visibleWidth * 0.7), 0);
+    const start = Math.min(preferredStart, maxStart);
+    return {
+      segment: line.slice(start, start + visibleWidth),
+      start,
+    };
+  }
 
   return (
     <Box flexDirection="column">
@@ -233,13 +318,23 @@ export function MultiLineInput({
           if (!isCursorRow) {
             return (
               <Text key={rowIdx} wrap="truncate">
-                {line}
+                {truncateForDisplay(line)}
               </Text>
             );
           }
-          const before = line.slice(0, cursorCol);
-          const cursorChar = line[cursorCol] ?? " ";
-          const after = line.slice(cursorCol + 1);
+
+          const { segment, start } = cursorWindow(line, cursorCol);
+          const hasCharAtCursor = cursorCol < line.length;
+          const localCursor = Math.min(
+            Math.max(cursorCol - start, 0),
+            segment.length,
+          );
+          const before = segment.slice(0, localCursor);
+          const cursorChar = hasCharAtCursor ? (line[cursorCol] ?? " ") : " ";
+          const after = hasCharAtCursor
+            ? segment.slice(localCursor + 1)
+            : segment.slice(localCursor);
+
           return (
             <Text key={rowIdx} wrap="truncate">
               {before}
@@ -259,4 +354,4 @@ export function MultiLineInput({
       )}
     </Box>
   );
-}
+});

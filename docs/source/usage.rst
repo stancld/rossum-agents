@@ -145,6 +145,22 @@ Using with AI Agents
 The Rossum Agent is built with Anthropic Claude for intelligent document processing.
 The agent includes file system tools, plotting capabilities, and seamless Rossum integration.
 
+Slash Commands
+^^^^^^^^^^^^^^
+
+The REST API supports slash commands — messages starting with ``/`` that are intercepted
+before reaching the agent. They return instant responses without consuming tokens.
+
+.. code-block:: text
+
+   /list-commands    List all available slash commands
+   /list-commits     List configuration commits made in this chat
+   /list-skills      List available agent skills
+   /list-mcp-tools   List MCP tools by category
+   /list-agent-tools List built-in agent tools
+
+Available commands can be discovered via ``GET /api/v1/commands``.
+
 Available Tools
 ---------------
 
@@ -2269,6 +2285,35 @@ Files are saved to a session-specific directory that can be shared with the user
      "status": "success",
      "message": "Successfully wrote 1234 characters to report.md",
      "path": "/path/to/outputs/report.md"
+   }
+
+Document Testing Tools
+^^^^^^^^^^^^^^^^^^^^^^
+
+generate_mock_pdf
+"""""""""""""""""
+
+Generate a mock PDF document with realistic values matching schema fields.
+
+Use for end-to-end extraction testing: generate PDF → upload → verify extracted values match expected.
+
+**Parameters:**
+
+- ``fields`` (list[dict], required): Schema field descriptors: ``[{id, label, type, rir_field_names?, options?}]``. Extract from schema content (sections → datapoints, multivalues → tuples).
+- ``document_type`` (string, optional): ``invoice``, ``purchase_order``, ``receipt``, ``delivery_note``, ``credit_note``. Default: ``invoice``.
+- ``line_item_count`` (int, optional): Number of line item rows to generate. Default: 3.
+- ``overrides`` (dict[str, str], optional): Force specific field values: ``{field_id: value}``.
+- ``filename`` (string, optional): Output filename (auto-generated if omitted).
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "status": "success",
+     "file_path": "/path/to/mock.pdf",
+     "expected_values": {"invoice_id": "INV-2026-00142", "date_issue": "2026-02-10"},
+     "line_items": [{"item_description": "Office supplies", "item_amount_total": "150.00"}]
    }
 
 Lookup Field Tools

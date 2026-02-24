@@ -14,7 +14,7 @@ import re
 import httpx
 from anthropic import beta_tool
 
-from rossum_agent.tools.core import require_rossum_credentials
+from rossum_agent.tools.core import get_context
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ def suggest_formula_field(
     logger.info(f"suggest_formula_field: {field_schema_id=}, {schema_id=}, {section_id=}, hint={hint[:100]}...")
 
     try:
-        api_base_url, token = require_rossum_credentials()
+        api_base_url, token = get_context().require_rossum_credentials()
         url = _build_suggest_formula_url(api_base_url)
 
         schema_content = _fetch_schema_content(api_base_url, token, schema_id)

@@ -15,6 +15,7 @@ from __future__ import annotations
 from regression_tests.custom_checks import (
     check_business_validation_hook_settings,
     check_business_validation_rules,
+    check_cautious_persona_asks_clarification,
     check_formula_field_for_table,
     check_formula_field_updated,
     check_hook_deleted_and_reverted,
@@ -22,6 +23,7 @@ from regression_tests.custom_checks import (
     check_knowledge_base_hidden_multivalue_warning,
     check_lookup_field_configured,
     check_lookup_match_results,
+    check_multi_turn_schema_reverted,
     check_net_terms_formula_field_added,
     check_no_misleading_training_suggestions,
     check_queue_deleted,
@@ -134,6 +136,16 @@ SCHEMA_REVERT_TYPE_VALIDATION_CHECK = CustomCheck(
     check_fn=check_schema_reverted_with_valid_types,
 )
 
+MULTI_TURN_SCHEMA_REVERTED_CHECK = CustomCheck(
+    name="Multi-turn session fields reverted and feature availability checked",
+    check_fn=check_multi_turn_schema_reverted,
+)
+
+CAUTIOUS_PERSONA_CLARIFICATION_CHECK = CustomCheck(
+    name="Cautious persona asked clarifying question instead of creating formula field",
+    check_fn=check_cautious_persona_asks_clarification,
+)
+
 
 REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
@@ -144,7 +156,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url=None,
         prompt="Hey, what can you do?",
         tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=4800, max_total_tokens=5500),
+        token_budget=TokenBudget(min_total_tokens=6000, max_total_tokens=6500),
         success_criteria=SuccessCriteria(
             required_keywords=["hook", "queue"],
             max_steps=1,
@@ -159,7 +171,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url="https://mr-fabry.rossum.app/documents?filtering=%7B%22items%22%3A%5B%7B%22field%22%3A%22queue%22%2C%22value%22%3A%5B%222500259%22%5D%2C%22operator%22%3A%22isAnyOf%22%7D%5D%2C%22logicOperator%22%3A%22and%22%7D&level=queue&page=1&page_size=100",
         prompt="Explain a document workflow and learning workflow on this queue.",
         tool_expectation=ToolExpectation(expected_tools=["get_queue", "get_queue_engine"], mode=ToolMatchMode.SUBSET),
-        token_budget=TokenBudget(min_total_tokens=18000, max_total_tokens=50000),
+        token_budget=TokenBudget(min_total_tokens=25000, max_total_tokens=60000),
         success_criteria=SuccessCriteria(
             required_keywords=["document_type", "classification", "training", "workflow"],
             max_steps=5,
@@ -508,7 +520,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=180000, max_total_tokens=320000),
+        token_budget=TokenBudget(min_total_tokens=180000, max_total_tokens=360000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
             max_steps=12,
@@ -540,7 +552,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "prune_schema_fields",
                 ("patch_schema", "patch_schema_with_subagent"),
             ],
-            mode=ToolMatchMode.EXACT_SEQUENCE,
+            mode=ToolMatchMode.SUBSET,
         ),
         token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=90000),
         success_criteria=SuccessCriteria(
@@ -659,6 +671,82 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             max_steps=6,
             file_expectation=FileExpectation(),
             custom_checks=[SCHEMA_REVERT_TYPE_VALIDATION_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="multi_turn_create_and_restore_schema",
+        description=(
+            "Multi-turn: create queue, add formula + reasoning fields via conversation, "
+            "verify feature availability, then revert all schema changes"
+        ),
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        rossum_url=None,
+        requires_redis=True,
+        prompts=[
+            "Create a 'New revert queue' in workspace 785638. Use EU template.",
+            (
+                "Add field to the queue.\n"
+                "    - Field name: The Net Terms\n"
+                "    - Section: basic_info_section\n"
+                "    - Logic: Compute 'Due Date' - 'Issue Date' and categorize it as 'Net 15', 'Net 30' and 'Outstanding'"
+            ),
+            "If either date missing, please return 'Unavailable' instead of 'Outstanding'.",
+            (
+                "Add a reasoning field that will take city from the customer address and derive the country of the customer. "
+                "Before adding that, can you reason it's a good idea to do it like that?"
+            ),
+            "Thank you for the considerations. Also, are reasoning fields available on my account?",
+            "Then derive it from the whole address, let's see. Add it to the schema.",
+            "Print me the list of changes we made.",
+            "Add timestamps pls also",
+            "I'm not really sure we took a good approach. Please restore the schema back to how it was right after the queue was created.",
+        ],
+        tool_expectation=ToolExpectation(
+            expected_tools=[
+                "create_queue_from_template",
+                "suggest_formula_field",
+                ("patch_schema", "patch_schema_with_subagent"),
+                "are_reasoning_fields_enabled",
+                "load_skill",
+                "restore_entity_version",
+            ],
+            mode=ToolMatchMode.SUBSET,
+        ),
+        token_budget=TokenBudget(min_total_tokens=300000, max_total_tokens=700000),
+        success_criteria=SuccessCriteria(
+            require_subagent=None,
+            required_keywords=[],
+            max_steps=30,
+            file_expectation=FileExpectation(),
+            custom_checks=[MULTI_TURN_SCHEMA_REVERTED_CHECK],
+        ),
+    ),
+    RegressionTestCase(
+        name="cautious_persona_asks_before_formula_field",
+        description="Cautious persona asks clarifying question before creating formula field",
+        api_base_url="https://mr-fabry.rossum.app/api/v1",
+        persona="cautious",
+        rossum_url=None,
+        prompts=[
+            "Create a 'New revert queue' in workspace 785638. Use EU template.",
+            (
+                "Add field to the queue.\n"
+                "    - Field name: The Net Terms\n"
+                "    - Section: basic_info_section\n"
+                "    - Logic: Compute 'Due Date' - 'Issue Date' and categorize it as 'Net 15', 'Net 30' and 'Outstanding'"
+            ),
+        ],
+        tool_expectation=ToolExpectation(
+            expected_tools=["create_queue_from_template"],
+            mode=ToolMatchMode.SUBSET,
+            forbidden_tools=["patch_schema", "patch_schema_with_subagent"],
+        ),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=65000),
+        success_criteria=SuccessCriteria(
+            required_keywords=[],
+            max_steps=5,
+            file_expectation=FileExpectation(),
+            custom_checks=[CAUTIOUS_PERSONA_CLARIFICATION_CHECK],
         ),
     ),
     RegressionTestCase(

@@ -389,19 +389,6 @@ class TestCreateUser:
         assert call_data["groups"] == ["https://api.test.rossum.ai/v1/groups/2"]
         assert call_data["metadata"] == {"external_id": "abc123"}
 
-    @pytest.mark.asyncio
-    async def test_create_user_read_only_mode(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test create_user returns error in read-only mode."""
-        set_mcp_mode("read-only")
-        try:
-            register_user_tools(mock_mcp, mock_client)
-            create_user = mock_mcp._tools["create_user"]
-            result = await create_user(username="test@example.com", email="test@example.com")
-            assert result == {"error": "create_user is not available in read-only mode"}
-            mock_client.create_new_user.assert_not_called()
-        finally:
-            set_mcp_mode("read-write")
-
 
 @pytest.mark.unit
 class TestUpdateUser:
@@ -454,19 +441,6 @@ class TestUpdateUser:
             "is_active": False,
             "groups": ["https://api.test.rossum.ai/v1/groups/3"],
         }
-
-    @pytest.mark.asyncio
-    async def test_update_user_read_only_mode(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test update_user returns error in read-only mode."""
-        set_mcp_mode("read-only")
-        try:
-            register_user_tools(mock_mcp, mock_client)
-            update_user = mock_mcp._tools["update_user"]
-            result = await update_user(user_id=100, first_name="Test")
-            assert result == {"error": "update_user is not available in read-only mode"}
-            mock_client._http_client.update.assert_not_called()
-        finally:
-            set_mcp_mode("read-write")
 
 
 @pytest.mark.unit

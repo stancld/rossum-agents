@@ -14,12 +14,13 @@ npm run build
 
 ## Configuration
 
-| Option | Flag | Environment Variable | Required |
-|--------|------|---------------------|----------|
-| Agent API URL | `--api-url` | `ROSSUM_AGENT_API_URL` | Yes |
-| Rossum API token | `--token` | `ROSSUM_API_TOKEN` | Yes |
-| Rossum API base URL | `--rossum-url` | `ROSSUM_API_BASE_URL` | Yes |
-| MCP mode | `--mcp-mode` | `ROSSUM_MCP_MODE` | No (default: `read-only`) |
+| Option              | Flag           | Environment Variable   | Required                  |
+| ------------------- | -------------- | ---------------------- | ------------------------- |
+| Agent API URL       | `--api-url`    | `ROSSUM_AGENT_API_URL` | Yes                       |
+| Rossum API token    | `--token`      | `ROSSUM_API_TOKEN`     | Yes                       |
+| Rossum API base URL | `--rossum-url` | `ROSSUM_API_BASE_URL`  | Yes                       |
+| MCP mode            | `--mcp-mode`   | `ROSSUM_MCP_MODE`      | No (default: `read-only`) |
+| Persona             | `--persona`    | `ROSSUM_AGENT_PERSONA` | No (default: `default`)   |
 
 ## Usage
 
@@ -35,18 +36,25 @@ fabry --api-url http://localhost:8000 --token your-token --rossum-url https://ap
 
 # Read-write mode
 fabry --mcp-mode read-write
+
+# Cautious persona
+fabry --persona cautious
 ```
 
 ## Keyboard Controls
 
-| Mode | Key | Action |
-|------|-----|--------|
-| Input | `Esc` | Switch to browse mode |
-| Browse | `i` / `Tab` | Switch to input mode |
-| Browse | `j` / `↓` | Move selection down |
-| Browse | `k` / `↑` | Move selection up |
-| Browse | `Enter` / `Space` | Expand/collapse selected item |
-| Browse | `G` | Jump to bottom (re-enable auto-scroll) |
+| Mode   | Key                 | Action                                 |
+| ------ | ------------------- | -------------------------------------- |
+| Input  | `Esc`               | Switch to browse mode                  |
+| Browse | `i` / `Tab`         | Switch to input mode                   |
+| Browse | `j` / `↓`           | Move selection down                    |
+| Browse | `k` / `↑`           | Move selection up                      |
+| Browse | `Ctrl+D` / `Ctrl+U` | Scroll chat viewport down/up           |
+| Browse | `Enter` / `Space`   | Expand/collapse selected item          |
+| Browse | `G`                 | Jump to bottom (re-enable auto-scroll) |
+| Input  | `Meta+1`            | Quick reply: Approve                   |
+| Input  | `Meta+2`            | Quick reply: Reject                    |
+| Input  | `Meta+3`            | Quick reply: Let's chat about it.      |
 
 Expandable items: thinking steps, tool calls, and intermediate content (instructions).
 
@@ -54,11 +62,11 @@ Expandable items: thinking steps, tool calls, and intermediate content (instruct
 
 When the agent uses task tracking for multi-step operations, a task list appears inline showing progress:
 
-| Badge | Status |
-|-------|--------|
-| `✓` (green) | Completed |
-| Spinner | In progress |
-| `○` (dimmed) | Pending |
+| Badge        | Status      |
+| ------------ | ----------- |
+| `✓` (green)  | Completed   |
+| Spinner      | In progress |
+| `○` (dimmed) | Pending     |
 
 Tasks update in real-time as the agent works through each step.
 

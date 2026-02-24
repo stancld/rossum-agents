@@ -11,8 +11,10 @@ from rossum_agent.change_tracking.models import ConfigCommit, compute_commit_has
 
 if TYPE_CHECKING:
     from rossum_agent.change_tracking.models import EntityChange
-    from rossum_agent.change_tracking.store import CommitStore
+    from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
     from rossum_agent.rossum_mcp_integration import MCPConnection
+
+_EPOCH = datetime.min.replace(tzinfo=UTC)
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +74,9 @@ def generate_commit_message(changes: list[EntityChange], user_request: str) -> s
 class CommitService:
     """Orchestrates creating config commits from tracked changes."""
 
-    def __init__(self, store: CommitStore) -> None:
+    def __init__(self, store: CommitStore, snapshot_store: SnapshotStore) -> None:
         self.store = store
+        self.snapshot_store = snapshot_store
 
     def create_commit(
         self, tracking_connection: MCPConnection, chat_id: str, user_request: str, environment: str
@@ -96,7 +99,46 @@ class CommitService:
             changes=changes,
         )
         self.store.save_commit(commit)
+        self._save_snapshots(commit)
         tracking_connection.clear_changes()
 
         logger.info(f"Config commit {commit.hash}: {commit.message}")
         return commit
+
+    def _resolve_parent(self, commit: ConfigCommit) -> tuple[str, datetime]:
+        """Return (hash, timestamp) for the parent commit, or a sentinel if none."""
+        if commit.parent:
+            parent = self.store.get_commit(commit.environment, commit.parent)
+            if parent:
+                return parent.hash, parent.timestamp
+        return "initial", _EPOCH
+
+    def _save_snapshots(self, commit: ConfigCommit) -> None:
+        for change in commit.changes:
+            # For the first tracked update of an entity, also save the pre-change state
+            # so show_entity_history exposes the full history including before agent touched it.
+            if (
+                change.operation == "update"
+                and change.before is not None
+                and self.snapshot_store.get_earliest_version(commit.environment, change.entity_type, change.entity_id)
+                is None
+            ):
+                parent_hash, parent_ts = self._resolve_parent(commit)
+                self.snapshot_store.save_snapshot(
+                    commit.environment,
+                    change.entity_type,
+                    change.entity_id,
+                    parent_hash,
+                    parent_ts,
+                    change.before,
+                )
+
+            if change.after is not None:
+                self.snapshot_store.save_snapshot(
+                    commit.environment,
+                    change.entity_type,
+                    change.entity_id,
+                    commit.hash,
+                    commit.timestamp,
+                    change.after,
+                )

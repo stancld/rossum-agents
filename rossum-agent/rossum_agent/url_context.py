@@ -27,7 +27,7 @@ class RossumUrlContext:
 
     def is_empty(self) -> bool:
         """Check if no context was extracted."""
-        return all(getattr(self, f) is None for f in ["queue_id", "document_id", "hook_id", "engine_id"])
+        return self.queue_id is None and self.document_id is None and self.hook_id is None and self.engine_id is None
 
     def to_context_string(self) -> str:
         """Convert the context to a human-readable string for the agent."""

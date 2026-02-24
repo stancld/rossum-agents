@@ -11,6 +11,7 @@ class CreateChatRequest(BaseModel):
     """Request body for creating a new chat session."""
 
     mcp_mode: Literal["read-only", "read-write"] = "read-only"
+    persona: Literal["default", "cautious"] = "default"
 
 
 class ImageContent(BaseModel):

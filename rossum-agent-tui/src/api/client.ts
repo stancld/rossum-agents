@@ -1,4 +1,9 @@
-import type { ChatResponse, ChatListResponse, Config } from "../types.js";
+import type {
+  ChatResponse,
+  ChatListResponse,
+  CommandInfo,
+  Config,
+} from "../types.js";
 
 export function buildHeaders(config: Config): Record<string, string> {
   return {
@@ -24,7 +29,10 @@ export async function createChat(config: Config): Promise<ChatResponse> {
     res = await fetch(`${config.apiUrl}/api/v1/chats`, {
       method: "POST",
       headers: buildHeaders(config),
-      body: JSON.stringify({ mcp_mode: config.mcpMode }),
+      body: JSON.stringify({
+        mcp_mode: config.mcpMode,
+        persona: config.persona,
+      }),
     });
   } catch (err) {
     throw unwrapFetchError(err, `Cannot connect to ${config.apiUrl}`);
@@ -34,6 +42,21 @@ export async function createChat(config: Config): Promise<ChatResponse> {
     throw new Error(`Failed to create chat (${res.status}): ${body}`);
   }
   return (await res.json()) as ChatResponse;
+}
+
+export async function listCommands(config: Config): Promise<CommandInfo[]> {
+  try {
+    const res = await fetch(`${config.apiUrl}/api/v1/commands`, {
+      headers: buildHeaders(config),
+    });
+    if (!res.ok) {
+      return [];
+    }
+    const data = (await res.json()) as { commands: CommandInfo[] };
+    return data.commands;
+  } catch {
+    return [];
+  }
 }
 
 export async function listChats(

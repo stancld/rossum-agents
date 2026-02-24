@@ -94,24 +94,6 @@ class TestUploadDocument:
         assert "File not found" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_upload_document_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, tmp_path: Path, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test upload_document is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_annotation_tools(mock_mcp, mock_client)
-
-        test_file = tmp_path / "test.pdf"
-        test_file.write_text("test content")
-
-        upload_document = mock_mcp._tools["upload_document"]
-        result = await upload_document(file_path=str(test_file), queue_id=100)
-
-        assert result["error"] == "upload_document is not available in read-only mode"
-        mock_client.upload_document.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_upload_document_key_error(
         self, mock_mcp: Mock, mock_client: AsyncMock, tmp_path: Path, monkeypatch: MonkeyPatch
     ) -> None:
@@ -300,21 +282,6 @@ class TestStartAnnotation:
         assert "started successfully" in result["message"]
         mock_client.start_annotation.assert_called_once_with(12345)
 
-    @pytest.mark.asyncio
-    async def test_start_annotation_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test start_annotation is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_annotation_tools(mock_mcp, mock_client)
-
-        start_annotation = mock_mcp._tools["start_annotation"]
-        result = await start_annotation(annotation_id=12345)
-
-        assert result["error"] == "start_annotation is not available in read-only mode"
-        mock_client.start_annotation.assert_not_called()
-
 
 @pytest.mark.unit
 class TestBulkUpdateAnnotationFields:
@@ -342,21 +309,6 @@ class TestBulkUpdateAnnotationFields:
         assert "updated with 2 operations" in result["message"]
         mock_client.bulk_update_annotation_data.assert_called_once_with(12345, operations)
 
-    @pytest.mark.asyncio
-    async def test_bulk_update_annotation_fields_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test bulk_update_annotation_fields is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_annotation_tools(mock_mcp, mock_client)
-
-        bulk_update = mock_mcp._tools["bulk_update_annotation_fields"]
-        result = await bulk_update(annotation_id=12345, operations=[])
-
-        assert result["error"] == "bulk_update_annotation_fields is not available in read-only mode"
-        mock_client.bulk_update_annotation_data.assert_not_called()
-
 
 @pytest.mark.unit
 class TestConfirmAnnotation:
@@ -377,21 +329,6 @@ class TestConfirmAnnotation:
         assert result["annotation_id"] == 12345
         assert "confirmed successfully" in result["message"]
         mock_client.confirm_annotation.assert_called_once_with(12345)
-
-    @pytest.mark.asyncio
-    async def test_confirm_annotation_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test confirm_annotation is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_annotation_tools(mock_mcp, mock_client)
-
-        confirm_annotation = mock_mcp._tools["confirm_annotation"]
-        result = await confirm_annotation(annotation_id=12345)
-
-        assert result["error"] == "confirm_annotation is not available in read-only mode"
-        mock_client.confirm_annotation.assert_not_called()
 
 
 @pytest.mark.unit
@@ -480,21 +417,6 @@ class TestCopyAnnotations:
         call_kwargs = mock_client._http_client.request_json.call_args[1]
         assert call_kwargs["json"]["target_status"] == "confirmed"
 
-    @pytest.mark.asyncio
-    async def test_copy_annotations_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test copy_annotations is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_annotation_tools(mock_mcp, mock_client)
-
-        copy_annotations = mock_mcp._tools["copy_annotations"]
-        result = await copy_annotations(annotation_ids=[111, 222], target_queue_id=300)
-
-        assert result["error"] == "copy_annotations is not available in read-only mode"
-        mock_client._http_client.request_json.assert_not_called()
-
 
 @pytest.mark.unit
 class TestDeleteAnnotation:
@@ -517,18 +439,3 @@ class TestDeleteAnnotation:
         assert "deleted" in result["message"]
         assert "12345" in result["message"]
         mock_client.delete_annotation.assert_called_once_with(12345)
-
-    @pytest.mark.asyncio
-    async def test_delete_annotation_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test delete_annotation is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_annotation_tools(mock_mcp, mock_client)
-
-        delete_annotation = mock_mcp._tools["delete_annotation"]
-        result = await delete_annotation(annotation_id=12345)
-
-        assert result["error"] == "delete_annotation is not available in read-only mode"
-        mock_client.delete_annotation.assert_not_called()

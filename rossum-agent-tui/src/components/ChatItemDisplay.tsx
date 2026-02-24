@@ -3,7 +3,9 @@ import { Box, Text } from "ink";
 import { ThinkingBlock } from "./ThinkingBlock.js";
 import { ToolCall } from "./ToolCall.js";
 import { StreamingIndicator } from "./StreamingIndicator.js";
-import type { ChatItem } from "../types.js";
+import { renderMarkdown } from "../utils/markdown.js";
+import { truncate } from "../utils/format.js";
+import type { ChatItem, ConfigCommitInfo } from "../types.js";
 
 interface ChatItemDisplayProps {
   item: ChatItem;
@@ -21,23 +23,22 @@ function IntermediateBlock({
   selected: boolean;
 }) {
   const lines = content.split("\n");
-  const isLong = lines.length > 5;
+  const lineCount = lines.length;
   const arrow = expanded ? "▾" : "▸";
-
-  if (!isLong) {
-    return (
-      <Text wrap="wrap" dimColor>
-        {"  "}
-        {content}
-      </Text>
-    );
-  }
+  const preview = truncate(
+    lines
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .slice(0, 2)
+      .join(" "),
+    100,
+  );
 
   if (!expanded) {
-    const preview = lines.slice(0, 3).join("\n");
     return (
       <Text inverse={selected} dimColor>
-        {arrow} {preview} ... ({lines.length} lines)
+        {arrow} {preview || "(empty)"}
+        {lineCount > 1 ? ` ... (${lineCount} lines)` : ""}
       </Text>
     );
   }
@@ -45,12 +46,71 @@ function IntermediateBlock({
   return (
     <Box flexDirection="column">
       <Text inverse={selected} dimColor>
-        {arrow} Content ({lines.length} lines)
+        {arrow} Draft response ({lineCount} lines)
       </Text>
       <Box marginLeft={2}>
         <Text dimColor wrap="wrap">
           {content}
         </Text>
+      </Box>
+    </Box>
+  );
+}
+
+function ConfigCommitItem({ commit }: { commit: ConfigCommitInfo }) {
+  const suffix = commit.changesCount !== 1 ? "s" : "";
+  return (
+    <Text color="cyan">
+      {"  ✓ "}
+      <Text bold>Committed</Text> <Text dimColor>[{commit.hash}]</Text>{" "}
+      {commit.message}{" "}
+      <Text dimColor>
+        ({commit.changesCount} change{suffix})
+      </Text>
+    </Text>
+  );
+}
+
+function FinalAnswerBlock({
+  content,
+  expanded,
+  selected,
+}: {
+  content: string;
+  expanded: boolean;
+  selected: boolean;
+}) {
+  const lines = content.split("\n");
+  const lineCount = lines.length;
+
+  if (!expanded) {
+    const firstLine = truncate(
+      lines.map((line) => line.trim()).find((line) => line.length > 0) || "",
+      80,
+    );
+    return (
+      <Text inverse={selected}>
+        {"▸ "}
+        <Text color="green" bold>
+          {"● "}
+        </Text>
+        {firstLine || "(empty)"}
+        {lineCount > 1 ? ` ... (${lineCount} lines)` : ""}
+      </Text>
+    );
+  }
+
+  return (
+    <Box flexDirection="column">
+      <Text inverse={selected}>
+        {"▾ "}
+        <Text color="green" bold>
+          {"● "}
+        </Text>
+        Response
+      </Text>
+      <Box marginLeft={2}>
+        <Text wrap="wrap">{renderMarkdown(content)}</Text>
       </Box>
     </Box>
   );
@@ -64,10 +124,21 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
   switch (item.kind) {
     case "user_message":
       return (
-        <Text color="green" bold wrap="wrap">
-          {"❯ "}
-          {item.text}
-        </Text>
+        <Box flexDirection="column">
+          <Text color="green" bold wrap="wrap">
+            {"❯ "}
+            {item.text}
+          </Text>
+          {!!item.attachments?.length && (
+            <Box paddingLeft={2} gap={1}>
+              {item.attachments.map((att, i) => (
+                <Text key={i} dimColor>
+                  [{att.type === "image" ? "img" : "doc"}] {att.filename}
+                </Text>
+              ))}
+            </Box>
+          )}
+        </Box>
       );
 
     case "thinking":
@@ -100,12 +171,11 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
 
     case "final_answer":
       return (
-        <Text wrap="wrap">
-          <Text color="green" bold>
-            {"● "}
-          </Text>
-          {item.content}
-        </Text>
+        <FinalAnswerBlock
+          content={item.content}
+          expanded={expanded}
+          selected={selected}
+        />
       );
 
     case "error":
@@ -124,17 +194,7 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
       );
 
     case "config_commit":
-      return (
-        <Text color="cyan">
-          {"  ✓ "}
-          <Text bold>Committed</Text> <Text dimColor>[{item.commit.hash}]</Text>{" "}
-          {item.commit.message}{" "}
-          <Text dimColor>
-            ({item.commit.changesCount} change
-            {item.commit.changesCount !== 1 ? "s" : ""})
-          </Text>
-        </Text>
-      );
+      return <ConfigCommitItem commit={item.commit} />;
 
     case "streaming":
       return (

@@ -7,6 +7,29 @@ All notable changes to this project will be documented in this file.
 ## [1.2.1] - 2026-02-18
 
 ### Added
+- Added `summary` field to chat list response (`GET /api/v1/chats`) — auto-generated one-line summary via Claude Haiku after each turn, persisted in chat metadata [#208](https://github.com/stancld/rossum-agents/pull/208)
+- Added agent persona support (`default`, `cautious`) — settable at chat creation (`POST /api/v1/chats`) and overridable per message; persisted in chat metadata [#199](https://github.com/stancld/rossum-agents/pull/199)
+- Added `/persona` slash command with argument suggestions for dynamic persona switching [#213](https://github.com/stancld/rossum-agents/pull/213)
+- Added `SnapshotStore` — Redis-backed store (7-day TTL) that indexes full entity snapshots by `(entity_type, entity_id, commit_hash)` for point-in-time restore [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Added `show_entity_history` tool — lists all historical versions of a specific entity [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Added `restore_entity_version` tool — restores an entity to a specific historical version by commit hash [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Added `diff_objects` tool — computes unified diff between two JSON objects for explicit comparison requests [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Added slash commands — intercepted in the message endpoint before reaching the agent, with `GET /commands` endpoint for TUI discovery [#207](https://github.com/stancld/rossum-agents/pull/207): `/list-commands` (list all slash commands), `/list-commits` (list configuration commits in current chat), `/list-skills` (list loadable agent skills with slugs), `/list-mcp-tools` (list MCP tools grouped by category from cached catalog), `/list-agent-tools` (list built-in agent tools with descriptions)
+- Reverted commits are now marked with a `[REVERTED]` badge in `/list-commits` output; `show_change_history` also exposes a `reverted` field per commit [#210](https://github.com/stancld/rossum-agents/pull/210)
+- Added `document-testing` skill and `generate_mock_pdf` tool for uploading mocked documents to Rossum queues — generates realistic multi-page PDFs with configurable field values for testing extraction pipelines [#215](https://github.com/stancld/rossum-agents/pull/215)
+
+### Changed
+- `revert_commit` no longer restricted to the latest commit — any historical commit can now be reverted [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Increased max tool result length from 20 000 to 30 000 characters
+- Upgraded FastMCP dependency from 2.x to 3.0 [#201](https://github.com/stancld/rossum-agents/pull/201)
+
+### Fixed
+- Fixed schema revert failing under concurrent modifications — now retries with backoff on HTTP 412 (up to 5 attempts) using fetch-then-patch to register current state before each write [#200](https://github.com/stancld/rossum-agents/pull/200)
+- Fixed Bedrock 400 errors silently hanging the agent — producer exceptions are now propagated through the event queue so the client receives a proper error response
+
+## [1.2.1] - 2026-02-18
+
+### Added
 - Added `lookup-fields` skill and `suggest_lookup_field`, `evaluate_lookup_field`, `get_lookup_dataset_raw_values`, `query_lookup_dataset` tools for creating and testing lookup fields backed by Master Data Hub datasets [#183](https://github.com/stancld/rossum-agents/pull/183)
 
 ### Changed

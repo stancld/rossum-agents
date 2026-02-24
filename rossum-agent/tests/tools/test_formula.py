@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+from rossum_agent.tools.core import AgentContext, set_context
 from rossum_agent.tools.formula import (
     _build_suggest_formula_url,
     _clean_html,
@@ -172,9 +173,8 @@ class TestSuggestFormulaField:
         assert parsed["status"] == "no_suggestions"
 
     @patch.dict("os.environ", {}, clear=True)
-    @patch("rossum_agent.tools.core._rossum_credentials")
-    def test_missing_credentials(self, mock_creds: MagicMock) -> None:
-        mock_creds.get.return_value = None
+    def test_missing_credentials(self) -> None:
+        set_context(AgentContext())
         result = suggest_formula_field(
             label="Test",
             hint="test",

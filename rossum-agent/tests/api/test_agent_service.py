@@ -3,11 +3,24 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from rossum_agent.agent.memory import AgentMemory, MemoryStep, TaskStep
-from rossum_agent.agent.models import AgentStep, StepType, ThinkingBlockData, ToolCall, ToolResult
+from rossum_agent.agent.models import (
+    ErrorStep,
+    FinalAnswerStep,
+    StepType,
+    TextDeltaStep,
+    ThinkingBlockData,
+    ThinkingStep,
+    ToolCall,
+    ToolResult,
+    ToolResultStep,
+    ToolStartStep,
+)
 from rossum_agent.api.models.schemas import (
     ImageContent,
     StepEvent,
@@ -19,10 +32,12 @@ from rossum_agent.api.services.agent_service import (
     AgentService,
     _create_tool_result_event,
     _create_tool_start_event,
+    _log_commit_hook,
     convert_step_to_events,
     convert_sub_agent_progress_to_event,
 )
-from rossum_agent.tools import SubAgentProgress, SubAgentText
+from rossum_agent.change_tracking.models import ConfigCommit, EntityChange
+from rossum_agent.tools.core import SubAgentProgress, SubAgentText
 
 
 class TestConvertStepToEvents:
@@ -30,7 +45,7 @@ class TestConvertStepToEvents:
 
     def test_convert_error_step(self):
         """Test converting error step."""
-        step = AgentStep(step_number=1, error="Something went wrong")
+        step = ErrorStep(step_number=1, error="Something went wrong")
         events = convert_step_to_events(step)
 
         assert len(events) == 1
@@ -41,11 +56,7 @@ class TestConvertStepToEvents:
 
     def test_convert_final_answer_step(self):
         """Test converting final answer step."""
-        step = AgentStep(
-            step_number=2,
-            final_answer="Here is your answer",
-            is_final=True,
-        )
+        step = FinalAnswerStep(step_number=2, final_answer="Here is your answer")
         events = convert_step_to_events(step)
 
         assert len(events) == 1
@@ -55,12 +66,12 @@ class TestConvertStepToEvents:
         assert events[0].is_final is True
 
     def test_convert_tool_start_step(self):
-        """Test converting tool start step."""
-        step = AgentStep(
+        """Test converting tool start step with current_tool."""
+        step = ToolStartStep(
             step_number=1,
-            current_tool="list_annotations",
             tool_calls=[ToolCall(id="tc_1", name="list_annotations", arguments={"queue_id": 123})],
             tool_progress=(1, 3),
+            current_tool="list_annotations",
         )
         events = convert_step_to_events(step)
 
@@ -73,14 +84,14 @@ class TestConvertStepToEvents:
 
     def test_convert_tool_result_step(self):
         """Test converting tool result step."""
-        step = AgentStep(
+        step = ToolResultStep(
             step_number=1,
+            tool_calls=[ToolCall(id="call_123", name="list_annotations", arguments={})],
             tool_results=[
                 ToolResult(
                     tool_call_id="call_123", name="list_annotations", content='{"annotations": []}', is_error=False
                 ),
             ],
-            is_streaming=False,
         )
         events = convert_step_to_events(step)
 
@@ -94,14 +105,14 @@ class TestConvertStepToEvents:
 
     def test_convert_tool_result_error_step(self):
         """Test converting tool result with error."""
-        step = AgentStep(
+        step = ToolResultStep(
             step_number=1,
+            tool_calls=[ToolCall(id="call_456", name="get_annotation", arguments={})],
             tool_results=[
                 ToolResult(
                     tool_call_id="call_456", name="get_annotation", content="Annotation not found", is_error=True
                 ),
             ],
-            is_streaming=False,
         )
         events = convert_step_to_events(step)
 
@@ -112,7 +123,7 @@ class TestConvertStepToEvents:
 
     def test_convert_thinking_step(self):
         """Test converting thinking step."""
-        step = AgentStep(step_number=1, thinking="I'll help you with that...", is_streaming=True)
+        step = ThinkingStep(step_number=1, thinking="I'll help you with that...")
         events = convert_step_to_events(step)
 
         assert len(events) == 1
@@ -123,7 +134,7 @@ class TestConvertStepToEvents:
 
     def test_convert_thinking_step_not_streaming(self):
         """Test converting thinking step when not streaming."""
-        step = AgentStep(step_number=1, thinking="Complete thought", is_streaming=False)
+        step = ThinkingStep(step_number=1, thinking="Complete thought", is_streaming=False)
         events = convert_step_to_events(step)
 
         assert len(events) == 1
@@ -131,12 +142,12 @@ class TestConvertStepToEvents:
         assert events[0].is_streaming is False
 
     def test_convert_intermediate_text_step(self):
-        """Test converting intermediate text step with accumulated_text."""
-        step = AgentStep(
+        """Test converting intermediate text step."""
+        step = TextDeltaStep(
             step_number=1,
             step_type=StepType.INTERMEDIATE,
+            text_delta="delta",
             accumulated_text="Here is some intermediate text",
-            is_streaming=True,
         )
         events = convert_step_to_events(step)
 
@@ -147,12 +158,12 @@ class TestConvertStepToEvents:
         assert events[0].is_streaming is True
 
     def test_convert_final_answer_streaming_text_step(self):
-        """Test converting final answer streaming text step with accumulated_text."""
-        step = AgentStep(
+        """Test converting final answer streaming text step."""
+        step = TextDeltaStep(
             step_number=2,
             step_type=StepType.FINAL_ANSWER,
+            text_delta="delta",
             accumulated_text="Final response text",
-            is_streaming=True,
         )
         events = convert_step_to_events(step)
 
@@ -162,41 +173,20 @@ class TestConvertStepToEvents:
         assert events[0].content == "Final response text"
         assert events[0].is_streaming is True
 
-    def test_convert_thinking_step_with_step_type(self):
-        """Test converting step with StepType.THINKING."""
-        step = AgentStep(
-            step_number=1,
-            step_type=StepType.THINKING,
-            thinking="Deep reasoning here",
-            is_streaming=True,
-        )
-        events = convert_step_to_events(step)
-
-        assert len(events) == 1
-        assert events[0].type == "thinking"
-        assert events[0].content == "Deep reasoning here"
-        assert events[0].is_streaming is True
-
-    def test_convert_fallback_step(self):
-        """Test converting step that falls through to fallback case."""
-        step = AgentStep(step_number=1, is_streaming=True)
-        events = convert_step_to_events(step)
-
-        assert len(events) == 1
-        assert events[0].type == "thinking"
-        assert events[0].content is None
-        assert events[0].is_streaming is True
-
     def test_convert_multi_tool_result_step(self):
         """Test that multiple tool results produce one event per result."""
-        step = AgentStep(
+        step = ToolResultStep(
             step_number=3,
+            tool_calls=[
+                ToolCall(id="tc_1", name="list_annotations", arguments={}),
+                ToolCall(id="tc_2", name="get_queue", arguments={}),
+                ToolCall(id="tc_3", name="get_annotation", arguments={}),
+            ],
             tool_results=[
                 ToolResult(tool_call_id="tc_1", name="list_annotations", content="result_1", is_error=False),
                 ToolResult(tool_call_id="tc_2", name="get_queue", content="result_2", is_error=False),
                 ToolResult(tool_call_id="tc_3", name="get_annotation", content="error_result", is_error=True),
             ],
-            is_streaming=False,
         )
         events = convert_step_to_events(step)
 
@@ -217,19 +207,39 @@ class TestConvertStepToEvents:
             assert e.type == "tool_result"
             assert e.step_number == 3
 
+    def test_convert_tool_start_all_tools(self):
+        """Test converting tool start step with current_tool=None emits all tools."""
+        step = ToolStartStep(
+            step_number=1,
+            tool_calls=[
+                ToolCall(id="tc_1", name="list_annotations", arguments={}),
+                ToolCall(id="tc_2", name="get_queue", arguments={}),
+            ],
+            tool_progress=(0, 2),
+        )
+        events = convert_step_to_events(step)
+
+        assert len(events) == 2
+        assert events[0].type == "tool_start"
+        assert events[0].tool_name == "list_annotations"
+        assert events[0].tool_progress == (1, 2)
+        assert events[1].type == "tool_start"
+        assert events[1].tool_name == "get_queue"
+        assert events[1].tool_progress == (2, 2)
+
 
 class TestCreateToolStartEvent:
     """Tests for _create_tool_start_event function."""
 
     def test_create_tool_start_event_with_tool_args(self):
         """Test creating tool start event with matching tool call args."""
-        step = AgentStep(
+        step = ToolStartStep(
             step_number=1,
-            current_tool="list_annotations",
             tool_calls=[
                 ToolCall(id="tc_1", name="list_annotations", arguments={"queue_id": 123}),
             ],
             tool_progress=(1, 2),
+            current_tool="list_annotations",
         )
         event = _create_tool_start_event(step, "list_annotations")
 
@@ -242,9 +252,8 @@ class TestCreateToolStartEvent:
 
     def test_create_tool_start_event_expands_call_on_connection(self):
         """Test that call_on_connection tool names are expanded."""
-        step = AgentStep(
+        step = ToolStartStep(
             step_number=1,
-            current_tool="call_on_connection",
             tool_calls=[
                 ToolCall(
                     id="tc_1",
@@ -253,6 +262,7 @@ class TestCreateToolStartEvent:
                 ),
             ],
             tool_progress=(1, 1),
+            current_tool="call_on_connection",
         )
         event = _create_tool_start_event(step, "call_on_connection")
 
@@ -263,13 +273,13 @@ class TestCreateToolStartEvent:
 
     def test_create_tool_start_event_no_matching_tool_call(self):
         """Test creating tool start event when tool call is not found."""
-        step = AgentStep(
+        step = ToolStartStep(
             step_number=1,
-            current_tool="get_annotation",
             tool_calls=[
                 ToolCall(id="tc_1", name="list_annotations", arguments={"queue_id": 123}),
             ],
             tool_progress=(2, 3),
+            current_tool="get_annotation",
         )
         event = _create_tool_start_event(step, "get_annotation")
 
@@ -763,8 +773,8 @@ class TestAgentServiceRunAgent:
         )
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, thinking="Processing...", is_streaming=True)
-            yield AgentStep(step_number=1, final_answer="Done!", is_final=True)
+            yield ThinkingStep(step_number=1, thinking="Processing...")
+            yield FinalAnswerStep(step_number=1, final_answer="Done!")
 
         mock_agent.run = mock_run
 
@@ -817,7 +827,7 @@ class TestAgentServiceRunAgent:
                 AgentService,
                 "_setup_change_tracking",
                 new_callable=AsyncMock,
-                return_value=(None, "https://api.rossum.ai"),
+                return_value=(None, None, "https://api.rossum.ai"),
             ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -850,7 +860,7 @@ class TestAgentServiceRunAgent:
         mock_agent.tokens.total_output = 0
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -868,7 +878,7 @@ class TestAgentServiceRunAgent:
                 AgentService,
                 "_setup_change_tracking",
                 new_callable=AsyncMock,
-                return_value=(None, "https://api.rossum.ai"),
+                return_value=(None, None, "https://api.rossum.ai"),
             ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -902,7 +912,7 @@ class TestAgentServiceRunAgent:
         mock_agent.memory = MagicMock()
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -916,7 +926,7 @@ class TestAgentServiceRunAgent:
                 AgentService,
                 "_setup_change_tracking",
                 new_callable=AsyncMock,
-                return_value=(None, "https://api.rossum.ai"),
+                return_value=(None, None, "https://api.rossum.ai"),
             ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -954,7 +964,7 @@ class TestAgentServiceRunAgent:
         mock_agent.memory = memory
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -966,7 +976,7 @@ class TestAgentServiceRunAgent:
                 AgentService,
                 "_setup_change_tracking",
                 new_callable=AsyncMock,
-                return_value=(None, "https://api.rossum.ai"),
+                return_value=(None, None, "https://api.rossum.ai"),
             ),
         ):
             mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
@@ -1292,7 +1302,6 @@ class TestAgentServiceSubAgentCallbacks:
 
     async def test_on_sub_agent_progress_queue_full(self, caplog):
         """Test _on_sub_agent_progress logs warning when queue is full."""
-        import logging
 
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
@@ -1360,7 +1369,6 @@ class TestAgentServiceSubAgentCallbacks:
 
     async def test_on_sub_agent_text_queue_full(self, caplog):
         """Test _on_sub_agent_text logs warning when queue is full."""
-        import logging
 
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
@@ -1412,7 +1420,6 @@ class TestAgentServiceSubAgentCallbacks:
 
     async def test_on_task_snapshot_queue_full(self, caplog):
         """Test _on_task_snapshot logs warning when queue is full."""
-        import logging
 
         from rossum_agent.api.services.agent_service import _request_context, _RequestContext
 
@@ -1437,7 +1444,6 @@ class TestAgentServiceRunAgentWithImages:
     @pytest.mark.asyncio
     async def test_run_agent_logs_image_count(self, tmp_path, caplog):
         """Test that run_agent logs the number of images."""
-        import logging
 
         service = AgentService()
 
@@ -1447,7 +1453,7 @@ class TestAgentServiceRunAgentWithImages:
         mock_agent.tokens.total_output = 0
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -1464,7 +1470,7 @@ class TestAgentServiceRunAgentWithImages:
                 AgentService,
                 "_setup_change_tracking",
                 new_callable=AsyncMock,
-                return_value=(None, "https://api.rossum.ai"),
+                return_value=(None, None, "https://api.rossum.ai"),
             ),
             caplog.at_level(logging.INFO),
         ):
@@ -1499,7 +1505,7 @@ class TestAgentServiceUrlContext:
         mock_agent.tokens.total_output = 0
 
         async def mock_run(prompt):
-            yield AgentStep(step_number=1, final_answer="Done", is_final=True)
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
 
         mock_agent.run = mock_run
 
@@ -1531,3 +1537,176 @@ class TestAgentServiceUrlContext:
 
             call_kwargs = mock_create_agent.call_args
             assert "URL context" in call_kwargs.kwargs["system_prompt"]
+
+
+class TestAfterLoopHook:
+    """Tests for the log_commit hook invocation."""
+
+    @pytest.mark.asyncio
+    async def test_log_commit_hook_no_changes(self):
+        commit = ConfigCommit(
+            hash="deadbeef1234",
+            chat_id="test",
+            timestamp=datetime.now(),
+            message="Updated queue settings",
+            user_request="Update settings",
+            environment="https://api.rossum.ai",
+            changes=[],
+        )
+        result = await _log_commit_hook(commit)
+        assert result == "✓ deadbeef — Updated queue settings"
+
+    async def test_log_commit_hook_with_changes(self):
+        commit = ConfigCommit(
+            hash="cafebabe5678",
+            chat_id="test",
+            timestamp=datetime.now(),
+            message="Configured schema",
+            user_request="Configure",
+            environment="https://api.rossum.ai",
+            changes=[
+                EntityChange(
+                    entity_type="queue",
+                    entity_id="1",
+                    entity_name="Main Queue",
+                    operation="update",
+                    before={},
+                    after={},
+                ),
+                EntityChange(
+                    entity_type="schema",
+                    entity_id="2",
+                    entity_name="Invoice",
+                    operation="create",
+                    before=None,
+                    after={},
+                ),
+                EntityChange(
+                    entity_type="hook",
+                    entity_id="3",
+                    entity_name="Old Hook",
+                    operation="delete",
+                    before={},
+                    after=None,
+                ),
+            ],
+        )
+        result = await _log_commit_hook(commit)
+        assert result is not None
+        lines = result.splitlines()
+        assert lines[0] == "✓ cafebabe — Configured schema"
+        assert lines[1] == '  [~] queue "Main Queue"'
+        assert lines[2] == '  [+] schema "Invoice"'
+        assert lines[3] == '  [-] hook "Old Hook"'
+
+    @pytest.mark.asyncio
+    async def test_run_agent_calls_hook_on_commit(self, tmp_path):
+        """Test that the log_commit hook is called when a commit is created."""
+        service = AgentService()
+
+        mock_mcp_connection = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tokens.total_input = 0
+        mock_agent.tokens.total_output = 0
+        mock_agent.tokens.total_cache_creation = 0
+        mock_agent.tokens.total_cache_read = 0
+        mock_agent.get_token_usage_breakdown.return_value = {}
+        mock_agent.log_token_usage_summary = MagicMock()
+        mock_agent.memory = MagicMock()
+
+        async def mock_run(prompt):
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
+
+        mock_agent.run = mock_run
+
+        fake_commit = ConfigCommit(
+            hash="abc123",
+            chat_id="test-chat",
+            timestamp=datetime.now(),
+            message="Updated schema",
+            user_request="Update schema",
+            environment="https://api.rossum.ai",
+            changes=[],
+        )
+
+        with (
+            patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
+            patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
+            patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(AgentService, "_try_create_config_commit", return_value=fake_commit),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(MagicMock(), MagicMock(), "https://api.rossum.ai"),
+            ),
+        ):
+            mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
+            mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_create_agent.return_value = mock_agent
+
+            events = []
+            async for event in service.run_agent(
+                chat_id="test-chat",
+                prompt="Test",
+                conversation_history=[],
+                rossum_api_token="token",
+                rossum_api_base_url="https://api.rossum.ai",
+            ):
+                events.append(event)
+
+        # Hook output is yielded as a StepEvent before StreamDoneEvent
+        hook_events = [e for e in events if isinstance(e, StepEvent) and e.is_hook_output]
+        assert len(hook_events) == 1
+        assert hook_events[0].type == "final_answer"
+        assert "abc123" in hook_events[0].content
+        assert hook_events[0].is_final is True
+
+    @pytest.mark.asyncio
+    async def test_run_agent_skips_hook_when_no_commit(self, tmp_path):
+        """Test that hook output is not emitted when no commit is created."""
+        service = AgentService()
+
+        mock_mcp_connection = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tokens.total_input = 0
+        mock_agent.tokens.total_output = 0
+        mock_agent.tokens.total_cache_creation = 0
+        mock_agent.tokens.total_cache_read = 0
+        mock_agent.get_token_usage_breakdown.return_value = {}
+        mock_agent.log_token_usage_summary = MagicMock()
+        mock_agent.memory = MagicMock()
+
+        async def mock_run(prompt):
+            yield FinalAnswerStep(step_number=1, final_answer="Done")
+
+        mock_agent.run = mock_run
+
+        with (
+            patch("rossum_agent.api.services.agent_service.connect_mcp_server") as mock_connect,
+            patch("rossum_agent.api.services.agent_service.create_agent") as mock_create_agent,
+            patch("rossum_agent.api.services.agent_service.create_session_output_dir", return_value=tmp_path),
+            patch.object(AgentService, "_try_create_config_commit", return_value=None),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(MagicMock(), MagicMock(), "https://api.rossum.ai"),
+            ),
+        ):
+            mock_connect.return_value.__aenter__ = AsyncMock(return_value=mock_mcp_connection)
+            mock_connect.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_create_agent.return_value = mock_agent
+
+            events = []
+            async for event in service.run_agent(
+                chat_id="test-chat",
+                prompt="Test",
+                conversation_history=[],
+                rossum_api_token="token",
+                rossum_api_base_url="https://api.rossum.ai",
+            ):
+                events.append(event)
+
+        hook_events = [e for e in events if isinstance(e, StepEvent) and e.is_hook_output]
+        assert len(hook_events) == 0

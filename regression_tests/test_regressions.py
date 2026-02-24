@@ -23,11 +23,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from rossum_agent.agent.models import ErrorStep, FinalAnswerStep, ToolStartStep
 
 from regression_tests.conftest import try_connect_redis
 from regression_tests.framework.assertions import assert_files_created, assert_tokens_within_budget, assert_tools_match
 from regression_tests.framework.mermaid_analyzer import extract_mermaid_diagrams, validate_mermaid_diagrams
-from regression_tests.framework.runner import run_regression_test
+from regression_tests.framework.runner import run_multiturn_regression_test, run_regression_test
 from regression_tests.test_cases import REGRESSION_TEST_CASES
 
 _REDIS_AVAILABLE = try_connect_redis() is not None
@@ -78,14 +79,14 @@ def _evaluate_criteria(
         "Token budget", lambda: assert_tokens_within_budget(run, case.token_budget), failures
     )
 
-    final_steps = [s for s in run.steps if s.is_final]
+    final_steps = [s for s in run.steps if isinstance(s, FinalAnswerStep)]
     final_step = final_steps[-1] if final_steps else None
     final_answer = final_step.final_answer if final_step else ""
 
     # Always required checks
     all_passed &= _check("Final answer present", bool(final_answer), "No final answer", failures)
 
-    errors = [s.error for s in run.steps if s.error]
+    errors = [s.error for s in run.steps if isinstance(s, ErrorStep)]
     all_passed &= _check("No agent errors", not errors, f"Errors: {errors}", failures)
 
     criteria = case.success_criteria
@@ -105,7 +106,7 @@ def _evaluate_criteria(
             failures,
         )
 
-    used_subagent = any(s.sub_agent_progress is not None for s in run.steps)
+    used_subagent = any(isinstance(s, ToolStartStep) and s.sub_agent_progress is not None for s in run.steps)
     if criteria.require_subagent is None:
         print(f"  - Sub-agent usage: optional (used={used_subagent})")
     elif criteria.require_subagent:
@@ -178,18 +179,28 @@ def _apply_mode_marker(case: RegressionTestCase) -> pytest.ParameterSet:
     return pytest.param(case, marks=marks, id=case.name)
 
 
+def _apply_placeholders(text: str, placeholders: dict[str, str]) -> str:
+    for key, value in placeholders.items():
+        text = text.replace(f"{{{key}}}", value)
+    return text
+
+
 @pytest.mark.regression
 @pytest.mark.asyncio
 @pytest.mark.parametrize("case", [_apply_mode_marker(c) for c in REGRESSION_TEST_CASES])
 async def test_agent_regression(case, create_live_agent, show_answer, temp_output_dir):
     """Run a single regression test case against live API."""
     async with create_live_agent(case) as ctx:
-        prompt = case.prompt
-        if case.setup_fn:
-            placeholders = case.setup_fn(case.api_base_url, ctx.api_token)
-            for key, value in placeholders.items():
-                prompt = prompt.replace(f"{{{key}}}", value)
-        run = await run_regression_test(ctx.agent, prompt)
+        if case.prompts:
+            placeholders = case.setup_fn(case.api_base_url, ctx.api_token) if case.setup_fn else {}
+            prompts = [_apply_placeholders(p, placeholders) for p in case.prompts]
+            run = await run_multiturn_regression_test(ctx.agent, prompts)
+        else:
+            prompt = case.prompt
+            if case.setup_fn:
+                placeholders = case.setup_fn(case.api_base_url, ctx.api_token)
+                prompt = _apply_placeholders(prompt, placeholders)
+            run = await run_regression_test(ctx.agent, prompt)
 
         print(f"\n{'=' * 60}")
         print(f"Test: {case.name}")
@@ -211,7 +222,7 @@ async def test_agent_regression(case, create_live_agent, show_answer, temp_outpu
         all_passed, failures = _evaluate_criteria(run, case, ctx.api_token, temp_output_dir)
 
         if show_answer:
-            final_steps = [s for s in run.steps if s.is_final]
+            final_steps = [s for s in run.steps if isinstance(s, FinalAnswerStep)]
             final_answer = final_steps[-1].final_answer if final_steps else "(no answer)"
             print("\n--- Final Answer ---")
             print(final_answer)

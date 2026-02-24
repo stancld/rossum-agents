@@ -6,6 +6,7 @@ import json
 import re
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import FinalAnswerStep, ToolResultStep
 from rossum_agent.bedrock_client import HAIKU_MODEL_ID, create_bedrock_client
 from rossum_api import SyncRossumAPIClient
 from rossum_api.dtos import Token
@@ -58,7 +59,7 @@ def call_haiku_check(prompt: str) -> tuple[bool, str]:
 
 def get_final_answer(steps: list[AgentStep]) -> str | None:
     """Extract most recent final answer from steps."""
-    return next((s.final_answer for s in reversed(steps) if s.final_answer), None)
+    return next((s.final_answer for s in reversed(steps) if isinstance(s, FinalAnswerStep)), None)
 
 
 def extract_id_from_final_answer(steps: list[AgentStep]) -> str | None:
@@ -73,12 +74,14 @@ def extract_id_from_final_answer(steps: list[AgentStep]) -> str | None:
 
 def agent_called_tool(steps: list[AgentStep], tool_name: str) -> bool:
     """Check if a tool was called in any step."""
-    return any(tc.name == tool_name for step in steps for tc in step.tool_calls)
+    return any(tc.name == tool_name for step in steps if isinstance(step, ToolResultStep) for tc in step.tool_calls)
 
 
 def count_tool_calls(steps: list[AgentStep], tool_name: str) -> int:
     """Count how many times a tool was called."""
-    return sum(1 for step in steps for tc in step.tool_calls if tc.name == tool_name)
+    return sum(
+        1 for step in steps if isinstance(step, ToolResultStep) for tc in step.tool_calls if tc.name == tool_name
+    )
 
 
 def create_api_client(api_base_url: str, api_token: str) -> SyncRossumAPIClient:

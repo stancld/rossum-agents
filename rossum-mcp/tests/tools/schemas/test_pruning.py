@@ -213,23 +213,6 @@ class TestPruneSchemaFields:
         assert "invoice_number" in result["remaining_fields"]
 
     @pytest.mark.asyncio
-    async def test_prune_schema_fields_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test pruning in read-only mode returns error."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        importlib.reload(schemas)
-
-        schemas.register_schema_tools(mock_mcp, mock_client)
-
-        prune_schema_fields = mock_mcp._tools["prune_schema_fields"]
-        result = await prune_schema_fields(schema_id=50, fields_to_keep=["invoice_number"])
-
-        assert "error" in result
-        assert "read-only" in result["error"]
-
-    @pytest.mark.asyncio
     async def test_prune_schema_fields_both_params_error(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:

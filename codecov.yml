@@ -6,10 +6,11 @@ coverage:
     project:
       default:
         target: auto
-        threshold: 1%
+        threshold: 0.5%
     patch:
       default:
         target: auto
+        threshold: 0%
 
 flags:
   rossum-mcp:

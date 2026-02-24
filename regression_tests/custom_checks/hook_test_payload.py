@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import ToolResultStep
+
 from regression_tests.custom_checks._utils import call_haiku_check, get_final_answer
 
 if TYPE_CHECKING:
@@ -27,12 +29,14 @@ Answer with a JSON object:
 
 def check_hook_test_results_reported(steps: list[AgentStep], _api_base_url: str, _api_token: str) -> tuple[bool, str]:
     """Verify agent used test_hook and reported the results."""
-    tool_names = [tc.name for step in steps for tc in step.tool_calls]
+    tool_names = [tc.name for step in steps if isinstance(step, ToolResultStep) for tc in step.tool_calls]
 
     if "test_hook" not in tool_names:
         return False, "test_hook was not called"
 
     for step in steps:
+        if not isinstance(step, ToolResultStep):
+            continue
         for tr in step.tool_results:
             if tr.name == "test_hook":
                 logger.info("test_hook result: %s", tr.content)

@@ -68,36 +68,38 @@ from rossum_agent.agent.memory import AgentMemory, MemoryStep
 from rossum_agent.agent.models import (
     AgentConfig,
     AgentStep,
+    ErrorStep,
+    FinalAnswerStep,
     StepType,
     StreamDelta,
+    TextDeltaStep,
     ThinkingBlockData,
+    ThinkingStep,
     ToolCall,
     ToolResult,
+    ToolResultStep,
+    ToolStartStep,
     truncate_content,
 )
 from rossum_agent.api.models.schemas import TokenUsageBreakdown
 from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
 from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
-from rossum_agent.tools import (
-    DEPLOY_TOOLS,
-    DISCOVERY_TOOL_NAME,
+from rossum_agent.tools import execute_internal_tool, execute_tool, get_internal_tool_names, get_internal_tools
+from rossum_agent.tools.core import (
+    AgentContext,
     SubAgentProgress,
     SubAgentTokenUsage,
-    execute_internal_tool,
-    execute_tool,
-    get_deploy_tool_names,
-    get_deploy_tools,
+    get_context,
+    set_context,
+)
+from rossum_agent.tools.deploy import DEPLOY_TOOLS, get_deploy_tool_names, get_deploy_tools
+from rossum_agent.tools.dynamic_tools import (
+    DISCOVERY_TOOL_NAME,
     get_dynamic_tools,
-    get_internal_tool_names,
-    get_internal_tools,
-    get_mcp_mode,
     get_tools_version,
     is_skill_loaded,
     preload_categories_for_request,
     reset_dynamic_tools,
-    set_mcp_connection,
-    set_progress_callback,
-    set_token_callback,
 )
 from rossum_agent.utils import add_message_cache_breakpoint
 
@@ -208,20 +210,19 @@ class _StreamState:
         """Get the step type based on whether tool calls are pending."""
         return StepType.INTERMEDIATE if self.pending_tools or self.tool_calls else StepType.FINAL_ANSWER
 
-    def flush_buffer(self, step_num: int, step_type: StepType) -> AgentStep | None:
-        """Flush text buffer and return AgentStep if buffer had content."""
+    def flush_buffer(self, step_num: int, step_type: StepType) -> TextDeltaStep | None:
+        """Flush text buffer and return TextDeltaStep if buffer had content."""
         if not self.text_buffer:
             return None
         buffered_text = "".join(self.text_buffer)
         self.text_buffer.clear()
         self.response_text += buffered_text
-        return AgentStep(
+        return TextDeltaStep(
             step_number=step_num,
-            thinking=self.thinking_text or None,
-            is_streaming=True,
+            step_type=step_type,
             text_delta=buffered_text,
             accumulated_text=self.response_text,
-            step_type=step_type,
+            thinking=self.thinking_text or None,
         )
 
     @property
@@ -466,10 +467,7 @@ class RossumAgent:
             yield (None, stream.get_final_message())
 
     def _process_stream_event(
-        self,
-        event: MessageStreamEvent,
-        pending_tools: dict[int, dict[str, str]],
-        tool_calls: list[ToolCall],
+        self, event: MessageStreamEvent, pending_tools: dict[int, dict[str, str]], tool_calls: list[ToolCall]
     ) -> StreamDelta | None:
         """Process a single stream event.
 
@@ -514,7 +512,7 @@ class RossumAgent:
 
     def _handle_text_delta(
         self, step_num: int, content: str, delta_kind: Literal["thinking", "text"], state: _StreamState
-    ) -> AgentStep | None:
+    ) -> TextDeltaStep | None:
         """Handle a text delta, buffering or flushing as appropriate."""
         if state.first_text_token_time is None:
             state.first_text_token_time = time.monotonic()
@@ -537,7 +535,7 @@ class RossumAgent:
     async def _process_stream_events(
         self,
         step_num: int,
-        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | None],
+        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | Exception | None],
         state: _StreamState,
     ) -> AsyncIterator[AgentStep]:
         """Process stream events and yield AgentSteps.
@@ -563,6 +561,9 @@ class RossumAgent:
                     yield step
                 continue
 
+            if isinstance(item, Exception):
+                raise item
+
             if item is None:
                 # Yield #2: Stream ended - flush any remaining buffered text
                 if step := state.flush_buffer(step_num, state.get_step_type()):
@@ -583,15 +584,12 @@ class RossumAgent:
 
             if delta.kind == "thinking":
                 state.thinking_text += delta.content
+                state.first_text_token_time = state.first_text_token_time or time.monotonic()
                 # Yield #3: Streaming thinking tokens (extended thinking / chain-of-thought)
-                yield AgentStep(
+                yield ThinkingStep(
                     step_number=step_num,
                     thinking=state.thinking_text,
-                    is_streaming=True,
-                    step_type=StepType.THINKING,
                 )
-                if state.first_text_token_time is None:
-                    state.first_text_token_time = time.monotonic()
                 continue
 
             # Yield #4: Text delta - immediate flush after initial buffer period or when tool calls detected
@@ -613,21 +611,25 @@ class RossumAgent:
         model_id = get_model_id()
         state = _StreamState()
 
-        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | None] = queue.Queue()
+        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | Exception | None] = queue.Queue()
 
         def producer() -> None:
-            for item in self._sync_stream_events(model_id, messages, tools):
-                event_queue.put(item)
-            event_queue.put(None)
+            try:
+                for item in self._sync_stream_events(model_id, messages, tools):
+                    event_queue.put(item)
+                event_queue.put(None)
+            except Exception as e:
+                event_queue.put(e)
 
         ctx = copy_context()
         producer_task = asyncio.get_event_loop().run_in_executor(None, partial(ctx.run, producer))
 
-        # Yield #5: Forward all streaming steps from _process_stream_events (yields #1-4)
-        async for step in self._process_stream_events(step_num, event_queue, state):
-            yield step
-
-        await producer_task
+        try:
+            # Yield #5: Forward all streaming steps from _process_stream_events (yields #1-4)
+            async for step in self._process_stream_events(step_num, event_queue, state):
+                yield step
+        finally:
+            await producer_task
 
         if state.final_message is None:
             raise RuntimeError("Stream ended without final message")
@@ -645,19 +647,7 @@ class RossumAgent:
             f"total_input={self.tokens.total_input}, total_output={self.tokens.total_output}"
         )
 
-        step = AgentStep(
-            step_number=step_num,
-            thinking=state.thinking_text if state.thinking_text else None,
-            tool_calls=state.tool_calls,
-            is_streaming=False,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            step_type=StepType.FINAL_ANSWER if not state.tool_calls else StepType.INTERMEDIATE,
-        )
-
         if not state.tool_calls:
-            step.final_answer = state.response_text or None
-            step.is_final = True
             memory_step = MemoryStep(
                 step_number=step_num,
                 text=state.response_text if state.response_text else None,
@@ -666,29 +656,38 @@ class RossumAgent:
             )
             self.memory.add_step(memory_step)
             # Yield #6: Final answer step (no tool calls, response complete)
-            yield step
+            yield FinalAnswerStep(
+                step_number=step_num,
+                final_answer=state.response_text or "",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            )
             return
 
         # Yield #7: Forward tool execution progress steps from _execute_tools_with_progress
         async for step_or_result in self._execute_tools_with_progress(
-            step_num, state.response_text, state.tool_calls, step, input_tokens, output_tokens, thinking_blocks
+            step_num,
+            response_text=state.response_text,
+            tool_calls=state.tool_calls,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            thinking_blocks=thinking_blocks,
         ):
             yield step_or_result
 
     async def _execute_tools_with_progress(
         self,
         step_num: int,
-        thinking_text: str,
+        response_text: str,
         tool_calls: list[ToolCall],
-        step: AgentStep,
         input_tokens: int,
         output_tokens: int,
         thinking_blocks: list[ThinkingBlockData] | None = None,
-    ) -> AsyncIterator[AgentStep]:
+    ) -> AsyncIterator[ToolStartStep | ToolResultStep]:
         """Execute tools in parallel and yield progress updates."""
         memory_step = MemoryStep(
             step_number=step_num,
-            text=thinking_text or None,
+            text=response_text or None,
             tool_calls=tool_calls,
             thinking_blocks=thinking_blocks or [],
             input_tokens=input_tokens,
@@ -697,17 +696,13 @@ class RossumAgent:
 
         total_tools = len(tool_calls)
 
-        yield AgentStep(
+        yield ToolStartStep(
             step_number=step_num,
-            thinking=thinking_text or None,
             tool_calls=tool_calls,
-            is_streaming=True,
-            current_tool=None,
             tool_progress=(0, total_tools),
-            step_type=StepType.INTERMEDIATE,
         )
 
-        progress_queue: asyncio.Queue[AgentStep] = asyncio.Queue()
+        progress_queue: asyncio.Queue[ToolStartStep] = asyncio.Queue()
         results_by_id: dict[str, ToolResult] = {}
 
         # Stagger schema patch calls to avoid 412 conflicts from concurrent writes
@@ -720,7 +715,7 @@ class RossumAgent:
             async for progress_or_result in self._execute_tool_with_progress(
                 tool_call, step_num, tool_calls, tool_progress
             ):
-                if isinstance(progress_or_result, AgentStep):
+                if isinstance(progress_or_result, ToolStartStep):
                     await progress_queue.put(progress_or_result)
                 elif isinstance(progress_or_result, ToolResult):
                     results_by_id[tool_call.id] = progress_or_result
@@ -747,13 +742,16 @@ class RossumAgent:
             raise
 
         tool_results = [results_by_id[tc.id] for tc in tool_calls if tc.id in results_by_id]
-
-        step.tool_results = tool_results
         memory_step.tool_results = tool_results
-
         self.memory.add_step(memory_step)
 
-        yield step
+        yield ToolResultStep(
+            step_number=step_num,
+            tool_calls=tool_calls,
+            tool_results=tool_results,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
 
     def _drain_token_queue(self, token_queue: queue.Queue[SubAgentTokenUsage]) -> None:
         """Drain all pending token usage from the queue."""
@@ -771,10 +769,10 @@ class RossumAgent:
 
     async def _execute_tool_with_progress(
         self, tool_call: ToolCall, step_num: int, tool_calls: list[ToolCall], tool_progress: tuple[int, int]
-    ) -> AsyncIterator[AgentStep | ToolResult]:
+    ) -> AsyncIterator[ToolStartStep | ToolResult]:
         """Execute a tool and yield progress updates for sub-agents.
 
-        For tools with sub-agents, this yields AgentStep updates
+        For tools with sub-agents, this yields ToolStartStep updates
         with sub_agent_progress. Always yields the final ToolResult.
         """
         progress_queue: queue.Queue[SubAgentProgress] = queue.Queue()
@@ -791,26 +789,34 @@ class RossumAgent:
         try:
             if tool_call.name in get_internal_tool_names():
                 logger.info(f"Calling internal tool {tool_call.name}")
-                set_progress_callback(progress_callback)
-                set_token_callback(token_callback)
+                # Create a per-tool AgentContext copy with isolated callbacks
+                # to avoid races when multiple tools run in parallel
+                agent_ctx = get_context()
+                tool_ctx = dataclasses.replace(
+                    agent_ctx,
+                    progress_callback=progress_callback,
+                    token_callback=token_callback,
+                )
+
+                def _run_internal_tool(tool_ctx: AgentContext, name: str, arguments: dict) -> object:
+                    set_context(tool_ctx)
+                    return execute_internal_tool(name, arguments)
 
                 loop = asyncio.get_event_loop()
                 ctx = copy_context()
                 future = loop.run_in_executor(
-                    None, partial(ctx.run, execute_internal_tool, tool_call.name, tool_call.arguments)
+                    None, partial(ctx.run, _run_internal_tool, tool_ctx, tool_call.name, tool_call.arguments)
                 )
 
                 while not future.done():
                     try:
                         progress = progress_queue.get_nowait()
-                        yield AgentStep(
+                        yield ToolStartStep(
                             step_number=step_num,
                             tool_calls=tool_calls,
-                            is_streaming=True,
-                            current_tool=tool_call.name,
                             tool_progress=tool_progress,
+                            current_tool=tool_call.name,
                             sub_agent_progress=progress,
-                            step_type=StepType.INTERMEDIATE,
                         )
                     except queue.Empty:
                         pass
@@ -823,8 +829,6 @@ class RossumAgent:
                 result = future.result()
                 content = str(result)
                 logger.info(f"Internal tool {tool_call.name} result: {content}")
-                set_progress_callback(None)
-                set_token_callback(None)
             elif tool_call.name in get_deploy_tool_names():
                 logger.info(f"Calling deploy tool {tool_call.name}")
                 loop = asyncio.get_event_loop()
@@ -842,8 +846,6 @@ class RossumAgent:
             yield ToolResult(tool_call_id=tool_call.id, name=tool_call.name, content=content)
 
         except Exception as e:
-            set_progress_callback(None)
-            set_token_callback(None)
             error_msg = f"Tool {tool_call.name} failed: {e}"
             logger.warning(f"Tool {tool_call.name} failed: {e}", exc_info=True)
             yield ToolResult(tool_call_id=tool_call.id, name=tool_call.name, content=error_msg, is_error=True)
@@ -886,8 +888,9 @@ class RossumAgent:
         Rate limiting is handled with exponential backoff and jitter.
         """
         loop = asyncio.get_event_loop()
-        mcp_mode = get_mcp_mode()
-        set_mcp_connection(self.mcp_connection, loop, mcp_mode)
+        agent_ctx = get_context()
+        agent_ctx.mcp_connection = self.mcp_connection
+        agent_ctx.mcp_event_loop = loop
 
         # Pre-load tool categories based on keywords in the user's request
         # Run in thread pool to avoid blocking the event loop (preload uses sync MCP calls)
@@ -912,13 +915,13 @@ class RossumAgent:
 
             while True:
                 try:
-                    final_step: AgentStep | None = None
+                    is_done = False
                     async for step in self._stream_model_response(step_num):
                         yield step
-                        if not step.is_streaming:
-                            final_step = step
+                        if isinstance(step, (FinalAnswerStep, ErrorStep)):
+                            is_done = True
 
-                    if final_step and final_step.is_final:
+                    if is_done:
                         return
 
                     break
@@ -930,11 +933,9 @@ class RossumAgent:
                     rate_limit_retries += 1
                     if rate_limit_retries > RATE_LIMIT_MAX_RETRIES:
                         logger.error(f"Rate limit retries exhausted at step {step_num}: {e}")
-                        yield AgentStep(
+                        yield ErrorStep(
                             step_number=step_num,
                             error=f"Rate limit exceeded after {RATE_LIMIT_MAX_RETRIES} retries. Please try again later.",
-                            is_final=True,
-                            step_type=StepType.FINAL_ANSWER,
                         )
                         return
 
@@ -943,11 +944,9 @@ class RossumAgent:
                         f"Rate limit hit at step {step_num} (attempt {rate_limit_retries}/{RATE_LIMIT_MAX_RETRIES}), "
                         f"retrying in {wait_time:.1f}s: {e}"
                     )
-                    yield AgentStep(
+                    yield ThinkingStep(
                         step_number=step_num,
                         thinking=f"⏳ Rate limited, waiting {wait_time:.1f}s before retry ({rate_limit_retries}/{RATE_LIMIT_MAX_RETRIES})...",
-                        is_streaming=True,
-                        step_type=StepType.INTERMEDIATE,
                     )
                     await asyncio.sleep(wait_time)
 
@@ -960,20 +959,16 @@ class RossumAgent:
                         if is_timeout
                         else f"API error occurred: {e}"
                     )
-                    yield AgentStep(
+                    yield ErrorStep(
                         step_number=step_num,
                         error=error_msg,
-                        is_final=True,
-                        step_type=StepType.FINAL_ANSWER,
                     )
                     return
 
         else:
-            yield AgentStep(
+            yield ErrorStep(
                 step_number=self.config.max_steps,
                 error=f"Maximum steps ({self.config.max_steps}) reached without final answer.",
-                is_final=True,
-                step_type=StepType.FINAL_ANSWER,
             )
 
 

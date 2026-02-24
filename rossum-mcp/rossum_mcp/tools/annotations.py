@@ -9,7 +9,7 @@ import anyio
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.annotation import Annotation
 
-from rossum_mcp.tools.base import build_filters, build_resource_url, delete_resource, graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, build_resource_url, delete_resource, graceful_list
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -21,9 +21,6 @@ type Sideload = Literal["content", "document", "automation_blocker"]
 
 
 async def _upload_document(client: AsyncRossumAPIClient, file_path: str, queue_id: int) -> dict:
-    if not is_read_write_mode():
-        return {"error": "upload_document is not available in read-only mode"}
-
     path = Path(file_path)
     if not await anyio.Path(path).exists():
         logger.error(f"File not found: {file_path}")
@@ -83,9 +80,6 @@ async def _list_annotations(
 
 
 async def _start_annotation(client: AsyncRossumAPIClient, annotation_id: int) -> dict:
-    if not is_read_write_mode():
-        return {"error": "start_annotation is not available in read-only mode"}
-
     logger.debug(f"Starting annotation: annotation_id={annotation_id}")
     await client.start_annotation(annotation_id)
     return {
@@ -97,9 +91,6 @@ async def _start_annotation(client: AsyncRossumAPIClient, annotation_id: int) ->
 async def _bulk_update_annotation_fields(
     client: AsyncRossumAPIClient, annotation_id: int, operations: list[dict]
 ) -> dict:
-    if not is_read_write_mode():
-        return {"error": "bulk_update_annotation_fields is not available in read-only mode"}
-
     logger.debug(f"Bulk updating annotation: annotation_id={annotation_id}, ops={operations}")
     await client.bulk_update_annotation_data(annotation_id, operations)
     return {
@@ -110,9 +101,6 @@ async def _bulk_update_annotation_fields(
 
 
 async def _confirm_annotation(client: AsyncRossumAPIClient, annotation_id: int) -> dict:
-    if not is_read_write_mode():
-        return {"error": "confirm_annotation is not available in read-only mode"}
-
     logger.debug(f"Confirming annotation: annotation_id={annotation_id}")
     await client.confirm_annotation(annotation_id)
     return {
@@ -128,9 +116,6 @@ async def _copy_annotations(
     target_status: str | None = None,
     reimport: bool = False,
 ) -> dict:
-    if not is_read_write_mode():
-        return {"error": "copy_annotations is not available in read-only mode"}
-
     target_queue_url = build_resource_url("queues", target_queue_id)
     params = {"reimport": "true"} if reimport else {}
 
@@ -162,15 +147,27 @@ async def _delete_annotation(client: AsyncRossumAPIClient, annotation_id: int) -
 
 
 def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Upload a document; use list_annotations to find the created annotation.")
+    @mcp.tool(
+        description="Upload a document; use list_annotations to find the created annotation.",
+        tags={"annotations", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def upload_document(file_path: str, queue_id: int) -> dict:
         return await _upload_document(client, file_path, queue_id)
 
-    @mcp.tool(description="Retrieve an annotation; include sideload='content' to return extracted data.")
+    @mcp.tool(
+        description="Retrieve an annotation; include sideload='content' to return extracted data.",
+        tags={"annotations"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_annotation(annotation_id: int, sideloads: Sequence[Sideload] = ()) -> Annotation:
         return await _get_annotation(client, annotation_id, sideloads)
 
-    @mcp.tool(description="List queue annotations; ordering=['-created_at'] returns newest first.")
+    @mcp.tool(
+        description="List queue annotations; ordering=['-created_at'] returns newest first.",
+        tags={"annotations"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_annotations(
         queue_id: int,
         status: str | None = "importing,to_review,confirmed,exported",
@@ -179,22 +176,34 @@ def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> Non
     ) -> list[Annotation]:
         return await _list_annotations(client, queue_id, status, ordering, first_n)
 
-    @mcp.tool(description="Set annotation status to 'reviewing' (from 'to_review').")
+    @mcp.tool(
+        description="Set annotation status to 'reviewing' (from 'to_review').",
+        tags={"annotations", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def start_annotation(annotation_id: int) -> dict:
         return await _start_annotation(client, annotation_id)
 
     @mcp.tool(
-        description="Bulk update extracted fields. Requires annotation in 'reviewing' status. Use datapoint IDs from content, not schema_id."
+        description="Bulk update extracted fields. Requires annotation in 'reviewing' status. Use datapoint IDs from content, not schema_id.",
+        tags={"annotations", "write"},
+        annotations={"readOnlyHint": False},
     )
     async def bulk_update_annotation_fields(annotation_id: int, operations: list[dict]) -> dict:
         return await _bulk_update_annotation_fields(client, annotation_id, operations)
 
-    @mcp.tool(description="Set annotation status to 'confirmed' (typically after field updates).")
+    @mcp.tool(
+        description="Set annotation status to 'confirmed' (typically after field updates).",
+        tags={"annotations", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def confirm_annotation(annotation_id: int) -> dict:
         return await _confirm_annotation(client, annotation_id)
 
     @mcp.tool(
-        description="Copy annotations to another queue. reimport=True re-extracts data in the target queue (use when moving/uploading documents between queues). reimport=False preserves original extracted data as-is."
+        description="Copy annotations to another queue. reimport=True re-extracts data in the target queue (use when moving/uploading documents between queues). reimport=False preserves original extracted data as-is.",
+        tags={"annotations", "write"},
+        annotations={"readOnlyHint": False},
     )
     async def copy_annotations(
         annotation_ids: Sequence[int],
@@ -204,6 +213,10 @@ def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> Non
     ) -> dict:
         return await _copy_annotations(client, annotation_ids, target_queue_id, target_status, reimport)
 
-    @mcp.tool(description="Soft-delete an annotation (status 'deleted').")
+    @mcp.tool(
+        description="Soft-delete an annotation (status 'deleted').",
+        tags={"annotations", "write"},
+        annotations={"readOnlyHint": False, "destructiveHint": True},
+    )
     async def delete_annotation(annotation_id: int) -> dict:
         return await _delete_annotation(client, annotation_id)

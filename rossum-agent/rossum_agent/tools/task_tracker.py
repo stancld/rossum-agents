@@ -17,7 +17,7 @@ _NUMBERED_PREFIX = re.compile(r"^(\d+)\.\s")
 
 from anthropic import beta_tool
 
-from rossum_agent.tools.core import get_task_tracker, report_task_snapshot
+from rossum_agent.tools.core import get_context
 
 
 class TaskStatus(StrEnum):
@@ -135,11 +135,11 @@ def create_task(subject: str, description: str = "") -> str:
     Returns:
         JSON with the created task's id, subject, and status.
     """
-    tracker = get_task_tracker()
+    tracker = get_context().task_tracker
     if tracker is None:
         return json.dumps({"error": "Task tracking not available"})
     task, snapshot = tracker.create_task_atomic(subject=subject, description=description)
-    report_task_snapshot(snapshot)
+    get_context().report_task_snapshot(snapshot)
     return _task_to_json(task)
 
 
@@ -155,7 +155,7 @@ def update_task(task_id: str, status: str | None = None, subject: str | None = N
     Returns:
         JSON with the updated task's id, subject, and status.
     """
-    tracker = get_task_tracker()
+    tracker = get_context().task_tracker
     if tracker is None:
         return json.dumps({"error": "Task tracking not available"})
     try:
@@ -166,7 +166,7 @@ def update_task(task_id: str, status: str | None = None, subject: str | None = N
         task, snapshot = tracker.update_task_atomic(task_id=task_id, status=parsed_status, subject=subject)
     except KeyError:
         return json.dumps({"error": f"Task {task_id} not found"})
-    report_task_snapshot(snapshot)
+    get_context().report_task_snapshot(snapshot)
     return _task_to_json(task)
 
 
@@ -177,7 +177,7 @@ def list_tasks() -> str:
     Returns:
         JSON array of tasks with id, subject, status, and description.
     """
-    tracker = get_task_tracker()
+    tracker = get_context().task_tracker
     if tracker is None:
         return json.dumps({"error": "Task tracking not available"})
     return json.dumps(tracker.snapshot())

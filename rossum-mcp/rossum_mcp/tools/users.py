@@ -7,7 +7,7 @@ from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.group import Group
 from rossum_api.models.user import User
 
-from rossum_mcp.tools.base import build_filters, graceful_list, is_read_write_mode
+from rossum_mcp.tools.base import build_filters, graceful_list
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -17,8 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 async def _get_user(client: AsyncRossumAPIClient, user_id: int) -> User:
-    user: User = await client.retrieve_user(user_id)
-    return user
+    return await client.retrieve_user(user_id)
 
 
 async def _list_users(
@@ -30,6 +29,9 @@ async def _list_users(
     is_active: bool | None = None,
     is_organization_group_admin: bool | None = None,
 ) -> list[User]:
+    logger.info(
+        f"Listing users: username={username}, email={email}, first_name={first_name}, last_name={last_name}, is_active={is_active}, is_organization_group_admin={is_organization_group_admin}"
+    )
     filters = build_filters(
         username=username, email=email, first_name=first_name, last_name=last_name, is_active=is_active
     )
@@ -62,9 +64,6 @@ async def _create_user(
     oidc_id: str | None = None,
     auth_type: str = "password",
 ) -> User | dict:
-    if not is_read_write_mode():
-        return {"error": "create_user is not available in read-only mode"}
-
     user_data: dict[str, Any] = {
         "username": username,
         "email": email,
@@ -103,9 +102,6 @@ async def _update_user(
     auth_type: str | None = None,
     ui_settings: dict | None = None,
 ) -> User | dict:
-    if not is_read_write_mode():
-        return {"error": "update_user is not available in read-only mode"}
-
     logger.debug(f"Updating user: user_id={user_id}")
 
     patch_data = build_filters(
@@ -127,17 +123,24 @@ async def _update_user(
 
 
 async def _list_user_roles(client: AsyncRossumAPIClient) -> list[Group]:
+    logger.info("Listing user roles")
     result = await graceful_list(client, Resource.Group, "user_role")
     return result.items
 
 
 def register_user_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve one user by ID.")
+    @mcp.tool(
+        description="Retrieve one user by ID.",
+        tags={"users"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_user(user_id: int) -> User:
         return await _get_user(client, user_id)
 
     @mcp.tool(
-        description="List users (filterable by username/email). organization_group_admin users cannot be used as token owners; filter with is_organization_group_admin=false."
+        description="List users (filterable by username/email). organization_group_admin users cannot be used as token owners; filter with is_organization_group_admin=false.",
+        tags={"users"},
+        annotations={"readOnlyHint": True},
     )
     async def list_users(
         username: str | None = None,
@@ -152,7 +155,9 @@ def register_user_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         )
 
     @mcp.tool(
-        description="Create a user (requires username + email). Use list_user_roles for role/group URLs; queue/group fields take full API URLs."
+        description="Create a user (requires username + email). Use list_user_roles for role/group URLs; queue/group fields take full API URLs.",
+        tags={"users", "write"},
+        annotations={"readOnlyHint": False},
     )
     async def create_user(
         username: str,
@@ -170,7 +175,11 @@ def register_user_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
             client, username, email, queues, groups, first_name, last_name, is_active, metadata, oidc_id, auth_type
         )
 
-    @mcp.tool(description="Patch a user; only provided fields change. Use list_user_roles for role/group URLs.")
+    @mcp.tool(
+        description="Patch a user; only provided fields change. Use list_user_roles for role/group URLs.",
+        tags={"users", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def update_user(
         user_id: int,
         username: str | None = None,
@@ -201,6 +210,10 @@ def register_user_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
             ui_settings,
         )
 
-    @mcp.tool(description="List all user roles (groups of permissions) in the organization.")
+    @mcp.tool(
+        description="List all user roles (groups of permissions) in the organization.",
+        tags={"users"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_user_roles() -> list[Group]:
         return await _list_user_roles(client)

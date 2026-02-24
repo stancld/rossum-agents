@@ -15,17 +15,10 @@ from dotenv import dotenv_values
 from rossum_agent.agent.core import RossumAgent
 from rossum_agent.agent.models import AgentConfig
 from rossum_agent.bedrock_client import create_bedrock_client
-from rossum_agent.change_tracking.store import CommitStore
+from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.rossum_mcp_integration import connect_mcp_server
-from rossum_agent.tools.core import (
-    set_commit_store,
-    set_mcp_connection,
-    set_output_dir,
-    set_rossum_credentials,
-    set_rossum_environment,
-    set_task_tracker,
-)
+from rossum_agent.tools.core import AgentContext, reset_context, set_context
 from rossum_agent.tools.dynamic_tools import get_write_tools_async
 from rossum_agent.tools.task_tracker import TaskTracker
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
@@ -53,10 +46,10 @@ def try_connect_redis() -> redis.Redis | None:
         return None
 
 
-def _create_commit_store() -> CommitStore | None:
-    """Create a CommitStore if Redis is reachable."""
+def _create_stores() -> tuple[CommitStore, SnapshotStore] | None:
+    """Create CommitStore and SnapshotStore from the same Redis client, or None if unreachable."""
     client = try_connect_redis()
-    return CommitStore(client) if client else None
+    return (CommitStore(client), SnapshotStore(client)) if client else None
 
 
 def _load_env_tokens() -> dict[str, str]:
@@ -209,25 +202,35 @@ def create_live_agent(
         async with connect_mcp_server(
             rossum_api_token=token, rossum_api_base_url=case.api_base_url, mcp_mode=case.mode
         ) as mcp_connection:
-            set_output_dir(temp_output_dir)
-            set_rossum_credentials(case.api_base_url, token)
-            set_mcp_connection(mcp_connection, asyncio.get_event_loop(), case.mode)
-
             commit_store = None
+            snapshot_store = None
+            environment = None
             if case.requires_redis:
-                commit_store = _create_commit_store()
-                if commit_store:
+                stores = _create_stores()
+                if stores:
+                    commit_store, snapshot_store = stores
                     write_tools = await get_write_tools_async(mcp_connection)
                     chat_id = f"regression-test-{case.name}"
                     environment = case.api_base_url.rstrip("/")
-                    mcp_connection.setup_change_tracking(write_tools, chat_id, environment, commit_store)
-                    set_commit_store(commit_store)
-                    set_rossum_environment(environment)
+                    mcp_connection.setup_change_tracking(
+                        write_tools, chat_id, environment, commit_store, snapshot_store
+                    )
 
-            set_task_tracker(TaskTracker())
+            ctx = AgentContext(
+                mcp_connection=mcp_connection,
+                mcp_event_loop=asyncio.get_event_loop(),
+                mcp_mode=case.mode,
+                rossum_credentials=(case.api_base_url, token),
+                rossum_environment=environment,
+                output_dir=temp_output_dir,
+                commit_store=commit_store,
+                snapshot_store=snapshot_store,
+                task_tracker=TaskTracker(),
+            )
+            token_ref = set_context(ctx)
 
             client = create_bedrock_client()
-            system_prompt = get_system_prompt()
+            system_prompt = get_system_prompt(persona=case.persona)
 
             if case.rossum_url:
                 url_context = extract_url_context(case.rossum_url)
@@ -242,12 +245,6 @@ def create_live_agent(
             try:
                 yield LiveAgentContext(agent=agent, api_token=token)
             finally:
-                set_output_dir(None)
-                set_rossum_credentials(None, None)
-                set_mcp_connection(None, None)  # type: ignore[arg-type]
-                set_task_tracker(None)
-                if commit_store:
-                    set_commit_store(None)
-                    set_rossum_environment(None)
+                reset_context(token_ref)
 
     return _create_agent

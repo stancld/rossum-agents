@@ -17,6 +17,7 @@ export interface ChatSummary {
   message_count: number;
   first_message: string;
   preview: string | null;
+  summary: string | null;
 }
 
 export interface ChatListResponse {
@@ -138,18 +139,31 @@ export type SSEEvent =
   | { event: "error"; data: { message: string } };
 
 export type McpMode = "read-only" | "read-write";
+export type Persona = "default" | "cautious";
 
 export interface Config {
   apiUrl: string;
   token: string;
   rossumUrl: string;
   mcpMode: McpMode;
+  persona: Persona;
+}
+
+export interface ArgumentSuggestion {
+  value: string;
+  description: string;
+}
+
+export interface CommandInfo {
+  name: string;
+  description: string;
+  argument_suggestions?: ArgumentSuggestion[];
 }
 
 export type InteractionMode = "input" | "browse";
 
 export type ChatItem =
-  | { kind: "user_message"; text: string }
+  | { kind: "user_message"; text: string; attachments?: AttachmentInfo[] }
   | { kind: "thinking"; stepNumber: number; content: string }
   | {
       kind: "tool_call";
@@ -172,9 +186,15 @@ export interface ExpandState {
   [itemIndex: number]: boolean;
 }
 
+export interface AttachmentInfo {
+  filename: string;
+  type: "image" | "document" | "text";
+}
+
 export interface UserMessage {
   text: string;
   stepIndexBefore: number;
+  attachments?: AttachmentInfo[];
 }
 
 export type ConnectionStatus =

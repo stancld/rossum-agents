@@ -11,6 +11,9 @@ from regression_tests.custom_checks.business_validation_hook import (
 from regression_tests.custom_checks.business_validation_rules import (
     check_business_validation_rules,
 )
+from regression_tests.custom_checks.cautious_persona import (
+    check_cautious_persona_asks_clarification,
+)
 from regression_tests.custom_checks.delete_hook_and_revert import (
     check_hook_deleted_and_reverted,
 )
@@ -29,6 +32,9 @@ from regression_tests.custom_checks.hook_test_payload import (
 from regression_tests.custom_checks.lookup_field import (
     check_lookup_field_configured,
     check_lookup_match_results,
+)
+from regression_tests.custom_checks.multi_turn_schema_revert import (
+    check_multi_turn_schema_reverted,
 )
 from regression_tests.custom_checks.net_terms_formula_field import (
     check_net_terms_formula_field_added,
@@ -61,6 +67,7 @@ from regression_tests.custom_checks.serverless_hook_txscript import (
 __all__ = [
     "check_business_validation_hook_settings",
     "check_business_validation_rules",
+    "check_cautious_persona_asks_clarification",
     "check_formula_field_for_table",
     "check_formula_field_updated",
     "check_hook_deleted_and_reverted",
@@ -68,6 +75,7 @@ __all__ = [
     "check_knowledge_base_hidden_multivalue_warning",
     "check_lookup_field_configured",
     "check_lookup_match_results",
+    "check_multi_turn_schema_reverted",
     "check_net_terms_formula_field_added",
     "check_no_misleading_training_suggestions",
     "check_queue_deleted",

@@ -80,9 +80,11 @@ export function buildChatItems(state: ChatState): ChatItem[] {
       state.userMessages[msgIdx]!.stepIndexBefore <=
         getOriginalStepIndex(paired, i)
     ) {
+      const msg = state.userMessages[msgIdx]!;
       items.push({
         kind: "user_message",
-        text: state.userMessages[msgIdx]!.text,
+        text: msg.text,
+        attachments: msg.attachments,
       });
       msgIdx++;
     }
@@ -90,9 +92,11 @@ export function buildChatItems(state: ChatState): ChatItem[] {
   }
 
   while (msgIdx < state.userMessages.length) {
+    const msg = state.userMessages[msgIdx]!;
     items.push({
       kind: "user_message",
-      text: state.userMessages[msgIdx]!.text,
+      text: msg.text,
+      attachments: msg.attachments,
     });
     msgIdx++;
   }

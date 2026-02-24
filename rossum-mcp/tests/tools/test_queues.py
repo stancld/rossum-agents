@@ -13,7 +13,8 @@ from rossum_api.models.engine import Engine
 from rossum_api.models.queue import Queue
 from rossum_api.models.schema import Schema
 from rossum_mcp.tools import base
-from rossum_mcp.tools.queues import register_queue_tools
+from rossum_mcp.tools.queues import QueueListItem, _create_queue_from_template, _get_engine_url, register_queue_tools
+from rossum_mcp.tools.resource_tracking import TRACKED_RESOURCES_KEY
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -157,6 +158,7 @@ class TestListQueues:
         result = await list_queues()
 
         assert len(result) == 2
+        assert isinstance(result[0], QueueListItem)
         assert result[0].id == 1
         assert result[1].id == 2
 
@@ -244,8 +246,8 @@ class TestListQueues:
         assert len(result) == 0
 
     @pytest.mark.asyncio
-    async def test_list_queues_truncates_verbose_settings(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test that verbose settings fields are truncated in list response."""
+    async def test_list_queues_omits_settings(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that settings are omitted in list response."""
         register_queue_tools(mock_mcp, mock_client)
 
         mock_queue = create_mock_queue(
@@ -268,28 +270,8 @@ class TestListQueues:
         result = await list_queues()
 
         assert len(result) == 1
-        assert result[0].settings["accepted_mime_types"] == "<omitted>"
-        assert result[0].settings["annotation_list_table"] == "<omitted>"
-        assert result[0].settings["columns"] == [{"schema_id": "doc_id"}]
-        assert result[0].settings["ui_upload_enabled"] is True
-
-    @pytest.mark.asyncio
-    async def test_list_queues_handles_empty_settings(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test that empty settings are handled correctly."""
-        register_queue_tools(mock_mcp, mock_client)
-
-        mock_queue = create_mock_queue(id=1, name="Queue 1", settings={})
-
-        async def mock_fetch_all(resource, **filters):
-            yield mock_queue
-
-        mock_client._http_client.fetch_all = mock_fetch_all
-
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues()
-
-        assert len(result) == 1
-        assert result[0].settings == {}
+        assert isinstance(result[0], QueueListItem)
+        assert result[0].settings == "<omitted>"
 
     @pytest.mark.asyncio
     async def test_list_queues_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -314,6 +296,70 @@ class TestListQueues:
 
         list_queues = mock_mcp._tools["list_queues"]
         result = await list_queues()
+
+        assert len(result) == 2
+
+    @pytest.mark.asyncio
+    async def test_list_queues_with_regex_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that use_regex=True filters queues client-side by regex pattern."""
+        register_queue_tools(mock_mcp, mock_client)
+
+        mock_queues = [
+            create_mock_queue(id=1, name="Invoice Queue"),
+            create_mock_queue(id=2, name="Receipt Queue"),
+            create_mock_queue(id=3, name="invoice_training"),
+        ]
+        received_filters: dict = {}
+
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
+            for queue in mock_queues:
+                yield queue
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_queues = mock_mcp._tools["list_queues"]
+        result = await list_queues(name="invoice", use_regex=True)
+
+        assert len(result) == 2
+        assert result[0].name == "Invoice Queue"
+        assert result[1].name == "invoice_training"
+        assert "name" not in received_filters
+
+    @pytest.mark.asyncio
+    async def test_list_queues_with_regex_no_match(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that use_regex=True returns empty list when no queues match pattern."""
+        register_queue_tools(mock_mcp, mock_client)
+
+        mock_queues = [create_mock_queue(id=1, name="Receipt Queue")]
+
+        async def mock_fetch_all(resource, **filters):
+            for queue in mock_queues:
+                yield queue
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_queues = mock_mcp._tools["list_queues"]
+        result = await list_queues(name="^invoice$", use_regex=True)
+
+        assert len(result) == 0
+
+    @pytest.mark.asyncio
+    async def test_list_queues_with_regex_no_name_returns_all(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test that use_regex=True without name returns all queues."""
+        register_queue_tools(mock_mcp, mock_client)
+
+        mock_queues = [create_mock_queue(id=1, name="Queue A"), create_mock_queue(id=2, name="Queue B")]
+
+        async def mock_fetch_all(resource, **filters):
+            for queue in mock_queues:
+                yield queue
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        list_queues = mock_mcp._tools["list_queues"]
+        result = await list_queues(use_regex=True)
 
         assert len(result) == 2
 
@@ -539,21 +585,6 @@ class TestCreateQueue:
         mock_client.create_new_queue.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_queue_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_queue is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_queue_tools(mock_mcp, mock_client)
-
-        create_queue = mock_mcp._tools["create_queue"]
-        result = await create_queue(name="New Queue", workspace_id=1, schema_id=10)
-
-        assert result["error"] == "create_queue is not available in read-only mode"
-        mock_client.create_new_queue.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_create_queue_with_inbox_id(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
@@ -655,21 +686,6 @@ class TestUpdateQueue:
         assert result.id == 100
         assert result.name == "Updated Queue"
         mock_client._http_client.update.assert_called_once_with(Resource.Queue, 100, {"name": "Updated Queue"})
-
-    @pytest.mark.asyncio
-    async def test_update_queue_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test update_queue is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_queue_tools(mock_mcp, mock_client)
-
-        update_queue = mock_mcp._tools["update_queue"]
-        result = await update_queue(queue_id=100, queue_data={"name": "Updated"})
-
-        assert result["error"] == "update_queue is not available in read-only mode"
-        mock_client._http_client.update.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_update_queue_rejects_invalid_meta_name(
@@ -831,23 +847,206 @@ class TestCreateQueueFromTemplate:
         mock_client._http_client.request_json.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_create_queue_from_template_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_queue_from_template is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
+    async def test_tracks_schema_and_engine(self, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
+        """Test that _create_queue_from_template tracks side-effect schema and engine."""
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
         importlib.reload(base)
-        register_queue_tools(mock_mcp, mock_client)
 
-        create_queue_from_template = mock_mcp._tools["create_queue_from_template"]
-        result = await create_queue_from_template(
-            name="New Queue",
-            template_name="EU Demo Template",
-            workspace_id=1,
+        mock_queue = create_mock_queue(
+            id=300,
+            name="Template Queue",
+            schema="https://api.test.rossum.ai/v1/schemas/50",
+            engine="https://api.test.rossum.ai/v1/engines/60",
+        )
+        mock_client._http_client.request_json.return_value = {"id": 300}
+        mock_client._deserializer = Mock(return_value=mock_queue)
+        mock_client.retrieve_schema.return_value = create_mock_schema(id=50, name="Template Schema")
+        mock_client.retrieve_engine.return_value = create_mock_engine(id=60, name="Template Engine")
+
+        result = await _create_queue_from_template(mock_client, "Template Queue", "EU Demo Template", workspace_id=1)
+
+        assert isinstance(result, dict)
+        assert result["id"] == 300
+        tracked = result[TRACKED_RESOURCES_KEY]
+        assert len(tracked) == 2
+        assert tracked[0]["entity_type"] == "schema"
+        assert tracked[0]["entity_id"] == "50"
+        assert tracked[0]["data"]["name"] == "Template Schema"
+        assert tracked[1]["entity_type"] == "engine"
+        assert tracked[1]["entity_id"] == "60"
+        assert tracked[1]["data"]["name"] == "Template Engine"
+
+    @pytest.mark.asyncio
+    async def test_tracks_engine_even_when_engine_id_provided(
+        self, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that engine is tracked even when engine_id is explicitly provided (pre-existing engine)."""
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+
+        mock_queue = create_mock_queue(
+            id=300,
+            schema="https://api.test.rossum.ai/v1/schemas/50",
+            engine="https://api.test.rossum.ai/v1/engines/42",
+        )
+        mock_client._http_client.request_json.return_value = {"id": 300}
+        mock_client._deserializer = Mock(return_value=mock_queue)
+        mock_client.retrieve_schema.return_value = create_mock_schema(id=50)
+        mock_client.retrieve_engine.return_value = create_mock_engine(id=42, name="Existing Engine")
+
+        result = await _create_queue_from_template(
+            mock_client, "Template Queue", "EU Demo Template", workspace_id=1, engine_id=42
         )
 
-        assert result["error"] == "create_queue_from_template is not available in read-only mode"
-        mock_client._http_client.request_json.assert_not_called()
+        assert isinstance(result, dict)
+        tracked = result[TRACKED_RESOURCES_KEY]
+        engine_tracked = [t for t in tracked if t["entity_type"] == "engine"]
+        assert len(engine_tracked) == 1
+        assert engine_tracked[0]["entity_id"] == "42"
+
+    @pytest.mark.asyncio
+    async def test_schema_fetch_failure_is_logged_and_skipped(
+        self, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that schema fetch failure doesn't break queue creation."""
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+
+        mock_queue = create_mock_queue(
+            id=300,
+            schema="https://api.test.rossum.ai/v1/schemas/50",
+            engine="https://api.test.rossum.ai/v1/engines/60",
+        )
+        mock_client._http_client.request_json.return_value = {"id": 300}
+        mock_client._deserializer = Mock(return_value=mock_queue)
+        mock_client.retrieve_schema.side_effect = Exception("Schema not found")
+        mock_client.retrieve_engine.return_value = create_mock_engine(id=60, name="Template Engine")
+
+        result = await _create_queue_from_template(mock_client, "Queue", "EU Demo Template", workspace_id=1)
+
+        assert isinstance(result, dict)
+        tracked = result[TRACKED_RESOURCES_KEY]
+        assert len(tracked) == 1
+        assert tracked[0]["entity_type"] == "engine"
+
+    @pytest.mark.asyncio
+    async def test_engine_fetch_failure_is_logged_and_skipped(
+        self, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that engine fetch failure doesn't break queue creation."""
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+
+        mock_queue = create_mock_queue(
+            id=300,
+            schema="https://api.test.rossum.ai/v1/schemas/50",
+            engine="https://api.test.rossum.ai/v1/engines/60",
+        )
+        mock_client._http_client.request_json.return_value = {"id": 300}
+        mock_client._deserializer = Mock(return_value=mock_queue)
+        mock_client.retrieve_schema.return_value = create_mock_schema(id=50, name="Template Schema")
+        mock_client.retrieve_engine.side_effect = Exception("Engine not found")
+
+        result = await _create_queue_from_template(mock_client, "Queue", "EU Demo Template", workspace_id=1)
+
+        assert isinstance(result, dict)
+        tracked = result[TRACKED_RESOURCES_KEY]
+        assert len(tracked) == 1
+        assert tracked[0]["entity_type"] == "schema"
+
+    @pytest.mark.asyncio
+    async def test_both_fetches_fail_returns_queue_without_tracked(
+        self, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """When both schema and engine fetch fail, result has empty tracked list."""
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+
+        mock_queue = create_mock_queue(
+            id=300,
+            schema="https://api.test.rossum.ai/v1/schemas/50",
+            engine="https://api.test.rossum.ai/v1/engines/60",
+        )
+        mock_client._http_client.request_json.return_value = {"id": 300}
+        mock_client._deserializer = Mock(return_value=mock_queue)
+        mock_client.retrieve_schema.side_effect = Exception("Schema fetch failed")
+        mock_client.retrieve_engine.side_effect = Exception("Engine fetch failed")
+
+        result = await _create_queue_from_template(mock_client, "Queue", "EU Demo Template", workspace_id=1)
+
+        # No tracked resources → embed_tracked_resources returns the original Queue dataclass
+        assert isinstance(result, Queue)
+        assert result.id == 300
+
+    @pytest.mark.asyncio
+    async def test_queue_with_no_engine_only_tracks_schema(
+        self, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that queue with no engine URL only tracks schema."""
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+
+        mock_queue = create_mock_queue(
+            id=300,
+            schema="https://api.test.rossum.ai/v1/schemas/50",
+            engine=None,
+            dedicated_engine=None,
+            generic_engine=None,
+        )
+        mock_client._http_client.request_json.return_value = {"id": 300}
+        mock_client._deserializer = Mock(return_value=mock_queue)
+        mock_client.retrieve_schema.return_value = create_mock_schema(id=50, name="Template Schema")
+
+        result = await _create_queue_from_template(mock_client, "Queue", "EU Demo Template", workspace_id=1)
+
+        assert isinstance(result, dict)
+        tracked = result[TRACKED_RESOURCES_KEY]
+        assert len(tracked) == 1
+        assert tracked[0]["entity_type"] == "schema"
+        mock_client.retrieve_engine.assert_not_called()
+
+
+@pytest.mark.unit
+class TestGetEngineUrl:
+    """Tests for _get_engine_url helper."""
+
+    def test_dedicated_engine_takes_priority(self) -> None:
+        queue = create_mock_queue(
+            dedicated_engine="https://api.test.rossum.ai/v1/engines/20",
+            generic_engine="https://api.test.rossum.ai/v1/engines/30",
+            engine="https://api.test.rossum.ai/v1/engines/10",
+        )
+        assert _get_engine_url(queue) == "https://api.test.rossum.ai/v1/engines/20"
+
+    def test_generic_engine_fallback(self) -> None:
+        queue = create_mock_queue(
+            dedicated_engine=None,
+            generic_engine="https://api.test.rossum.ai/v1/engines/30",
+            engine="https://api.test.rossum.ai/v1/engines/10",
+        )
+        assert _get_engine_url(queue) == "https://api.test.rossum.ai/v1/engines/30"
+
+    def test_engine_fallback(self) -> None:
+        queue = create_mock_queue(
+            dedicated_engine=None,
+            generic_engine=None,
+            engine="https://api.test.rossum.ai/v1/engines/10",
+        )
+        assert _get_engine_url(queue) == "https://api.test.rossum.ai/v1/engines/10"
+
+    def test_all_none_returns_none(self) -> None:
+        queue = create_mock_queue(
+            dedicated_engine=None,
+            generic_engine=None,
+            engine=None,
+        )
+        assert _get_engine_url(queue) is None
 
 
 @pytest.mark.unit
@@ -871,21 +1070,6 @@ class TestDeleteQueue:
         assert "scheduled for deletion" in result["message"]
         assert "100" in result["message"]
         mock_client.delete_queue.assert_called_once_with(100)
-
-    @pytest.mark.asyncio
-    async def test_delete_queue_read_only_mode(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test delete_queue is blocked in read-only mode."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        importlib.reload(base)
-        register_queue_tools(mock_mcp, mock_client)
-
-        delete_queue = mock_mcp._tools["delete_queue"]
-        result = await delete_queue(queue_id=100)
-
-        assert result["error"] == "delete_queue is not available in read-only mode"
-        mock_client.delete_queue.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_delete_queue_not_found(

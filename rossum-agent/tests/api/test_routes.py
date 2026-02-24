@@ -17,6 +17,7 @@ from rossum_agent.api.models.schemas import (
     StepEvent,
     StreamDoneEvent,
 )
+from rossum_agent.change_tracking.models import ConfigCommit, EntityChange
 from rossum_agent.redis_storage import ChatData, ChatMetadata
 
 from .conftest import create_mock_httpx_client
@@ -92,6 +93,7 @@ class TestCreateChatEndpoint:
         mock_chat_service.create_chat.assert_called_once()
         call_kwargs = mock_chat_service.create_chat.call_args
         assert call_kwargs.kwargs["mcp_mode"] == "read-write"
+        assert call_kwargs.kwargs["persona"] == "default"
 
     @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
     def test_create_chat_defaults_to_read_only_mode(self, mock_httpx, client, mock_chat_service, valid_headers):
@@ -107,6 +109,22 @@ class TestCreateChatEndpoint:
         mock_chat_service.create_chat.assert_called_once()
         call_kwargs = mock_chat_service.create_chat.call_args
         assert call_kwargs.kwargs["mcp_mode"] == "read-only"
+        assert call_kwargs.kwargs["persona"] == "default"
+
+    @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
+    def test_create_chat_respects_persona_from_request(self, mock_httpx, client, mock_chat_service, valid_headers):
+        """Test creating a chat respects persona from request body."""
+        mock_httpx.return_value = create_mock_httpx_client()
+
+        now = datetime.now(UTC)
+        mock_chat_service.create_chat.return_value = ChatResponse(chat_id="chat_123", created_at=now)
+
+        response = client.post("/api/v1/chats", headers=valid_headers, json={"persona": "cautious"})
+
+        assert response.status_code == 201
+        mock_chat_service.create_chat.assert_called_once()
+        call_kwargs = mock_chat_service.create_chat.call_args
+        assert call_kwargs.kwargs["persona"] == "cautious"
 
     def test_create_chat_missing_token(self, client, mock_chat_service):
         """Test creating a chat without token."""
@@ -308,10 +326,10 @@ class TestSendMessageEndpoint:
     def test_send_message_preserves_mcp_mode_metadata(
         self, mock_httpx, client, mock_chat_service, mock_agent_service, valid_headers
     ):
-        """Test that send message preserves mcp_mode in metadata across messages."""
+        """Test that send message preserves metadata across messages."""
         mock_httpx.return_value = create_mock_httpx_client()
 
-        original_metadata = ChatMetadata(mcp_mode="read-write")
+        original_metadata = ChatMetadata(mcp_mode="read-write", persona="default")
         mock_chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=original_metadata)
         mock_chat_service.save_messages.return_value = True
 
@@ -330,6 +348,7 @@ class TestSendMessageEndpoint:
         call_kwargs = mock_chat_service.save_messages.call_args.kwargs
         assert call_kwargs["metadata"] is original_metadata
         assert call_kwargs["metadata"].mcp_mode == "read-write"
+        assert call_kwargs["metadata"].persona == "default"
 
     @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
     def test_send_message_uses_message_level_mcp_mode(
@@ -363,6 +382,64 @@ class TestSendMessageEndpoint:
         assert save_kwargs["metadata"].mcp_mode == "read-write"
 
     @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
+    def test_send_message_uses_message_level_persona(
+        self, mock_httpx, client, mock_chat_service, mock_agent_service, valid_headers, mock_run_agent_factory
+    ):
+        """Test that per-message persona overrides chat persona."""
+        mock_httpx.return_value = create_mock_httpx_client()
+
+        original_metadata = ChatMetadata(mcp_mode="read-only", persona="default")
+        mock_chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=original_metadata)
+        mock_chat_service.save_messages.return_value = True
+
+        run_agent_calls, mock_run_agent = mock_run_agent_factory()
+        mock_agent_service.run_agent = mock_run_agent
+        mock_agent_service.build_updated_history.return_value = []
+
+        response = client.post(
+            "/api/v1/chats/chat_123/messages",
+            headers=valid_headers,
+            json={"content": "Hello", "persona": "cautious"},
+        )
+
+        assert response.status_code == 200
+        response.text
+
+        assert len(run_agent_calls) == 1
+        assert run_agent_calls[0]["persona"] == "cautious"
+
+        mock_chat_service.save_messages.assert_called_once()
+        save_kwargs = mock_chat_service.save_messages.call_args.kwargs
+        assert save_kwargs["metadata"].persona == "cautious"
+
+    @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
+    def test_send_message_falls_back_to_chat_persona(
+        self, mock_httpx, client, mock_chat_service, mock_agent_service, valid_headers, mock_run_agent_factory
+    ):
+        """Test that message without persona uses chat persona."""
+        mock_httpx.return_value = create_mock_httpx_client()
+
+        original_metadata = ChatMetadata(mcp_mode="read-write", persona="cautious")
+        mock_chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=original_metadata)
+        mock_chat_service.save_messages.return_value = True
+
+        run_agent_calls, mock_run_agent = mock_run_agent_factory()
+        mock_agent_service.run_agent = mock_run_agent
+        mock_agent_service.build_updated_history.return_value = []
+
+        response = client.post(
+            "/api/v1/chats/chat_123/messages",
+            headers=valid_headers,
+            json={"content": "Hello"},
+        )
+
+        assert response.status_code == 200
+        response.text
+
+        assert len(run_agent_calls) == 1
+        assert run_agent_calls[0]["persona"] == "cautious"
+
+    @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
     def test_send_message_falls_back_to_chat_mcp_mode(
         self, mock_httpx, client, mock_chat_service, mock_agent_service, valid_headers, mock_run_agent_factory
     ):
@@ -388,6 +465,94 @@ class TestSendMessageEndpoint:
 
         assert len(run_agent_calls) == 1
         assert run_agent_calls[0]["mcp_mode"] == "read-write"
+
+
+class TestListChatCommitsEndpoint:
+    """Tests for GET /api/v1/chats/{chat_id}/commits endpoint."""
+
+    @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
+    def test_chat_not_found(self, mock_httpx, client, mock_chat_service, valid_headers):
+        mock_httpx.return_value = create_mock_httpx_client()
+        mock_chat_service.get_chat_data.return_value = None
+
+        response = client.get("/api/v1/chats/chat_missing/commits", headers=valid_headers)
+
+        assert response.status_code == 404
+
+    @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
+    def test_no_commits(self, mock_httpx, client, mock_chat_service, valid_headers):
+        mock_httpx.return_value = create_mock_httpx_client()
+        mock_chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=ChatMetadata())
+        mock_chat_service.storage.is_connected.return_value = False
+
+        response = client.get("/api/v1/chats/chat_123/commits", headers=valid_headers)
+
+        assert response.status_code == 200
+        assert response.json() == {"commits": []}
+
+    @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
+    def test_with_commits(self, mock_httpx, client, mock_chat_service, valid_headers):
+        mock_httpx.return_value = create_mock_httpx_client()
+
+        metadata = ChatMetadata(config_commits=["abc123"])
+        mock_chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=metadata)
+        mock_chat_service.storage.is_connected.return_value = True
+
+        commit = ConfigCommit(
+            hash="abc123",
+            chat_id="chat_123",
+            timestamp=datetime(2026, 1, 15, 10, 30, tzinfo=UTC),
+            message="Updated queue settings",
+            user_request="Change queue",
+            environment="https://api.rossum.ai",
+            changes=[
+                EntityChange(
+                    entity_type="queue",
+                    entity_id="123",
+                    entity_name="My Queue",
+                    operation="update",
+                    before={},
+                    after={},
+                )
+            ],
+        )
+        mock_commit_store = MagicMock()
+        mock_commit_store.get_commit.return_value = commit
+
+        with patch("rossum_agent.api.routes.chats.CommitStore", return_value=mock_commit_store):
+            response = client.get("/api/v1/chats/chat_123/commits", headers=valid_headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["commits"]) == 1
+        c = data["commits"][0]
+        assert c["hash"] == "abc123"
+        assert c["message"] == "Updated queue settings"
+        assert c["user_request"] == "Change queue"
+        assert len(c["changes"]) == 1
+        assert c["changes"][0] == {
+            "entity_type": "queue",
+            "entity_id": "123",
+            "entity_name": "My Queue",
+            "operation": "update",
+        }
+
+    @patch("rossum_agent.api.dependencies.httpx.AsyncClient")
+    def test_expired_commit_skipped(self, mock_httpx, client, mock_chat_service, valid_headers):
+        mock_httpx.return_value = create_mock_httpx_client()
+
+        metadata = ChatMetadata(config_commits=["expired"])
+        mock_chat_service.get_chat_data.return_value = ChatData(messages=[], metadata=metadata)
+        mock_chat_service.storage.is_connected.return_value = True
+
+        mock_commit_store = MagicMock()
+        mock_commit_store.get_commit.return_value = None
+
+        with patch("rossum_agent.api.routes.chats.CommitStore", return_value=mock_commit_store):
+            response = client.get("/api/v1/chats/chat_123/commits", headers=valid_headers)
+
+        assert response.status_code == 200
+        assert response.json() == {"commits": []}
 
 
 class TestOpenAPIDocumentation:

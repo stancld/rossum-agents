@@ -156,32 +156,6 @@ class TestElisOpenapiGrep:
         assert "No matches found" in result["result"]
 
 
-class TestRefreshOpenapiSpec:
-    """Tests for refresh_openapi_spec function."""
-
-    def test_refresh_deletes_cache_and_clears_memory(self, tmp_path: Path) -> None:
-        """Test that refresh deletes cache file and clears in-memory cache."""
-        cache_file = tmp_path / "rossum_elis_openapi.json"
-        cache_file.write_text('{"test": true}')
-        openapi_module._cache = SpecCache(cache_file)
-
-        # Populate in-memory cache
-        openapi_module._cache._spec = {"test": True}
-        openapi_module._cache._mtime = 123.0
-
-        openapi_module.refresh_openapi_spec()
-        assert not cache_file.exists()
-        assert openapi_module._cache._spec is None
-        assert openapi_module._cache._mtime == 0
-
-    def test_refresh_no_error_if_cache_missing(self, tmp_path: Path) -> None:
-        """Test that refresh doesn't error if cache doesn't exist."""
-        cache_file = tmp_path / "rossum_elis_openapi.json"
-        assert not cache_file.exists()
-        openapi_module._cache = SpecCache(cache_file)
-        openapi_module.refresh_openapi_spec()
-
-
 class TestExtractSpecFromRedocly:
     """Tests for _extract_spec_from_redocly function."""
 

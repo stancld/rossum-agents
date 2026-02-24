@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import replace
+import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, cast, get_args
 
 from rossum_api import APIClientError
@@ -18,9 +19,8 @@ from rossum_mcp.tools.base import (
     delete_resource,
     extract_id_from_url,
     graceful_list,
-    is_read_write_mode,
-    truncate_dict_fields,
 )
+from rossum_mcp.tools.resource_tracking import embed_tracked_resources, track_resource
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -28,21 +28,39 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Fields to truncate in queue.settings for list responses
-_QUEUE_SETTINGS_TRUNCATE_FIELDS = (
-    "accepted_mime_types",
-    "annotation_list_table",
-    "users",
-    "dashboard_customization",
-    "email_notifications",
-)
+
+@dataclass
+class QueueListItem:
+    """Queue summary for list responses (settings omitted to save context)."""
+
+    id: int
+    name: str
+    url: str
+    workspace: str | None = None
+    schema: str | None = None
+    inbox: str | None = None
+    connector: str | None = None
+    automation_enabled: bool = False
+    automation_level: str = "never"
+    status: str | None = None
+    counts: dict[str, int] | None = None
+    settings: str = "<omitted>"
 
 
-def _truncate_queue_for_list(queue: Queue) -> Queue:
-    """Truncate verbose fields in queue settings to save context in list responses."""
-    if not queue.settings:
-        return queue
-    return replace(queue, settings=truncate_dict_fields(queue.settings, _QUEUE_SETTINGS_TRUNCATE_FIELDS))
+def _queue_to_list_item(queue: Queue) -> QueueListItem:
+    return QueueListItem(
+        id=queue.id,
+        name=queue.name,
+        url=queue.url,
+        workspace=queue.workspace,
+        schema=queue.schema,
+        inbox=queue.inbox,
+        connector=queue.connector,
+        automation_enabled=queue.automation_enabled,
+        automation_level=queue.automation_level,
+        status=queue.status,
+        counts=queue.counts or None,
+    )
 
 
 async def _get_queue(client: AsyncRossumAPIClient, queue_id: int) -> Queue:
@@ -56,11 +74,15 @@ async def _list_queues(
     id: str | None = None,
     workspace_id: int | None = None,
     name: str | None = None,
-) -> list[Queue]:
+    use_regex: bool = False,
+) -> list[QueueListItem]:
     logger.debug(f"Listing queues: id={id}, workspace_id={workspace_id}, name={name}")
-    filters = build_filters(id=id, workspace=workspace_id, name=name)
+    filters = build_filters(id=id, workspace=workspace_id, name=None if use_regex else name)
     result = await graceful_list(client, Resource.Queue, "queue", **filters)
-    return [_truncate_queue_for_list(queue) for queue in result.items]
+    items = [_queue_to_list_item(queue) for queue in result.items]
+    if use_regex and name is not None:
+        items = [item for item in items if re.search(name, item.name, re.IGNORECASE)]
+    return items
 
 
 async def _get_queue_schema(client: AsyncRossumAPIClient, queue_id: int) -> Schema:
@@ -115,9 +137,6 @@ async def _create_queue(
     training_enabled: bool = True,
     splitting_screen_feature_flag: bool = False,
 ) -> Queue | dict:
-    if not is_read_write_mode():
-        return {"error": "create_queue is not available in read-only mode"}
-
     logger.debug(
         f"Creating queue: name={name}, workspace_id={workspace_id}, schema_id={schema_id}, engine_id={engine_id}"
     )
@@ -194,9 +213,6 @@ def _validate_queue_column_settings(queue_data: dict) -> str | None:
 
 
 async def _update_queue(client: AsyncRossumAPIClient, queue_id: int, queue_data: dict) -> Queue | dict:
-    if not is_read_write_mode():
-        return {"error": "update_queue is not available in read-only mode"}
-
     validation_error = _validate_queue_column_settings(queue_data)
     if validation_error:
         return {"error": validation_error}
@@ -238,6 +254,15 @@ QueueTemplateName = Literal[
 QUEUE_TEMPLATE_NAMES = get_args(QueueTemplateName)
 
 
+def _get_engine_url(queue: Queue) -> str | None:
+    """Extract the engine URL from a queue, checking all engine fields."""
+    for attr in ("dedicated_engine", "generic_engine", "engine"):
+        value = getattr(queue, attr, None)
+        if value and isinstance(value, str):
+            return value
+    return None
+
+
 async def _create_queue_from_template(
     client: AsyncRossumAPIClient,
     name: str,
@@ -246,9 +271,6 @@ async def _create_queue_from_template(
     include_documents: bool = False,
     engine_id: int | None = None,
 ) -> Queue | dict:
-    if not is_read_write_mode():
-        return {"error": "create_queue_from_template is not available in read-only mode"}
-
     if template_name not in QUEUE_TEMPLATE_NAMES:
         return {
             "error": f"Invalid template_name: '{template_name}'",
@@ -274,29 +296,74 @@ async def _create_queue_from_template(
         url="queues/from_template",
         json=payload,
     )
-    return cast("Queue", client._deserializer(Resource.Queue, response))
+    queue = cast("Queue", client._deserializer(Resource.Queue, response))
+
+    tracked: list[dict] = []
+
+    # Track the schema created as a side effect
+    try:
+        schema_id = extract_id_from_url(queue.schema)
+        schema = await client.retrieve_schema(schema_id)
+        track_resource(tracked, "schema", schema_id, schema)
+    except Exception:
+        logger.warning(f"Failed to fetch schema for tracked resource (queue={queue.id})", exc_info=True)
+
+    # Track the engine created as a side effect
+    engine_url = _get_engine_url(queue)
+    if engine_url:
+        try:
+            eid = extract_id_from_url(engine_url)
+            engine = await client.retrieve_engine(eid)
+            track_resource(tracked, "engine", eid, engine)
+        except Exception:
+            logger.warning(f"Failed to fetch engine for tracked resource (queue={queue.id})", exc_info=True)
+
+    return embed_tracked_resources(queue, tracked)
 
 
 def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(description="Retrieve queue details.")
+    @mcp.tool(
+        description="Retrieve queue details.",
+        tags={"queues"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_queue(queue_id: int) -> Queue:
         return await _get_queue(client, queue_id)
 
-    @mcp.tool(description="List queues with filters; id supports comma-separated values.")
+    @mcp.tool(
+        description="List queues with filters; id supports comma-separated values. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
+        tags={"queues"},
+        annotations={"readOnlyHint": True},
+    )
     async def list_queues(
-        id: str | None = None, workspace_id: int | None = None, name: str | None = None
-    ) -> list[Queue]:
-        return await _list_queues(client, id, workspace_id, name)
+        id: str | None = None,
+        workspace_id: int | None = None,
+        name: str | None = None,
+        use_regex: bool = False,
+    ) -> list[QueueListItem]:
+        return await _list_queues(client, id, workspace_id, name, use_regex)
 
-    @mcp.tool(description="Retrieve queue schema.")
+    @mcp.tool(
+        description="Retrieve queue schema.",
+        tags={"queues"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_queue_schema(queue_id: int) -> Schema:
         return await _get_queue_schema(client, queue_id)
 
-    @mcp.tool(description="Retrieve queue engine. Returns None if no engine assigned.")
+    @mcp.tool(
+        description="Retrieve queue engine. Returns None if no engine assigned.",
+        tags={"queues"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_queue_engine(queue_id: int) -> Engine | dict:
         return await _get_queue_engine(client, queue_id)
 
-    @mcp.tool(description="Create a queue.")
+    @mcp.tool(
+        description="Create a queue.",
+        tags={"queues", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def create_queue(
         name: str,
         workspace_id: int,
@@ -325,19 +392,35 @@ def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
             splitting_screen_feature_flag,
         )
 
-    @mcp.tool(description="Update queue settings.")
+    @mcp.tool(
+        description="Update queue settings.",
+        tags={"queues", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def update_queue(queue_id: int, queue_data: dict) -> Queue | dict:
         return await _update_queue(client, queue_id, queue_data)
 
-    @mcp.tool(description="Delete a queue (deletion begins after ~24h); cascades to annotations/documents.")
+    @mcp.tool(
+        description="Delete a queue (deletion begins after ~24h); cascades to annotations/documents.",
+        tags={"queues", "write"},
+        annotations={"readOnlyHint": False, "destructiveHint": True},
+    )
     async def delete_queue(queue_id: int) -> dict:
         return await _delete_queue(client, queue_id)
 
-    @mcp.tool(description="List template names usable by create_queue_from_template.")
+    @mcp.tool(
+        description="List template names usable by create_queue_from_template.",
+        tags={"queues"},
+        annotations={"readOnlyHint": True},
+    )
     async def get_queue_template_names() -> list[str]:
         return list(QUEUE_TEMPLATE_NAMES)
 
-    @mcp.tool(description="Create a queue from a template (includes schema + engine defaults).")
+    @mcp.tool(
+        description="Create a queue from a template (includes schema + engine defaults).",
+        tags={"queues", "write"},
+        annotations={"readOnlyHint": False},
+    )
     async def create_queue_from_template(
         name: str,
         template_name: QueueTemplateName,

@@ -6,13 +6,8 @@ import json
 from typing import TYPE_CHECKING
 
 import pytest
-from rossum_agent.tools import (
-    INTERNAL_TOOLS,
-    execute_tool,
-    get_internal_tool_names,
-    get_internal_tools,
-    set_output_dir,
-)
+from rossum_agent.tools import INTERNAL_TOOLS, execute_tool, get_internal_tool_names, get_internal_tools
+from rossum_agent.tools.core import AgentContext, set_context
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -75,14 +70,14 @@ class TestExecuteTool:
 
     def test_execute_write_file_tool(self, tmp_path: Path) -> None:
         """Test executing write_file through execute_tool."""
-        set_output_dir(tmp_path)
+        set_context(AgentContext(output_dir=tmp_path))
         try:
             result_json = execute_tool("write_file", {"filename": "test.txt", "content": "Hello"}, INTERNAL_TOOLS)
             result = json.loads(result_json)
             assert result["status"] == "success"
             assert (tmp_path / "test.txt").read_text() == "Hello"
         finally:
-            set_output_dir(None)
+            set_context(AgentContext())
 
     def test_execute_load_skill_tool(self) -> None:
         """Test executing load_skill through execute_tool."""
@@ -93,12 +88,12 @@ class TestExecuteTool:
 
     def test_execute_tool_with_missing_args(self, tmp_path: Path) -> None:
         """Test executing tool with missing required arguments."""
-        set_output_dir(tmp_path)
+        set_context(AgentContext(output_dir=tmp_path))
         try:
             with pytest.raises(TypeError):
                 execute_tool("write_file", {}, INTERNAL_TOOLS)
         finally:
-            set_output_dir(None)
+            set_context(AgentContext())
 
 
 class TestExecuteInternalTool:
@@ -165,14 +160,14 @@ class TestExecuteInternalTool:
         """Test executing a BetaTool through execute_internal_tool."""
         from rossum_agent.tools import execute_internal_tool
 
-        set_output_dir(tmp_path)
+        set_context(AgentContext(output_dir=tmp_path))
         try:
             result_json = execute_internal_tool("write_file", {"filename": "test.txt", "content": "Hello"})
             result = json.loads(result_json)
             assert result["status"] == "success"
             assert (tmp_path / "test.txt").read_text() == "Hello"
         finally:
-            set_output_dir(None)
+            set_context(AgentContext())
 
     def test_load_tool_category_is_in_internal_tools(self) -> None:
         """Test that load_tool_category is listed as an internal tool."""

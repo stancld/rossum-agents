@@ -25,9 +25,6 @@ class GracefulListResult(Generic[T]):  # noqa: UP046 - PEP 695 breaks sphinx-aut
     skipped_ids: list[int | str] = field(default_factory=list)
 
 
-# Marker used to indicate omitted fields in list responses
-TRUNCATED_MARKER = "<omitted>"
-
 VALID_MODES = ("read-only", "read-write")
 
 _base_url: str = ""
@@ -84,30 +81,9 @@ def build_resource_url(resource_type: str, resource_id: int) -> str:
     return f"{_base_url}/{resource_type}/{resource_id}"
 
 
-def is_read_write_mode() -> bool:
-    """Check if server is in read-write mode."""
-    _ensure_configured()
-    return _mcp_mode == "read-write"
-
-
 def build_filters(**kwargs: Any) -> dict[str, Any]:
     """Build a filter dict from kwargs, excluding None values."""
     return {k: v for k, v in kwargs.items() if v is not None}
-
-
-def truncate_dict_fields(data: dict[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
-    """Truncate specified fields in a dictionary to save context.
-
-    Returns a new dictionary with specified fields replaced by TRUNCATED_MARKER.
-    """
-    if not data:
-        return data
-
-    result = dict(data)
-    for field_name in fields:
-        if field_name in result:
-            result[field_name] = TRUNCATED_MARKER
-    return result
 
 
 async def graceful_list(
@@ -134,11 +110,11 @@ async def graceful_list(
         except Exception:
             item_id = raw.get("id", "unknown")
             skipped_ids.append(item_id)
-            logger.warning("Failed to deserialize %s (id=%s), skipping", resource_label, item_id)
+            logger.warning(f"Failed to deserialize {resource_label} (id={item_id}), skipping")
         if max_items is not None and len(items) >= max_items:
             break
     if skipped_ids:
-        logger.warning("Skipped %d %s item(s) that failed to deserialize", len(skipped_ids), resource_label)
+        logger.warning(f"Skipped {len(skipped_ids)} {resource_label} item(s) that failed to deserialize")
     return GracefulListResult(items=items, skipped_ids=skipped_ids)
 
 
@@ -148,21 +124,16 @@ async def delete_resource(
     delete_fn: Callable[[int], Awaitable[None]],
     success_message: str | None = None,
 ) -> dict:
-    """Generic delete operation with read-only mode check.
+    """Generic delete operation.
+
+    Write-access is enforced at the MCP layer via tags={"write"} + mcp.disable().
 
     Args:
         resource_type: Name of the resource (e.g., "queue", "workspace")
         resource_id: ID of the resource to delete
         delete_fn: Async function that performs the deletion
         success_message: Custom success message. If None, uses default format.
-
-    Returns:
-        Dict with "message" on success or "error" in read-only mode.
     """
-    tool_name = f"delete_{resource_type}"
-    if not is_read_write_mode():
-        return {"error": f"{tool_name} is not available in read-only mode"}
-
     logger.debug(f"Deleting {resource_type}: {resource_type}_id={resource_id}")
     await delete_fn(resource_id)
 

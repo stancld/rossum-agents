@@ -162,9 +162,13 @@ class RossumAgentClient(BaseClient):
         response = self._request("GET", f"{self.agent_api_url}/api/v1/health")
         return HealthResponse.model_validate(response.json())
 
-    def create_chat(self, mcp_mode: Literal["read-only", "read-write"] = "read-only") -> ChatResponse:
+    def create_chat(
+        self,
+        mcp_mode: Literal["read-only", "read-write"] = "read-only",
+        persona: Literal["default", "cautious"] = "default",
+    ) -> ChatResponse:
         """Create a new chat session."""
-        request = CreateChatRequest(mcp_mode=mcp_mode)
+        request = CreateChatRequest(mcp_mode=mcp_mode, persona=persona)
         response = self._request(
             "POST",
             f"{self.agent_api_url}/api/v1/chats",
@@ -314,9 +318,13 @@ class AsyncRossumAgentClient(BaseClient):
         response = await self._request("GET", f"{self.agent_api_url}/api/v1/health")
         return HealthResponse.model_validate(response.json())
 
-    async def create_chat(self, mcp_mode: Literal["read-only", "read-write"] = "read-only") -> ChatResponse:
+    async def create_chat(
+        self,
+        mcp_mode: Literal["read-only", "read-write"] = "read-only",
+        persona: Literal["default", "cautious"] = "default",
+    ) -> ChatResponse:
         """Create a new chat session."""
-        request = CreateChatRequest(mcp_mode=mcp_mode)
+        request = CreateChatRequest(mcp_mode=mcp_mode, persona=persona)
         response = await self._request(
             "POST",
             f"{self.agent_api_url}/api/v1/chats",

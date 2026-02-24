@@ -7,11 +7,14 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+type Persona = Literal["default", "cautious"]
+
 
 class CreateChatRequest(BaseModel):
     """Request body for creating a new chat session."""
 
     mcp_mode: Literal["read-only", "read-write"] = "read-only"
+    persona: Persona = "default"
 
 
 class ChatResponse(BaseModel):
@@ -29,6 +32,7 @@ class ChatSummary(BaseModel):
     message_count: int
     first_message: str
     preview: str | None = None
+    summary: str | None = None
 
 
 class ChatListResponse(BaseModel):
@@ -143,6 +147,10 @@ class MessageRequest(BaseModel):
         default=None,
         description="MCP mode to use for this message and all subsequent messages. If not specified, uses the chat's current mode.",
     )
+    persona: Persona | None = Field(
+        default=None,
+        description="Agent persona to use for this message and all subsequent messages. If not specified, uses the chat's current persona.",
+    )
 
 
 class StepEvent(BaseModel):
@@ -165,6 +173,7 @@ class StepEvent(BaseModel):
     is_streaming: bool = False
     is_final: bool = False
     tool_call_id: str | None = None
+    is_hook_output: bool = False
 
 
 class SubAgentProgressEvent(BaseModel):
@@ -321,8 +330,8 @@ class TokenUsageBreakdown(BaseModel):
             return self._format_summary_no_cache()
         return self._format_summary_with_cache()
 
-    def _format_summary_no_cache(self) -> list[str]:
-        """Format summary when no caching is active."""
+    def _format_table_lines(self) -> list[str]:
+        """Build the shared header and per-agent rows (used by both summary variants)."""
         w = 60
         lines = [
             "",
@@ -342,36 +351,23 @@ class TokenUsageBreakdown(BaseModel):
             [
                 "-" * w,
                 f"{'TOTAL':<25} {self.total.input_tokens:>12,} {self.total.output_tokens:>12,} {self.total.total_tokens:>12,}",
-                "=" * w,
             ]
         )
         return lines
 
+    def _format_summary_no_cache(self) -> list[str]:
+        w = 60
+        return [*self._format_table_lines(), "=" * w]
+
     def _format_summary_with_cache(self) -> list[str]:
-        """Format summary with cache token breakdown."""
         w = 60
 
         def _new_input(source: TokenUsageBySource | SubAgentTokenUsageDetail) -> int:
             return source.input_tokens - source.cache_creation_input_tokens - source.cache_read_input_tokens
 
-        lines = [
-            "",
-            "=" * w,
-            "TOKEN USAGE SUMMARY",
-            "=" * w,
-            f"{'Category':<25} {'Input':>12} {'Output':>12} {'Total':>12}",
-            "-" * w,
-            f"{'Main Agent':<25} {self.main_agent.input_tokens:>12,} {self.main_agent.output_tokens:>12,} {self.main_agent.total_tokens:>12,}",
-            f"{'Sub-agents (total)':<25} {self.sub_agents.input_tokens:>12,} {self.sub_agents.output_tokens:>12,} {self.sub_agents.total_tokens:>12,}",
-        ]
-        for tool_name, usage in self.sub_agents.by_tool.items():
-            lines.append(
-                f"  └─ {tool_name:<21} {usage.input_tokens:>12,} {usage.output_tokens:>12,} {usage.total_tokens:>12,}"
-            )
+        lines = self._format_table_lines()
         lines.extend(
             [
-                "-" * w,
-                f"{'TOTAL':<25} {self.total.input_tokens:>12,} {self.total.output_tokens:>12,} {self.total.total_tokens:>12,}",
                 "-" * w,
                 "",
                 "Input token breakdown:",
@@ -443,3 +439,49 @@ class FileListResponse(BaseModel):
 
     files: list[FileInfo]
     total: int
+
+
+class EntityChangeInfo(BaseModel):
+    """A single entity change within a config commit."""
+
+    entity_type: str
+    entity_id: str
+    entity_name: str
+    operation: Literal["create", "update", "delete"]
+
+
+class CommitInfo(BaseModel):
+    """A configuration commit with its changes."""
+
+    hash: str
+    timestamp: datetime
+    message: str
+    user_request: str
+    changes: list[EntityChangeInfo]
+
+
+class CommitListResponse(BaseModel):
+    """Response for listing config commits in a chat."""
+
+    commits: list[CommitInfo]
+
+
+class ArgumentSuggestion(BaseModel):
+    """A suggested value for a slash command argument."""
+
+    value: str
+    description: str
+
+
+class CommandInfo(BaseModel):
+    """Information about an available slash command."""
+
+    name: str
+    description: str
+    argument_suggestions: list[ArgumentSuggestion] = []
+
+
+class CommandListResponse(BaseModel):
+    """Response for listing available slash commands."""
+
+    commands: list[CommandInfo]

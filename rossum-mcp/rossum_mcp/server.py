@@ -78,9 +78,18 @@ def create_app() -> FastMCP:
     async def set_mcp_mode_tool(mode: str) -> dict:
         try:
             set_mcp_mode(mode)
-            return {"message": f"MCP mode set to '{get_mcp_mode()}'"}
+            current = get_mcp_mode()
+            if current == "read-only":
+                mcp.disable(tags={"write"})
+            else:
+                mcp.enable(tags={"write"})
+            return {"message": f"MCP mode set to '{current}'"}
         except ValueError as e:
             return {"error": str(e)}
+
+    # Enforce read-only mode by hiding write tools via FastMCP visibility
+    if mcp_mode == "read-only":
+        mcp.disable(tags={"write"})
 
     return mcp
 

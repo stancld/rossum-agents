@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-OPENAPI_URL = "https://rossum.app/api/docs/"
+OPENAPI_URL = "https://rossum.app/api/docs/openapi/openapi-specs/openapi.external.json"
 _CACHE_PATH = Path(tempfile.gettempdir()) / "rossum_elis_openapi.json"
 _CACHE_TTL_SECONDS = 24 * 60 * 60  # 24 hours
 
@@ -123,11 +123,6 @@ class SpecCache:
 
 # Module-level singleton
 _cache = SpecCache()
-
-
-def refresh_openapi_spec() -> None:
-    """Delete cached OpenAPI spec to force fresh download on next use."""
-    _cache.invalidate()
 
 
 def _extract_spec_from_redocly(html: str) -> dict[str, Any]:

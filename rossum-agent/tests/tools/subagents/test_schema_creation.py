@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+from rossum_agent.tools.core import AgentContext, set_context
 from rossum_agent.tools.subagents.base import SubAgentResult
 from rossum_agent.tools.subagents.schema_creation import (
     _CREATE_SCHEMA_TOOL,
@@ -141,9 +142,6 @@ class TestCallOpusForCreation:
         """Test that progress is reported during creation."""
         progress_calls: list = []
 
-        def capture_progress(progress):
-            progress_calls.append(progress)
-
         mock_response = MagicMock()
         mock_response.stop_reason = "end_of_turn"
         mock_response.content = [MagicMock(text="Schema created", type="text")]
@@ -151,17 +149,22 @@ class TestCallOpusForCreation:
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress", side_effect=capture_progress),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-        ):
-            mock_client.return_value.messages.create.return_value = mock_response
+        set_context(
+            AgentContext(
+                progress_callback=lambda p: progress_calls.append(p),
+                token_callback=MagicMock(),
+            )
+        )
+        try:
+            with patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client:
+                mock_client.return_value.messages.create.return_value = mock_response
 
-            _call_opus_for_creation("Test Schema", "Simple schema with one section")
+                _call_opus_for_creation("Test Schema", "Simple schema with one section")
 
-            assert len(progress_calls) >= 1
-            assert progress_calls[0].tool_name == "create_schema"
+                assert len(progress_calls) >= 1
+                assert progress_calls[0].tool_name == "create_schema"
+        finally:
+            set_context(AgentContext())
 
     def test_iterates_with_tool_use(self):
         """Test that sub-agent iterates when tools are used."""
@@ -187,23 +190,25 @@ class TestCallOpusForCreation:
         second_response.usage.input_tokens = 200
         second_response.usage.output_tokens = 100
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch(
-                "rossum_agent.tools.subagents.schema_creation._execute_opus_tool",
-                return_value='{"id": 123, "name": "Test"}',
-            ),
-        ):
-            mock_client.return_value.messages.create.side_effect = [first_response, second_response]
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+                patch(
+                    "rossum_agent.tools.subagents.schema_creation._execute_opus_tool",
+                    return_value='{"id": 123, "name": "Test"}',
+                ),
+            ):
+                mock_client.return_value.messages.create.side_effect = [first_response, second_response]
 
-            result = _call_opus_for_creation("Test", "Simple schema")
+                result = _call_opus_for_creation("Test", "Simple schema")
 
-            assert "Schema created successfully" in result.analysis
-            assert result.input_tokens == 300
-            assert result.output_tokens == 150
-            assert mock_client.return_value.messages.create.call_count == 2
+                assert "Schema created successfully" in result.analysis
+                assert result.input_tokens == 300
+                assert result.output_tokens == 150
+                assert mock_client.return_value.messages.create.call_count == 2
+        finally:
+            set_context(AgentContext())
 
     def test_max_iterations_is_3(self):
         """Test that max iterations is set to 3 for schema creation."""
@@ -219,22 +224,24 @@ class TestCallOpusForCreation:
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
 
-        with (
-            patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
-            patch("rossum_agent.tools.subagents.base.report_progress"),
-            patch("rossum_agent.tools.subagents.base.report_token_usage"),
-            patch(
-                "rossum_agent.tools.subagents.schema_creation._execute_opus_tool",
-                return_value='{"id": 123}',
-            ),
-            patch("rossum_agent.tools.subagents.base.logger"),
-        ):
-            mock_client.return_value.messages.create.return_value = mock_response
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
+                patch(
+                    "rossum_agent.tools.subagents.schema_creation._execute_opus_tool",
+                    return_value='{"id": 123}',
+                ),
+                patch("rossum_agent.tools.subagents.base.logger"),
+            ):
+                mock_client.return_value.messages.create.return_value = mock_response
 
-            result = _call_opus_for_creation("Test", "Simple schema")
+                result = _call_opus_for_creation("Test", "Simple schema")
 
-            assert result.iterations_used == 3
-            assert mock_client.return_value.messages.create.call_count == 3
+                assert result.iterations_used == 3
+                assert mock_client.return_value.messages.create.call_count == 3
+        finally:
+            set_context(AgentContext())
 
     def test_bedrock_client_exception_returns_error(self):
         """Test that create_bedrock_client exception returns error message."""

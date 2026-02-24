@@ -30,10 +30,11 @@ if TYPE_CHECKING:
     import redis
     from mcp.types import Tool as MCPTool
 
-    from rossum_agent.change_tracking.store import CommitStore
+    from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 
 logger = logging.getLogger(__name__)
 
+_TRACKED_RESOURCES_KEY = "_tracked_resources"
 _WRITE_PREFIXES = ("create_", "update_", "delete_", "patch_")
 _READ_PREFIXES = ("get_", "list_")
 
@@ -111,6 +112,17 @@ def _classify_operation(tool_name: str) -> Literal["create", "update", "delete"]
     return "update"
 
 
+def _pop_tracked_resources(result: Any) -> list[dict[str, Any]]:
+    """Extract and remove _tracked_resources from a dict result.
+
+    Returns the list of tracked resource entries, or an empty list if the
+    result is not a dict or has no tracked resources.
+    """
+    if isinstance(result, dict):
+        return result.pop(_TRACKED_RESOURCES_KEY, [])
+    return []
+
+
 @dataclass
 class MCPConnection:
     """MCP client connection with optional change tracking.
@@ -128,6 +140,7 @@ class MCPConnection:
     _read_cache: dict[tuple[str, str], dict] = field(default_factory=dict, init=False, repr=False)
     _changes: list[EntityChange] = field(default_factory=list, init=False, repr=False)
     _commit_store: CommitStore | None = field(default=None, init=False, repr=False)
+    _snapshot_store: SnapshotStore | None = field(default=None, init=False, repr=False)
     _environment: str | None = field(default=None, init=False, repr=False)
 
     async def get_tools(self) -> list[MCPTool]:
@@ -190,13 +203,42 @@ class MCPConnection:
 
         before = await self._get_before_snapshot(entity_type, entity_id, operation)
         result = await self._call_mcp(name, arguments)
+
+        tracked = _pop_tracked_resources(result)
+
         after, entity_id = await self._get_after_snapshot(operation, entity_type, entity_id, result)
 
         if after is not None and entity_type and entity_id:
             self._cache_set(entity_type, entity_id, after)
 
         self._record_change(name, arguments, entity_type, entity_id, operation, before, after)
+        self._record_tracked_resources(tracked, operation)
         return result
+
+    def _record_tracked_resources(
+        self,
+        tracked: list[dict[str, Any]],
+        operation: Literal["create", "update", "delete"],
+    ) -> None:
+        """Create EntityChange entries for side-effect resources reported by MCP tools."""
+        for entry in tracked:
+            et = entry.get("entity_type", "")
+            eid = entry.get("entity_id", "")
+            data = entry.get("data")
+            if not (et and eid and isinstance(data, dict)):
+                continue
+            self._cache_set(et, eid, data)
+            self._changes.append(
+                EntityChange(
+                    entity_type=et,
+                    entity_id=eid,
+                    entity_name=_extract_entity_name(data),
+                    operation=operation,
+                    before=None,
+                    after=data,
+                )
+            )
+            logger.info(f"Tracked side-effect {operation} on {et}:{eid}")
 
     def _auto_commit_if_needed(
         self,
@@ -319,19 +361,21 @@ class MCPConnection:
         chat_id: str,
         environment: str,
         commit_store: CommitStore,
+        snapshot_store: SnapshotStore,
     ) -> None:
         """Configure change tracking on this connection."""
         self.write_tools = write_tools
         self.chat_id = chat_id
         self.redis_client = commit_store.client
         self._commit_store = commit_store
+        self._snapshot_store = snapshot_store
         self._environment = environment
 
     def flush_and_commit(self, user_request: str) -> None:
         """Commit pending changes to the store."""
-        if not (self._commit_store and self._environment and self._changes):
+        if not (self._commit_store and self._snapshot_store and self._environment and self._changes):
             return
-        CommitService(self._commit_store).create_commit(
+        CommitService(self._commit_store, self._snapshot_store).create_commit(
             self, self.chat_id or "unknown", user_request, self._environment
         )
 

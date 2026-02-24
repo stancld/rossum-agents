@@ -104,25 +104,6 @@ class TestBuildResourceUrl:
 
 
 @pytest.mark.unit
-class TestIsReadWriteMode:
-    """Tests for is_read_write_mode function."""
-
-    def test_returns_true_when_read_write(self) -> None:
-        """Test is_read_write_mode returns True when mode is read-write."""
-        from rossum_mcp.tools.base import is_read_write_mode, set_mcp_mode
-
-        set_mcp_mode("read-write")
-        assert is_read_write_mode() is True
-
-    def test_returns_false_when_read_only(self) -> None:
-        """Test is_read_write_mode returns False when mode is read-only."""
-        from rossum_mcp.tools.base import is_read_write_mode, set_mcp_mode
-
-        set_mcp_mode("read-only")
-        assert is_read_write_mode() is False
-
-
-@pytest.mark.unit
 class TestDeleteResource:
     """Tests for delete_resource function."""
 
@@ -150,19 +131,6 @@ class TestDeleteResource:
         result = await delete_resource("queue", 123, mock_delete_fn, "Queue 123 scheduled for deletion")
 
         assert result == {"message": "Queue 123 scheduled for deletion"}
-
-    @pytest.mark.asyncio
-    async def test_delete_resource_read_only_mode(self) -> None:
-        """Test deletion is blocked in read-only mode."""
-        from rossum_mcp.tools.base import delete_resource, set_mcp_mode
-
-        set_mcp_mode("read-only")
-
-        mock_delete_fn = AsyncMock()
-        result = await delete_resource("queue", 123, mock_delete_fn)
-
-        assert result == {"error": "delete_queue is not available in read-only mode"}
-        mock_delete_fn.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_delete_resource_propagates_exception(self) -> None:

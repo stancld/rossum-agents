@@ -10,6 +10,7 @@ import pytest
 from rossum_agent.change_tracking.models import EntityChange
 from rossum_agent.rossum_mcp_integration import (
     MCPConnection,
+    _pop_tracked_resources,
     connect_mcp_server,
     create_mcp_transport,
     mcp_tools_to_anthropic_format,
@@ -538,3 +539,170 @@ class TestChangeTrackerState:
         conn.clear_changes()
         assert not conn.has_changes()
         assert conn.get_changes() == []
+
+
+# -- Tracked resources tests --
+
+
+class TestPopTrackedResources:
+    def test_extracts_from_dict_result(self):
+        result = {
+            "id": 1,
+            "name": "Q",
+            "_tracked_resources": [{"entity_type": "schema", "entity_id": "10", "data": {"id": 10}}],
+        }
+        tracked = _pop_tracked_resources(result)
+
+        assert len(tracked) == 1
+        assert tracked[0]["entity_type"] == "schema"
+        assert "_tracked_resources" not in result
+
+    def test_returns_empty_for_non_dict(self):
+        assert _pop_tracked_resources("plain string") == []
+        assert _pop_tracked_resources(42) == []
+        assert _pop_tracked_resources(None) == []
+
+    def test_returns_empty_when_key_absent(self):
+        result = {"id": 1, "name": "Q"}
+        tracked = _pop_tracked_resources(result)
+
+        assert tracked == []
+        assert result == {"id": 1, "name": "Q"}
+
+
+class TestHandleWriteTrackedResources:
+    @pytest.mark.asyncio
+    async def test_records_tracked_resources_as_changes(self):
+        conn = _make_connection(write_tools={"create_queue_from_template"})
+        created = {
+            "result": {"id": 99, "name": "New Queue"},
+            "_tracked_resources": [
+                {"entity_type": "schema", "entity_id": "50", "data": {"id": 50, "name": "S"}},
+                {"entity_type": "engine", "entity_id": "60", "data": {"id": 60, "name": "E"}},
+            ],
+        }
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
+
+        await conn.call_tool("create_queue_from_template", {"name": "Q"})
+
+        changes = conn.get_changes()
+        assert len(changes) == 3
+
+        queue_change = changes[0]
+        assert queue_change.entity_type == "queue"
+        assert queue_change.entity_id == "99"
+        assert queue_change.operation == "create"
+
+        schema_change = changes[1]
+        assert schema_change.entity_type == "schema"
+        assert schema_change.entity_id == "50"
+        assert schema_change.entity_name == "S"
+        assert schema_change.operation == "create"
+        assert schema_change.before is None
+        assert schema_change.after == {"id": 50, "name": "S"}
+
+        engine_change = changes[2]
+        assert engine_change.entity_type == "engine"
+        assert engine_change.entity_id == "60"
+        assert engine_change.entity_name == "E"
+
+    @pytest.mark.asyncio
+    async def test_tracked_resources_are_cached(self):
+        conn = _make_connection(write_tools={"create_queue_from_template"})
+        created = {
+            "result": {"id": 99, "name": "Q"},
+            "_tracked_resources": [
+                {"entity_type": "schema", "entity_id": "50", "data": {"id": 50, "name": "S"}},
+            ],
+        }
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
+
+        await conn.call_tool("create_queue_from_template", {"name": "Q"})
+
+        assert conn._cache_get("schema", "50") == {"id": 50, "name": "S"}
+
+    @pytest.mark.asyncio
+    async def test_tracked_resources_stripped_from_main_snapshot(self):
+        conn = _make_connection(write_tools={"create_queue_from_template"})
+        created = {
+            "result": {"id": 99, "name": "Q"},
+            "_tracked_resources": [
+                {"entity_type": "schema", "entity_id": "50", "data": {"id": 50}},
+            ],
+        }
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
+
+        await conn.call_tool("create_queue_from_template", {"name": "Q"})
+
+        queue_change = conn.get_changes()[0]
+        # The after snapshot should not contain _tracked_resources
+        assert "_tracked_resources" not in (queue_change.after or {})
+
+    @pytest.mark.asyncio
+    async def test_no_tracked_resources_works_normally(self):
+        conn = _make_connection(write_tools={"create_queue"})
+        created = {"result": {"id": 99, "name": "Q"}}
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
+
+        await conn.call_tool("create_queue", {"name": "Q"})
+
+        changes = conn.get_changes()
+        assert len(changes) == 1
+        assert changes[0].entity_type == "queue"
+
+    @pytest.mark.asyncio
+    async def test_setup_change_tracking_sets_snapshot_store(self):
+        conn = _make_connection()
+        commit_store = MagicMock()
+        commit_store.client = MagicMock()
+        snapshot_store = MagicMock()
+
+        conn.setup_change_tracking(
+            write_tools={"update_queue"},
+            chat_id="chat-1",
+            environment="https://api.elis.rossum.ai/v1",
+            commit_store=commit_store,
+            snapshot_store=snapshot_store,
+        )
+
+        assert conn._snapshot_store is snapshot_store
+        assert conn._commit_store is commit_store
+        assert conn.write_tools == {"update_queue"}
+        assert conn.chat_id == "chat-1"
+        assert conn._environment == "https://api.elis.rossum.ai/v1"
+
+    def test_flush_skipped_when_snapshot_store_is_none(self):
+        conn = _make_connection()
+        conn._commit_store = MagicMock()
+        conn._snapshot_store = None
+        conn._environment = "https://api.elis.rossum.ai/v1"
+        conn._changes.append(
+            EntityChange(entity_type="queue", entity_id="1", entity_name="Q", operation="update", before={}, after={})
+        )
+
+        # Should not raise and should not call CommitService
+        with patch("rossum_agent.rossum_mcp_integration.CommitService") as mock_cs:
+            conn.flush_and_commit("test request")
+            mock_cs.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_skips_malformed_tracked_entries(self):
+        conn = _make_connection(write_tools={"create_queue_from_template"})
+        created = {
+            "result": {"id": 99, "name": "Q"},
+            "_tracked_resources": [
+                {"entity_type": "", "entity_id": "50", "data": {"id": 50}},
+                {"entity_type": "schema", "entity_id": "", "data": {"id": 50}},
+                {"entity_type": "engine", "entity_id": "60", "data": "not a dict"},
+                {"entity_type": "schema", "entity_id": "70", "data": {"id": 70, "name": "Valid"}},
+            ],
+        }
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
+
+        await conn.call_tool("create_queue_from_template", {"name": "Q"})
+
+        changes = conn.get_changes()
+        # 1 queue + 1 valid tracked resource (the last one)
+        assert len(changes) == 2
+        assert changes[1].entity_type == "schema"
+        assert changes[1].entity_id == "70"

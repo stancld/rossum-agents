@@ -8,32 +8,166 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from anthropic import beta_tool
-from rossum_deploy.models import IdMapping
+from rossum_deploy.models import (
+    CopyResult,
+    DeployResult,
+    IdMapping,
+    ObjectType,
+    PullResult,
+    PushResult,
+)
 from rossum_deploy.workspace import Workspace
 
-from rossum_agent.tools.core import get_output_dir, require_rossum_credentials
+from rossum_agent.tools.core import get_context
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from anthropic._tools import BetaTool  # ty: ignore[unresolved-import] - private API
     from anthropic.types import ToolParam
     from rossum_deploy.workspace import Workspace as WorkspaceType
 
 logger = logging.getLogger(__name__)
 
+type _ResultTuple = tuple[ObjectType, int, str] | tuple[ObjectType, int, str, str] | tuple[ObjectType, int, int, str]
+
+
+def _type_counts(items: Sequence[_ResultTuple]) -> str:
+    """Format type counts from result tuples where first element is ObjectType.
+
+    Returns e.g. '2 queue, 1 schema, 2 hook' or '' if empty.
+    """
+    if not items:
+        return ""
+    counts = Counter(item[0].value for item in items)
+    return ", ".join(f"{count} {name}" for name, count in sorted(counts.items()))
+
+
+def _count_line(label: str, items: Sequence[_ResultTuple]) -> str:
+    """Format a summary count line with optional type breakdown."""
+    type_info = _type_counts(items)
+    suffix = f" ({type_info})" if type_info else ""
+    return f"- {label}: {len(items)}{suffix}"
+
+
+def _grouped_detail_lines(items: Sequence[_ResultTuple], format_item: str) -> list[str]:
+    """Group items by object type and format detail lines."""
+    grouped: dict[str, list[_ResultTuple]] = defaultdict(list)
+    for item in items:
+        grouped[item[0].value].append(item)
+
+    lines: list[str] = []
+    for type_name in sorted(grouped):
+        type_items = grouped[type_name]
+        lines.append(f"\n**{type_name}** ({len(type_items)})")
+        for item in type_items:
+            lines.append(format_item.format(*item[1:]))
+    return lines
+
+
+def format_push_summary(result: PushResult) -> str:
+    """Enhanced summary of a push result with type grouping."""
+    lines = ["# Push Summary", ""]
+    lines.append(_count_line("Pushed", result.pushed))
+    lines.append(_count_line("Skipped", result.skipped))
+    lines.append(_count_line("Failed", result.failed))
+
+    if result.pushed:
+        lines.append("\n## Pushed")
+        lines.extend(_grouped_detail_lines(result.pushed, "- {1} ({0})"))
+
+    if result.skipped:
+        lines.append("\n## Skipped")
+        lines.extend(_grouped_detail_lines(result.skipped, "- {1} ({0}) - {2}"))
+
+    if result.failed:
+        lines.append("\n## Failed")
+        lines.extend(_grouped_detail_lines(result.failed, "- {1} ({0}) - {2}"))
+
+    return "\n".join(lines)
+
+
+def format_pull_summary(result: PullResult) -> str:
+    """Enhanced summary of a pull result with type grouping."""
+    lines = ["# Pull Summary", ""]
+    if result.organization_name:
+        lines.append(f"- Organization: {result.organization_name}")
+    if result.workspace_name:
+        lines.append(f"- Workspace: {result.workspace_name}")
+    lines.append(_count_line("Pulled", result.pulled))
+    lines.append(_count_line("Skipped", result.skipped))
+
+    if result.pulled:
+        lines.append("\n## Pulled")
+        lines.extend(_grouped_detail_lines(result.pulled, "- {1} ({0})"))
+
+    return "\n".join(lines)
+
+
+def format_copy_summary(result: CopyResult) -> str:
+    """Enhanced summary of a copy result with type grouping."""
+    lines = ["# Copy Summary", ""]
+    lines.append(_count_line("Created", result.created))
+    lines.append(_count_line("Skipped", result.skipped))
+    lines.append(_count_line("Failed", result.failed))
+
+    if result.created:
+        lines.append("\n## Created")
+        lines.extend(_grouped_detail_lines(result.created, "- {2} (source: {0} → target: {1})"))
+
+    if result.skipped:
+        lines.append("\n## Skipped")
+        lines.extend(_grouped_detail_lines(result.skipped, "- {1} ({0}) - {2}"))
+
+    if result.failed:
+        lines.append("\n## Failed")
+        lines.extend(_grouped_detail_lines(result.failed, "- {1} ({0}) - {2}"))
+
+    return "\n".join(lines)
+
+
+def format_deploy_summary(result: DeployResult) -> str:
+    """Enhanced summary of a deploy result with type grouping."""
+    lines = ["# Deploy Summary", ""]
+    lines.append(_count_line("Created", result.created))
+    lines.append(_count_line("Updated", result.updated))
+    lines.append(_count_line("Skipped", result.skipped))
+    lines.append(_count_line("Failed", result.failed))
+
+    if result.created:
+        lines.append("\n## Created")
+        lines.extend(_grouped_detail_lines(result.created, "- {1} ({0})"))
+
+    if result.updated:
+        lines.append("\n## Updated")
+        lines.extend(_grouped_detail_lines(result.updated, "- {1} ({0})"))
+
+    if result.skipped:
+        lines.append("\n## Skipped")
+        lines.extend(_grouped_detail_lines(result.skipped, "- {1} ({0}) - {2}"))
+
+    if result.failed:
+        lines.append("\n## Failed")
+        lines.extend(_grouped_detail_lines(result.failed, "- {1} ({0}) - {2}"))
+
+    return "\n".join(lines)
+
 
 def create_workspace(
     path: str | None = None, api_base_url: str | None = None, token: str | None = None
 ) -> WorkspaceType:
     """Create a Workspace instance for deployment operations."""
-    default_api_base, default_token = require_rossum_credentials()
+    ctx = get_context()
+    default_api_base, default_token = ctx.require_rossum_credentials()
     api_base = api_base_url or default_api_base
     api_token = token or default_token
 
-    workspace_path = Path(path) if path else get_output_dir() / "rossum-config"
+    workspace_path = Path(path) if path else ctx.get_output_dir() / "rossum-config"
     workspace_path.mkdir(parents=True, exist_ok=True)
 
     return Workspace(workspace_path, api_base=api_base, token=api_token)
@@ -69,7 +203,7 @@ def deploy_pull(
         return json.dumps(
             {
                 "status": "success",
-                "summary": result.summary(),
+                "summary": format_pull_summary(result),
                 "pulled_count": len(result.pulled),
                 "skipped_count": len(result.skipped),
                 "workspace_path": str(ws.path),
@@ -141,7 +275,7 @@ def deploy_push(dry_run: bool = False, force: bool = False, workspace_path: str 
                 {
                     "status": "success",
                     "dry_run": True,
-                    "summary": result.summary(),
+                    "summary": format_push_summary(result),
                     "would_push_count": len(result.pushed),
                     "would_skip_count": len(result.skipped),
                     "workspace_path": str(ws.path),
@@ -153,7 +287,7 @@ def deploy_push(dry_run: bool = False, force: bool = False, workspace_path: str 
             {
                 "status": "success",
                 "dry_run": False,
-                "summary": result.summary(),
+                "summary": format_push_summary(result),
                 "pushed_count": len(result.pushed),
                 "skipped_count": len(result.skipped),
                 "failed_count": len(result.failed),
@@ -208,7 +342,7 @@ def deploy_copy_org(
         return json.dumps(
             {
                 "status": "success",
-                "summary": result.summary(),
+                "summary": format_copy_summary(result),
                 "created_count": len(result.created),
                 "skipped_count": len(result.skipped),
                 "failed_count": len(result.failed),
@@ -263,7 +397,7 @@ def deploy_copy_workspace(
         return json.dumps(
             {
                 "status": "success",
-                "summary": result.summary(),
+                "summary": format_copy_summary(result),
                 "created_count": len(result.created),
                 "skipped_count": len(result.skipped),
                 "failed_count": len(result.failed),
@@ -306,7 +440,7 @@ def deploy_compare_workspaces(
     )
 
     try:
-        api_base, token = require_rossum_credentials()
+        api_base, token = get_context().require_rossum_credentials()
 
         source_ws = Workspace(Path(source_workspace_path), api_base=api_base, token=token)
         target_ws = Workspace(Path(target_workspace_path), api_base=api_base, token=token)
@@ -372,7 +506,7 @@ def deploy_to_org(
             {
                 "status": "success",
                 "dry_run": dry_run,
-                "summary": result.summary(),
+                "summary": format_deploy_summary(result),
                 "created_count": len(result.created),
                 "updated_count": len(result.updated),
                 "skipped_count": len(result.skipped),

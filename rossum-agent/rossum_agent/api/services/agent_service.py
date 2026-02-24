@@ -13,7 +13,18 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from rossum_agent.agent.core import RossumAgent, create_agent
 from rossum_agent.agent.memory import AgentMemory
-from rossum_agent.agent.models import AgentConfig, AgentStep, StepType, ToolResult
+from rossum_agent.agent.models import (
+    AgentConfig,
+    AgentStep,
+    ErrorStep,
+    FinalAnswerStep,
+    StepType,
+    TextDeltaStep,
+    ThinkingStep,
+    ToolResult,
+    ToolResultStep,
+    ToolStartStep,
+)
 from rossum_agent.api.models.schemas import (
     DocumentContent,
     ImageContent,
@@ -24,30 +35,24 @@ from rossum_agent.api.models.schemas import (
     TaskSnapshotEvent,
 )
 from rossum_agent.change_tracking.commit_service import CommitService
-from rossum_agent.change_tracking.store import CommitStore
+from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.redis_storage import RedisStorage
 from rossum_agent.rossum_mcp_integration import MCPConnection, connect_mcp_server
-from rossum_agent.tools import (
+from rossum_agent.tools.core import (
+    AgentContext,
     SubAgentProgress,
     SubAgentText,
-    TaskTracker,
-    get_write_tools_async,
-    set_commit_store,
-    set_mcp_connection,
-    set_output_dir,
-    set_progress_callback,
-    set_rossum_credentials,
-    set_rossum_environment,
-    set_task_snapshot_callback,
-    set_task_tracker,
-    set_text_callback,
+    reset_context,
+    set_context,
 )
+from rossum_agent.tools.dynamic_tools import get_write_tools_async
+from rossum_agent.tools.task_tracker import TaskTracker
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
 from rossum_agent.utils import create_session_output_dir, get_display_tool_name
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable
+    from collections.abc import AsyncIterator
     from pathlib import Path
 
     from anthropic.types import ImageBlockParam, TextBlockParam
@@ -56,6 +61,16 @@ if TYPE_CHECKING:
     from rossum_agent.change_tracking.models import ConfigCommit
 
 logger = logging.getLogger(__name__)
+
+
+async def _log_commit_hook(commit: ConfigCommit) -> str | None:
+    """Built-in hook: show a commit summary after the agent turn."""
+    _op_icon = {"create": "+", "update": "~", "delete": "-"}
+    lines = [f"✓ {commit.hash[:8]} — {commit.message}"]
+    for change in commit.changes:
+        icon = _op_icon.get(change.operation, "?")
+        lines.append(f'  [{icon}] {change.entity_type} "{change.entity_name}"')
+    return "\n".join(lines)
 
 
 @dataclass
@@ -91,8 +106,7 @@ def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentP
     )
 
 
-def _create_tool_start_event(step: AgentStep, current_tool: str) -> StepEvent:
-    """Create a tool_start event from an AgentStep."""
+def _create_tool_start_event(step: ToolStartStep, current_tool: str) -> StepEvent:
     current_tool_args = None
     current_tool_call_id = None
     for tc in step.tool_calls:
@@ -112,7 +126,6 @@ def _create_tool_start_event(step: AgentStep, current_tool: str) -> StepEvent:
 
 
 def _create_tool_result_event(step_number: int, result: ToolResult) -> StepEvent:
-    """Create a tool_result event from a single ToolResult."""
     return StepEvent(
         type="tool_result",
         step_number=step_number,
@@ -131,98 +144,67 @@ def _log_events(events: list[StepEvent]) -> None:
         )
 
 
-def _handle_error(step: AgentStep) -> list[StepEvent] | None:
-    if not step.error:
-        return None
-    return [StepEvent(type="error", step_number=step.step_number, content=step.error, is_final=True)]
-
-
-def _handle_final_answer(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.is_final and step.final_answer):
-        return None
-    return [StepEvent(type="final_answer", step_number=step.step_number, content=step.final_answer, is_final=True)]
-
-
-def _handle_intermediate_text(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.step_type == StepType.INTERMEDIATE and step.accumulated_text is not None):
-        return None
-    return [
-        StepEvent(type="intermediate", step_number=step.step_number, content=step.accumulated_text, is_streaming=True)
-    ]
-
-
-def _handle_streaming_final_answer(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.step_type == StepType.FINAL_ANSWER and step.accumulated_text is not None):
-        return None
-    return [
-        StepEvent(type="final_answer", step_number=step.step_number, content=step.accumulated_text, is_streaming=True)
-    ]
-
-
-def _handle_current_tool(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.current_tool and step.tool_progress):
-        return None
-    return [_create_tool_start_event(step, step.current_tool)]
-
-
-def _handle_streaming_tool_calls(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.tool_calls and step.is_streaming and step.tool_progress):
-        return None
-    total = len(step.tool_calls)
-    events: list[StepEvent] = []
-    for idx, tc in enumerate(step.tool_calls, 1):
-        ev = _create_tool_start_event(step, tc.name)
-        ev.tool_progress = (idx, total)
-        events.append(ev)
-    return events
-
-
-def _handle_tool_results(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.tool_results and not step.is_streaming):
-        return None
-    return [_create_tool_result_event(step.step_number, r) for r in step.tool_results]
-
-
-def _handle_thinking(step: AgentStep) -> list[StepEvent] | None:
-    if not (step.step_type == StepType.THINKING or step.thinking is not None):
-        return None
-    return [
-        StepEvent(type="thinking", step_number=step.step_number, content=step.thinking, is_streaming=step.is_streaming)
-    ]
-
-
-_STEP_HANDLERS: tuple[Callable[[AgentStep], list[StepEvent] | None], ...] = (
-    _handle_error,
-    _handle_final_answer,
-    _handle_intermediate_text,
-    _handle_streaming_final_answer,
-    _handle_current_tool,
-    _handle_streaming_tool_calls,
-    _handle_tool_results,
-    _handle_thinking,
-)
-
-
 def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
     """Convert an AgentStep to StepEvents for SSE streaming.
 
-    Extended thinking mode produces three distinct content types:
-    - "thinking": Model's chain-of-thought reasoning (from thinking blocks)
-    - "intermediate": Model's response text before tool calls
-    - "final_answer": Model's final response (no more tool calls)
-
-    Per Claude's extended thinking API, thinking blocks contain internal reasoning
-    while text blocks contain the actual response. Both are streamed separately.
-
-    Returns a list because a single step may contain multiple tool results.
+    Uses pattern matching on the discriminated union step types.
+    Returns a list because a single ToolResultStep may contain multiple tool results.
     """
-    for handler in _STEP_HANDLERS:
-        events = handler(step)
-        if events is not None:
-            _log_events(events)
-            return events
+    match step:
+        case ErrorStep():
+            events = [StepEvent(type="error", step_number=step.step_number, content=step.error, is_final=True)]
 
-    events = [StepEvent(type="thinking", step_number=step.step_number, content=None, is_streaming=step.is_streaming)]
+        case FinalAnswerStep():
+            events = [
+                StepEvent(type="final_answer", step_number=step.step_number, content=step.final_answer, is_final=True)
+            ]
+
+        case TextDeltaStep(step_type=StepType.INTERMEDIATE):
+            events = [
+                StepEvent(
+                    type="intermediate",
+                    step_number=step.step_number,
+                    content=step.accumulated_text,
+                    is_streaming=True,
+                )
+            ]
+
+        case TextDeltaStep(step_type=StepType.FINAL_ANSWER):
+            events = [
+                StepEvent(
+                    type="final_answer",
+                    step_number=step.step_number,
+                    content=step.accumulated_text,
+                    is_streaming=True,
+                )
+            ]
+
+        case ToolStartStep(current_tool=None):
+            # All tools starting — emit one event per tool call
+            total = len(step.tool_calls)
+            events = []
+            for idx, tc in enumerate(step.tool_calls, 1):
+                ev = _create_tool_start_event(step, tc.name)
+                ev.tool_progress = (idx, total)
+                events.append(ev)
+
+        case ToolStartStep():
+            # Single tool progress update
+            events = [_create_tool_start_event(step, step.current_tool)]
+
+        case ToolResultStep():
+            events = [_create_tool_result_event(step.step_number, r) for r in step.tool_results]
+
+        case ThinkingStep():
+            events = [
+                StepEvent(
+                    type="thinking",
+                    step_number=step.step_number,
+                    content=step.thinking,
+                    is_streaming=step.is_streaming,
+                )
+            ]
+
     _log_events(events)
     return events
 
@@ -238,26 +220,27 @@ class AgentService:
         """Initialize agent service."""
         self._chat_runs: dict[str, _ChatRunState] = {}
 
-    def _get_or_create_commit_store(self) -> CommitStore | None:
+    def _get_or_create_stores(self) -> tuple[CommitStore | None, SnapshotStore | None]:
         storage = RedisStorage()
         if storage.is_connected():
-            return CommitStore(storage.client)
+            return CommitStore(storage.client), SnapshotStore(storage.client)
         logger.warning("Redis unavailable — change tracking disabled for this run")
-        return None
+        return None, None
 
     async def _setup_change_tracking(
         self, mcp_connection: MCPConnection, chat_id: str, rossum_api_base_url: str
-    ) -> tuple[CommitStore | None, str]:
-        """Configure change tracking on the MCP connection. Returns (store, environment)."""
-        commit_store = self._get_or_create_commit_store()
+    ) -> tuple[CommitStore | None, SnapshotStore | None, str]:
+        """Configure change tracking on the MCP connection. Returns (commit_store, snapshot_store, environment)."""
+        commit_store, snapshot_store = self._get_or_create_stores()
         write_tools = await get_write_tools_async(mcp_connection)
         environment = rossum_api_base_url.rstrip("/")
         if commit_store is not None:
-            mcp_connection.setup_change_tracking(write_tools, chat_id, environment, commit_store)
+            assert snapshot_store is not None  # both created together from the same Redis client
+            mcp_connection.setup_change_tracking(write_tools, chat_id, environment, commit_store, snapshot_store)
         else:
             mcp_connection.write_tools = write_tools
             mcp_connection.chat_id = chat_id
-        return commit_store, environment
+        return commit_store, snapshot_store, environment
 
     def _get_context(self) -> _RequestContext:
         """Get the current request context, creating if needed."""
@@ -350,26 +333,14 @@ class AgentService:
         ctx.event_loop.call_soon_threadsafe(_put)
 
     def _on_sub_agent_progress(self, progress: SubAgentProgress) -> None:
-        """Callback for sub-agent progress updates.
-
-        Converts the progress to an event and puts it on the queue for streaming.
-        """
         event = convert_sub_agent_progress_to_event(progress)
         self._enqueue_event_threadsafe(event, "Sub-agent progress")
 
     def _on_sub_agent_text(self, text: SubAgentText) -> None:
-        """Callback for sub-agent text streaming.
-
-        Converts the text to an event and puts it on the queue for streaming.
-        """
         event = SubAgentTextEvent(tool_name=text.tool_name, text=text.text, is_final=text.is_final)
         self._enqueue_event_threadsafe(event, "Sub-agent text")
 
     def _on_task_snapshot(self, snapshot: list[dict[str, object]]) -> None:
-        """Callback for task tracker state changes.
-
-        Puts a TaskSnapshotEvent on the queue for streaming.
-        """
         event = TaskSnapshotEvent(tasks=snapshot)
         self._enqueue_event_threadsafe(event, "Task snapshot")
 
@@ -394,6 +365,7 @@ class AgentService:
         rossum_api_token: str,
         rossum_api_base_url: str,
         mcp_mode: Literal["read-only", "read-write"] = "read-only",
+        persona: Literal["default", "cautious"] = "default",
         rossum_url: str | None = None,
         images: list[ImageContent] | None = None,
         documents: list[DocumentContent] | None = None,
@@ -415,30 +387,30 @@ class AgentService:
 
         run_id = await self._register_run(chat_id)
 
-        ctx = _RequestContext()
-        _request_context.set(ctx)
+        req_ctx = _RequestContext()
+        _request_context.set(req_ctx)
 
         output_dir = create_session_output_dir()
-        set_output_dir(output_dir)
-        set_rossum_credentials(rossum_api_base_url, rossum_api_token)
         self._get_chat_run_state(chat_id).output_dir = output_dir
         logger.info(f"Created session output directory: {output_dir}")
 
         if documents:
             self._save_documents_to_output_dir(documents, output_dir)
 
-        ctx.event_queue = asyncio.Queue(maxsize=100)
-        ctx.event_loop = asyncio.get_running_loop()
-        set_progress_callback(self._on_sub_agent_progress)
-        set_text_callback(self._on_sub_agent_text)
-        set_task_tracker(TaskTracker())
-        set_task_snapshot_callback(self._on_task_snapshot)
+        req_ctx.event_queue = asyncio.Queue(maxsize=100)
+        req_ctx.event_loop = asyncio.get_running_loop()
 
-        system_prompt = get_system_prompt()
-        url_context = extract_url_context(rossum_url)
-        if not url_context.is_empty():
-            context_section = format_context_for_prompt(url_context)
-            system_prompt = system_prompt + "\n\n---\n" + context_section
+        agent_ctx = AgentContext(
+            output_dir=output_dir,
+            rossum_credentials=(rossum_api_base_url, rossum_api_token),
+            progress_callback=self._on_sub_agent_progress,
+            text_callback=self._on_sub_agent_text,
+            task_tracker=TaskTracker(),
+            task_snapshot_callback=self._on_task_snapshot,
+        )
+        ctx_token = set_context(agent_ctx)
+
+        system_prompt = self._build_system_prompt(rossum_url, persona)
 
         try:
             try:
@@ -447,7 +419,7 @@ class AgentService:
                     rossum_api_base_url=rossum_api_base_url,
                     mcp_mode=mcp_mode,
                 ) as mcp_connection:
-                    commit_store, environment = await self._setup_change_tracking(
+                    commit_store, snapshot_store, environment = await self._setup_change_tracking(
                         mcp_connection, chat_id, rossum_api_base_url
                     )
 
@@ -455,9 +427,12 @@ class AgentService:
                         mcp_connection=mcp_connection, system_prompt=system_prompt, config=AgentConfig()
                     )
 
-                    set_mcp_connection(mcp_connection, asyncio.get_event_loop(), mcp_mode)
-                    set_commit_store(commit_store)
-                    set_rossum_environment(environment)
+                    agent_ctx.mcp_connection = mcp_connection
+                    agent_ctx.mcp_event_loop = asyncio.get_event_loop()
+                    agent_ctx.mcp_mode = mcp_mode
+                    agent_ctx.commit_store = commit_store
+                    agent_ctx.snapshot_store = snapshot_store
+                    agent_ctx.rossum_environment = environment
 
                     self._restore_conversation_history(agent, conversation_history)
 
@@ -469,38 +444,35 @@ class AgentService:
 
                     try:
                         async for step in agent.run(user_content):
-                            for sub_event in self._drain_queue(ctx.event_queue):
+                            for sub_event in self._drain_queue(req_ctx.event_queue):
                                 yield sub_event
 
                             for event in convert_step_to_events(step):
                                 yield event
 
-                            if not step.is_streaming:
+                            if isinstance(step, (ToolResultStep, FinalAnswerStep, ErrorStep)):
                                 total_steps = step.step_number
                                 total_input_tokens = agent.tokens.total_input
                                 total_output_tokens = agent.tokens.total_output
 
-                        for sub_event in self._drain_queue(ctx.event_queue):
+                        for sub_event in self._drain_queue(req_ctx.event_queue):
                             yield sub_event
 
                         self._get_chat_run_state(chat_id).last_memory = agent.memory
 
-                        commit = self._try_create_config_commit(
-                            commit_store, mcp_connection, chat_id, prompt, rossum_api_base_url
-                        )
-
-                        yield StreamDoneEvent(
-                            total_steps=total_steps,
-                            input_tokens=total_input_tokens,
-                            output_tokens=total_output_tokens,
-                            cache_creation_input_tokens=agent.tokens.total_cache_creation,
-                            cache_read_input_tokens=agent.tokens.total_cache_read,
-                            token_usage_breakdown=agent.get_token_usage_breakdown(),
-                            config_commit_hash=commit.hash if commit else None,
-                            config_commit_message=commit.message if commit else None,
-                            config_changes_count=len(commit.changes) if commit else 0,
-                        )
-                        agent.log_token_usage_summary()
+                        async for event in self._stream_finalization(
+                            commit_store,
+                            snapshot_store,
+                            mcp_connection,
+                            chat_id,
+                            prompt,
+                            rossum_api_base_url,
+                            total_steps,
+                            total_input_tokens,
+                            total_output_tokens,
+                            agent,
+                        ):
+                            yield event
 
                     except Exception as e:
                         logger.error(f"Agent execution failed: {e}", exc_info=True)
@@ -511,14 +483,7 @@ class AgentService:
                             is_final=True,
                         )
             finally:
-                set_progress_callback(None)
-                set_text_callback(None)
-                set_task_snapshot_callback(None)
-                set_task_tracker(None)
-                set_output_dir(None)
-                set_rossum_credentials(None, None)
-                set_commit_store(None)
-                set_rossum_environment(None)
+                reset_context(ctx_token)
         except asyncio.CancelledError:
             logger.info(f"Run cancelled for chat {chat_id} (run_id={run_id})")
             raise
@@ -526,17 +491,70 @@ class AgentService:
             await self._clear_run(chat_id, run_id)
 
     @staticmethod
-    def _try_create_config_commit(
+    def _build_system_prompt(rossum_url: str | None, persona: Literal["default", "cautious"] = "default") -> str:
+        system_prompt = get_system_prompt(persona)
+        url_context = extract_url_context(rossum_url)
+        if not url_context.is_empty():
+            context_section = format_context_for_prompt(url_context)
+            system_prompt = system_prompt + "\n\n---\n" + context_section
+        return system_prompt
+
+    async def _stream_finalization(
+        self,
         commit_store: CommitStore | None,
+        snapshot_store: SnapshotStore | None,
+        mcp_connection: MCPConnection,
+        chat_id: str,
+        prompt: str,
+        rossum_api_base_url: str,
+        total_steps: int,
+        total_input_tokens: int,
+        total_output_tokens: int,
+        agent: RossumAgent,
+    ) -> AsyncIterator[StepEvent | StreamDoneEvent]:
+        commit = (
+            self._try_create_config_commit(
+                commit_store, snapshot_store, mcp_connection, chat_id, prompt, rossum_api_base_url
+            )
+            if commit_store and snapshot_store
+            else None
+        )
+        if commit is not None:
+            hook_output = await _log_commit_hook(commit)
+            if hook_output:
+                yield StepEvent(
+                    type="final_answer",
+                    step_number=total_steps + 1,
+                    content=hook_output,
+                    is_final=True,
+                    is_hook_output=True,
+                )
+        yield StreamDoneEvent(
+            total_steps=total_steps,
+            input_tokens=total_input_tokens,
+            output_tokens=total_output_tokens,
+            cache_creation_input_tokens=agent.tokens.total_cache_creation,
+            cache_read_input_tokens=agent.tokens.total_cache_read,
+            token_usage_breakdown=agent.get_token_usage_breakdown(),
+            config_commit_hash=commit.hash if commit else None,
+            config_commit_message=commit.message if commit else None,
+            config_changes_count=len(commit.changes) if commit else 0,
+        )
+        agent.log_token_usage_summary()
+
+    @staticmethod
+    def _try_create_config_commit(
+        commit_store: CommitStore,
+        snapshot_store: SnapshotStore,
         mcp_connection: MCPConnection,
         chat_id: str,
         prompt: str,
         rossum_api_base_url: str,
     ) -> ConfigCommit | None:
         """Create a config commit if there are tracked changes."""
-        if not commit_store or not mcp_connection.has_changes():
+        if not mcp_connection.has_changes():
             return None
-        commit_service = CommitService(commit_store)
+        commit_service = CommitService(commit_store, snapshot_store)
         return commit_service.create_commit(mcp_connection, chat_id, prompt, rossum_api_base_url.rstrip("/"))
 
     def _save_documents_to_output_dir(self, documents: list[DocumentContent], output_dir: Path) -> None:

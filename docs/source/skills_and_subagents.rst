@@ -60,6 +60,10 @@ Available Skills
      - Hook templates, token_owner, testing, debugging
    * - ``txscript``
      - TxScript language reference for formula fields, serverless functions, and rule trigger conditions
+   * - ``lookup-fields``
+     - Create lookup fields matching against Master Data Hub datasets
+   * - ``document-testing``
+     - Generate mock PDFs, upload to queues, verify extraction, test hooks end-to-end
 
 Hooks Skill
 """"""""""""
@@ -133,6 +137,49 @@ UI Settings Skill
 **Goal**: Update queue UI settings (``settings.annotation_list_table.columns``) without corrupting structure.
 
 Workflow: Fetch current settings → Modify only ``columns`` array → Patch via ``update_queue``.
+
+Document Testing Skill
+""""""""""""""""""""""
+
+**Goal**: Test document processing end-to-end — generate a schema-aware mock PDF, upload it, verify extraction, optionally trigger hooks.
+
+Workflow: ``get_schema`` → extract fields → ``generate_mock_pdf(fields=[...])`` → ``upload_document`` → poll ``list_annotations`` → ``get_annotation`` with sideloads → compare expected vs extracted values.
+
+``generate_mock_pdf`` tool parameters:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 15 65
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``fields``
+     - ``list[dict]``
+     - Schema field descriptors: ``[{id, label, type, rir_field_names?, options?}]``
+   * - ``document_type``
+     - ``str``
+     - ``invoice``, ``purchase_order``, ``receipt``, ``delivery_note``, ``credit_note``
+   * - ``line_item_count``
+     - ``int``
+     - Number of line item rows (default 3)
+   * - ``overrides``
+     - ``dict[str, str]``
+     - Force specific field values: ``{field_id: value}``
+   * - ``filename``
+     - ``str``
+     - Output filename (auto-generated if omitted)
+
+Returns JSON:
+
+.. code-block:: json
+
+   {
+     "status": "success",
+     "file_path": "/path/to/mock.pdf",
+     "expected_values": {"invoice_id": "INV-2026-00142", "date_issue": "2026-02-10"},
+     "line_items": [{"item_description": "Office supplies", "item_amount_total": "150.00"}]
+   }
 
 Dynamic Tool Loading
 --------------------
@@ -213,6 +260,55 @@ When the user sends their first message, the agent scans for keywords and automa
 - User says "list all queues" → ``queues`` category is pre-loaded
 
 This ensures relevant tools are available without requiring explicit loading while keeping context usage minimal.
+
+
+Slash Commands
+--------------
+
+Slash commands provide instant introspection into the agent's capabilities without consuming tokens or invoking the agent. Messages starting with ``/`` sent via the ``POST /api/v1/chats/{id}/messages`` endpoint are intercepted and return a direct response as an SSE stream.
+
+Available Commands
+^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Command
+     - Description
+   * - ``/list-commands``
+     - List all available slash commands
+   * - ``/list-commits``
+     - List configuration commits made in the current chat (requires Redis)
+   * - ``/list-skills``
+     - List available agent skills with their slugs and goal descriptions
+   * - ``/list-mcp-tools``
+     - List MCP tools grouped by category from the cached catalog
+   * - ``/list-agent-tools``
+     - List built-in agent tools with descriptions
+
+Discovery Endpoint
+^^^^^^^^^^^^^^^^^^
+
+Available commands can be fetched programmatically:
+
+.. code-block:: bash
+
+   GET /api/v1/commands
+
+.. code-block:: json
+
+   {
+     "commands": [
+       {"name": "/list-commands", "description": "List all available slash commands"},
+       {"name": "/list-commits", "description": "List configuration commits made in this chat"},
+       {"name": "/list-skills", "description": "List available agent skills"},
+       {"name": "/list-mcp-tools", "description": "List MCP tools by category"},
+       {"name": "/list-agent-tools", "description": "List built-in agent tools"}
+     ]
+   }
+
+The TUI uses this endpoint to provide autocomplete suggestions when the user types ``/``.
 
 
 Sub-Agents

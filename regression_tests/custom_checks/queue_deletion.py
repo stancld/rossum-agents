@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from rossum_agent.agent.models import ToolResultStep
+
 from regression_tests.custom_checks._utils import create_api_client
 
 if TYPE_CHECKING:
@@ -35,7 +37,7 @@ def _extract_queue_id_from_tool_call(tool_call: ToolCall, tool_results: list[Too
 def _find_queue_id(steps: list[AgentStep]) -> int | None:
     """Find queue_id from agent steps by checking tool calls."""
     for step in steps:
-        if not step.tool_calls:
+        if not isinstance(step, ToolResultStep):
             continue
         for tool_call in step.tool_calls:
             queue_id = _extract_queue_id_from_tool_call(tool_call, step.tool_results)

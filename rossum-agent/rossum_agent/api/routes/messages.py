@@ -11,12 +11,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
+import anthropic
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from rossum_agent.agent.memory import AgentMemory
+from rossum_agent.api.commands import CommandContext, ParsedCommand, execute_command, parse_command
 from rossum_agent.api.dependencies import (
     RossumCredentials,
     get_agent_service,
@@ -37,7 +39,8 @@ from rossum_agent.api.models.schemas import (
 )
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
-from rossum_agent.redis_storage import ChatData
+from rossum_agent.change_tracking.store import CommitStore
+from rossum_agent.redis_storage import ChatData, RedisStorage
 
 # To prevent (legacy) proxy servers from dropping connections during long periods of thinking,
 # we are sending SSE_KEEPALIVE_COMMENT every SSE_KEEPALIVE_INTERVAL as per recommendation:
@@ -55,6 +58,27 @@ router = APIRouter(prefix="/chats", tags=["messages"])
 def _format_sse_event(event_type: str, data: str) -> str:
     """Format an SSE event string."""
     return f"event: {event_type}\ndata: {data}\n\n"
+
+
+async def _generate_chat_summary(user_prompt: str) -> str | None:
+    """Generate a one-line summary of the chat turn via Claude Haiku. Returns None on failure."""
+    try:
+        client = anthropic.AsyncAnthropic()
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=50,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Summarize this in one sentence (max 10 words): {user_prompt[:500]}",
+                }
+            ],
+        )
+        text_block = next((b for b in response.content if isinstance(b, anthropic.types.TextBlock)), None)
+        return text_block.text.strip() if text_block else None
+    except Exception as e:
+        logger.warning(f"Failed to generate chat summary: {e}")
+        return None
 
 
 type AgentEvent = StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | StepEvent
@@ -112,10 +136,12 @@ def _save_chat_history(
     output_dir: Path | None,
     memory: AgentMemory | None,
     done_event: StreamDoneEvent | None = None,
+    summary: str | None = None,
 ) -> None:
     """Persist updated conversation history after a successful agent run."""
     if done_event and done_event.config_commit_hash:
         chat_data.metadata.config_commits.append(done_event.config_commit_hash)
+    chat_data.metadata.summary = summary
 
     updated_history = agent_service.build_updated_history(
         existing_history=history,
@@ -153,6 +179,13 @@ def _resolve_mcp_mode(message: MessageRequest, chat_data: ChatData) -> str:
         chat_data.metadata.mcp_mode = message.mcp_mode
         return message.mcp_mode
     return chat_data.metadata.mcp_mode
+
+
+def _resolve_persona(message: MessageRequest, chat_data: ChatData) -> str:
+    """Resolve the effective persona from the message and chat metadata."""
+    if message.persona is not None:
+        chat_data.metadata.persona = message.persona
+    return chat_data.metadata.persona
 
 
 async def _with_sse_keepalive(
@@ -194,6 +227,48 @@ async def _with_sse_keepalive(
                 await pending
 
 
+def _get_commit_store() -> CommitStore | None:
+    """Create a CommitStore if Redis is available."""
+    try:
+        storage = RedisStorage()
+        if storage.is_connected():
+            return CommitStore(storage.client)
+    except Exception as e:
+        logger.warning(f"Commit store is unavailable: {e}")
+    return None
+
+
+def _handle_slash_command(
+    command: ParsedCommand,
+    chat_id: str,
+    credentials: RossumCredentials,
+    chat_service: ChatService,
+) -> StreamingResponse:
+    """Execute a slash command and return its result as an SSE stream."""
+    commit_store = _get_commit_store() if command.name == "/list-commits" else None
+    ctx = CommandContext(
+        chat_id=chat_id,
+        user_id=credentials.user_id,
+        credentials_api_url=credentials.api_url,
+        chat_service=chat_service,
+        commit_store=commit_store,
+        args=command.args,
+    )
+
+    async def command_event_generator() -> AsyncIterator[str]:
+        result_text = await execute_command(command.name, ctx)
+        step = StepEvent(type="final_answer", step_number=1, content=result_text, is_final=True)
+        yield _format_sse_event("step", step.model_dump_json())
+        done = StreamDoneEvent(total_steps=1, input_tokens=0, output_tokens=0)
+        yield _format_sse_event("done", done.model_dump_json())
+
+    return StreamingResponse(
+        command_event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.post(
     "/{chat_id}/messages",
     response_class=StreamingResponse,
@@ -204,7 +279,7 @@ async def _with_sse_keepalive(
     },
 )
 @limiter.limit("10/minute")
-async def send_message(
+async def send_message(  # noqa: C901 - endpoint handler with slash command interception
     request: Request,
     chat_id: str,
     message: MessageRequest,
@@ -222,8 +297,14 @@ async def send_message(
     if chat_data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
 
+    # Intercept slash commands — bypass the agent entirely
+    command = parse_command(message.content)
+    if command is not None:
+        return _handle_slash_command(command, chat_id, credentials, chat_service)
+
     history = chat_data.messages
     mcp_mode = _resolve_mcp_mode(message, chat_data)
+    persona = _resolve_persona(message, chat_data)
     user_prompt = message.content
     images: list[ImageContent] | None = message.images
     documents: list[DocumentContent] | None = message.documents
@@ -245,6 +326,7 @@ async def send_message(
                 rossum_api_base_url=credentials.api_url,
                 rossum_url=message.rossum_url,
                 mcp_mode=mcp_mode,
+                persona=persona,
             )
             async for event, is_keepalive in _with_sse_keepalive(agent_events):
                 if is_keepalive:
@@ -253,7 +335,8 @@ async def send_message(
                 result = _process_agent_event(event)
                 if result.done_event:
                     done_event = result.done_event
-                if result.final_response_update:
+                # Hook output is shown in chat but excluded from conversation history
+                if result.final_response_update and not (isinstance(event, StepEvent) and event.is_hook_output):
                     final_response = result.final_response_update
                 if result.sse_event:
                     yield result.sse_event
@@ -273,6 +356,7 @@ async def send_message(
 
         output_dir = agent_service.get_output_dir(chat_id)
         memory = agent_service.pop_last_memory(chat_id)
+        summary = await _generate_chat_summary(user_prompt)
 
         _save_chat_history(
             chat_service=chat_service,
@@ -288,6 +372,7 @@ async def send_message(
             output_dir=output_dir,
             memory=memory,
             done_event=done_event,
+            summary=summary,
         )
 
         for file_event in _yield_file_events(output_dir, chat_id):
