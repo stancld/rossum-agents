@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+## [1.3.1] - 2026-02-25
+
 ### Changed
 - Agent now calls `update_task` with `in_progress`/`completed` status transitions during multi-step operations for real-time progress visibility
 
