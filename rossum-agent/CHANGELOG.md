@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+## [1.3.2] - 2026-02-25
+
 ### Fixed
 - Fixed MDH dataset metadata lookup failing when the endpoint returns a redirect
 
