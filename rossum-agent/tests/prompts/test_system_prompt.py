@@ -13,3 +13,14 @@ class TestSystemPromptPersona:
         prompt = get_system_prompt("cautious")
         assert "# Persona: cautious" in prompt
         assert "# Persona: default" not in prompt
+
+
+class TestSystemPromptTaskTracking:
+    def test_requires_update_task_transitions(self):
+        prompt = get_system_prompt("default")
+        assert 'update_task(status="in_progress")' in prompt
+        assert 'update_task(status="completed")' in prompt
+
+    def test_does_not_forbid_update_task(self):
+        prompt = get_system_prompt("default")
+        assert "Do not call `update_task`" not in prompt

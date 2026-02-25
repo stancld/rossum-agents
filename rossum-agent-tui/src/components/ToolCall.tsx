@@ -120,9 +120,10 @@ export function ToolCall({
   const progress = step.toolProgress
     ? ` [${step.toolProgress[0]}/${step.toolProgress[1]}]`
     : "";
+  const isPending = !resultStep;
   const isError = resultStep?.isError ?? false;
-  const statusIcon = isError ? "✗" : "✓";
-  const statusColor = isError ? "red" : "green";
+  const statusIcon = isPending ? "…" : isError ? "✗" : "✓";
+  const statusColor = isPending ? "yellow" : isError ? "red" : "green";
   const result = resultStep?.result ?? null;
 
   if (!expanded) {

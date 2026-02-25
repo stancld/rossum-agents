@@ -172,7 +172,10 @@ def _resolve_mdh_dataset_identifier(api_base_url: str, token: str, dataset: str)
             response = _request_with_retry(client, "get", url, headers={"Authorization": f"Bearer {token}"})
             metadata = response.json()
     except Exception:
-        logger.info("Failed to resolve MDH dataset identifier from metadata endpoint; dataset preselection skipped.")
+        logger.info(
+            "Failed to resolve MDH dataset identifier from metadata endpoint; dataset preselection skipped.",
+            exc_info=True,
+        )
         return None
 
     dataset_items: list[object]

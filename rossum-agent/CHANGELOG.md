@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ## [1.3.0] - 2026-02-24
 
+### Changed
+- Agent now calls `update_task` with `in_progress`/`completed` status transitions during multi-step operations for real-time progress visibility
+
+### Fixed
+- MDH dataset metadata endpoint failures now log the full exception traceback for easier debugging
+
+## [1.3.0] - 2026-02-24
+
 ### Added
 - Added `summary` field to chat list response (`GET /api/v1/chats`) — auto-generated one-line summary via Claude Haiku after each turn, persisted in chat metadata [#208](https://github.com/stancld/rossum-agents/pull/208)
 - Added agent persona support (`default`, `cautious`) — settable at chat creation (`POST /api/v1/chats`) and overridable per message; persisted in chat metadata [#199](https://github.com/stancld/rossum-agents/pull/199)
