@@ -109,7 +109,15 @@ CHANGE_HISTORY = """
 TASK_TRACKING = """
 # Task Tracking
 
-For complex multi-step operations (3+ steps), call `create_task` for each step (subject prefixed with `1. ...`, `2. ...`). Skip for simple requests. Do not call `update_task` — focus on executing the work."""
+For complex multi-step operations (3+ steps), keep progress visible with task updates:
+
+| Phase | Required action |
+|------|------------------|
+| After planning | Call `create_task` for each step (subject prefixed with `1. ...`, `2. ...`) |
+| When a step starts | Call `update_task(status="in_progress")` |
+| When a step finishes | Call `update_task(status="completed")` |
+
+Skip task tracking for simple requests. Create tasks in execution order and keep at most one task `in_progress` at a time."""
 
 PERSONA_BEHAVIORS: dict[str, str] = {
     "default": "# Persona: default",
