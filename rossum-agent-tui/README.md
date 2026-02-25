@@ -5,6 +5,15 @@ Terminal UI for interacting with the Rossum Agent API. Development test-bed for 
 > [!NOTE]
 > This is a development tool, not a production application. Tests are not required for this package.
 
+## Prerequisites
+
+- **Node.js 22+**
+- **[rossum-agent](../rossum-agent/)** — the API backend the TUI connects to:
+  ```bash
+  pip install rossum-agent
+  ```
+  This provides the `rossum-agent-api` command used by `--start-api`.
+
 ## Setup
 
 ```bash

@@ -87,9 +87,13 @@ async function main() {
         stderrOutput += chunk.toString();
       });
 
-      apiProcess.on("error", (err) =>
-        abort.abort(`Failed to start rossum-agent-api: ${err.message}`),
-      );
+      apiProcess.on("error", (err) => {
+        const isNotFound = (err as NodeJS.ErrnoException).code === "ENOENT";
+        const message = isNotFound
+          ? "rossum-agent-api not found. Install it with: pip install rossum-agent"
+          : `Failed to start rossum-agent-api: ${err.message}`;
+        abort.abort(message);
+      });
       apiProcess.on("exit", (code) => {
         if (code !== 0 && code !== null) {
           const detail = stderrOutput.trim();
