@@ -10,6 +10,7 @@
 | rossum-agent | `rossum-agent/CHANGELOG.md` | `rossum-agent-vX.Y.Z` | Rossum Agent X.Y.Z |
 | rossum-deploy | `rossum-deploy/CHANGELOG.md` | `rossum-deploy-vX.Y.Z` | Rossum Deploy X.Y.Z |
 | rossum-agent-client | `rossum-agent-client/CHANGELOG.md` | `rossum-agent-client-vX.Y.Z` | Rossum Agent Client X.Y.Z |
+| rossum-agent-tui | no changelog — use git log | `rossum-agent-tui-vX.Y.Z` | Fabry X.Y.Z |
 
 ## Approach
 
@@ -17,7 +18,7 @@
 |------|--------|
 | Parse input | Extract package name and version from `$ARGUMENTS` |
 | Validate | Confirm tag exists on GitHub |
-| Read changelog | Get release content from `CHANGELOG.md` |
+| Read changelog | Get release content from `CHANGELOG.md` (or git log for TUI) |
 | Check existing | Verify release notes are empty or confirm overwrite |
 | Generate notes | Create markdown following style guide below |
 | Update release | Push notes and title to GitHub |
@@ -39,6 +40,19 @@
 | Improvements | `## Improvements` or `## Changes` |
 | Bug fixes | `## Bug Fixes` or `## Bug Fix` |
 | Breaking | `## Breaking Changes` |
+
+### rossum-agent-tui (Fabry)
+
+No `CHANGELOG.md` — generate release notes from git history:
+
+| Step | Action |
+|------|--------|
+| Find previous tag | `git tag --list 'rossum-agent-tui-v*' --sort=-v:refname` |
+| Get commits | `git log --oneline prev-tag..current-tag -- rossum-agent-tui/` |
+| Check `.agents/` | Look for `release-notes-*.md` files with draft content for the version |
+| Write notes | Group changes into sections, use commit messages and PR context |
+
+Title format: **Fabry X.Y.Z** (not "Rossum Agent TUI").
 
 ### RC Releases
 
@@ -74,4 +88,5 @@ After generating, provide:
 /ds-release-notes rossum-mcp 1.1.0
 /ds-release-notes rossum-agent 1.0.0rc5
 /ds-release-notes rossum-agent-client 1.1.0
+/ds-release-notes rossum-agent-tui 0.2.0
 ```
