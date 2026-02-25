@@ -3,14 +3,20 @@ import { Text, Box } from "ink";
 import { Spinner } from "@inkjs/ui";
 import { getDisplayToolName } from "../utils/format.js";
 import { renderMarkdown } from "../utils/markdown.js";
-import type { StepEvent, SubAgentProgressEvent } from "../types.js";
+import type {
+  StepEvent,
+  SubAgentProgressEvent,
+  SubAgentTextState,
+} from "../types.js";
 
 function ToolStartIndicator({
   streaming,
   subAgentProgress,
+  subAgentText,
 }: {
   streaming: StepEvent;
   subAgentProgress: SubAgentProgressEvent | null;
+  subAgentText: SubAgentTextState | null;
 }) {
   const displayName = getDisplayToolName(
     streaming.tool_name!,
@@ -33,6 +39,13 @@ function ToolStartIndicator({
             : ""}
         </Text>
       )}
+      {subAgentText?.text && (
+        <Box marginLeft={4}>
+          <Text dimColor italic wrap="wrap">
+            {subAgentText.text}
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }
@@ -40,11 +53,13 @@ function ToolStartIndicator({
 interface StreamingIndicatorProps {
   streaming: StepEvent;
   subAgentProgress: SubAgentProgressEvent | null;
+  subAgentText: SubAgentTextState | null;
 }
 
 export function StreamingIndicator({
   streaming,
   subAgentProgress,
+  subAgentText,
 }: StreamingIndicatorProps) {
   if (streaming.type === "final_answer" && streaming.content) {
     return (
@@ -65,6 +80,7 @@ export function StreamingIndicator({
       <ToolStartIndicator
         streaming={streaming}
         subAgentProgress={subAgentProgress}
+        subAgentText={subAgentText}
       />
     );
   }

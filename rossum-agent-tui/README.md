@@ -55,8 +55,10 @@ fabry --persona cautious
 | Input  | `Meta+1`            | Quick reply: Approve                   |
 | Input  | `Meta+2`            | Quick reply: Reject                    |
 | Input  | `Meta+3`            | Quick reply: Let's chat about it.      |
+| Any    | `Ctrl+X`            | Stop current response stream           |
+| Any    | `Ctrl+N`            | Start a new chat                       |
 
-Expandable items: thinking steps, tool calls, and intermediate content (instructions).
+Expandable items: thinking steps, tool calls, intermediate content, and final answers.
 
 ## Task Tracking
 

@@ -35,6 +35,7 @@ export function loadPersistedState(): ChatState | null {
       currentStreaming: null,
       tasks: p.tasks ?? [],
       subAgentProgress: null,
+      subAgentText: null,
       finalAnswer: p.finalAnswer ?? null,
       tokenUsage: p.tokenUsage ?? null,
       configCommit: null,

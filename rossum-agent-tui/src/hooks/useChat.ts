@@ -15,8 +15,10 @@ import type {
   SSEEvent,
   StepEvent,
   SubAgentProgressEvent,
+  SubAgentTextEvent,
   TaskItem,
   TokenUsageBreakdown,
+  StreamDoneEvent,
 } from "../types.js";
 import type {
   ImageAttachment,
@@ -30,6 +32,7 @@ const INITIAL_STATE: ChatState = {
   currentStreaming: null,
   tasks: [],
   subAgentProgress: null,
+  subAgentText: null,
   finalAnswer: null,
   tokenUsage: null,
   configCommit: null,
@@ -116,6 +119,90 @@ function handleStepEvent(prev: ChatState, step: StepEvent): ChatState {
   };
 }
 
+function handleSubAgentTextEvent(
+  prev: ChatState,
+  textEvent: SubAgentTextEvent,
+): ChatState {
+  const prevText =
+    prev.subAgentText?.tool_name === textEvent.tool_name
+      ? prev.subAgentText.text
+      : "";
+  const nextText = textEvent.text.startsWith(prevText)
+    ? textEvent.text
+    : prevText + textEvent.text;
+  return {
+    ...prev,
+    subAgentText: {
+      tool_name: textEvent.tool_name,
+      text: nextText,
+      is_final: textEvent.is_final,
+    },
+  };
+}
+
+function handleDoneEvent(
+  prev: ChatState,
+  eventData: StreamDoneEvent,
+): ChatState {
+  const lastStream = prev.currentStreaming;
+  const extra: CompletedStep[] = lastStream
+    ? [stepToCompleted(lastStream)]
+    : [];
+  const commitInfo: ConfigCommitInfo | null = eventData.config_commit_hash
+    ? {
+        hash: eventData.config_commit_hash,
+        message: eventData.config_commit_message ?? "",
+        changesCount: eventData.config_changes_count ?? 0,
+      }
+    : null;
+
+  return {
+    ...prev,
+    connectionStatus: "idle",
+    completedSteps: [...prev.completedSteps, ...extra],
+    currentStreaming: null,
+    subAgentProgress: null,
+    subAgentText: null,
+    tokenUsage: eventData.token_usage_breakdown as TokenUsageBreakdown | null,
+    configCommit: commitInfo,
+  };
+}
+
+function reduceEvent(prev: ChatState, event: SSEEvent): ChatState {
+  switch (event.event) {
+    case "step":
+      return handleStepEvent(prev, event.data);
+
+    case "task_snapshot":
+      return { ...prev, tasks: event.data.tasks as TaskItem[] };
+
+    case "sub_agent_progress":
+      return { ...prev, subAgentProgress: event.data as SubAgentProgressEvent };
+
+    case "sub_agent_text":
+      return handleSubAgentTextEvent(prev, event.data as SubAgentTextEvent);
+
+    case "done":
+      return handleDoneEvent(prev, event.data);
+
+    case "file_created":
+      return {
+        ...prev,
+        files: [...prev.files, event.data as FileCreatedEvent],
+      };
+
+    case "error":
+      return {
+        ...prev,
+        error: (event.data as { message: string }).message,
+        connectionStatus: "error",
+      };
+
+    default:
+      return prev;
+  }
+}
+
 export function useChat(config: Config) {
   const [state, setState] = useState<ChatState>(
     () => loadPersistedState() ?? INITIAL_STATE,
@@ -130,65 +217,7 @@ export function useChat(config: Config) {
   }, [state]);
 
   const dispatch = useCallback((event: SSEEvent) => {
-    setState((prev) => {
-      switch (event.event) {
-        case "step":
-          return handleStepEvent(prev, event.data);
-
-        case "task_snapshot":
-          return { ...prev, tasks: event.data.tasks as TaskItem[] };
-
-        case "sub_agent_progress":
-          return {
-            ...prev,
-            subAgentProgress: event.data as SubAgentProgressEvent,
-          };
-
-        case "sub_agent_text":
-          return prev;
-
-        case "done": {
-          const lastStream = prev.currentStreaming;
-          const extra: CompletedStep[] = lastStream
-            ? [stepToCompleted(lastStream)]
-            : [];
-          const commitInfo: ConfigCommitInfo | null = event.data
-            .config_commit_hash
-            ? {
-                hash: event.data.config_commit_hash,
-                message: event.data.config_commit_message ?? "",
-                changesCount: event.data.config_changes_count ?? 0,
-              }
-            : null;
-          return {
-            ...prev,
-            connectionStatus: "idle",
-            completedSteps: [...prev.completedSteps, ...extra],
-            currentStreaming: null,
-            subAgentProgress: null,
-            tokenUsage: event.data
-              .token_usage_breakdown as TokenUsageBreakdown | null,
-            configCommit: commitInfo,
-          };
-        }
-
-        case "file_created":
-          return {
-            ...prev,
-            files: [...prev.files, event.data as FileCreatedEvent],
-          };
-
-        case "error":
-          return {
-            ...prev,
-            error: (event.data as { message: string }).message,
-            connectionStatus: "error",
-          };
-
-        default:
-          return prev;
-      }
-    });
+    setState((prev) => reduceEvent(prev, event));
   }, []);
 
   const sendMessage = useCallback(
@@ -211,6 +240,7 @@ export function useChat(config: Config) {
         completedSteps: prev.chatId ? prev.completedSteps : [],
         currentStreaming: null,
         subAgentProgress: null,
+        subAgentText: null,
         finalAnswer: null,
         tokenUsage: null,
         configCommit: null,
@@ -233,6 +263,10 @@ export function useChat(config: Config) {
           chatId = chat.chat_id;
           chatIdRef.current = chatId;
           setState((prev) => ({ ...prev, chatId }));
+        }
+
+        if (controller.signal.aborted) {
+          return;
         }
 
         setState((prev) => ({ ...prev, connectionStatus: "streaming" }));
@@ -279,5 +313,31 @@ export function useChat(config: Config) {
     setState(INITIAL_STATE);
   }, []);
 
-  return { state, sendMessage, resetChat };
+  const abortStreaming = useCallback(() => {
+    abortRef.current?.abort();
+    setState((prev) => {
+      if (
+        prev.connectionStatus !== "connecting" &&
+        prev.connectionStatus !== "streaming"
+      ) {
+        return prev;
+      }
+
+      const extra = prev.currentStreaming
+        ? [stepToCompleted(prev.currentStreaming)]
+        : [];
+
+      return {
+        ...prev,
+        connectionStatus: "idle",
+        completedSteps: [...prev.completedSteps, ...extra],
+        currentStreaming: null,
+        subAgentProgress: null,
+        subAgentText: null,
+        error: null,
+      };
+    });
+  }, []);
+
+  return { state, sendMessage, resetChat, abortStreaming };
 }
