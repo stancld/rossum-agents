@@ -180,6 +180,9 @@ function estimateStreamingToolStartHeight(
     const line = `Sub-agent (${p.tool_name}): iteration ${p.iteration}/${p.max_iterations}, ${p.status}${suffix}`;
     h += countWrappedLines(line, w.content);
   }
+  if (item.subAgentText?.text) {
+    h += countWrappedLines(item.subAgentText.text, w.indented);
+  }
   return h;
 }
 
@@ -438,6 +441,12 @@ export const ChatView = React.memo(function ChatView({
                 {line}
               </Text>
             ))}
+            <Text dimColor> </Text>
+            <Text dimColor>Type a message to start.</Text>
+            <Text dimColor>Use / for commands and @path to attach files.</Text>
+            <Text dimColor>
+              Esc: browse history, Ctrl+X: stop, Ctrl+N: new chat
+            </Text>
           </Box>
         </Box>
       ) : (

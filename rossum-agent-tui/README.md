@@ -5,7 +5,28 @@ Terminal UI for interacting with the Rossum Agent API. Development test-bed for 
 > [!NOTE]
 > This is a development tool, not a production application. Tests are not required for this package.
 
-## Setup
+## Prerequisites
+
+- **Node.js 22+**
+- **[rossum-agent](../rossum-agent/)** — the API backend the TUI connects to:
+  ```bash
+  pip install "rossum-agent[api]"
+  # or
+  uv pip install "rossum-agent[api]"
+  ```
+  This provides the `rossum-agent-api` command used by `--start-api`.
+
+## Installation
+
+Download the latest release from [GitHub Releases](https://github.com/stancld/rossum-agents/releases) and install it with npm:
+
+```bash
+npm install -g https://github.com/stancld/rossum-agents/releases/download/rossum-agent-tui-vX.Y.Z/rossum-agent-tui-X.Y.Z.tgz
+```
+
+Replace `X.Y.Z` with the version you want to install. After installation, the `fabry` command is available globally.
+
+## Development Setup
 
 ```bash
 npm install
@@ -55,8 +76,10 @@ fabry --persona cautious
 | Input  | `Meta+1`            | Quick reply: Approve                   |
 | Input  | `Meta+2`            | Quick reply: Reject                    |
 | Input  | `Meta+3`            | Quick reply: Let's chat about it.      |
+| Any    | `Ctrl+X`            | Stop current response stream           |
+| Any    | `Ctrl+N`            | Start a new chat                       |
 
-Expandable items: thinking steps, tool calls, and intermediate content (instructions).
+Expandable items: thinking steps, tool calls, intermediate content, and final answers.
 
 ## Task Tracking
 

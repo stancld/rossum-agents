@@ -201,6 +201,7 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
         <StreamingIndicator
           streaming={item.streaming}
           subAgentProgress={item.subAgentProgress}
+          subAgentText={item.subAgentText}
         />
       );
 

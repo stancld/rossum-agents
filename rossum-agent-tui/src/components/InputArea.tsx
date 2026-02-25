@@ -260,7 +260,7 @@ export function InputArea({
           {"❯ "}
         </Text>
         {isDisabled ? (
-          <Text dimColor>Waiting for response...</Text>
+          <Text dimColor>Waiting for response... (Ctrl+X to stop)</Text>
         ) : (
           <MultiLineInput
             ref={inputRef}

@@ -121,6 +121,7 @@ export function buildChatItems(state: ChatState): ChatItem[] {
       kind: "streaming",
       streaming: state.currentStreaming,
       subAgentProgress: state.subAgentProgress,
+      subAgentText: state.subAgentText,
     });
   }
 

@@ -1,0 +1,51 @@
+name: Release rossum-agent-tui
+
+on:
+  push:
+    tags:
+      - 'rossum-agent-tui-v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Extract version from package.json
+        id: package_version
+        run: |
+          VERSION=$(node -p "require('./rossum-agent-tui/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted package.json version: $VERSION"
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: rossum-agent-tui
+
+      - name: Build
+        run: npm run build
+        working-directory: rossum-agent-tui
+
+      - name: Pack
+        run: npm pack
+        working-directory: rossum-agent-tui
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: rossum-agent-tui v${{ steps.package_version.outputs.version }}
+          draft: false
+          prerelease: ${{ contains(steps.package_version.outputs.version, '-') }}
+          files: rossum-agent-tui/rossum-agent-tui-${{ steps.package_version.outputs.version }}.tgz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

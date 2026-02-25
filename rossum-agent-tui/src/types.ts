@@ -75,6 +75,12 @@ export interface SubAgentTextEvent {
   is_final: boolean;
 }
 
+export interface SubAgentTextState {
+  tool_name: string;
+  text: string;
+  is_final: boolean;
+}
+
 export interface TaskItem {
   id: string;
   subject: string;
@@ -180,6 +186,7 @@ export type ChatItem =
       kind: "streaming";
       streaming: StepEvent;
       subAgentProgress: SubAgentProgressEvent | null;
+      subAgentText: SubAgentTextState | null;
     };
 
 export interface ExpandState {
@@ -223,6 +230,7 @@ export interface ChatState {
   currentStreaming: StepEvent | null;
   tasks: TaskItem[];
   subAgentProgress: SubAgentProgressEvent | null;
+  subAgentText: SubAgentTextState | null;
   finalAnswer: string | null;
   tokenUsage: TokenUsageBreakdown | null;
   configCommit: ConfigCommitInfo | null;

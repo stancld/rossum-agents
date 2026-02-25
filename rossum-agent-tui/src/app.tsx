@@ -119,7 +119,7 @@ function isExpandable(kind: string): boolean {
 }
 
 export function App({ config }: AppProps) {
-  const { state, sendMessage, resetChat } = useChat(config);
+  const { state, sendMessage, resetChat, abortStreaming } = useChat(config);
   const { commands } = useCommands(config);
   const { rows, columns } = useTerminalSize();
 
@@ -295,6 +295,12 @@ export function App({ config }: AppProps) {
       setSelectedIndex(0);
       setAutoScroll(true);
       setMode("input");
+    }
+  });
+
+  useInput((input, key) => {
+    if (input === "x" && key.ctrl) {
+      abortStreaming();
     }
   });
 
