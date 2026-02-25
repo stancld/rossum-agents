@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Agent now calls `update_task` with `in_progress`/`completed` status transitions during multi-step operations for real-time progress visibility
 
+### Fixed
+- MDH dataset metadata endpoint failures now log the full exception traceback for easier debugging
+
 ## [1.3.0] - 2026-02-24
 
 ### Added
