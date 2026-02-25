@@ -53,7 +53,7 @@ def _build_evaluate_computed_fields_url(api_base_url: str) -> str:
 
 def _build_mdh_datasets_metadata_url(api_base_url: str) -> str:
     base = re.sub(r"/(?:api/)?v1/?$", "", api_base_url.rstrip("/"))
-    return f"{base}/svc/master-data-hub/api/v2/datasets/metadata/"  # "/" is required!
+    return f"{base}/svc/master-data-hub/api/v2/datasets/metadata/"  # trailing slash required
 
 
 def _build_mdh_aggregate_url(api_base_url: str) -> str:
@@ -168,7 +168,7 @@ def _resolve_mdh_dataset_identifier(api_base_url: str, token: str, dataset: str)
 
     try:
         url = _build_mdh_datasets_metadata_url(api_base_url)
-        with httpx.Client(timeout=20) as client:
+        with httpx.Client(timeout=20, follow_redirects=True) as client:
             response = _request_with_retry(client, "get", url, headers={"Authorization": f"Bearer {token}"})
             metadata = response.json()
     except Exception:
