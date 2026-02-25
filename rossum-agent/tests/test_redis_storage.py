@@ -640,6 +640,23 @@ class TestRedisStorage:
         assert chats[0]["preview"] is None
 
     @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_list_all_chats_with_task_step_messages(self, mock_redis):
+        """Test listing chats extracts first_message from task_step format."""
+        mock_client = MagicMock()
+        mock_client.keys.return_value = [b"chat:test_20240115120000"]
+        mock_client.get.return_value = (
+            b'{"messages": [{"type": "task_step", "task": "Deploy my schema"}], "output_dir": null, "metadata": {}}'
+        )
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        chats = storage.list_all_chats()
+
+        assert len(chats) == 1
+        assert chats[0]["first_message"] == "Deploy my schema"
+        assert chats[0]["preview"] == "Deploy my schema"
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
     def test_close_connection(self, mock_redis):
         """Test closing Redis connection."""
         mock_client = MagicMock()

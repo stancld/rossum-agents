@@ -460,3 +460,23 @@ class TestGenerateChatSummary:
             result = await _generate_chat_summary("Trigger an error")
 
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_includes_previous_summary_in_prompt(self):
+        """When previous_summary is provided, the prompt includes it for context."""
+        mock_response = MagicMock()
+        mock_text_block = MagicMock(spec=anthropic.types.TextBlock)
+        mock_text_block.text = "Schema deployment and hook configuration."
+        mock_response.content = [mock_text_block]
+
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+        with patch("rossum_agent.api.routes.messages.anthropic.AsyncAnthropic", return_value=mock_client):
+            result = await _generate_chat_summary("Now configure a hook", previous_summary="User deployed a schema")
+
+        assert result == "Schema deployment and hook configuration."
+        call_args = mock_client.messages.create.call_args
+        prompt = call_args.kwargs["messages"][0]["content"]
+        assert "User deployed a schema" in prompt
+        assert "Now configure a hook" in prompt

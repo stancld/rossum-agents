@@ -13,6 +13,7 @@ from rossum_agent.api.commands import (
     execute_command,
     parse_command,
 )
+from rossum_agent.api.models.schemas import ChatListResponse, ChatSummary
 from rossum_agent.change_tracking.models import ConfigCommit, EntityChange
 from rossum_agent.redis_storage import ChatData, ChatMetadata
 
@@ -76,6 +77,9 @@ class TestCommandRegistry:
 
     def test_list_agent_tools_registered(self):
         assert "/list-agent-tools" in COMMANDS
+
+    def test_history_registered(self):
+        assert "/history" in COMMANDS
 
     def test_persona_registered(self):
         assert "/persona" in COMMANDS
@@ -456,3 +460,144 @@ class TestCommandsRoute:
         for cmd in data["commands"]:
             if cmd["name"] != "/persona":
                 assert cmd["argument_suggestions"] == []
+
+
+def _make_chat_summary(
+    chat_id: str = "chat_old",
+    timestamp: int = 1706000000,
+    message_count: int = 5,
+    first_message: str = "Hello",
+    preview: str | None = None,
+    summary: str | None = None,
+) -> ChatSummary:
+    return ChatSummary(
+        chat_id=chat_id,
+        timestamp=timestamp,
+        message_count=message_count,
+        first_message=first_message,
+        preview=preview,
+        summary=summary,
+    )
+
+
+class TestHistoryHandler:
+    @pytest.mark.asyncio
+    async def test_no_past_chats(self):
+        chat_service = MagicMock()
+        chat_service.list_chats.return_value = ChatListResponse(chats=[], total=0, limit=21, offset=0)
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/history", ctx)
+        assert result == "No past chats found."
+
+    @pytest.mark.asyncio
+    async def test_current_chat_excluded(self):
+        chat_service = MagicMock()
+        chat_service.list_chats.return_value = ChatListResponse(
+            chats=[_make_chat_summary(chat_id="chat_123")],
+            total=1,
+            limit=21,
+            offset=0,
+        )
+        ctx = _make_ctx(chat_id="chat_123", chat_service=chat_service)
+        result = await execute_command("/history", ctx)
+        assert result == "No past chats found."
+
+    @pytest.mark.asyncio
+    async def test_multiple_chats_displayed(self):
+        chat_service = MagicMock()
+        chat_service.list_chats.return_value = ChatListResponse(
+            chats=[
+                _make_chat_summary(
+                    chat_id="chat_1", timestamp=1706000000, first_message="First chat", message_count=3
+                ),
+                _make_chat_summary(
+                    chat_id="chat_2", timestamp=1706100000, first_message="Second chat", message_count=7
+                ),
+            ],
+            total=2,
+            limit=21,
+            offset=0,
+        )
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/history", ctx)
+
+        assert "Past chats (2)" in result
+        assert "First chat" in result
+        assert "3 messages" in result
+        assert "Second chat" in result
+        assert "7 messages" in result
+
+    @pytest.mark.asyncio
+    async def test_custom_limit(self):
+        chat_service = MagicMock()
+        chat_service.list_chats.return_value = ChatListResponse(chats=[], total=0, limit=6, offset=0)
+        ctx = _make_ctx(chat_service=chat_service, args=["5"])
+        await execute_command("/history", ctx)
+        chat_service.list_chats.assert_called_once_with(user_id="user_42", limit=6)
+
+    @pytest.mark.asyncio
+    async def test_invalid_limit(self):
+        ctx = _make_ctx(args=["abc"])
+        result = await execute_command("/history", ctx)
+        assert "Invalid limit" in result
+        assert "`abc`" in result
+
+    @pytest.mark.asyncio
+    async def test_summary_preferred_over_preview(self):
+        chat_service = MagicMock()
+        chat_service.list_chats.return_value = ChatListResponse(
+            chats=[
+                _make_chat_summary(
+                    chat_id="c1", summary="The summary", preview="The preview", first_message="First msg"
+                )
+            ],
+            total=1,
+            limit=21,
+            offset=0,
+        )
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/history", ctx)
+        assert "The summary" in result
+        assert "The preview" not in result
+
+    @pytest.mark.asyncio
+    async def test_preview_preferred_over_first_message(self):
+        chat_service = MagicMock()
+        chat_service.list_chats.return_value = ChatListResponse(
+            chats=[_make_chat_summary(chat_id="c1", preview="The preview", first_message="First msg")],
+            total=1,
+            limit=21,
+            offset=0,
+        )
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/history", ctx)
+        assert "The preview" in result
+        assert "First msg" not in result
+
+    @pytest.mark.asyncio
+    async def test_long_label_truncated(self):
+        chat_service = MagicMock()
+        long_msg = "A" * 100
+        chat_service.list_chats.return_value = ChatListResponse(
+            chats=[_make_chat_summary(chat_id="c1", first_message=long_msg)],
+            total=1,
+            limit=21,
+            offset=0,
+        )
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/history", ctx)
+        assert "A" * 77 + "..." in result
+        assert "A" * 78 not in result
+
+    @pytest.mark.asyncio
+    async def test_empty_chat_label(self):
+        chat_service = MagicMock()
+        chat_service.list_chats.return_value = ChatListResponse(
+            chats=[_make_chat_summary(chat_id="c1", first_message="")],
+            total=1,
+            limit=21,
+            offset=0,
+        )
+        ctx = _make_ctx(chat_service=chat_service)
+        result = await execute_command("/history", ctx)
+        assert "(empty)" in result

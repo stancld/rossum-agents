@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Added
+- Added `/history` slash command — lists past chat sessions with timestamps, message counts, and summaries/previews; accepts optional `<limit>` argument (default: 20)
+
+### Fixed
+- Fixed several chat summary issues: now updates incrementally instead of regenerating from scratch, correctly extracts `first_message` from `task_step` format, and no longer overwrites an existing summary with `None` on failure
+
 ## [1.3.2] - 2026-02-25
 
 ### Fixed
