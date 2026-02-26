@@ -37,22 +37,40 @@ get_annotation
 ^^^^^^^^^^^^^^
 
 **MCP Tool:**
-  ``get_annotation(annotation_id: int, sideloads: Sequence[str])``
+  ``get_annotation(annotation_id: int)``
 
 **Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_annotation(annotation_id, sideloads)``
+  ``AsyncRossumAPIClient.retrieve_annotation(annotation_id)``
 
 **API Endpoint:**
   ``GET /v1/annotations/{annotation_id}``
-
-**Query Parameters:**
-  - ``sideload``: Content and related objects (e.g., ``['content']``)
 
 **SDK Documentation:**
   https://github.com/rossumai/rossum-api
 
 **Implementation:**
-  See ``rossum_mcp.server:69-98``
+  See ``rossum_mcp.tools.annotations``
+
+get_annotation_content
+^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``get_annotation_content(annotation_id: int)``
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.retrieve_annotation(annotation_id, sideloads=("content",))``
+
+**API Endpoint:**
+  ``GET /v1/annotations/{annotation_id}?sideload=content``
+
+**Returns:**
+  Path to a local JSON file at ``/tmp/rossum_annotation_{id}_content.json``
+
+**SDK Documentation:**
+  https://github.com/rossumai/rossum-api
+
+**Implementation:**
+  See ``rossum_mcp.tools.annotations``
 
 list_annotations
 ^^^^^^^^^^^^^^^^

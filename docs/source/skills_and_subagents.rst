@@ -349,6 +349,27 @@ Returns JSON with:
 
 For extension setup guides and workflow tutorials, use ``search_knowledge_base`` instead.
 
+General-Purpose Data Tools
+""""""""""""""""""""""""""
+
+Available for any JSON/text content — annotation data, logs, schema dumps, API responses.
+
+``run_jq(jq_query, data)``
+   Run a jq expression on a JSON string or file path. Returns the jq output as a string (truncated at 50 000 chars).
+
+   .. code-block:: python
+
+      run_jq(jq_query='.[] | select(.status == "active")', data="/tmp/annotations.json")
+      run_jq(jq_query='map(.id)', data='[{"id": 1}, {"id": 2}]')
+
+``run_grep(pattern, text, case_insensitive=True)``
+   Regex search in multi-line text or a file path. Returns matching lines with line numbers (max 200 matches).
+
+   .. code-block:: python
+
+      run_grep(pattern="amount_total", text="/tmp/schema_dump.json")
+      run_grep(pattern=r"error: \d+", text=log_output, case_insensitive=False)
+
 Direct OpenAPI Search Tools
 """""""""""""""""""""""""""
 

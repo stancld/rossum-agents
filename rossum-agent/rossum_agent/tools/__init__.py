@@ -16,6 +16,7 @@ from rossum_agent.tools.change_history import (
     show_entity_history,
 )
 from rossum_agent.tools.core import get_context
+from rossum_agent.tools.data_tools import run_grep, run_jq
 from rossum_agent.tools.dynamic_tools import (
     get_load_tool_category_definition,
     get_load_tool_definition,
@@ -61,6 +62,8 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     create_task,
     update_task,
     list_tasks,
+    run_jq,
+    run_grep,
     elis_openapi_jq,
     elis_openapi_grep,
     kb_grep,

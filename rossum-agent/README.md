@@ -128,6 +128,10 @@ The agent provides internal tools and access to 70 MCP tools via dynamic loading
 - `kb_grep` - Regex search across Knowledge Base article titles and content
 - `kb_get_article` - Retrieve full Knowledge Base article by slug
 
+**Data Tools:**
+- `run_jq` - Run jq expressions on JSON content or file paths
+- `run_grep` - Regex search in text content or file paths
+
 **API Reference:**
 - `elis_openapi_jq` - Query Rossum API OpenAPI spec with jq
 - `elis_openapi_grep` - Free-text search in API spec
