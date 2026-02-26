@@ -28,6 +28,7 @@ extend-select = [
     "ICN",  # import conventions
     "NPY",  # numpy-specific rules
     "PLC0415",  # import-outside-top-level
+    "PTH",  # pathlib over os.path
     "RET",  # returns formatting
     "RUF",  # ruff-specific rules
     "SIM",  # flake8-simplify

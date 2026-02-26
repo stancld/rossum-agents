@@ -447,7 +447,7 @@ def deploy_compare_workspaces(
 
         id_mapping = None
         if id_mapping_path:
-            with open(id_mapping_path) as f:
+            with Path(id_mapping_path).open() as f:
                 id_mapping = IdMapping.model_validate(json.load(f))
 
         result = source_ws.compare_workspaces(target_ws, id_mapping=id_mapping)

@@ -180,7 +180,7 @@ def main() -> None:
         finally:
             Path(tmp_path).unlink()
     else:
-        with open(args.output, "w") as f:
+        with Path(args.output).open("w") as f:
             f.write(output_json)
         logger.info(f"Written to {args.output} ({len(output_json)} bytes, {len(articles)} articles)")
 

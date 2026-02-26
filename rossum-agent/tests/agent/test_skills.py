@@ -226,11 +226,10 @@ class TestSkillRegistryErrorHandling:
     def test_handles_corrupted_skill_file(self, tmp_path, caplog):
         """Test that registry handles unreadable skill files gracefully."""
         import logging
-        import os
 
         skill_file = tmp_path / "broken-skill.md"
         skill_file.write_text("Valid content")
-        os.chmod(skill_file, 0o000)
+        Path(skill_file).chmod(0o000)
 
         try:
             with caplog.at_level(logging.ERROR):
@@ -240,4 +239,4 @@ class TestSkillRegistryErrorHandling:
             assert len(skills) == 0
             assert "Failed to load skill" in caplog.text
         finally:
-            os.chmod(skill_file, 0o644)
+            Path(skill_file).chmod(0o644)
