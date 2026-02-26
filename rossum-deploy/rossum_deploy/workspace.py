@@ -811,9 +811,7 @@ class Workspace:
         if is_tuple and parent_is_multivalue_tuple:
             return True
         child_is_tuple = child.get("category") == "tuple"
-        if is_multivalue and child_is_tuple:
-            return True
-        return False
+        return bool(is_multivalue and child_is_tuple)
 
     def _find_object_path(self, obj_type: ObjectType, obj_id: int) -> Path | None:
         for path in self._list_local_objects(obj_type):

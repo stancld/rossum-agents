@@ -938,10 +938,12 @@ class TestStreamModelResponse:
         mock_stream.__exit__ = MagicMock(return_value=False)
         mock_stream.__iter__ = MagicMock(side_effect=error)
 
-        with patch.object(agent.client.messages, "stream", return_value=mock_stream):
-            with pytest.raises(ValueError, match="Stream failed mid-response"):
-                async for _ in agent._stream_model_response(1):
-                    pass
+        with (
+            patch.object(agent.client.messages, "stream", return_value=mock_stream),
+            pytest.raises(ValueError, match="Stream failed mid-response"),
+        ):
+            async for _ in agent._stream_model_response(1):
+                pass
 
     @pytest.mark.asyncio
     async def test_thinking_delta_starts_buffer_timer(self):
@@ -1270,10 +1272,12 @@ class TestAgentRun:
             raise asyncio.CancelledError
             yield  # Make it a generator
 
-        with patch.object(agent, "_stream_model_response", side_effect=mock_stream_response):
-            with pytest.raises(asyncio.CancelledError):
-                async for _ in agent.run("Test prompt"):
-                    pass
+        with (
+            patch.object(agent, "_stream_model_response", side_effect=mock_stream_response),
+            pytest.raises(asyncio.CancelledError),
+        ):
+            async for _ in agent.run("Test prompt"):
+                pass
 
 
 class TestExecuteTool:
@@ -1379,9 +1383,11 @@ class TestExecuteTool:
             arguments={"hook_id": "123"},
         )
 
-        with patch("rossum_agent.agent.core.execute_tool", return_value="Deploy Success") as mock_execute:
-            with patch("rossum_agent.agent.core.get_deploy_tool_names", return_value=["deploy_hook"]):
-                result = await self._get_final_result(agent, tool_call)
+        with (
+            patch("rossum_agent.agent.core.execute_tool", return_value="Deploy Success") as mock_execute,
+            patch("rossum_agent.agent.core.get_deploy_tool_names", return_value=["deploy_hook"]),
+        ):
+            result = await self._get_final_result(agent, tool_call)
 
         mock_execute.assert_called_once()
         assert result.content == "Deploy Success"

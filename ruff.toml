@@ -42,8 +42,6 @@ unfixable = [
 ignore = [
     "C408",
     "E501",  # Long literals which Black can't split
-    "SIM103",  # Checks for if statements that can be replaced with bool.
-    "SIM117",  # Use a single with statement with multiple contexts instead of nested with statements
     "UP010",  # Unnecessary __future__ import {import} for target Python version -- we require `from __future__ import annotations` everywhere
     "UP030",  # Use implicit references for positional format fields -- personally, I don't like relying on implicit values
     "UP031",

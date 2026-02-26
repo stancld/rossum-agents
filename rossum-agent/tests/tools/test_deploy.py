@@ -718,18 +718,20 @@ class TestDeployCompareWorkspaces:
 
         set_context(AgentContext(rossum_credentials=("https://api.test", "token")))
         try:
-            with patch("rossum_agent.tools.deploy.Workspace") as mock_ws_class:
-                with patch("rossum_agent.tools.deploy.IdMapping.model_validate") as mock_validate:
-                    mock_source_ws = MagicMock()
-                    mock_source_ws.compare_workspaces.return_value = mock_result
-                    mock_ws_class.return_value = mock_source_ws
-                    mock_validate.return_value = MagicMock()
+            with (
+                patch("rossum_agent.tools.deploy.Workspace") as mock_ws_class,
+                patch("rossum_agent.tools.deploy.IdMapping.model_validate") as mock_validate,
+            ):
+                mock_source_ws = MagicMock()
+                mock_source_ws.compare_workspaces.return_value = mock_result
+                mock_ws_class.return_value = mock_source_ws
+                mock_validate.return_value = MagicMock()
 
-                    result_json = deploy_compare_workspaces(
-                        source_workspace_path=str(source_path),
-                        target_workspace_path=str(target_path),
-                        id_mapping_path=str(mapping_file),
-                    )
+                result_json = deploy_compare_workspaces(
+                    source_workspace_path=str(source_path),
+                    target_workspace_path=str(target_path),
+                    id_mapping_path=str(mapping_file),
+                )
         finally:
             set_context(AgentContext())
 
@@ -1032,8 +1034,10 @@ class TestRequireRossumCredentials:
         """Test that error is raised when neither context nor env vars have credentials."""
         set_context(AgentContext())
         try:
-            with patch.dict("os.environ", {}, clear=True):
-                with pytest.raises(ValueError, match="credentials not available"):
-                    get_context().require_rossum_credentials()
+            with (
+                patch.dict("os.environ", {}, clear=True),
+                pytest.raises(ValueError, match="credentials not available"),
+            ):
+                get_context().require_rossum_credentials()
         finally:
             set_context(AgentContext())
