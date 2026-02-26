@@ -39,7 +39,7 @@ from rossum_agent.api.models.schemas import (
 )
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
-from rossum_agent.bedrock_client import HAIKU_MODEL_ID, create_async_bedrock_client
+from rossum_agent.bedrock_client import create_async_bedrock_client, get_small_model_id
 from rossum_agent.change_tracking.store import CommitStore
 from rossum_agent.redis_storage import ChatData, RedisStorage
 
@@ -75,7 +75,7 @@ async def _generate_chat_summary(user_prompt: str, previous_summary: str | None 
 
         client = create_async_bedrock_client()
         response = await client.messages.create(
-            model=HAIKU_MODEL_ID,
+            model=get_small_model_id(),
             max_tokens=50,
             messages=[{"role": "user", "content": prompt}],
         )
