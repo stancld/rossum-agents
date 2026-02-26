@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [1.3.4] - 2026-02-26
 
 ### Changed
 - Hidden `create_queue` tool — agent now uses `create_queue_from_template` exclusively; if the template is unknown, the agent asks the user and presents options grouped by category ([#218](https://github.com/rossumai/rossum-agents/pull/218))
