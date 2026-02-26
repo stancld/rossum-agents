@@ -7,7 +7,7 @@ import re
 from typing import TYPE_CHECKING
 
 from rossum_agent.agent.models import FinalAnswerStep, ToolResultStep
-from rossum_agent.bedrock_client import HAIKU_MODEL_ID, create_bedrock_client
+from rossum_agent.bedrock_client import create_bedrock_client, get_small_model_id
 from rossum_api import SyncRossumAPIClient
 from rossum_api.dtos import Token
 from rossum_api.models.schema import Datapoint
@@ -41,7 +41,7 @@ def call_haiku_check(prompt: str) -> tuple[bool, str]:
     """
     client = create_bedrock_client()
     response = client.messages.create(
-        model=HAIKU_MODEL_ID, max_tokens=256, temperature=0, messages=[{"role": "user", "content": prompt}]
+        model=get_small_model_id(), max_tokens=256, temperature=0, messages=[{"role": "user", "content": prompt}]
     )
 
     text = "".join(block.text for block in response.content if hasattr(block, "text"))

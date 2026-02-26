@@ -6,7 +6,7 @@ import json
 import re
 from typing import TYPE_CHECKING
 
-from rossum_agent.bedrock_client import HAIKU_MODEL_ID, create_bedrock_client
+from rossum_agent.bedrock_client import create_bedrock_client, get_small_model_id
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -68,7 +68,7 @@ def validate_mermaid_diagrams(
 
     client = create_bedrock_client()
     response = client.messages.create(
-        model=HAIKU_MODEL_ID,
+        model=get_small_model_id(),
         max_tokens=1024,
         messages=[
             {

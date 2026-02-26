@@ -6,7 +6,7 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from rossum_agent.bedrock_client import HAIKU_MODEL_ID, create_bedrock_client
+from rossum_agent.bedrock_client import create_bedrock_client, get_small_model_id
 from rossum_agent.change_tracking.models import ConfigCommit, compute_commit_hash
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ def generate_commit_message(changes: list[EntityChange], user_request: str) -> s
         changes_summary = _format_changes_for_message(changes)
 
         response = client.messages.create(
-            model=HAIKU_MODEL_ID,
+            model=get_small_model_id(),
             max_tokens=150,
             messages=[
                 {

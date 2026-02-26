@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Changed
+- Haiku model calls now respect `AWS_BEDROCK_MODEL_ARN_SMALL` env var (mirrors `AWS_BEDROCK_MODEL_ARN` for Opus)
+
 ## [1.3.4] - 2026-02-26
 
 ### Changed
