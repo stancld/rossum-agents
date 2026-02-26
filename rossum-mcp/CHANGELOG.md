@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [1.4.1] - 2026-02-26
 
 ### Added
 - `get_annotation_content` tool: fetches annotation extracted content and saves it to `/tmp/rossum_annotation_{id}_content.json`; returns the local path for `jq`/`grep` processing
