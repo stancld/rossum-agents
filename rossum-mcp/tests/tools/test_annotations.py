@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import importlib
+import json
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
+import anyio
 import pytest
 from conftest import create_mock_annotation
 from rossum_mcp.tools import base
@@ -172,25 +174,35 @@ class TestGetAnnotation:
         mock_client.retrieve_annotation.return_value = mock_annotation
 
         get_annotation = mock_mcp._tools["get_annotation"]
-        result = await get_annotation(annotation_id=67890, sideloads=["content"])
+        result = await get_annotation(annotation_id=67890)
 
         assert result.id == 67890
         assert result.status == "confirmed"
-        mock_client.retrieve_annotation.assert_called_once_with(67890, ["content"])
+        mock_client.retrieve_annotation.assert_called_once_with(67890)
+
+
+@pytest.mark.unit
+class TestGetAnnotationContent:
+    """Tests for get_annotation_content tool."""
 
     @pytest.mark.asyncio
-    async def test_get_annotation_no_sideloads(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test annotation retrieval without sideloads."""
+    async def test_get_annotation_content_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test annotation content is written to a local file and path is returned."""
         register_annotation_tools(mock_mcp, mock_client)
 
-        mock_annotation = create_mock_annotation(id=67890, status="to_review")
+        content_data = [{"id": "abc123", "value": "test_value"}]
+        mock_annotation = create_mock_annotation(id=67890, content=content_data)
         mock_client.retrieve_annotation.return_value = mock_annotation
 
-        get_annotation = mock_mcp._tools["get_annotation"]
-        result = await get_annotation(annotation_id=67890, sideloads=())
+        get_annotation_content = mock_mcp._tools["get_annotation_content"]
+        result = await get_annotation_content(annotation_id=67890)
 
-        assert result.id == 67890
-        mock_client.retrieve_annotation.assert_called_once_with(67890, ())
+        assert "path" in result
+        path = anyio.Path(result["path"])
+        assert await path.exists()
+        assert json.loads(await path.read_text()) == content_data
+        mock_client.retrieve_annotation.assert_called_once_with(67890, sideloads=("content",))
+        await path.unlink()
 
 
 @pytest.mark.unit

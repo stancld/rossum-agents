@@ -26,7 +26,7 @@
 
 | Capability | Description |
 |------------|-------------|
-| **Rossum MCP Integration** | Full access to 70 MCP tools for document processing |
+| **Rossum MCP Integration** | Full access to 71 MCP tools for document processing |
 | **Hook Debugging** | Test hooks via native Rossum API endpoints |
 | **Deployment Tools** | Pull, push, diff, copy configs across environments |
 | **Knowledge Base Search** | AI-powered Rossum documentation search |
@@ -117,7 +117,7 @@ asyncio.run(main())
 
 ## Available Tools
 
-The agent provides internal tools and access to 70 MCP tools via dynamic loading.
+The agent provides internal tools and access to 71 MCP tools via dynamic loading.
 
 <details>
 <summary><strong>Internal Tools</strong></summary>
@@ -128,6 +128,10 @@ The agent provides internal tools and access to 70 MCP tools via dynamic loading
 - `kb_grep` - Regex search across Knowledge Base article titles and content
 - `kb_get_article` - Retrieve full Knowledge Base article by slug
 
+**Data Tools:**
+- `run_jq` - Run jq expressions on JSON content or file paths
+- `run_grep` - Regex search in text content or file paths
+
 **API Reference:**
 - `elis_openapi_jq` - Query Rossum API OpenAPI spec with jq
 - `elis_openapi_grep` - Free-text search in API spec
@@ -135,6 +139,9 @@ The agent provides internal tools and access to 70 MCP tools via dynamic loading
 
 **Formula:**
 - `suggest_formula_field` - Suggest formula field expressions via Rossum Local Copilot
+
+**Rules:**
+- `suggest_rule` - Suggest rule trigger conditions and actions via Rossum Local Copilot
 
 **Lookup Fields:**
 - `suggest_lookup_field` - Suggest lookup field matching configuration for MDH datasets
@@ -211,7 +218,7 @@ flowchart TB
     end
 
     subgraph MCP["Rossum MCP Server"]
-        Tools[70 MCP Tools]
+        Tools[71 MCP Tools]
     end
 
     API[Rossum API]

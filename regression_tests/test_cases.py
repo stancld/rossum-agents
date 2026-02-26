@@ -393,7 +393,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "Region: EU\n\n"
             "## Tasks:\n\n"
             "1. Create a new queue: Invoices\n"
-            "2. Create a SINGLE business validation rule with these 3 checks:\n"
+            "2. Create one single rule with these 3 checks:\n"
             '    - Total amount is smaller than 400. Error message: "Total amount is larger than allowed 400."\n'
             '    - Sum of all total amount line items equals total amount. Error message: "Sum of all total amount line items does not equal total amount."\n'
             '    - All line items it holds: "quantity x unit price = total amount"\n\n'
@@ -402,7 +402,9 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
+                "load_skill",
                 "create_rule",
+                "suggest_rule",
             ],
             mode=ToolMatchMode.SUBSET,
             forbidden_tools=[
@@ -413,7 +415,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "search_elis_docs",
             ],
         ),
-        token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=90000),
+        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=110000),
         success_criteria=SuccessCriteria(
             require_subagent=False,
             required_keywords=[],
