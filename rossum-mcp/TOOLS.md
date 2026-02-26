@@ -1,8 +1,8 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 70 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 71 MCP tools. For quick start and setup, see [README.md](README.md).
 
-## Document Processing (8 tools)
+## Document Processing (9 tools)
 
 ### upload_document
 
@@ -924,7 +924,7 @@ Set the MCP operation mode. Use 'read-only' to disable write operations, 'read-w
 Lists all available tool categories with descriptions, tool names, and keywords for dynamic tool loading.
 
 **Available Categories:**
-- `annotations` - Document processing (8 tools)
+- `annotations` - Document processing (9 tools)
 - `queues` - Queue management (9 tools)
 - `schemas` - Schema management (8 tools)
 - `engines` - AI engine management (6 tools)

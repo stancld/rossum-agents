@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import tempfile
 from collections.abc import Sequence  # noqa: TC003 - needed at runtime for FastMCP
 from typing import TYPE_CHECKING
 
@@ -65,7 +66,7 @@ async def _get_annotation(client: AsyncRossumAPIClient, annotation_id: int) -> A
 async def _get_annotation_content(client: AsyncRossumAPIClient, annotation_id: int) -> dict:
     logger.debug(f"Retrieving annotation content: annotation_id={annotation_id}")
     annotation: Annotation = await client.retrieve_annotation(annotation_id, sideloads=("content",))
-    path = anyio.Path(f"/tmp/rossum_annotation_{annotation_id}_content.json")
+    path = anyio.Path(tempfile.gettempdir()) / f"rossum_annotation_{annotation_id}_content.json"
     await path.write_text(json.dumps(annotation.content, indent=2))
     return {"path": str(path)}
 

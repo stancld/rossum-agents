@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **70 tools** organized into fourteen categories:
+The MCP server provides **71 tools** organized into fourteen categories:
 
 **Document Processing**
 

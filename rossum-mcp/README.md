@@ -2,14 +2,14 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 70 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. 71 tools for queues, schemas, hooks, engines, and more.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI - rossum-mcp](https://img.shields.io/pypi/v/rossum-mcp?label=rossum-mcp)](https://pypi.org/project/rossum-mcp/)
 [![Coverage](https://codecov.io/gh/stancld/rossum-agents/branch/master/graph/badge.svg?flag=rossum-mcp)](https://codecov.io/gh/stancld/rossum-agents)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-70-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-71-blue.svg)](#available-tools)
 
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
@@ -97,11 +97,11 @@ Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
 
 ## Available Tools
 
-The server provides **70 tools** organized into categories:
+The server provides **71 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
-| **Document Processing** | 8 | Upload documents, retrieve/update/confirm/copy/delete annotations |
+| **Document Processing** | 9 | Upload documents, retrieve/update/confirm/copy/delete annotations |
 | **Queue Management** | 9 | Create, configure, delete, and list queues |
 | **Schema Management** | 8 | Define, modify, and delete field structures |
 | **Engine Management** | 6 | Configure extraction and splitting engines |
