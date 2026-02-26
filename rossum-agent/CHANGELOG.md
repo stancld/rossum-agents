@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [1.3.3] - 2026-02-26
 
 ### Added
 - Added `/history` slash command — lists past chat sessions with timestamps, message counts, and summaries/previews; accepts optional `<limit>` argument (default: 20)

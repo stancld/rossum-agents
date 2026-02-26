@@ -2257,7 +2257,7 @@ wheels = [
 
 [[package]]
 name = "rossum-agent"
-version = "1.3.2"
+version = "1.3.3"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -2380,7 +2380,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32" },
     { name = "rossum-api", specifier = ">=3.9.1" },
     { name = "rossum-deploy", specifier = ">=0.1.0" },
-    { name = "rossum-mcp", specifier = ">=1.4.0" },
+    { name = "rossum-mcp", specifier = ">=1.4.1" },
     { name = "slack-sdk", extras = ["optional"], marker = "extra == 'all'", specifier = ">=3.27.0" },
     { name = "slack-sdk", extras = ["optional"], marker = "extra == 'slack'", specifier = ">=3.27.0" },
     { name = "slack-sdk", extras = ["optional"], marker = "extra == 'tests'", specifier = ">=3.27.0" },
@@ -2435,16 +2435,16 @@ wheels = [
 
 [[package]]
 name = "rossum-mcp"
-version = "1.4.0"
+version = "1.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastmcp" },
     { name = "pydantic" },
     { name = "rossum-api" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/66/4f/2a8c0df72c89cc63d969aa723f4e81a2607f5294a4807b01fe8363c78e83/rossum_mcp-1.4.0.tar.gz", hash = "sha256:1f4d4d0fb625b019cad0c3af62c6fef0c80c3d27d619538b8321e9e500246cd0", size = 38625, upload-time = "2026-02-24T16:18:58.875Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/85/30c2da1e93870ea1c8b65280656101c6e3f016633d2958aa76c0bd111844/rossum_mcp-1.4.1.tar.gz", hash = "sha256:6e71e3064e67b240f6e0ab05c29bd61da78df84280796adedc81f47d09808f71", size = 38785, upload-time = "2026-02-26T11:09:30.577Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/62/39/b60b0277677172ef3fe0a40aab00057e46eff4e5e46ac0a2564d487ee9ff/rossum_mcp-1.4.0-py3-none-any.whl", hash = "sha256:a30c858508c2c8ef84f1270f4dc632162b84e4d36774d41a5c4208074737fb08", size = 46637, upload-time = "2026-02-24T16:18:57.599Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/80/63662903b116c011d19ccaa5ca08a324c0b37f3e58970f5bf5d7837240be/rossum_mcp-1.4.1-py3-none-any.whl", hash = "sha256:b34bb3ebc9bb2a1a268a5713e26dd432e525073df37e63dc2319c3770b967a84", size = 46758, upload-time = "2026-02-26T11:09:29.553Z" },
 ]
 
 [[package]]
