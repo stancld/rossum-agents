@@ -120,7 +120,7 @@ The server provides **70 tools** organized into categories:
 <summary><strong>Tool List by Category</strong></summary>
 
 **Document Processing:**
-`upload_document`, `get_annotation`, `list_annotations`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`, `delete_annotation`
+`upload_document`, `get_annotation`, `get_annotation_content`, `list_annotations`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`, `delete_annotation`
 
 **Queue Management:**
 `get_queue`, `list_queues`, `get_queue_schema`, `get_queue_engine`, `create_queue`, `create_queue_from_template`, `get_queue_template_names`, `update_queue`, `delete_queue`
@@ -187,7 +187,8 @@ annotation = get_annotation(annotation_id=annotations[0].id)
 start_annotation(annotation_id=12345)
 
 # 2. Get content with field IDs
-annotation = get_annotation(annotation_id=12345, sideloads=['content'])
+annotation_content = get_annotation_content(annotation_id=12345)
+# Returns {"path": "/tmp/rossum_annotation_12345_content.json"} — use jq/grep on that file
 
 # 3. Update fields using datapoint IDs
 bulk_update_annotation_fields(
