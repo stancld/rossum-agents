@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
-import anthropic
+from anthropic.types import TextBlock
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
@@ -39,6 +39,7 @@ from rossum_agent.api.models.schemas import (
 )
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
+from rossum_agent.bedrock_client import HAIKU_MODEL_ID, create_async_bedrock_client
 from rossum_agent.change_tracking.store import CommitStore
 from rossum_agent.redis_storage import ChatData, RedisStorage
 
@@ -72,13 +73,13 @@ async def _generate_chat_summary(user_prompt: str, previous_summary: str | None 
         else:
             prompt = f"Summarize this in one sentence (max 10 words): {user_prompt[:500]}"
 
-        client = anthropic.AsyncAnthropic()
+        client = create_async_bedrock_client()
         response = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=HAIKU_MODEL_ID,
             max_tokens=50,
             messages=[{"role": "user", "content": prompt}],
         )
-        text_block = next((b for b in response.content if isinstance(b, anthropic.types.TextBlock)), None)
+        text_block = next((b for b in response.content if isinstance(b, TextBlock)), None)
         return text_block.text.strip() if text_block else None
     except Exception as e:
         logger.warning(f"Failed to generate chat summary: {e}")

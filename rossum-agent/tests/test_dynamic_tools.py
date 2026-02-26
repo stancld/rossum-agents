@@ -825,6 +825,9 @@ class TestHiddenTools:
     def test_update_schema_is_hidden(self) -> None:
         assert "update_schema" in HIDDEN_TOOLS
 
+    def test_create_queue_is_hidden(self) -> None:
+        assert "create_queue" in HIDDEN_TOOLS
+
     @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
     @patch("rossum_agent.tools.dynamic_tools.get_write_tools")

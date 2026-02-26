@@ -32,6 +32,9 @@ HIDDEN_TOOLS: dict[str, str] = {
         "Hidden: agent tends to use update_schema incorrectly, unintentionally "
         "overwriting the whole schema. Use the schema_patching subagent instead."
     ),
+    "create_queue": (
+        "Hidden: use create_queue_from_template instead. Ask the user which template to use if not specified."
+    ),
 }
 
 
