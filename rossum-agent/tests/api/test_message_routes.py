@@ -431,7 +431,7 @@ class TestGenerateChatSummary:
         mock_client = AsyncMock()
         mock_client.messages.create = AsyncMock(return_value=mock_response)
 
-        with patch("rossum_agent.api.routes.messages.anthropic.AsyncAnthropic", return_value=mock_client):
+        with patch("rossum_agent.api.routes.messages.create_async_bedrock_client", return_value=mock_client):
             result = await _generate_chat_summary("How do I deploy a queue?")
 
         assert result == "User asked about deployments."
@@ -445,7 +445,7 @@ class TestGenerateChatSummary:
         mock_client = AsyncMock()
         mock_client.messages.create = AsyncMock(return_value=mock_response)
 
-        with patch("rossum_agent.api.routes.messages.anthropic.AsyncAnthropic", return_value=mock_client):
+        with patch("rossum_agent.api.routes.messages.create_async_bedrock_client", return_value=mock_client):
             result = await _generate_chat_summary("What is Rossum?")
 
         assert result is None
@@ -456,7 +456,7 @@ class TestGenerateChatSummary:
         mock_client = AsyncMock()
         mock_client.messages.create = AsyncMock(side_effect=Exception("API unavailable"))
 
-        with patch("rossum_agent.api.routes.messages.anthropic.AsyncAnthropic", return_value=mock_client):
+        with patch("rossum_agent.api.routes.messages.create_async_bedrock_client", return_value=mock_client):
             result = await _generate_chat_summary("Trigger an error")
 
         assert result is None
@@ -472,7 +472,7 @@ class TestGenerateChatSummary:
         mock_client = AsyncMock()
         mock_client.messages.create = AsyncMock(return_value=mock_response)
 
-        with patch("rossum_agent.api.routes.messages.anthropic.AsyncAnthropic", return_value=mock_client):
+        with patch("rossum_agent.api.routes.messages.create_async_bedrock_client", return_value=mock_client):
             result = await _generate_chat_summary("Now configure a hook", previous_summary="User deployed a schema")
 
         assert result == "Schema deployment and hook configuration."

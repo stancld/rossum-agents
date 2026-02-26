@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Hidden `create_queue` tool — agent now uses `create_queue_from_template` exclusively; if the template is unknown, the agent asks the user and presents options grouped by category ([#218](https://github.com/rossumai/rossum-agents/pull/218))
 - Added queue template guidance to base prompt — lists available templates grouped by category (standard invoices, AP&R, tax invoices, specialty, other) ([#218](https://github.com/rossumai/rossum-agents/pull/218))
+- Chat summary generation now uses AWS Bedrock (`create_async_bedrock_client`) instead of the direct Anthropic API
 
 ## [1.3.3] - 2026-02-26
 
