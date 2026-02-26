@@ -372,7 +372,7 @@ class TestSendMessageEndpoint:
         )
 
         assert response.status_code == 200
-        response.text  # Consume streaming response
+        _ = response.text  # Consume streaming response
 
         assert len(run_agent_calls) == 1
         assert run_agent_calls[0]["mcp_mode"] == "read-write"
@@ -403,7 +403,7 @@ class TestSendMessageEndpoint:
         )
 
         assert response.status_code == 200
-        response.text
+        _ = response.text
 
         assert len(run_agent_calls) == 1
         assert run_agent_calls[0]["persona"] == "cautious"
@@ -434,7 +434,7 @@ class TestSendMessageEndpoint:
         )
 
         assert response.status_code == 200
-        response.text
+        _ = response.text
 
         assert len(run_agent_calls) == 1
         assert run_agent_calls[0]["persona"] == "cautious"
@@ -461,7 +461,7 @@ class TestSendMessageEndpoint:
         )
 
         assert response.status_code == 200
-        response.text  # Consume streaming response
+        _ = response.text  # Consume streaming response
 
         assert len(run_agent_calls) == 1
         assert run_agent_calls[0]["mcp_mode"] == "read-write"

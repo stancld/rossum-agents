@@ -588,7 +588,7 @@ class TestAgentMemorySerialization:
         restored_messages = restored.write_to_messages()
 
         assert len(original_messages) == len(restored_messages)
-        for orig, rest in zip(original_messages, restored_messages):
+        for orig, rest in zip(original_messages, restored_messages, strict=True):
             assert orig["role"] == rest["role"]
 
 

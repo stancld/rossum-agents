@@ -40,15 +40,8 @@ unfixable = [
 ]
 
 ignore = [
-    "B017",  # self.assertRaises(Exception): should be considered evil. It can lead to your test passing even if the code being tested is never executed due to a typo. (DC-1734)
-    "B018",  # Found useless attribute access. Either assign it to a variable or remove it.
-    "B019",  # Use of functools.lru_cache or functools.cache on methods can lead to memory leaks (DC-1088)
-    "B028",  # No explicit `stacklevel` keyword argument found
-    "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
-    "B905",  # `zip()` without an explicit `strict=` parameter
     "C408",
     "E501",  # Long literals which Black can't split
-    "E741",  # Ambiguous variable name
     "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar` (over 500 occurrences)
     "RUF017",  # Avoid Quadratic list summation [rule in preview stage]
     "RUF018",  # Assignment in assert [rule in preview stage]

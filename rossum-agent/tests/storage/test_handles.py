@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
 from rossum_agent.storage.handles import (
     Context,
     ContextHandle,
@@ -118,6 +119,6 @@ def test_serialize_produces_json_bytes():
 
 def test_sow_handle_wrong_artifact_type_rejected():
     plan_handle = PlanHandle(org_id="org1", artifact_id="plan-1", timestamp=TIMESTAMP)
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         # Parsing a plan key with SoWHandle should fail Literal["sow"] validation
         SoWHandle.from_key(plan_handle.s3_key)
