@@ -47,7 +47,6 @@ ignore = [
     "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
     "B905",  # `zip()` without an explicit `strict=` parameter
     "C408",
-    "E402",  # Module level import not at top of file
     "E501",  # Long literals which Black can't split
     "E741",  # Ambiguous variable name
     "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar` (over 500 occurrences)

@@ -13,11 +13,11 @@ import threading
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-_NUMBERED_PREFIX = re.compile(r"^(\d+)\.\s")
-
 from anthropic import beta_tool
 
 from rossum_agent.tools.core import get_context
+
+_NUMBERED_PREFIX = re.compile(r"^(\d+)\.\s")
 
 
 class TaskStatus(StrEnum):

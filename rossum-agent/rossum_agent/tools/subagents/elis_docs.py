@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING
 
 from anthropic import beta_tool
 
+from rossum_agent.tools.elis_backend_openapi_search import elis_openapi_grep, elis_openapi_jq
+from rossum_agent.tools.subagents.base import SubAgent, SubAgentConfig
+
 if TYPE_CHECKING:
     from typing import Any
 
 logger = logging.getLogger(__name__)
-
-from rossum_agent.tools.elis_backend_openapi_search import elis_openapi_grep, elis_openapi_jq
-from rossum_agent.tools.subagents.base import SubAgent, SubAgentConfig
 
 # Sub-agent context window budget: keep tool results small enough for productive iteration
 _TOOL_RESULT_LIMIT = 15000
