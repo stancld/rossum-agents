@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Added `/history` slash command — lists past chat sessions with timestamps, message counts, and summaries/previews; accepts optional `<limit>` argument (default: 20)
+- Added `run_jq` and `run_grep` tools — general-purpose data tools for querying and filtering JSON/structured data with jq expressions and searching tool results with regex patterns ([#217](https://github.com/stancld/rossum-agents/pull/217))
 
 ### Fixed
 - Fixed several chat summary issues: now updates incrementally instead of regenerating from scratch, correctly extracts `first_message` from `task_step` format, and no longer overwrites an existing summary with `None` on failure
