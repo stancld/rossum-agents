@@ -587,15 +587,17 @@ class TestPatchSchema:
         mock_client._http_client.update.side_effect = APIClientError("PATCH", "schemas/50", 412, "Precondition Failed")
 
         patch_schema = mock_mcp._tools["patch_schema"]
-        with patch("rossum_mcp.tools.schemas.operations.asyncio.sleep", new_callable=AsyncMock):
-            with pytest.raises(APIClientError, match="412"):
-                await patch_schema(
-                    schema_id=50,
-                    operation="add",
-                    node_id="vendor_name",
-                    parent_id="header_section",
-                    node_data={"label": "Vendor Name", "type": "string", "category": "datapoint"},
-                )
+        with (
+            patch("rossum_mcp.tools.schemas.operations.asyncio.sleep", new_callable=AsyncMock),
+            pytest.raises(APIClientError, match="412"),
+        ):
+            await patch_schema(
+                schema_id=50,
+                operation="add",
+                node_id="vendor_name",
+                parent_id="header_section",
+                node_data={"label": "Vendor Name", "type": "string", "category": "datapoint"},
+            )
 
     @pytest.mark.asyncio
     async def test_patch_schema_invalid_operation(

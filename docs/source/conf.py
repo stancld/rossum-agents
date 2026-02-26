@@ -4,16 +4,16 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 from __future__ import annotations
 
-import os
+import pathlib
 import sys
 import tomllib
 
-sys.path.insert(0, os.path.abspath("../../"))
+sys.path.insert(0, str(pathlib.Path("../../").resolve()))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-with open(os.path.abspath("../../rossum-mcp/pyproject.toml"), "rb") as f:
+with pathlib.Path("../../rossum-mcp/pyproject.toml").resolve().open("rb") as f:
     _pyproject = tomllib.load(f)
 
 project = "Rossum MCP Server"

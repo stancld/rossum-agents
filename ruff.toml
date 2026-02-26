@@ -28,6 +28,7 @@ extend-select = [
     "ICN",  # import conventions
     "NPY",  # numpy-specific rules
     "PLC0415",  # import-outside-top-level
+    "PTH",  # pathlib over os.path
     "RET",  # returns formatting
     "RUF",  # ruff-specific rules
     "SIM",  # flake8-simplify
@@ -40,23 +41,8 @@ unfixable = [
 ]
 
 ignore = [
-    "B017",  # self.assertRaises(Exception): should be considered evil. It can lead to your test passing even if the code being tested is never executed due to a typo. (DC-1734)
-    "B018",  # Found useless attribute access. Either assign it to a variable or remove it.
-    "B019",  # Use of functools.lru_cache or functools.cache on methods can lead to memory leaks (DC-1088)
-    "B028",  # No explicit `stacklevel` keyword argument found
-    "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
-    "B905",  # `zip()` without an explicit `strict=` parameter
     "C408",
-    "E402",  # Module level import not at top of file
     "E501",  # Long literals which Black can't split
-    "E741",  # Ambiguous variable name
-    "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar` (over 500 occurrences)
-    "RUF017",  # Avoid Quadratic list summation [rule in preview stage]
-    "RUF018",  # Assignment in assert [rule in preview stage]
-    "RUF019",  # Unnecessary key check [rule in preview stage]
-    "RUF200",  # Invalid pyproject TOML (Not monorepo friendly. We miss `name` in individual `pyproject.toml`)
-    "SIM103",  # Checks for if statements that can be replaced with bool.
-    "SIM117",  # Use a single with statement with multiple contexts instead of nested with statements
     "UP010",  # Unnecessary __future__ import {import} for target Python version -- we require `from __future__ import annotations` everywhere
     "UP030",  # Use implicit references for positional format fields -- personally, I don't like relying on implicit values
     "UP031",

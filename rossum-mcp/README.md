@@ -2,14 +2,14 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 70 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. 71 tools for queues, schemas, hooks, engines, and more.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI - rossum-mcp](https://img.shields.io/pypi/v/rossum-mcp?label=rossum-mcp)](https://pypi.org/project/rossum-mcp/)
 [![Coverage](https://codecov.io/gh/stancld/rossum-agents/branch/master/graph/badge.svg?flag=rossum-mcp)](https://codecov.io/gh/stancld/rossum-agents)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-70-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-71-blue.svg)](#available-tools)
 
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
@@ -97,11 +97,11 @@ Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
 
 ## Available Tools
 
-The server provides **70 tools** organized into categories:
+The server provides **71 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
-| **Document Processing** | 8 | Upload documents, retrieve/update/confirm/copy/delete annotations |
+| **Document Processing** | 9 | Upload documents, retrieve/update/confirm/copy/delete annotations |
 | **Queue Management** | 9 | Create, configure, delete, and list queues |
 | **Schema Management** | 8 | Define, modify, and delete field structures |
 | **Engine Management** | 6 | Configure extraction and splitting engines |
@@ -120,7 +120,7 @@ The server provides **70 tools** organized into categories:
 <summary><strong>Tool List by Category</strong></summary>
 
 **Document Processing:**
-`upload_document`, `get_annotation`, `list_annotations`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`, `delete_annotation`
+`upload_document`, `get_annotation`, `get_annotation_content`, `list_annotations`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`, `delete_annotation`
 
 **Queue Management:**
 `get_queue`, `list_queues`, `get_queue_schema`, `get_queue_engine`, `create_queue`, `create_queue_from_template`, `get_queue_template_names`, `update_queue`, `delete_queue`
@@ -187,7 +187,8 @@ annotation = get_annotation(annotation_id=annotations[0].id)
 start_annotation(annotation_id=12345)
 
 # 2. Get content with field IDs
-annotation = get_annotation(annotation_id=12345, sideloads=['content'])
+annotation_content = get_annotation_content(annotation_id=12345)
+# Returns {"path": "/tmp/rossum_annotation_12345_content.json"} — use jq/grep on that file
 
 # 3. Update fields using datapoint IDs
 bulk_update_annotation_fields(

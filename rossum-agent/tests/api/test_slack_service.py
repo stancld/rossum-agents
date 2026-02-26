@@ -15,9 +15,11 @@ def slack_service():
 
 class TestSlackServiceInit:
     def test_raises_import_error_when_slack_sdk_missing(self):
-        with patch("rossum_agent.api.services.slack_service.AsyncWebClient", None):
-            with pytest.raises(ImportError, match="slack-sdk is required"):
-                SlackService(slack_bot_token="xoxb-test")
+        with (
+            patch("rossum_agent.api.services.slack_service.AsyncWebClient", None),
+            pytest.raises(ImportError, match="slack-sdk is required"),
+        ):
+            SlackService(slack_bot_token="xoxb-test")
 
 
 class TestBuildComment:

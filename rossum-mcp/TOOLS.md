@@ -1,8 +1,8 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 70 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 71 MCP tools. For quick start and setup, see [README.md](README.md).
 
-## Document Processing (8 tools)
+## Document Processing (9 tools)
 
 ### upload_document
 
@@ -24,11 +24,10 @@ Uploads a document to Rossum for processing. Returns a task ID. Use `list_annota
 
 ### get_annotation
 
-Retrieves annotation data for a previously uploaded document. Use this to check the status of a document.
+Retrieves annotation metadata. Use this to check the status of a document.
 
 **Parameters:**
 - `annotation_id` (integer, required): The annotation ID obtained from list_annotations
-- `sideloads` (array, optional): List of sideloads to include. Use `['content']` to fetch annotation content with datapoints
 
 **Returns:**
 ```json
@@ -39,9 +38,22 @@ Retrieves annotation data for a previously uploaded document. Use this to check 
   "schema": "67890",
   "modifier": "11111",
   "document": "22222",
-  "content": [...],
   "created_at": "2024-01-01T00:00:00Z",
   "modified_at": "2024-01-01T00:00:00Z"
+}
+```
+
+### get_annotation_content
+
+Fetches annotation extracted content and saves it to a local JSON file. Returns the path for `jq`/`grep` processing.
+
+**Parameters:**
+- `annotation_id` (integer, required): The annotation ID
+
+**Returns:**
+```json
+{
+  "path": "/tmp/rossum_annotation_12345_content.json"
 }
 ```
 
@@ -912,7 +924,7 @@ Set the MCP operation mode. Use 'read-only' to disable write operations, 'read-w
 Lists all available tool categories with descriptions, tool names, and keywords for dynamic tool loading.
 
 **Available Categories:**
-- `annotations` - Document processing (8 tools)
+- `annotations` - Document processing (9 tools)
 - `queues` - Queue management (9 tools)
 - `schemas` - Schema management (8 tools)
 - `engines` - AI engine management (6 tools)
@@ -963,7 +975,7 @@ Other states: `created`, `failed_import`, `split`, `in_workflow`, `rejected`, `f
 2. Get annotation ID using `list_annotations`
 3. Wait until status is `importing` or `to_review`
 4. Start annotation using `start_annotation`
-5. Get content using `get_annotation` with `sideloads=['content']`
+5. Get content using `get_annotation_content`
 6. Update fields using `bulk_update_annotation_fields`
 7. Confirm using `confirm_annotation`
 

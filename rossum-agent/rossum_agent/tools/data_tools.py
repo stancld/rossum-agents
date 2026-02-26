@@ -1,0 +1,108 @@
+"""General-purpose jq and grep tools for arbitrary JSON/text content."""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+import jq  # ty: ignore[unresolved-import] - no type stubs for jq
+from anthropic import beta_tool
+
+_JQ_OUTPUT_LIMIT = 50_000
+_GREP_MATCH_LIMIT = 200
+
+
+def _truncate_output(output: str, limit: int) -> str:
+    if len(output) <= limit:
+        return output
+    truncation_point = output.rfind("\n", 0, limit)
+    if truncation_point <= 0:
+        truncation_point = limit
+    return output[:truncation_point] + "\n... (truncated)"
+
+
+def _resolve_content(value: str) -> str:
+    """Return file contents if value is an existing path, otherwise return value as-is."""
+    path = Path(value)
+    if path.is_absolute() and path.is_file():
+        return path.read_text(encoding="utf-8")
+    return value
+
+
+@beta_tool
+def run_jq(jq_query: str, data: str) -> str:
+    """Run a jq expression against JSON content or a file path containing JSON.
+
+    Use to filter, transform, or extract values from API responses, schema
+    definitions, annotation content, or any JSON data.
+
+    Common patterns:
+    - `.[] | select(.status == "active")` — filter array elements
+    - `.[0].name` — extract nested value
+    - `keys` — list object keys
+    - `map(.id)` — extract field from array
+
+    Annotation content structure (get_annotation_content):
+    - Top-level array of sections, each with `.children[]` (datapoints or multivalues)
+    - Datapoint value is at `.content.value`, not `.value`
+    - To find a datapoint: `[.. | objects | select(.schema_id == "amount_total")] | .[0].content.value`
+
+    Args:
+        jq_query: A jq expression to run.
+        data: JSON string or absolute path to a JSON file (e.g. from get_annotation_content).
+
+    Returns:
+        JSON result from the jq expression, or error message.
+    """
+    content = _resolve_content(data)
+
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError as e:
+        return json.dumps({"status": "error", "message": f"Invalid JSON: {e}"})
+
+    try:
+        output = jq.compile(jq_query).input_value(parsed).text()
+    except (ValueError, SystemError) as e:
+        return json.dumps({"status": "error", "message": f"jq error: {e}"})
+
+    output = _truncate_output(output, _JQ_OUTPUT_LIMIT)
+    return json.dumps({"status": "success", "result": output})
+
+
+@beta_tool
+def run_grep(pattern: str, text: str, case_insensitive: bool = True) -> str:
+    """Search text for lines matching a regex pattern. Accepts raw text or a file path.
+
+    Use to find relevant lines in large text payloads — log output, configuration
+    files, schema dumps, or any multi-line string.
+
+    Args:
+        pattern: Regex or literal string to search for.
+        text: Multi-line text or absolute path to a text file.
+        case_insensitive: Whether to ignore case (default: True).
+
+    Returns:
+        Matching lines with line numbers, or error.
+    """
+    content = _resolve_content(text)
+
+    try:
+        compiled = re.compile(pattern, re.IGNORECASE if case_insensitive else 0)
+    except re.error as e:
+        return json.dumps({"status": "error", "message": f"Invalid regex: {e}"})
+
+    matches = [{"line": i + 1, "text": line} for i, line in enumerate(content.splitlines()) if compiled.search(line)]
+
+    if not matches:
+        return json.dumps({"status": "success", "result": "No matches found"})
+
+    truncated = False
+    if len(matches) > _GREP_MATCH_LIMIT:
+        total = len(matches)
+        matches = matches[:_GREP_MATCH_LIMIT]
+        matches.append({"line": -1, "text": f"... ({total - _GREP_MATCH_LIMIT} more matches)"})
+        truncated = True
+
+    return json.dumps({"status": "success", "matches": len(matches) - (1 if truncated else 0), "result": matches})

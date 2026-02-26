@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, get_args
 
 from rossum_agent.agent.skills import get_all_skills
@@ -222,6 +222,38 @@ async def _handle_persona(ctx: CommandContext) -> str:
     return "\n".join(parts)
 
 
+# -- /history ----------------------------------------------------------------
+
+_register("/history", "Show past chat sessions")
+
+
+async def _handle_history(ctx: CommandContext) -> str:
+    if ctx.args:
+        try:
+            limit = int(ctx.args[0])
+        except ValueError:
+            return f"Invalid limit `{ctx.args[0]}`. Usage: `/history` or `/history <number>`"
+    else:
+        limit = 20
+
+    response = ctx.chat_service.list_chats(user_id=ctx.user_id, limit=limit + 1)
+
+    chats = [c for c in response.chats if c.chat_id != ctx.chat_id][:limit]
+
+    if not chats:
+        return "No past chats found."
+
+    lines = [f"**Past chats ({len(chats)}):**", ""]
+    for chat in chats:
+        ts = datetime.fromtimestamp(chat.timestamp, tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
+        label = chat.summary or chat.preview or chat.first_message or "(empty)"
+        if len(label) > 80:
+            label = label[:77] + "..."
+        lines.append(f"- **{ts}** — {label} ({chat.message_count} messages)")
+
+    return "\n".join(lines)
+
+
 # -- Handler dispatch --------------------------------------------------------
 
 _HANDLERS: dict[str, Callable[[CommandContext], Awaitable[str]]] = {
@@ -231,6 +263,7 @@ _HANDLERS: dict[str, Callable[[CommandContext], Awaitable[str]]] = {
     "/list-mcp-tools": _handle_list_mcp_tools,
     "/list-agent-tools": _handle_list_agent_tools,
     "/persona": _handle_persona,
+    "/history": _handle_history,
 }
 
 

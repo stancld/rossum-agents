@@ -681,6 +681,8 @@ class TestPruneSchemaFields:
         mock_client._http_client.update.side_effect = APIClientError("PATCH", "schemas/50", 412, "Precondition Failed")
 
         prune_schema_fields = mock_mcp._tools["prune_schema_fields"]
-        with patch("rossum_mcp.tools.schemas.operations.asyncio.sleep", new_callable=AsyncMock):
-            with pytest.raises(APIClientError, match="412"):
-                await prune_schema_fields(schema_id=50, fields_to_remove=["invoice_date"])
+        with (
+            patch("rossum_mcp.tools.schemas.operations.asyncio.sleep", new_callable=AsyncMock),
+            pytest.raises(APIClientError, match="412"),
+        ):
+            await prune_schema_fields(schema_id=50, fields_to_remove=["invoice_date"])

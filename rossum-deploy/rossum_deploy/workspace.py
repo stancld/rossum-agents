@@ -117,12 +117,12 @@ class Workspace:
             data=data,
         )
         path = self._object_path(obj_type, obj_id, name)
-        with open(path, "w", encoding="utf-8") as f:
+        with Path(path).open("w", encoding="utf-8") as f:
             json.dump(local_obj.model_dump(by_alias=True, mode="json"), f, indent=2)
         return path
 
     def _load_object(self, path: Path) -> LocalObject:
-        with open(path, encoding="utf-8") as f:
+        with Path(path).open(encoding="utf-8") as f:
             result: LocalObject = LocalObject.model_validate(json.load(f))
             return result
 
@@ -811,9 +811,7 @@ class Workspace:
         if is_tuple and parent_is_multivalue_tuple:
             return True
         child_is_tuple = child.get("category") == "tuple"
-        if is_multivalue and child_is_tuple:
-            return True
-        return False
+        return bool(is_multivalue and child_is_tuple)
 
     def _find_object_path(self, obj_type: ObjectType, obj_id: int) -> Path | None:
         for path in self._list_local_objects(obj_type):
@@ -1408,7 +1406,7 @@ class Workspace:
     def _save_id_mapping(self, id_mapping: IdMapping) -> Path:
         self.path.mkdir(parents=True, exist_ok=True)
         mapping_path = self.path / f".id_mapping_{id_mapping.source_org_id}_to_{id_mapping.target_org_id}.json"
-        with open(mapping_path, "w") as f:
+        with Path(mapping_path).open("w") as f:
             json.dump(id_mapping.model_dump(mode="json"), f, indent=2)
         return mapping_path
 
@@ -1416,7 +1414,7 @@ class Workspace:
         mapping_path = self.path / f".id_mapping_{source_org_id}_to_{target_org_id}.json"
         if not mapping_path.exists():
             return None
-        with open(mapping_path) as f:
+        with Path(mapping_path).open() as f:
             result: IdMapping = IdMapping.model_validate(json.load(f))
             return result
 

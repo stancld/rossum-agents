@@ -29,6 +29,16 @@ def extract_text_from_content(content: str | list[dict[str, Any]] | None) -> str
     return ""
 
 
+def _extract_first_user_text(messages: list[dict[str, Any]]) -> str:
+    """Extract text from the first user message, handling both legacy and task_step formats."""
+    for msg in messages:
+        if msg.get("type") == "task_step":
+            return msg.get("task", "")
+        if msg.get("role") == "user":
+            return extract_text_from_content(msg.get("content"))
+    return ""
+
+
 @dataclass
 class ChatMetadata:
     """Metadata for a chat session."""
@@ -203,14 +213,7 @@ class RedisStorage:
                     messages = chat_data.messages
                     timestamp_str = chat_id.split("_")[1]
                     timestamp = int(dt.datetime.strptime(timestamp_str, "%Y%m%d%H%M%S").timestamp())
-                    first_message_content = messages[0].get("content") if messages else None
-                    first_message = extract_text_from_content(first_message_content)
-                    first_user_content = next(
-                        (m.get("content") for m in messages if m.get("role") == "user"),
-                        None,
-                    )
-                    first_user = extract_text_from_content(first_user_content)
-                    preview = first_user[:100] if first_user else None
+                    first_message = _extract_first_user_text(messages)
 
                     chats.append(
                         {
@@ -218,7 +221,7 @@ class RedisStorage:
                             "timestamp": timestamp,
                             "message_count": len(messages),
                             "first_message": first_message[:100],
-                            "preview": preview,
+                            "preview": first_message[:100] or None,
                             "commit_sha": chat_data.metadata.commit_sha,
                             "total_input_tokens": chat_data.metadata.total_input_tokens,
                             "total_output_tokens": chat_data.metadata.total_output_tokens,

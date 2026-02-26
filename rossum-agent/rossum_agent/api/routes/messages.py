@@ -60,19 +60,23 @@ def _format_sse_event(event_type: str, data: str) -> str:
     return f"event: {event_type}\ndata: {data}\n\n"
 
 
-async def _generate_chat_summary(user_prompt: str) -> str | None:
-    """Generate a one-line summary of the chat turn via Claude Haiku. Returns None on failure."""
+async def _generate_chat_summary(user_prompt: str, previous_summary: str | None = None) -> str | None:
+    """Generate a one-line chat summary via Claude Haiku. Updates previous summary if available."""
     try:
+        if previous_summary:
+            prompt = (
+                f"Current summary: {previous_summary}\n"
+                f"New user message: {user_prompt[:500]}\n\n"
+                f"Update the summary to cover the full conversation. One sentence, max 10 words."
+            )
+        else:
+            prompt = f"Summarize this in one sentence (max 10 words): {user_prompt[:500]}"
+
         client = anthropic.AsyncAnthropic()
         response = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=50,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"Summarize this in one sentence (max 10 words): {user_prompt[:500]}",
-                }
-            ],
+            messages=[{"role": "user", "content": prompt}],
         )
         text_block = next((b for b in response.content if isinstance(b, anthropic.types.TextBlock)), None)
         return text_block.text.strip() if text_block else None
@@ -141,7 +145,8 @@ def _save_chat_history(
     """Persist updated conversation history after a successful agent run."""
     if done_event and done_event.config_commit_hash:
         chat_data.metadata.config_commits.append(done_event.config_commit_hash)
-    chat_data.metadata.summary = summary
+    if summary is not None:
+        chat_data.metadata.summary = summary
 
     updated_history = agent_service.build_updated_history(
         existing_history=history,
@@ -356,7 +361,7 @@ async def send_message(  # noqa: C901 - endpoint handler with slash command inte
 
         output_dir = agent_service.get_output_dir(chat_id)
         memory = agent_service.pop_last_memory(chat_id)
-        summary = await _generate_chat_summary(user_prompt)
+        summary = await _generate_chat_summary(user_prompt, previous_summary=chat_data.metadata.summary)
 
         _save_chat_history(
             chat_service=chat_service,

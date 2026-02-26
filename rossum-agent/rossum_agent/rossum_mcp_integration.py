@@ -97,7 +97,7 @@ def _extract_entity_name(data: dict | None) -> str:
         return ""
     source = unwrap(data)
     for key in ("name", "label", "title", "subject"):
-        if key in source and source[key]:
+        if source.get(key):
             return str(source[key])
     return ""
 

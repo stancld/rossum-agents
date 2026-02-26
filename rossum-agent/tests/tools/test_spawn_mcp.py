@@ -594,16 +594,18 @@ class TestAsyncSpawnConnection:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_connection = MagicMock()
 
-        with patch("rossum_agent.tools.spawn_mcp.create_mcp_transport"):
-            with patch("rossum_agent.tools.spawn_mcp.Client", return_value=mock_client):
-                with patch("rossum_agent.tools.spawn_mcp.MCPConnection", return_value=mock_connection):
-                    result = await _spawn_connection_async(
-                        connection_id="test", api_token="token", api_base_url="https://api.test.com"
-                    )
+        with (
+            patch("rossum_agent.tools.spawn_mcp.create_mcp_transport"),
+            patch("rossum_agent.tools.spawn_mcp.Client", return_value=mock_client),
+            patch("rossum_agent.tools.spawn_mcp.MCPConnection", return_value=mock_connection),
+        ):
+            result = await _spawn_connection_async(
+                connection_id="test", api_token="token", api_base_url="https://api.test.com"
+            )
 
-                    assert result.connection is mock_connection
-                    assert result.api_base_url == "https://api.test.com"
-                    assert "test" in _spawned_connections
+            assert result.connection is mock_connection
+            assert result.api_base_url == "https://api.test.com"
+            assert "test" in _spawned_connections
 
         _spawned_connections.clear()
 

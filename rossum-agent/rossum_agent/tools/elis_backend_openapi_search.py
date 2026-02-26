@@ -112,7 +112,7 @@ class SpecCache:
         try:
             with os.fdopen(fd, "w") as f:
                 f.write(spec_json)
-            os.replace(tmp_path, self._cache_path)
+            Path(tmp_path).replace(self._cache_path)
         except BaseException:
             Path(tmp_path).unlink(missing_ok=True)
             raise

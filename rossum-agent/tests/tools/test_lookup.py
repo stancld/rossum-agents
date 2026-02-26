@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
+
+if TYPE_CHECKING:
+    from typing import ClassVar
 
 import httpx
 from rossum_agent.tools.core import AgentContext, set_context
@@ -925,7 +929,7 @@ class TestExtractLookupResults:
 
 
 class TestEvaluateLookupField:
-    _SCHEMA = [
+    _SCHEMA: ClassVar[list] = [
         {
             "id": "vendor_section",
             "category": "section",

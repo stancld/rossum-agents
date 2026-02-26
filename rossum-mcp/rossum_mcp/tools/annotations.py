@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 import logging
+import tempfile
 from collections.abc import Sequence  # noqa: TC003 - needed at runtime for FastMCP
-from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import anyio
 from rossum_api.domain_logic.resources import Resource
@@ -17,12 +18,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-type Sideload = Literal["content", "document", "automation_blocker"]
-
 
 async def _upload_document(client: AsyncRossumAPIClient, file_path: str, queue_id: int) -> dict:
-    path = Path(file_path)
-    if not await anyio.Path(path).exists():
+    path = anyio.Path(file_path)
+    if not await path.exists():
         logger.error(f"File not found: {file_path}")
         raise FileNotFoundError(f"File not found: {file_path}")
 
@@ -58,12 +57,18 @@ async def _upload_document(client: AsyncRossumAPIClient, file_path: str, queue_i
     }
 
 
-async def _get_annotation(
-    client: AsyncRossumAPIClient, annotation_id: int, sideloads: Sequence[Sideload] = ()
-) -> Annotation:
+async def _get_annotation(client: AsyncRossumAPIClient, annotation_id: int) -> Annotation:
     logger.debug(f"Retrieving annotation: annotation_id={annotation_id}")
-    annotation: Annotation = await client.retrieve_annotation(annotation_id, sideloads)  # type: ignore[arg-type]
+    annotation: Annotation = await client.retrieve_annotation(annotation_id)
     return annotation
+
+
+async def _get_annotation_content(client: AsyncRossumAPIClient, annotation_id: int) -> dict:
+    logger.debug(f"Retrieving annotation content: annotation_id={annotation_id}")
+    annotation: Annotation = await client.retrieve_annotation(annotation_id, sideloads=("content",))
+    path = anyio.Path(tempfile.gettempdir()) / f"rossum_annotation_{annotation_id}_content.json"
+    await path.write_text(json.dumps(annotation.content, indent=2))
+    return {"path": str(path)}
 
 
 async def _list_annotations(
@@ -156,12 +161,20 @@ def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> Non
         return await _upload_document(client, file_path, queue_id)
 
     @mcp.tool(
-        description="Retrieve an annotation; include sideload='content' to return extracted data.",
+        description="Retrieve an annotation (metadata only, no extracted content).",
         tags={"annotations"},
         annotations={"readOnlyHint": True},
     )
-    async def get_annotation(annotation_id: int, sideloads: Sequence[Sideload] = ()) -> Annotation:
-        return await _get_annotation(client, annotation_id, sideloads)
+    async def get_annotation(annotation_id: int) -> Annotation:
+        return await _get_annotation(client, annotation_id)
+
+    @mcp.tool(
+        description="Fetch annotation extracted content and save to a local JSON file; returns the path for jq/grep.",
+        tags={"annotations"},
+        annotations={"readOnlyHint": True},
+    )
+    async def get_annotation_content(annotation_id: int) -> dict:
+        return await _get_annotation_content(client, annotation_id)
 
     @mcp.tool(
         description="List queue annotations; ordering=['-created_at'] returns newest first.",

@@ -132,34 +132,38 @@ class TestLoadSkillTool:
             skill_file = Path(tmpdir) / "test-skill.md"
             skill_file.write_text("# Test Instructions\n\nDo this.")
 
-            with patch(
-                "rossum_agent.agent.skills._SKILLS_DIR",
-                Path(tmpdir),
-            ):
-                with patch(
+            with (
+                patch(
+                    "rossum_agent.agent.skills._SKILLS_DIR",
+                    Path(tmpdir),
+                ),
+                patch(
                     "rossum_agent.agent.skills._default_registry",
                     None,
-                ):
-                    result = load_skill(name="test-skill")
+                ),
+            ):
+                result = load_skill(name="test-skill")
 
-                    assert "success" in result
-                    assert "Test Instructions" in result
+                assert "success" in result
+                assert "Test Instructions" in result
 
     def test_load_skill_returns_error_for_unknown(self):
         """Test loading a nonexistent skill returns error."""
-        with TemporaryDirectory() as tmpdir:
-            with patch(
+        with (
+            TemporaryDirectory() as tmpdir,
+            patch(
                 "rossum_agent.agent.skills._SKILLS_DIR",
                 Path(tmpdir),
-            ):
-                with patch(
-                    "rossum_agent.agent.skills._default_registry",
-                    None,
-                ):
-                    result = load_skill(name="nonexistent")
+            ),
+            patch(
+                "rossum_agent.agent.skills._default_registry",
+                None,
+            ),
+        ):
+            result = load_skill(name="nonexistent")
 
-                    assert "error" in result
-                    assert "not found" in result
+            assert "error" in result
+            assert "not found" in result
 
     def test_execute_tool_integration(self):
         """Test load_skill via execute_tool."""
@@ -167,18 +171,20 @@ class TestLoadSkillTool:
             skill_file = Path(tmpdir) / "deploy.md"
             skill_file.write_text("# Deploy Guide")
 
-            with patch(
-                "rossum_agent.agent.skills._SKILLS_DIR",
-                Path(tmpdir),
-            ):
-                with patch(
+            with (
+                patch(
+                    "rossum_agent.agent.skills._SKILLS_DIR",
+                    Path(tmpdir),
+                ),
+                patch(
                     "rossum_agent.agent.skills._default_registry",
                     None,
-                ):
-                    result = execute_tool("load_skill", {"name": "deploy"}, INTERNAL_TOOLS)
+                ),
+            ):
+                result = execute_tool("load_skill", {"name": "deploy"}, INTERNAL_TOOLS)
 
-                    assert "success" in result
-                    assert "Deploy Guide" in result
+                assert "success" in result
+                assert "Deploy Guide" in result
 
 
 class TestModuleLevelFunctions:
@@ -190,17 +196,19 @@ class TestModuleLevelFunctions:
             skill_file = Path(tmpdir) / "my-skill.md"
             skill_file.write_text("Content")
 
-            with patch(
-                "rossum_agent.agent.skills._SKILLS_DIR",
-                Path(tmpdir),
-            ):
-                with patch(
+            with (
+                patch(
+                    "rossum_agent.agent.skills._SKILLS_DIR",
+                    Path(tmpdir),
+                ),
+                patch(
                     "rossum_agent.agent.skills._default_registry",
                     None,
-                ):
-                    skill = get_skill("my-skill")
-                    assert skill is not None
-                    assert skill.content == "Content"
+                ),
+            ):
+                skill = get_skill("my-skill")
+                assert skill is not None
+                assert skill.content == "Content"
 
     def test_get_skill_registry_creates_default(self):
         """Test get_skill_registry creates default registry."""
@@ -218,11 +226,10 @@ class TestSkillRegistryErrorHandling:
     def test_handles_corrupted_skill_file(self, tmp_path, caplog):
         """Test that registry handles unreadable skill files gracefully."""
         import logging
-        import os
 
         skill_file = tmp_path / "broken-skill.md"
         skill_file.write_text("Valid content")
-        os.chmod(skill_file, 0o000)
+        Path(skill_file).chmod(0o000)
 
         try:
             with caplog.at_level(logging.ERROR):
@@ -232,4 +239,4 @@ class TestSkillRegistryErrorHandling:
             assert len(skills) == 0
             assert "Failed to load skill" in caplog.text
         finally:
-            os.chmod(skill_file, 0o644)
+            Path(skill_file).chmod(0o644)
