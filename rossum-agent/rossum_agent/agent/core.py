@@ -42,7 +42,7 @@ import random
 import time
 from contextvars import copy_context
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from anthropic import APIError, APITimeoutError, RateLimitError
 from anthropic._types import Omit
@@ -162,7 +162,7 @@ def _parse_json_encoded_strings(arguments: dict) -> dict:
 class _SchemaStagger:
     """Stagger schema patch calls to avoid 412 conflicts from concurrent writes."""
 
-    _TOOLS = {"patch_schema", "patch_schema_with_subagent"}
+    _TOOLS: ClassVar[set[str]] = {"patch_schema", "patch_schema_with_subagent"}
     _DELAY_SECONDS = 0.5
 
     def __init__(self) -> None:

@@ -42,11 +42,6 @@ unfixable = [
 ignore = [
     "C408",
     "E501",  # Long literals which Black can't split
-    "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar` (over 500 occurrences)
-    "RUF017",  # Avoid Quadratic list summation [rule in preview stage]
-    "RUF018",  # Assignment in assert [rule in preview stage]
-    "RUF019",  # Unnecessary key check [rule in preview stage]
-    "RUF200",  # Invalid pyproject TOML (Not monorepo friendly. We miss `name` in individual `pyproject.toml`)
     "SIM103",  # Checks for if statements that can be replaced with bool.
     "SIM117",  # Use a single with statement with multiple contexts instead of nested with statements
     "UP010",  # Unnecessary __future__ import {import} for target Python version -- we require `from __future__ import annotations` everywhere
