@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Fixed several chat summary issues: now updates incrementally instead of regenerating from scratch, correctly extracts `first_message` from `task_step` format, and no longer overwrites an existing summary with `None` on failure
+- Fixed rule creation workflow — added `suggest_rule` tool that uses Rossum Local Copilot to generate trigger conditions and actions from natural language; updated rules-and-actions skill to use suggest-then-create flow and removed `schema_id` from scope requirements ([#217](https://github.com/rossumai/rossum-agents/pull/217))
 
 ## [1.3.2] - 2026-02-25
 

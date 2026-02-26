@@ -136,6 +136,9 @@ The agent provides internal tools and access to 70 MCP tools via dynamic loading
 **Formula:**
 - `suggest_formula_field` - Suggest formula field expressions via Rossum Local Copilot
 
+**Rules:**
+- `suggest_rule` - Suggest rule trigger conditions and actions via Rossum Local Copilot
+
 **Lookup Fields:**
 - `suggest_lookup_field` - Suggest lookup field matching configuration for MDH datasets
 - `evaluate_lookup_field` - Evaluate lookup field results on a real annotation

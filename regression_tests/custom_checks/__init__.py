@@ -57,6 +57,9 @@ from regression_tests.custom_checks.replace_schema_and_revert import (
 from regression_tests.custom_checks.replace_schema_with_formula import (
     check_schema_replaced_with_formula,
 )
+from regression_tests.custom_checks.rule_with_evaluate import (
+    check_single_threshold_rule_and_evaluated,
+)
 from regression_tests.custom_checks.schema_revert_type_validation import (
     check_schema_reverted_with_valid_types,
 )
@@ -85,4 +88,5 @@ __all__ = [
     "check_schema_replaced_with_formula",
     "check_schema_reverted_with_valid_types",
     "check_serverless_hook_uses_txscript",
+    "check_single_threshold_rule_and_evaluated",
 ]

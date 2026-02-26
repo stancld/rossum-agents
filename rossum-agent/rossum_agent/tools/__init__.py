@@ -34,6 +34,7 @@ from rossum_agent.tools.lookup import (
     suggest_lookup_field,
 )
 from rossum_agent.tools.mock_pdf import generate_mock_pdf
+from rossum_agent.tools.rule import evaluate_rules, suggest_rule
 from rossum_agent.tools.skills import load_skill
 from rossum_agent.tools.spawn_mcp import call_on_connection, close_connection, spawn_mcp_connection
 from rossum_agent.tools.subagents import patch_schema_with_subagent, search_elis_docs, search_knowledge_base
@@ -50,6 +51,8 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     search_elis_docs,
     patch_schema_with_subagent,
     suggest_formula_field,
+    suggest_rule,
+    evaluate_rules,
     suggest_lookup_field,
     evaluate_lookup_field,
     get_lookup_dataset_raw_values,
