@@ -537,6 +537,18 @@ class TestTryCacheRead:
         conn._try_cache_read("get_queue", {}, {"id": 42, "name": "Q"})
         assert conn._cache_get("queue", "42") == {"id": 42, "name": "Q"}
 
+    def test_unified_get_caches_data_from_wrapper(self):
+        conn = _make_connection()
+        result = {"entity": "queue", "id": 1, "data": {"id": 1, "name": "Q"}}
+        conn._try_cache_read("get", {"entity": "queue", "entity_id": 1}, result)
+        assert conn._cache_get("queue", "1") == {"id": 1, "name": "Q"}
+
+    def test_unified_get_caches_fallback_when_no_data_key(self):
+        conn = _make_connection()
+        result = {"id": 1, "name": "Q"}
+        conn._try_cache_read("get", {"entity": "queue", "entity_id": 1}, result)
+        assert conn._cache_get("queue", "1") == {"id": 1, "name": "Q"}
+
 
 class TestFetchSnapshot:
     @pytest.mark.asyncio
@@ -565,6 +577,16 @@ class TestFetchSnapshot:
         result = await conn._fetch_snapshot("queue", "1")
 
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_unwraps_unified_get_response(self):
+        conn = _make_connection()
+        unified = {"entity": "queue", "id": 1, "data": {"id": 1, "name": "Q", "schema": "https://..."}}
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(unified))
+
+        result = await conn._fetch_snapshot("queue", "1")
+
+        assert result == {"id": 1, "name": "Q", "schema": "https://..."}
 
 
 class TestChangeTrackerState:

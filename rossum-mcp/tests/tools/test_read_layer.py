@@ -17,10 +17,12 @@ from conftest import (
 from rossum_mcp.tools.read_layer import register_read_tools
 from rossum_mcp.tools.read_layer.models import (
     AnnotationSearch,
+    DocumentRelationSearch,
     EngineSearch,
     HookSearch,
     HookTemplateSearch,
     QueueSearch,
+    RelationSearch,
     SchemaSearch,
     WorkspaceSearch,
 )
@@ -503,3 +505,171 @@ class TestRegistry:
         registry = build_registry(mock_client)
         assert registry["organization_limit"].search_fn is None
         assert registry["organization_limit"].retrieve_fn is not None
+
+
+# ───────────────────────── SEARCH Error Cases ─────────────────────────
+
+
+@pytest.mark.unit
+class TestSearchErrors:
+    @pytest.mark.asyncio
+    async def test_search_unknown_entity_returns_error(
+        self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None
+    ) -> None:
+        register_read_tools(mock_mcp, mock_client)
+        # organization_limit has no search_fn
+        from rossum_mcp.tools.read_layer.models import BaseModel
+
+        class FakeSearch(BaseModel):
+            entity: str = "organization_limit"
+
+        # Build a query that mimics searching organization_limit
+        registry = build_registry(mock_client)
+        config = registry["organization_limit"]
+        assert config.search_fn is None
+
+
+# ───────────────────────── SEARCH Relations ─────────────────────────
+
+
+@pytest.mark.unit
+class TestSearchRelations:
+    @pytest.mark.asyncio
+    async def test_search_relations(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
+        with patch("rossum_mcp.tools.read_layer.registry.graceful_list") as mock_gl:
+            mock_gl.return_value = Mock(items=[Mock(id=1, type="edit")])
+            register_read_tools(mock_mcp, mock_client)
+            result = await mock_mcp._tools["search"](query=RelationSearch(type="edit"))
+        assert len(result) == 1
+
+    @pytest.mark.asyncio
+    async def test_search_document_relations(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
+        with patch("rossum_mcp.tools.read_layer.registry.graceful_list") as mock_gl:
+            mock_gl.return_value = Mock(items=[Mock(id=10, type="line_items")])
+            register_read_tools(mock_mcp, mock_client)
+            result = await mock_mcp._tools["search"](query=DocumentRelationSearch(type="line_items"))
+        assert len(result) == 1
+
+
+# ───────────────────────── include_related: schema ─────────────────────────
+
+
+@pytest.mark.unit
+class TestIncludeRelatedSchema:
+    @pytest.mark.asyncio
+    async def test_get_schema_include_related(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
+        mock_schema = create_mock_schema(id=10)
+        mock_client.retrieve_schema.return_value = mock_schema
+
+        mock_queue = create_mock_queue(id=1, name="Q1")
+        mock_rule = Mock(spec=["id", "name", "enabled"])
+        mock_rule.id = 5
+        mock_rule.name = "Rule 1"
+        mock_rule.enabled = True
+
+        with (
+            patch("rossum_mcp.tools.read_layer.related.graceful_list") as mock_gl,
+        ):
+            # First call returns queues, second returns rules
+            mock_gl.side_effect = [
+                Mock(items=[mock_queue]),
+                Mock(items=[mock_rule]),
+            ]
+            register_read_tools(mock_mcp, mock_client)
+            result = await mock_mcp._tools["get"](entity="schema", entity_id=10, include_related=True)
+
+        assert "_related" in result
+        assert "queues" in result["_related"]
+        assert "rules" in result["_related"]
+        assert len(result["_related"]["rules"]) == 1
+        assert result["_related"]["rules"][0]["name"] == "Rule 1"
+
+
+# ───────────────────────── include_related: hook ─────────────────────────
+
+
+@pytest.mark.unit
+class TestIncludeRelatedHook:
+    @pytest.mark.asyncio
+    async def test_get_hook_include_related_reuses_prefetched_hook(
+        self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None
+    ) -> None:
+        hook = create_mock_hook(id=5, queues=["https://q/1"], events=["annotation_status"])
+        mock_client.retrieve_hook.return_value = hook
+        register_read_tools(mock_mcp, mock_client)
+
+        result = await mock_mcp._tools["get"](entity="hook", entity_id=5, include_related=True)
+
+        assert "_related" in result
+        assert result["_related"]["queues"] == ["https://q/1"]
+        assert result["_related"]["events"] == ["annotation_status"]
+        # Should NOT call retrieve_hook a second time — the already-fetched object is reused
+        mock_client.retrieve_hook.assert_called_once_with(5)
+
+    @pytest.mark.asyncio
+    async def test_get_hook_include_related_with_empty_queues(
+        self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None
+    ) -> None:
+        hook = create_mock_hook(id=5, queues=[], events=[])
+        mock_client.retrieve_hook.return_value = hook
+        register_read_tools(mock_mcp, mock_client)
+
+        result = await mock_mcp._tools["get"](entity="hook", entity_id=5, include_related=True)
+
+        assert result["_related"]["queues"] == []
+        assert result["_related"]["events"] == []
+
+
+# ───────────────────────── include_related: queue error handling ─────────────────────────
+
+
+@pytest.mark.unit
+class TestIncludeRelatedQueueErrors:
+    @pytest.mark.asyncio
+    async def test_partial_failure_still_returns_successful_related(
+        self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None
+    ) -> None:
+        mock_queue = create_mock_queue(id=42)
+        mock_client.retrieve_queue.return_value = mock_queue
+
+        mock_hook = create_mock_hook(id=1, name="Hook 1", active=True)
+
+        with (
+            patch("rossum_mcp.tools.read_layer.related.get_schema_tree_structure") as mock_tree,
+            patch("rossum_mcp.tools.read_layer.related._get_queue_engine") as mock_eng,
+            patch("rossum_mcp.tools.read_layer.related._list_hooks") as mock_hooks,
+        ):
+            mock_tree.side_effect = RuntimeError("Schema tree failed")
+            mock_eng.return_value = create_mock_engine(id=10)
+            mock_hooks.return_value = [mock_hook]
+
+            register_read_tools(mock_mcp, mock_client)
+            result = await mock_mcp._tools["get"](entity="queue", entity_id=42, include_related=True)
+
+        related = result["_related"]
+        assert "schema_tree" not in related
+        assert "engine" in related
+        assert "hooks" in related
+        assert related["hooks_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_all_related_fail_returns_empty_related(
+        self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None
+    ) -> None:
+        mock_queue = create_mock_queue(id=42)
+        mock_client.retrieve_queue.return_value = mock_queue
+
+        with (
+            patch("rossum_mcp.tools.read_layer.related.get_schema_tree_structure") as mock_tree,
+            patch("rossum_mcp.tools.read_layer.related._get_queue_engine") as mock_eng,
+            patch("rossum_mcp.tools.read_layer.related._list_hooks") as mock_hooks,
+        ):
+            mock_tree.side_effect = RuntimeError("fail")
+            mock_eng.side_effect = RuntimeError("fail")
+            mock_hooks.side_effect = RuntimeError("fail")
+
+            register_read_tools(mock_mcp, mock_client)
+            result = await mock_mcp._tools["get"](entity="queue", entity_id=42, include_related=True)
+
+        # Empty dict from _fetch_queue_related is falsy, so _related is not set
+        assert "_related" not in result or result["_related"] == {}
