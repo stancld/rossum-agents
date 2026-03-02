@@ -31,11 +31,8 @@ from rossum_mcp.tools.schemas.patching import (
     apply_schema_patch,
 )
 from rossum_mcp.tools.schemas.validation import (
-    MAX_ID_LENGTH,
-    VALID_DATAPOINT_TYPES,
     VALID_UI_CONFIGURATION_EDIT,
     VALID_UI_CONFIGURATION_TYPES,
-    SchemaValidationError,
     sanitize_schema_content,
 )
 
@@ -44,8 +41,6 @@ if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
 
 __all__ = [
-    "MAX_ID_LENGTH",
-    "VALID_DATAPOINT_TYPES",
     "VALID_UI_CONFIGURATION_EDIT",
     "VALID_UI_CONFIGURATION_TYPES",
     "DatapointType",
@@ -58,7 +53,6 @@ __all__ = [
     "SchemaNodeUpdate",
     "SchemaTreeNode",
     "SchemaTuple",
-    "SchemaValidationError",
     "apply_schema_patch",
     "create_schema",
     "delete_schema",
