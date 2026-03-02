@@ -428,7 +428,7 @@ class AgentService:
                     )
 
                     agent_ctx.mcp_connection = mcp_connection
-                    agent_ctx.mcp_event_loop = asyncio.get_event_loop()
+                    agent_ctx.mcp_event_loop = asyncio.get_running_loop()
                     agent_ctx.mcp_mode = mcp_mode
                     agent_ctx.commit_store = commit_store
                     agent_ctx.snapshot_store = snapshot_store

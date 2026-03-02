@@ -654,7 +654,7 @@ class RossumAgent:
                 event_queue.put(e)
 
         ctx = copy_context()
-        producer_task = asyncio.get_event_loop().run_in_executor(None, partial(ctx.run, producer))
+        producer_task = asyncio.get_running_loop().run_in_executor(None, partial(ctx.run, producer))
 
         try:
             # Yield #5: Forward all streaming steps from _process_stream_events (yields #1-4)
@@ -836,7 +836,7 @@ class RossumAgent:
                     set_context(tool_ctx)
                     return execute_internal_tool(name, arguments)
 
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 ctx = copy_context()
                 future = loop.run_in_executor(
                     None, partial(ctx.run, _run_internal_tool, tool_ctx, tool_call.name, tool_call.arguments)
@@ -865,7 +865,7 @@ class RossumAgent:
                 logger.info(f"Internal tool {tool_call.name} result: {content}")
             elif tool_call.name in get_deploy_tool_names():
                 logger.info(f"Calling deploy tool {tool_call.name}")
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 ctx = copy_context()
                 future = loop.run_in_executor(
                     None, partial(ctx.run, execute_tool, tool_call.name, tool_call.arguments, DEPLOY_TOOLS)
@@ -921,7 +921,7 @@ class RossumAgent:
 
         Rate limiting is handled with exponential backoff and jitter.
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         agent_ctx = get_context()
         agent_ctx.mcp_connection = self.mcp_connection
         agent_ctx.mcp_event_loop = loop

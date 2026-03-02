@@ -28,7 +28,7 @@ class TestContextPropagation:
         """Test that output_dir context var is visible in run_in_executor."""
         set_context(AgentContext(output_dir=tmp_path))
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             ctx = copy_context()
             future = loop.run_in_executor(None, partial(ctx.run, lambda: get_context().get_output_dir()))
             result = await future
@@ -41,7 +41,7 @@ class TestContextPropagation:
         """Test that without copy_context, executor doesn't see the context var."""
         set_context(AgentContext(output_dir=tmp_path))
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             future = loop.run_in_executor(None, lambda: get_context().get_output_dir())
             result = await future
             assert result != tmp_path
@@ -54,7 +54,7 @@ class TestContextPropagation:
         """Test that write_file tool uses the propagated output_dir in executor."""
         set_context(AgentContext(output_dir=tmp_path))
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             ctx = copy_context()
             future = loop.run_in_executor(
                 None,
