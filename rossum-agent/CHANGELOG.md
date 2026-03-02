@@ -4,9 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - YYYY-MM-DD
+
+### Fixed
+- Fixed Rossum Elis OpenAPI spec URL — upstream renamed `openapi.external.json` to `openapi.json`, breaking spec downloads
+- Fixed path traversal vulnerability in document upload — `DocumentContent.filename` is now stripped to its bare name via `Path.name` at both the schema validation layer and the file write site, preventing absolute path injection (e.g. `/etc/cron.d/backdoor`) from writing outside the session output directory
+
 ## [1.3.5] - 2026-02-26
 
-### Changed
+### Fixed
 - Haiku model calls now respect `AWS_BEDROCK_MODEL_ARN_SMALL` env var (mirrors `AWS_BEDROCK_MODEL_ARN` for Opus)
 
 ## [1.3.4] - 2026-02-26
