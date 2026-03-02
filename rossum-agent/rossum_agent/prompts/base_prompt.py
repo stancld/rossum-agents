@@ -11,8 +11,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 
 | Source | Tool | Use For |
 |--------|------|---------|
-| API Reference (`rossum.app/api/docs`) | `elis_openapi_jq` / `elis_openapi_grep` | Endpoints, request/response schemas, query parameters, HTTP methods, TxScript functions, data formats |
-| API Reference (deep exploration) | `search_elis_docs` | Complex questions requiring multiple lookups or discovering related endpoints/schemas |
+| API Reference (`rossum.app/api/docs`) | `search_elis_docs` | Endpoints, request/response schemas, query parameters, HTTP methods, TxScript functions, data formats |
 | Knowledge Base (`knowledge-base.rossum.ai`) | `search_knowledge_base` | Extension setup, UI configuration, workflow tutorials, troubleshooting, Formula Fields |
 
 **Constraints**:

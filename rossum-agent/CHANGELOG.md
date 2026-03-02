@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Streaming progress logging — logs model/message count at stream start, periodic progress every 10s (phase, elapsed time, character throughput), and total elapsed time on completion for visibility into long Bedrock generations
 
+### Changed
+- Removed `elis_openapi_grep` and `elis_openapi_jq` as direct agent tools — Elis API reference lookups now route exclusively through the `search_elis_docs` sub-agent ([#220](https://github.com/rossumai/rossum-agents/pull/220))
+
 ### Fixed
 - Fixed `packages.find` in `pyproject.toml` — removed `rossum_mcp*` and `rossum_deploy*` from the `include` list; only `rossum_agent*` belongs in this package's build
 

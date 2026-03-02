@@ -33,7 +33,6 @@ from rossum_agent.tools.dynamic_tools import (
     load_tool,
     load_tool_category,
 )
-from rossum_agent.tools.elis_backend_openapi_search import elis_openapi_grep, elis_openapi_jq
 from rossum_agent.tools.file_tools import write_file
 from rossum_agent.tools.knowledge_base_search import kb_get_article, kb_grep
 from rossum_agent.tools.mock_pdf import generate_mock_pdf
@@ -63,8 +62,6 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     list_tasks,
     run_jq,
     run_grep,
-    elis_openapi_jq,
-    elis_openapi_grep,
     kb_grep,
     kb_get_article,
     generate_mock_pdf,
