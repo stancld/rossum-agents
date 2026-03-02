@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-OPENAPI_URL = "https://rossum.app/api/docs/openapi/openapi-specs/openapi.external.json"
+OPENAPI_URL = "https://rossum.app/api/docs/openapi/openapi-specs/openapi.json"
 _CACHE_PATH = Path(tempfile.gettempdir()) / "rossum_elis_openapi.json"
 _CACHE_TTL_SECONDS = 24 * 60 * 60  # 24 hours
 
