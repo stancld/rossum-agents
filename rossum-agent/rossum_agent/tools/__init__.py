@@ -15,6 +15,15 @@ from rossum_agent.tools.change_history import (
     show_commit_details,
     show_entity_history,
 )
+from rossum_agent.tools.copilot import (
+    evaluate_lookup_field,
+    evaluate_rules,
+    get_lookup_dataset_raw_values,
+    query_lookup_dataset,
+    suggest_formula_field,
+    suggest_lookup_field,
+    suggest_rule,
+)
 from rossum_agent.tools.core import get_context
 from rossum_agent.tools.data_tools import run_grep, run_jq
 from rossum_agent.tools.dynamic_tools import (
@@ -26,16 +35,8 @@ from rossum_agent.tools.dynamic_tools import (
 )
 from rossum_agent.tools.elis_backend_openapi_search import elis_openapi_grep, elis_openapi_jq
 from rossum_agent.tools.file_tools import write_file
-from rossum_agent.tools.formula import suggest_formula_field
 from rossum_agent.tools.knowledge_base_search import kb_get_article, kb_grep
-from rossum_agent.tools.lookup import (
-    evaluate_lookup_field,
-    get_lookup_dataset_raw_values,
-    query_lookup_dataset,
-    suggest_lookup_field,
-)
 from rossum_agent.tools.mock_pdf import generate_mock_pdf
-from rossum_agent.tools.rule import evaluate_rules, suggest_rule
 from rossum_agent.tools.skills import load_skill
 from rossum_agent.tools.spawn_mcp import call_on_connection, close_connection, spawn_mcp_connection
 from rossum_agent.tools.subagents import patch_schema_with_subagent, search_elis_docs, search_knowledge_base
