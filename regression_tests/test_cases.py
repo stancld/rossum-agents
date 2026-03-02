@@ -272,8 +272,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             forbidden_tools=[
                 "search_knowledge_base",
                 "kb_grep",
-                "elis_openapi_grep",
-                "elis_openapi_jq",
                 "search_elis_docs",
             ],
         ),
@@ -411,8 +409,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             forbidden_tools=[
                 "search_knowledge_base",
                 "kb_grep",
-                "elis_openapi_grep",
-                "elis_openapi_jq",
                 "search_elis_docs",
             ],
         ),
