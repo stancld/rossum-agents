@@ -9,17 +9,10 @@ from pathlib import Path
 import jq  # ty: ignore[unresolved-import] - no type stubs for jq
 from anthropic import beta_tool
 
+from rossum_agent.tools.utils import _truncate_output
+
 _JQ_OUTPUT_LIMIT = 50_000
 _GREP_MATCH_LIMIT = 200
-
-
-def _truncate_output(output: str, limit: int) -> str:
-    if len(output) <= limit:
-        return output
-    truncation_point = output.rfind("\n", 0, limit)
-    if truncation_point <= 0:
-        truncation_point = limit
-    return output[:truncation_point] + "\n... (truncated)"
 
 
 def _resolve_content(value: str) -> str:

@@ -15,6 +15,8 @@ import httpx
 import jq
 from anthropic import beta_tool
 
+from rossum_agent.tools.utils import _truncate_output
+
 if TYPE_CHECKING:
     from typing import Any
 
@@ -145,16 +147,6 @@ def _extract_spec_from_redocly(html: str) -> dict[str, Any]:
     if not spec.get("openapi"):
         raise ValueError("Extracted data does not contain OpenAPI spec")
     return spec
-
-
-def _truncate_output(output: str, limit: int) -> str:
-    """Truncate output at a line boundary to preserve readability."""
-    if len(output) <= limit:
-        return output
-    truncation_point = output.rfind("\n", 0, limit)
-    if truncation_point <= 0:
-        truncation_point = limit
-    return output[:truncation_point] + "\n... (truncated)"
 
 
 _MAX_WALK_DEPTH = 50

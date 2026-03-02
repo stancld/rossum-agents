@@ -18,6 +18,7 @@ from anthropic import beta_tool
 
 from rossum_agent.tools.core import get_context
 from rossum_agent.tools.formula import _fetch_schema_content, _find_field_in_schema
+from rossum_agent.tools.utils import _truncate_output
 
 logger = logging.getLogger(__name__)
 
@@ -653,15 +654,6 @@ def get_lookup_dataset_raw_values(dataset: str, limit: int = 10000) -> str:
     except Exception as e:
         logger.exception("Error in get_lookup_dataset_raw_values")
         return json.dumps({"status": "error", "error": str(e)})
-
-
-def _truncate_output(output: str, limit: int) -> str:
-    if len(output) <= limit:
-        return output
-    truncation_point = output.rfind("\n", 0, limit)
-    if truncation_point <= 0:
-        truncation_point = limit
-    return output[:truncation_point] + "\n... (truncated)"
 
 
 @beta_tool
