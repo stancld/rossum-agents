@@ -2,14 +2,14 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 71 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. 43 tools for queues, schemas, hooks, engines, and more.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI - rossum-mcp](https://img.shields.io/pypi/v/rossum-mcp?label=rossum-mcp)](https://pypi.org/project/rossum-mcp/)
 [![Coverage](https://codecov.io/gh/stancld/rossum-agents/branch/master/graph/badge.svg?flag=rossum-mcp)](https://codecov.io/gh/stancld/rossum-agents)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-71-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-43-blue.svg)](#available-tools)
 
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
@@ -97,63 +97,63 @@ Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
 
 ## Available Tools
 
-The server provides **71 tools** organized into categories:
+The server provides **43 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
-| **Document Processing** | 9 | Upload documents, retrieve/update/confirm/copy/delete annotations |
-| **Queue Management** | 9 | Create, configure, delete, and list queues |
-| **Schema Management** | 8 | Define, modify, and delete field structures |
-| **Engine Management** | 6 | Configure extraction and splitting engines |
-| **Extensions (Hooks)** | 9 | Webhooks, serverless functions, testing |
-| **Rules & Actions** | 6 | Business rules with triggers and actions |
-| **Workspace Management** | 4 | Organize and delete workspaces |
-| **Organization Groups** | 4 | View license groups across organizations |
-| **Organization Limits** | 1 | Email sending limits and usage counters |
-| **User Management** | 5 | Create, update, list users and roles |
-| **Relations** | 4 | Annotation and document relations |
-| **Email Templates** | 3 | Automated email responses |
+| **Read Layer** | 2 | Get any entity by ID or search/list with typed filters |
+| **Document Processing** | 7 | Upload documents, retrieve content, update/confirm/copy/delete annotations |
+| **Queue Management** | 5 | Create, configure, and delete queues |
+| **Schema Management** | 6 | Define, modify, and delete field structures |
+| **Engine Management** | 4 | Configure extraction and splitting engines |
+| **Extensions (Hooks)** | 5 | Webhooks, serverless functions, testing |
+| **Rules & Actions** | 4 | Business rules with triggers and actions |
+| **Workspace Management** | 2 | Create and delete workspaces |
+| **Organization Groups** | 2 | Check feature flags across organizations |
+| **User Management** | 2 | Create and update users |
+| **Email Templates** | 1 | Create automated email responses |
 | **MCP Mode** | 2 | Get/set read-only or read-write mode |
 | **Tool Discovery** | 1 | Dynamic tool loading |
 
 <details>
 <summary><strong>Tool List by Category</strong></summary>
 
+**Read Layer** (unified get + search replacing ~25 individual get_X/list_X tools):
+`get`, `search`
+
+Supported entities for `get` (by ID): `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`
+
+Supported entities for `search` (with typed filters): all `get` entities plus `hook_log`, `hook_template`, `user_role`
+
 **Document Processing:**
-`upload_document`, `get_annotation`, `get_annotation_content`, `list_annotations`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`, `delete_annotation`
+`upload_document`, `get_annotation_content`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`, `delete_annotation`
 
 **Queue Management:**
-`get_queue`, `list_queues`, `get_queue_schema`, `get_queue_engine`, `create_queue`, `create_queue_from_template`, `get_queue_template_names`, `update_queue`, `delete_queue`
+`create_queue`, `create_queue_from_template`, `get_queue_template_names`, `update_queue`, `delete_queue`
 
 **Schema Management:**
-`get_schema`, `list_schemas`, `create_schema`, `update_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`, `delete_schema`
+`create_schema`, `update_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`, `delete_schema`
 
 **Engine Management:**
-`get_engine`, `list_engines`, `create_engine`, `update_engine`, `create_engine_field`, `get_engine_fields`
+`create_engine`, `update_engine`, `create_engine_field`, `get_engine_fields`
 
 **Extensions (Hooks):**
-`get_hook`, `list_hooks`, `create_hook`, `update_hook`, `list_hook_templates`, `create_hook_from_template`, `test_hook`, `list_hook_logs`, `delete_hook`
+`create_hook`, `update_hook`, `create_hook_from_template`, `test_hook`, `delete_hook`
 
 **Rules & Actions:**
-`get_rule`, `list_rules`, `create_rule`, `update_rule`, `patch_rule`, `delete_rule`
+`create_rule`, `update_rule`, `patch_rule`, `delete_rule`
 
 **Workspace Management:**
-`get_workspace`, `list_workspaces`, `create_workspace`, `delete_workspace`
+`create_workspace`, `delete_workspace`
 
 **Organization Groups:**
-`get_organization_group`, `list_organization_groups`, `are_lookup_fields_enabled`, `are_reasoning_fields_enabled`
-
-**Organization Limits:**
-`get_organization_limit`
+`are_lookup_fields_enabled`, `are_reasoning_fields_enabled`
 
 **User Management:**
-`get_user`, `list_users`, `create_user`, `update_user`, `list_user_roles`
-
-**Relations:**
-`get_relation`, `list_relations`, `get_document_relation`, `list_document_relations`
+`create_user`, `update_user`
 
 **Email Templates:**
-`get_email_template`, `list_email_templates`, `create_email_template`
+`create_email_template`
 
 **MCP Mode:**
 `get_mcp_mode`, `set_mcp_mode`
@@ -174,10 +174,10 @@ For detailed API documentation with parameters and examples, see [TOOLS.md](TOOL
 upload_document(file_path="/path/to/invoice.pdf", queue_id=12345)
 
 # 2. Get annotation ID
-annotations = list_annotations(queue_id=12345)
+annotations = search(query={"entity": "annotation", "queue_id": 12345, "ordering": ["-created_at"], "first_n": 1})
 
 # 3. Check status
-annotation = get_annotation(annotation_id=annotations[0].id)
+annotation = get(entity="annotation", entity_id=annotations[0]["id"])
 ```
 
 ### Update Fields

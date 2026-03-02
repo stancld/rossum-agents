@@ -294,7 +294,7 @@ class TestHandleWriteUpdate:
         async def mock_call_tool(name, args):
             nonlocal call_count
             call_count += 1
-            if name == "get_queue":
+            if name == "get":
                 return _make_mcp_result(before if call_count == 1 else after)
             return _make_mcp_result({"ok": True})
 

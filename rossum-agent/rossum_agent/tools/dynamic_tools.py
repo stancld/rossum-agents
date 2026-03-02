@@ -285,8 +285,8 @@ def get_load_tool_category_definition() -> ToolParam:
         "description": (
             "Load MCP tools from one or more categories. Once loaded, the tools become "
             "available for use. Use list_tool_categories first to see available categories.\n"
-            "Categories: annotations, queues, schemas, engines, hooks, email_templates, "
-            "document_relations, relations, rules, users, workspaces"
+            "Categories: read, annotations, queues, schemas, engines, hooks, email_templates, "
+            "rules, users, workspaces"
         ),
         "input_schema": {
             "type": "object",

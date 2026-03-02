@@ -74,28 +74,6 @@ async def _create_email_template(
 
 def register_email_template_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Retrieve one email template by ID.",
-        tags={"email_templates"},
-        annotations={"readOnlyHint": True},
-    )
-    async def get_email_template(email_template_id: int) -> EmailTemplate:
-        return await _get_email_template(client, email_template_id)
-
-    @mcp.tool(
-        description="List email templates (filterable). Types: rejection, rejection_default, email_with_no_processable_attachments, custom. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
-        tags={"email_templates"},
-        annotations={"readOnlyHint": True},
-    )
-    async def list_email_templates(
-        queue_id: int | None = None,
-        type: EmailTemplateType | None = None,
-        name: str | None = None,
-        first_n: int | None = None,
-        use_regex: bool = False,
-    ) -> list[EmailTemplate]:
-        return await _list_email_templates(client, queue_id, type, name, first_n, use_regex)
-
-    @mcp.tool(
         description="Create an email template; set automate=true for automatic sending. to/cc/bcc are recipient objects {type: annotator|constant|datapoint, value: ...}.",
         tags={"email_templates", "write"},
         annotations={"readOnlyHint": False},

@@ -13,17 +13,15 @@ class TestCategoryMeta:
 
     def test_has_all_expected_categories(self) -> None:
         expected_categories = {
+            "read",
             "annotations",
             "queues",
             "schemas",
             "engines",
             "hooks",
             "email_templates",
-            "document_relations",
-            "relations",
             "rules",
             "organization_groups",
-            "organization_limits",
             "users",
             "workspaces",
         }

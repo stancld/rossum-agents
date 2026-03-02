@@ -13,14 +13,12 @@ from rossum_mcp.logging_config import setup_logging
 from rossum_mcp.tools import (
     register_annotation_tools,
     register_discovery_tools,
-    register_document_relation_tools,
     register_email_template_tools,
     register_engine_tools,
     register_hook_tools,
     register_organization_group_tools,
-    register_organization_limit_tools,
     register_queue_tools,
-    register_relation_tools,
+    register_read_tools,
     register_rule_tools,
     register_schema_tools,
     register_user_tools,
@@ -55,16 +53,14 @@ def create_app() -> FastMCP:
     client = AsyncRossumAPIClient(base_url=base_url, credentials=Token(token=api_token))
 
     register_discovery_tools(mcp)
+    register_read_tools(mcp, client)
     register_annotation_tools(mcp, client)
     register_queue_tools(mcp, client)
     register_schema_tools(mcp, client)
     register_engine_tools(mcp, client)
     register_hook_tools(mcp, client)
     register_organization_group_tools(mcp, client)
-    register_organization_limit_tools(mcp, client)
     register_email_template_tools(mcp, client)
-    register_document_relation_tools(mcp, client)
-    register_relation_tools(mcp, client)
     register_rule_tools(mcp, client)
     register_user_tools(mcp, client)
     register_workspace_tools(mcp, client)

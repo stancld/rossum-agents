@@ -21,7 +21,7 @@
 
 | Call Pattern | Environment Affected |
 |--------------|---------------------|
-| `get_schema(...)`, `update_schema(...)`, any direct MCP tool | **PRODUCTION** |
+| `get(entity="schema", ...)`, `update_schema(...)`, any direct MCP tool | **PRODUCTION** |
 | `call_on_connection("sandbox", "update_schema", ...)` | Sandbox |
 | `deploy_copy_workspace(..., target_token=SANDBOX_TOKEN)` | Copies FROM production TO sandbox |
 | `deploy_pull(..., token=SANDBOX_TOKEN)` | Pulls FROM sandbox |
@@ -55,7 +55,7 @@ Step 3: Never use direct MCP calls (`update_schema`, `update_queue`, etc.) - tho
 | Pull AFTER last | After all sandbox modifications, run `deploy_pull` to `./after`. Then compare. |
 | Spawned connections don't persist | Re-spawn `spawn_mcp_connection` each conversation turn. |
 | Never deploy without approval | Always show diff and wait for explicit user approval. |
-| IDs differ between environments | Sandbox copies have NEW IDs. Use `deploy_copy_workspace` return value or `call_on_connection("sandbox", "list_queues", ...)` to get sandbox IDs. Production IDs will 404 in sandbox. |
+| IDs differ between environments | Sandbox copies have NEW IDs. Use `deploy_copy_workspace` return value or `call_on_connection("sandbox", "search", '{"query": {"entity": "queue"}}')` to get sandbox IDs. Production IDs will 404 in sandbox. |
 | Identify credentials first | Before deployment, verify which token is production vs sandbox (see Credential Identification). |
 
 ## Sandbox Connection Setup
@@ -73,7 +73,7 @@ spawn_mcp_connection(connection_id="sandbox", api_token="<SANDBOX_TOKEN>", api_b
 | Update queue | `call_on_connection("sandbox", "update_queue", '{"queue_id": 456, ...}')` | `update_queue(queue_id=456, ...)` |
 | Update hook | `call_on_connection("sandbox", "update_hook", '{"hook_id": 789, ...}')` | `update_hook(hook_id=789, ...)` |
 
-All read operations (get_schema, get_queue, list_hooks) on sandbox also require `call_on_connection`.
+All read operations (`get`, `search`) on sandbox also require `call_on_connection`.
 
 ## Tools
 

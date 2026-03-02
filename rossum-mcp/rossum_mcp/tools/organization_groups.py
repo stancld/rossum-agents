@@ -53,22 +53,6 @@ async def _are_reasoning_fields_enabled(client: AsyncRossumAPIClient) -> dict:
 
 def register_organization_group_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Retrieve organization group details.",
-        tags={"organization_groups"},
-        annotations={"readOnlyHint": True},
-    )
-    async def get_organization_group(organization_group_id: int) -> OrganizationGroup:
-        return await _get_organization_group(client, organization_group_id)
-
-    @mcp.tool(
-        description="List organization groups with optional name filter. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
-        tags={"organization_groups"},
-        annotations={"readOnlyHint": True},
-    )
-    async def list_organization_groups(name: str | None = None, use_regex: bool = False) -> list[OrganizationGroup]:
-        return await _list_organization_groups(client, name, use_regex)
-
-    @mcp.tool(
         description="Check if lookup fields are enabled. Both 'datasets' and 'lookup_fields' features must be enabled in an organization group.",
         tags={"organization_groups"},
         annotations={"readOnlyHint": True},

@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from rossum_api.models.workspace import Workspace
+from rossum_mcp.tools.workspaces import _get_workspace, _list_workspaces
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -60,17 +61,12 @@ class TestGetWorkspace:
     """Tests for get_workspace tool."""
 
     @pytest.mark.asyncio
-    async def test_get_workspace_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_workspace_success(self, mock_client: AsyncMock) -> None:
         """Test successful workspace retrieval."""
-        from rossum_mcp.tools.workspaces import register_workspace_tools
-
-        register_workspace_tools(mock_mcp, mock_client)
-
         mock_workspace = create_mock_workspace(id=100, name="Production Workspace")
         mock_client.retrieve_workspace.return_value = mock_workspace
 
-        get_workspace = mock_mcp._tools["get_workspace"]
-        result = await get_workspace(workspace_id=100)
+        result = await _get_workspace(mock_client, workspace_id=100)
 
         assert result.id == 100
         assert result.name == "Production Workspace"
@@ -82,12 +78,8 @@ class TestListWorkspaces:
     """Tests for list_workspaces tool."""
 
     @pytest.mark.asyncio
-    async def test_list_workspaces_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_workspaces_success(self, mock_client: AsyncMock) -> None:
         """Test successful workspaces listing."""
-        from rossum_mcp.tools.workspaces import register_workspace_tools
-
-        register_workspace_tools(mock_mcp, mock_client)
-
         mock_ws1 = create_mock_workspace(id=1, name="Workspace 1")
         mock_ws2 = create_mock_workspace(id=2, name="Workspace 2")
 
@@ -97,18 +89,13 @@ class TestListWorkspaces:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_workspaces = mock_mcp._tools["list_workspaces"]
-        result = await list_workspaces()
+        result = await _list_workspaces(mock_client)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_list_workspaces_with_organization_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_workspaces_with_organization_filter(self, mock_client: AsyncMock) -> None:
         """Test workspaces listing filtered by organization."""
-        from rossum_mcp.tools.workspaces import register_workspace_tools
-
-        register_workspace_tools(mock_mcp, mock_client)
-
         mock_ws = create_mock_workspace(id=1, name="Org Workspace")
         received_filters: dict = {}
 
@@ -118,19 +105,14 @@ class TestListWorkspaces:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_workspaces = mock_mcp._tools["list_workspaces"]
-        result = await list_workspaces(organization_id=50)
+        result = await _list_workspaces(mock_client, organization_id=50)
 
         assert len(result) == 1
         assert received_filters["organization"] == 50
 
     @pytest.mark.asyncio
-    async def test_list_workspaces_with_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_workspaces_with_name_filter(self, mock_client: AsyncMock) -> None:
         """Test workspaces listing filtered by name."""
-        from rossum_mcp.tools.workspaces import register_workspace_tools
-
-        register_workspace_tools(mock_mcp, mock_client)
-
         mock_ws = create_mock_workspace(id=1, name="Production")
         received_filters: dict = {}
 
@@ -140,19 +122,14 @@ class TestListWorkspaces:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_workspaces = mock_mcp._tools["list_workspaces"]
-        result = await list_workspaces(name="Production")
+        result = await _list_workspaces(mock_client, name="Production")
 
         assert len(result) == 1
         assert received_filters["name"] == "Production"
 
     @pytest.mark.asyncio
-    async def test_list_workspaces_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_workspaces_skips_broken_items(self, mock_client: AsyncMock) -> None:
         """Test list_workspaces gracefully skips items that fail deserialization."""
-        from rossum_mcp.tools.workspaces import register_workspace_tools
-
-        register_workspace_tools(mock_mcp, mock_client)
-
         mock_ws = create_mock_workspace(id=1, name="Good Workspace")
 
         call_count = 0
@@ -173,18 +150,13 @@ class TestListWorkspaces:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_workspaces = mock_mcp._tools["list_workspaces"]
-        result = await list_workspaces()
+        result = await _list_workspaces(mock_client)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_list_workspaces_with_regex_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_workspaces_with_regex_name_filter(self, mock_client: AsyncMock) -> None:
         """Test that use_regex=True filters workspaces client-side by regex pattern."""
-        from rossum_mcp.tools.workspaces import register_workspace_tools
-
-        register_workspace_tools(mock_mcp, mock_client)
-
         mock_workspaces = [
             create_mock_workspace(id=1, name="Production EU"),
             create_mock_workspace(id=2, name="Staging US"),
@@ -199,8 +171,7 @@ class TestListWorkspaces:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_workspaces = mock_mcp._tools["list_workspaces"]
-        result = await list_workspaces(name="production", use_regex=True)
+        result = await _list_workspaces(mock_client, name="production", use_regex=True)
 
         assert len(result) == 2
         assert result[0].name == "Production EU"
@@ -208,12 +179,8 @@ class TestListWorkspaces:
         assert "name" not in received_filters
 
     @pytest.mark.asyncio
-    async def test_list_workspaces_with_regex_no_match(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_workspaces_with_regex_no_match(self, mock_client: AsyncMock) -> None:
         """Test that use_regex=True returns empty list when no workspaces match pattern."""
-        from rossum_mcp.tools.workspaces import register_workspace_tools
-
-        register_workspace_tools(mock_mcp, mock_client)
-
         mock_workspaces = [create_mock_workspace(id=1, name="Staging US")]
 
         async def mock_fetch_all(resource, **filters):
@@ -222,8 +189,7 @@ class TestListWorkspaces:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_workspaces = mock_mcp._tools["list_workspaces"]
-        result = await list_workspaces(name="^production$", use_regex=True)
+        result = await _list_workspaces(mock_client, name="^production$", use_regex=True)
 
         assert len(result) == 0
 

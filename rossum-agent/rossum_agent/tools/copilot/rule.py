@@ -46,7 +46,7 @@ def suggest_rule(user_query: str, queue_id: int) -> str:
 
     Args:
         user_query: Natural language description of the desired rule behavior.
-        queue_id: The numeric queue ID (e.g., 2519495). Get this from list_queues.
+        queue_id: The numeric queue ID (e.g., 2519495). Get this from search(query={"entity": "queue"}).
 
     Returns:
         JSON with the suggested rule (name, trigger_condition, actions) ready for create_rule.

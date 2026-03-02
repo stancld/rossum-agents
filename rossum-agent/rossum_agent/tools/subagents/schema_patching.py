@@ -13,6 +13,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import re
 import time
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING
@@ -30,6 +31,8 @@ from rossum_agent.tools.subagents.base import (
 from rossum_agent.tools.subagents.mcp_helpers import call_mcp_tool
 
 logger = logging.getLogger(__name__)
+
+_ENGINE_RESTRICTION_RE = re.compile(r"extracted field '(\w+)' is not present among names of engine fields")
 
 
 def _to_plain(obj: Any) -> Any:
@@ -105,7 +108,7 @@ Optional: format, options (for enum), rir_field_names, hidden, can_export, ui_co
 ## Constraints
 
 - Field `id` must be valid identifier (lowercase, underscores, no spaces)
-- Do NOT set `rir_field_names` unless user explicitly provides engine field names
+- Do NOT set `rir_field_names` unless user explicitly provides engine field names — the API rejects schemas when `rir_field_names` contains values unknown to the engine ("Engine restriction: extracted field '...' is not present among names of engine fields")
 - If user mentions extraction/AI capture, check existing schema for rir_field_names patterns first
 - `ui_configuration.type` must be one of: captured, data, manual, formula, reasoning, lookup
 - `ui_configuration.edit` must be one of: enabled, enabled_without_warning, disabled
@@ -475,6 +478,31 @@ def _update_fields_in_content(
     return modified, updated
 
 
+def _strip_invalid_rir_fields(content: list[dict[str, Any]], bad_names: set[str]) -> list[str]:
+    """Remove rir_field_names entries matching bad_names from all fields in content. Returns list of fixed field IDs."""
+    fixed: list[str] = []
+
+    def _walk(nodes: list[dict[str, Any]]) -> None:
+        for node in nodes:
+            rir = node.get("rir_field_names")
+            if isinstance(rir, list):
+                cleaned = [name for name in rir if name not in bad_names]
+                if len(cleaned) != len(rir):
+                    fixed.append(node.get("id", "?"))
+                    if cleaned:
+                        node["rir_field_names"] = cleaned
+                    else:
+                        del node["rir_field_names"]
+            children = node.get("children")
+            if isinstance(children, list):
+                _walk(children)
+            elif isinstance(children, dict):
+                _walk([children])
+
+    _walk(content)
+    return fixed
+
+
 def _apply_schema_changes(
     schema_id: int,
     current_content: list[dict[str, Any]],
@@ -509,7 +537,20 @@ def _apply_schema_changes(
         modified_content, updated = _update_fields_in_content(modified_content, fields_to_update)
         result["fields_updated"] = updated
 
-    mcp_result = call_mcp_tool("update_schema", {"schema_id": schema_id, "schema_data": {"content": modified_content}})
+    try:
+        mcp_result = call_mcp_tool(
+            "update_schema", {"schema_id": schema_id, "schema_data": {"content": modified_content}}
+        )
+    except Exception as e:
+        bad_names = set(_ENGINE_RESTRICTION_RE.findall(str(e)))
+        if not bad_names:
+            raise
+        fixed = _strip_invalid_rir_fields(modified_content, bad_names)
+        logger.info(f"Auto-fixed engine restriction: stripped rir_field_names from fields {fixed}")
+        mcp_result = call_mcp_tool(
+            "update_schema", {"schema_id": schema_id, "schema_data": {"content": modified_content}}
+        )
+
     result["fields_kept"] = sorted(_collect_field_ids(modified_content))
     result["update_result"] = "success" if mcp_result else "failed"
 
@@ -528,7 +569,10 @@ def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
         return json.dumps(plain_result, indent=2, default=str) if plain_result else "No data returned"
 
     if tool_name == "get_full_schema":
-        mcp_result = call_mcp_tool("get_schema", tool_input)
+        mcp_result = call_mcp_tool("get", {"entity": "schema", "entity_id": schema_id})
+        # Unwrap unified get response: {"entity": "schema", "id": X, "data": {...}}
+        if isinstance(mcp_result, dict) and "data" in mcp_result:
+            mcp_result = mcp_result["data"]
         if mcp_result and schema_id:
             content = _extract_schema_content(mcp_result)
             if not content:
@@ -586,7 +630,10 @@ def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> Su
     schema_id_int = int(schema_id)
 
     tree_result = call_mcp_tool("get_schema_tree_structure", {"schema_id": schema_id_int})
-    schema_result = call_mcp_tool("get_schema", {"schema_id": schema_id_int})
+    schema_result = call_mcp_tool("get", {"entity": "schema", "entity_id": schema_id_int})
+    # Unwrap unified get response
+    if isinstance(schema_result, dict) and "data" in schema_result:
+        schema_result = schema_result["data"]
     if schema_result:
         content = _extract_schema_content(schema_result)
         if not content:

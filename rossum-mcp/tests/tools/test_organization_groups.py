@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from rossum_api.models.organization_group import OrganizationGroup
+from rossum_mcp.tools.organization_groups import _get_organization_group, _list_organization_groups
 
 
 def create_mock_organization_group(**kwargs) -> OrganizationGroup:
@@ -57,17 +58,12 @@ class TestGetOrganizationGroup:
     """Tests for get_organization_group tool."""
 
     @pytest.mark.asyncio
-    async def test_get_organization_group_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_organization_group_success(self, mock_client: AsyncMock) -> None:
         """Test successful organization group retrieval."""
-        from rossum_mcp.tools.organization_groups import register_organization_group_tools
-
-        register_organization_group_tools(mock_mcp, mock_client)
-
         mock_org_group = create_mock_organization_group(id=100, name="Production Organization Group")
         mock_client.retrieve_organization_group.return_value = mock_org_group
 
-        get_organization_group = mock_mcp._tools["get_organization_group"]
-        result = await get_organization_group(organization_group_id=100)
+        result = await _get_organization_group(mock_client, organization_group_id=100)
 
         assert result.id == 100
         assert result.name == "Production Organization Group"
@@ -79,12 +75,8 @@ class TestListOrganizationGroups:
     """Tests for list_organization_groups tool."""
 
     @pytest.mark.asyncio
-    async def test_list_organization_groups_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_organization_groups_success(self, mock_client: AsyncMock) -> None:
         """Test successful organization groups listing."""
-        from rossum_mcp.tools.organization_groups import register_organization_group_tools
-
-        register_organization_group_tools(mock_mcp, mock_client)
-
         mock_og1 = create_mock_organization_group(id=1, name="Organization Group 1")
         mock_og2 = create_mock_organization_group(id=2, name="Organization Group 2")
 
@@ -94,18 +86,13 @@ class TestListOrganizationGroups:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_organization_groups = mock_mcp._tools["list_organization_groups"]
-        result = await list_organization_groups()
+        result = await _list_organization_groups(mock_client)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_list_organization_groups_with_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_organization_groups_with_name_filter(self, mock_client: AsyncMock) -> None:
         """Test organization groups listing filtered by name."""
-        from rossum_mcp.tools.organization_groups import register_organization_group_tools
-
-        register_organization_group_tools(mock_mcp, mock_client)
-
         mock_og = create_mock_organization_group(id=1, name="Production")
         received_filters: dict = {}
 
@@ -115,19 +102,14 @@ class TestListOrganizationGroups:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_organization_groups = mock_mcp._tools["list_organization_groups"]
-        result = await list_organization_groups(name="Production")
+        result = await _list_organization_groups(mock_client, name="Production")
 
         assert len(result) == 1
         assert received_filters["name"] == "Production"
 
     @pytest.mark.asyncio
-    async def test_list_organization_groups_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_organization_groups_skips_broken_items(self, mock_client: AsyncMock) -> None:
         """Test list_organization_groups gracefully skips items that fail deserialization."""
-        from rossum_mcp.tools.organization_groups import register_organization_group_tools
-
-        register_organization_group_tools(mock_mcp, mock_client)
-
         mock_og = create_mock_organization_group(id=1, name="Good Organization Group")
 
         call_count = 0
@@ -148,20 +130,13 @@ class TestListOrganizationGroups:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_organization_groups = mock_mcp._tools["list_organization_groups"]
-        result = await list_organization_groups()
+        result = await _list_organization_groups(mock_client)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_list_organization_groups_with_regex_name_filter(
-        self, mock_mcp: Mock, mock_client: AsyncMock
-    ) -> None:
+    async def test_list_organization_groups_with_regex_name_filter(self, mock_client: AsyncMock) -> None:
         """Test that use_regex=True filters organization groups client-side by regex pattern."""
-        from rossum_mcp.tools.organization_groups import register_organization_group_tools
-
-        register_organization_group_tools(mock_mcp, mock_client)
-
         mock_groups = [
             create_mock_organization_group(id=1, name="ACME Corp EU"),
             create_mock_organization_group(id=2, name="Beta Ltd"),
@@ -176,8 +151,7 @@ class TestListOrganizationGroups:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_organization_groups = mock_mcp._tools["list_organization_groups"]
-        result = await list_organization_groups(name="acme", use_regex=True)
+        result = await _list_organization_groups(mock_client, name="acme", use_regex=True)
 
         assert len(result) == 2
         assert result[0].name == "ACME Corp EU"
@@ -185,12 +159,8 @@ class TestListOrganizationGroups:
         assert "name" not in received_filters
 
     @pytest.mark.asyncio
-    async def test_list_organization_groups_with_regex_no_match(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_organization_groups_with_regex_no_match(self, mock_client: AsyncMock) -> None:
         """Test that use_regex=True returns empty list when no groups match pattern."""
-        from rossum_mcp.tools.organization_groups import register_organization_group_tools
-
-        register_organization_group_tools(mock_mcp, mock_client)
-
         mock_groups = [create_mock_organization_group(id=1, name="Beta Ltd")]
 
         async def mock_fetch_all(resource, **filters):
@@ -199,8 +169,7 @@ class TestListOrganizationGroups:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_organization_groups = mock_mcp._tools["list_organization_groups"]
-        result = await list_organization_groups(name="^acme$", use_regex=True)
+        result = await _list_organization_groups(mock_client, name="^acme$", use_regex=True)
 
         assert len(result) == 0
 

@@ -10,7 +10,6 @@ from rossum_api.domain_logic.resources import Resource
 from rossum_api.models import deserialize_default
 from rossum_api.models.engine import Engine
 from rossum_api.models.queue import Queue
-from rossum_api.models.schema import Schema
 
 from rossum_mcp.tools.base import (
     build_filters,
@@ -103,15 +102,6 @@ async def _list_queues(
     result = await graceful_list(client, Resource.Queue, "queue", **filters)
     items = [_queue_to_list_item(queue) for queue in result.items]
     return filter_by_name_regex(items, name, use_regex)
-
-
-async def _get_queue_schema(client: AsyncRossumAPIClient, queue_id: int) -> Schema:
-    logger.debug(f"Retrieving queue schema: queue_id={queue_id}")
-    queue: Queue = await client.retrieve_queue(queue_id)
-    schema_url = queue.schema
-    schema_id = extract_id_from_url(schema_url)
-    schema: Schema = await client.retrieve_schema(schema_id)
-    return schema
 
 
 async def _get_queue_engine(client: AsyncRossumAPIClient, queue_id: int) -> Engine | dict:
@@ -342,43 +332,6 @@ async def _create_queue_from_template(
 
 
 def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(
-        description="Retrieve queue details.",
-        tags={"queues"},
-        annotations={"readOnlyHint": True},
-    )
-    async def get_queue(queue_id: int) -> Queue:
-        return await _get_queue(client, queue_id)
-
-    @mcp.tool(
-        description="List queues with filters; id supports comma-separated values. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
-        tags={"queues"},
-        annotations={"readOnlyHint": True},
-    )
-    async def list_queues(
-        id: str | None = None,
-        workspace_id: int | None = None,
-        name: str | None = None,
-        use_regex: bool = False,
-    ) -> list[QueueListItem]:
-        return await _list_queues(client, id, workspace_id, name, use_regex)
-
-    @mcp.tool(
-        description="Retrieve queue schema.",
-        tags={"queues"},
-        annotations={"readOnlyHint": True},
-    )
-    async def get_queue_schema(queue_id: int) -> Schema:
-        return await _get_queue_schema(client, queue_id)
-
-    @mcp.tool(
-        description="Retrieve queue engine. Returns None if no engine assigned.",
-        tags={"queues"},
-        annotations={"readOnlyHint": True},
-    )
-    async def get_queue_engine(queue_id: int) -> Engine | dict:
-        return await _get_queue_engine(client, queue_id)
-
     @mcp.tool(
         description="Create a queue.",
         tags={"queues", "write"},

@@ -26,7 +26,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 - Specialty: Delivery Notes, Chinese Invoices (Fapiao), Certificates of Analysis, Purchase Order, Credit Note, Debit Note, Proforma Invoice
 - Other: Empty Organization
 
-**Hooks**: Prefer `list_hook_templates` + `create_hook_from_template` over custom code.
+**Hooks**: Prefer `search(query={"entity": "hook_template"})` + `create_hook_from_template` over custom code.
 
 **Skills** (load FIRST when relevant):
 - `load_skill("rossum-deployment")` → sandbox, deploy, cross-org, migrate
@@ -45,7 +45,7 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 
 **MCP Tools** (pre-loaded based on request keywords, or load manually):
 - `load_tool_category(["queues", "schemas"])` to load multiple categories at once
-- Categories: annotations, queues, schemas, engines, hooks, email_templates, document_relations, relations, rules, users, workspaces
+- Categories: read, annotations, queues, schemas, engines, hooks, email_templates, rules, users, workspaces
 """
 
 CRITICAL_REQUIREMENTS = """
@@ -57,7 +57,7 @@ CRITICAL_REQUIREMENTS = """
 - IDs are integers: `queue_id=12345` not `"12345"`
 - `score_threshold` cannot be null (default `0.8`) - API rejects null values
 - Annotation updates use numeric `id`, not `schema_id` string
-- List tools `name` filter is exact API-side match by default; pass `use_regex=True` for regex pattern matching (client-side)
+- `search` tool `name` filter is exact API-side match by default; pass `use_regex=True` for regex pattern matching (client-side)
 
 **Engine training**: Inbox queues cannot train classification engines - they contain unsplit documents without `document_type`. Only typed documents in training_queues contribute."""
 

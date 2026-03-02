@@ -72,64 +72,86 @@ get_annotation_content
 **Implementation:**
   See ``rossum_mcp.tools.annotations``
 
-list_annotations
-^^^^^^^^^^^^^^^^
+get
+^^^
 
 **MCP Tool:**
-  ``list_annotations(queue_id: int, status: str)``
+  ``get(entity: EntityType, entity_id: int, include_related: bool = False)``
 
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_annotations(**params)``
+**Supported entities:**
+  ``queue``, ``schema``, ``hook``, ``engine``, ``rule``, ``user``, ``workspace``,
+  ``email_template``, ``organization_group``, ``organization_limit``, ``annotation``,
+  ``relation``, ``document_relation``
 
-**API Endpoint:**
-  ``GET /v1/annotations``
+**Returns:**
+  ``{"entity": "<type>", "id": <id>, "data": {...}}``
 
-**Query Parameters:**
-  - ``queue``: Queue ID filter
-  - ``status``: Status filter (comma-separated)
-  - ``page_size``: Results per page (default: 100)
+**include_related enrichment:**
+  - ``queue`` → adds ``schema_tree``, ``engine``, ``hooks``, ``hooks_count``
+  - ``schema`` → adds ``queues``, ``rules``
+  - ``hook`` → adds ``queues``, ``events``
 
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
+**API Endpoints:**
+  Varies by entity — ``GET /v1/{entity_plural}/{id}``
 
 **Implementation:**
-  See ``rossum_mcp.server:100-134``
+  See ``rossum_mcp.tools.read_layer``
 
-get_queue
-^^^^^^^^^
+search
+^^^^^^
 
 **MCP Tool:**
-  ``get_queue(queue_id: int)``
+  ``search(query: SearchQuery)``
 
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_queue(queue_id)``
+**Query object:** discriminated union on ``entity`` field — each entity type exposes only its valid filter params.
 
-**API Endpoint:**
-  ``GET /v1/queues/{queue_id}``
+**Supported entities and their filters:**
 
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Entity
+     - Available filters
+   * - ``queue``
+     - ``id``, ``workspace_id``, ``name``, ``use_regex``
+   * - ``schema``
+     - ``name``, ``queue_id``, ``use_regex``
+   * - ``hook``
+     - ``queue_id``, ``active``, ``first_n``
+   * - ``engine``
+     - ``id``, ``engine_type``, ``agenda_id``
+   * - ``rule``
+     - ``schema_id``, ``organization_id``, ``enabled``
+   * - ``user``
+     - ``username``, ``email``, ``first_name``, ``last_name``, ``is_active``, ``is_organization_group_admin``
+   * - ``workspace``
+     - ``organization_id``, ``name``, ``use_regex``
+   * - ``email_template``
+     - ``queue_id``, ``type``, ``name``, ``first_n``, ``use_regex``
+   * - ``organization_group``
+     - ``name``, ``use_regex``
+   * - ``annotation``
+     - ``queue_id`` (required), ``status``, ``ordering``, ``first_n``
+   * - ``relation``
+     - ``id``, ``type``, ``parent``, ``key``, ``annotation``
+   * - ``document_relation``
+     - ``id``, ``type``, ``annotation``, ``key``, ``documents``
+   * - ``hook_log``
+     - ``hook_id``, ``queue_id``, ``annotation_id``, ``log_level``, ``status``, ``status_code``, ``timestamp_before/after``, ``start/end_before/after``, ``search``, ``page_size``
+   * - ``hook_template``
+     - *(no filters)*
+   * - ``user_role``
+     - *(no filters)*
+
+**Returns:**
+  ``list`` of entity objects
+
+**API Endpoints:**
+  Varies by entity — ``GET /v1/{entity_plural}``
 
 **Implementation:**
-  See ``rossum_mcp.server:136-156``
-
-get_schema
-^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_schema(schema_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_schema(schema_id)``
-
-**API Endpoint:**
-  ``GET /v1/schemas/{schema_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  See ``rossum_mcp.server:158-174``
+  See ``rossum_mcp.tools.read_layer``
 
 get_queue_schema
 ^^^^^^^^^^^^^^^^
@@ -332,46 +354,6 @@ update_engine
 ``json=`` parameter, not ``data=``. The Rossum API expects JSON-encoded data
 (application/json), not form-encoded data (application/x-www-form-urlencoded).
 
-list_hooks
-^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_hooks(queue_id: int | None, active: bool | None)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_hooks(**filters)``
-
-**API Endpoint:**
-  ``GET /v1/hooks``
-
-**Query Parameters:**
-  - ``queue``: Filter by queue ID
-  - ``active``: Filter by active status (true/false)
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists all hooks/extensions (webhooks or serverless functions) configured in
-  your organization. Optionally filter by queue ID and/or active status.
-  See ``rossum_mcp.server:928-970``
-
-**Common Use Cases:**
-
-  .. code-block:: python
-
-     # List all hooks
-     all_hooks = await server.list_hooks()
-
-     # List hooks for a specific queue
-     queue_hooks = await server.list_hooks(queue_id=12345)
-
-     # List only active hooks
-     active_hooks = await server.list_hooks(active=True)
-
-     # List inactive hooks for a queue
-     inactive_queue_hooks = await server.list_hooks(queue_id=12345, active=False)
-
 create_hook
 ^^^^^^^^^^^
 
@@ -434,47 +416,6 @@ create_hook
   - ``insecure_ssl`` (bool): Skip SSL verification (default: False)
   - ``secret`` (str, optional): Secret key for securing webhook requests
   - ``response_event`` (dict, optional): Configuration for response event handling
-
-list_rules
-^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_rules(schema_id: int | None, organization_id: int | None, enabled: bool | None)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_rules(**filters)``
-
-**API Endpoint:**
-  ``GET /v1/rules``
-
-**Query Parameters:**
-  - ``schema``: Filter by schema ID
-  - ``organization``: Filter by organization ID
-  - ``enabled``: Filter by enabled status (true/false)
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists all business rules configured in your organization. Rules define custom business
-  logic with trigger conditions (TxScript formulas) and actions. Optionally filter by
-  schema ID, organization ID, and/or enabled status. See ``rossum_mcp.server:974-1030``
-
-**Common Use Cases:**
-
-  .. code-block:: python
-
-     # List all rules
-     all_rules = await server.list_rules()
-
-     # List rules for a specific schema
-     schema_rules = await server.list_rules(schema_id=12345)
-
-     # List only enabled rules
-     enabled_rules = await server.list_rules(enabled=True)
-
-     # List enabled rules for a specific schema
-     enabled_schema_rules = await server.list_rules(schema_id=12345, enabled=True)
 
 create_rule
 ^^^^^^^^^^^
@@ -610,25 +551,6 @@ update_hook
   Updates an existing hook's properties. Only provided fields are updated; others remain
   unchanged. Commonly used to modify hook name, attached queues, events, config, or active status.
 
-list_hook_templates
-^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_hook_templates()``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.request_paginated("hook_templates")``
-
-**API Endpoint:**
-  ``GET /v1/hook_templates``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists all available hook templates from Rossum Store. Hook templates provide pre-built
-  extension configurations that can be used to quickly create hooks with standard functionality.
-
 create_hook_from_template
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -731,105 +653,6 @@ prune_schema_fields
   Removes multiple fields from a schema at once, keeping only specified fields and their
   ancestor sections/multivalues. Efficient for pruning unwanted fields during setup.
 
-get_user
-^^^^^^^^
-
-**MCP Tool:**
-  ``get_user(user_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_user(user_id)``
-
-**API Endpoint:**
-  ``GET /v1/users/{user_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Retrieves a single user by ID. Use ``list_users`` first to find users by username or email.
-
-list_users
-^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_users(username: str | None, email: str | None, first_name: str | None, last_name: str | None, is_active: bool | None, is_organization_group_admin: bool | None)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_users(**filters)``
-
-**API Endpoint:**
-  ``GET /v1/users``
-
-**Query Parameters:**
-  - ``username``: Filter by username
-  - ``email``: Filter by email
-  - ``first_name``: Filter by first name
-  - ``last_name``: Filter by last name
-  - ``is_active``: Filter by active status
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists users with optional filtering. The ``is_organization_group_admin`` filter is applied
-  client-side by checking user groups against organization_group_admin role URLs.
-
-list_user_roles
-^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_user_roles()``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_user_roles()``
-
-**API Endpoint:**
-  ``GET /v1/groups``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists all user roles (groups of permissions) in the organization.
-
-get_organization_group
-^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_organization_group(organization_group_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_organization_group(org_group_id)``
-
-**API Endpoint:**
-  ``GET /v1/organization_groups/{org_group_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Retrieves a single organization group by ID.
-
-list_organization_groups
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_organization_groups(name: str | None, use_regex: bool = False)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_organization_groups(**filters)``
-
-**API Endpoint:**
-  ``GET /v1/organization_groups``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists organization groups with optional name filter. Uses graceful deserialization
-  to skip items that fail to parse.
-
 are_lookup_fields_enabled
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -864,26 +687,6 @@ are_reasoning_fields_enabled
   feature set to ``{"enabled": True}`` in its ``features`` dict. Returns
   ``{"enabled": False}`` otherwise.
 
-get_organization_limit
-^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_organization_limit(organization_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_organization_limit(org_id)``
-
-**API Endpoint:**
-  ``GET /v1/organizations/{org_id}/limits``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Retrieves email sending limits and usage counters for a given organization.
-  Returns ``OrganizationLimit`` with nested ``EmailLimits`` containing daily/total
-  email counts and limits.
-
 list_tool_categories
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -917,6 +720,9 @@ list_tool_categories
    * - Category
      - Description
      - Keywords
+   * - ``read``
+     - Unified read layer: get one entity by ID or search/list with typed filters
+     - get, search, list, read, retrieve, find, lookup
    * - ``annotations``
      - Document processing: upload, retrieve, update, confirm
      - annotation, document, upload, extract, confirm, review
@@ -934,18 +740,12 @@ list_tool_categories
      - hook, extension, webhook, automation, function, serverless
    * - ``email_templates``
      - Email templates: automated email responses
-     - email, template, notification, rejection
-   * - ``document_relations``
-     - Document relations: export/einvoice links
-     - document relation, export, einvoice
-   * - ``relations``
-     - Annotation relations: edit/attachment/duplicate links
-     - relation, duplicate, attachment, edit
+     - email, notification, rejection
    * - ``rules``
      - Validation rules: schema validation
      - rule, validation, constraint
    * - ``users``
-     - User management: list users and roles
+     - User management: create and update users
      - user, role, permission, token_owner
    * - ``workspaces``
      - Workspace management: organize queues
@@ -953,9 +753,6 @@ list_tool_categories
    * - ``organization_groups``
      - Organization group management: view license groups
      - organization group, license, trial, production, deployment
-   * - ``organization_limits``
-     - Organization limits: email sending limits and usage
-     - organization limit, email limit, quota, email usage
 
 **Example:**
 

@@ -13,7 +13,15 @@ from rossum_api.models.engine import Engine
 from rossum_api.models.queue import Queue
 from rossum_api.models.schema import Schema
 from rossum_mcp.tools import base
-from rossum_mcp.tools.queues import QueueListItem, _create_queue_from_template, _get_engine_url, register_queue_tools
+from rossum_mcp.tools.queues import (
+    QueueListItem,
+    _create_queue_from_template,
+    _get_engine_url,
+    _get_queue,
+    _get_queue_engine,
+    _list_queues,
+    register_queue_tools,
+)
 from rossum_mcp.tools.resource_tracking import TRACKED_RESOURCES_KEY
 
 if TYPE_CHECKING:
@@ -117,15 +125,12 @@ class TestGetQueue:
     """Tests for get_queue tool."""
 
     @pytest.mark.asyncio
-    async def test_get_queue_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_queue_success(self, mock_client: AsyncMock) -> None:
         """Test successful queue retrieval."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queue = create_mock_queue(id=100, name="Production Queue")
         mock_client.retrieve_queue.return_value = mock_queue
 
-        get_queue = mock_mcp._tools["get_queue"]
-        result = await get_queue(queue_id=100)
+        result = await _get_queue(mock_client, 100)
 
         assert result.id == 100
         assert result.name == "Production Queue"
@@ -139,10 +144,8 @@ class TestListQueues:
     """Tests for list_queues tool."""
 
     @pytest.mark.asyncio
-    async def test_list_queues_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_queues_success(self, mock_client: AsyncMock) -> None:
         """Test successful queue listing."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queues = [
             create_mock_queue(id=1, name="Queue 1"),
             create_mock_queue(id=2, name="Queue 2"),
@@ -154,8 +157,7 @@ class TestListQueues:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues()
+        result = await _list_queues(mock_client)
 
         assert len(result) == 2
         assert isinstance(result[0], QueueListItem)
@@ -163,10 +165,8 @@ class TestListQueues:
         assert result[1].id == 2
 
     @pytest.mark.asyncio
-    async def test_list_queues_with_workspace_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_queues_with_workspace_filter(self, mock_client: AsyncMock) -> None:
         """Test queue listing with workspace filter."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queues = [create_mock_queue(id=1, name="Queue 1")]
         received_filters: dict = {}
 
@@ -178,17 +178,14 @@ class TestListQueues:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues(workspace_id=5)
+        result = await _list_queues(mock_client, workspace_id=5)
 
         assert len(result) == 1
         assert received_filters["workspace"] == 5
 
     @pytest.mark.asyncio
-    async def test_list_queues_with_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_queues_with_name_filter(self, mock_client: AsyncMock) -> None:
         """Test queue listing with name filter."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queues = [create_mock_queue(id=1, name="Test Queue")]
         received_filters: dict = {}
 
@@ -200,17 +197,14 @@ class TestListQueues:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues(name="Test Queue")
+        result = await _list_queues(mock_client, name="Test Queue")
 
         assert len(result) == 1
         assert received_filters["name"] == "Test Queue"
 
     @pytest.mark.asyncio
-    async def test_list_queues_with_all_filters(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_queues_with_all_filters(self, mock_client: AsyncMock) -> None:
         """Test queue listing with all filters."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queues = [create_mock_queue(id=1, name="Test Queue")]
         received_filters: dict = {}
 
@@ -222,17 +216,15 @@ class TestListQueues:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues(workspace_id=3, name="Test Queue")
+        result = await _list_queues(mock_client, workspace_id=3, name="Test Queue")
 
         assert len(result) == 1
         assert received_filters["workspace"] == 3
         assert received_filters["name"] == "Test Queue"
 
     @pytest.mark.asyncio
-    async def test_list_queues_empty_result(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_queues_empty_result(self, mock_client: AsyncMock) -> None:
         """Test queue listing with no results."""
-        register_queue_tools(mock_mcp, mock_client)
 
         async def mock_fetch_all(resource, **filters):
             return
@@ -240,16 +232,13 @@ class TestListQueues:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues()
+        result = await _list_queues(mock_client)
 
         assert len(result) == 0
 
     @pytest.mark.asyncio
-    async def test_list_queues_omits_settings(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_queues_omits_settings(self, mock_client: AsyncMock) -> None:
         """Test that settings are omitted in list response."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queue = create_mock_queue(
             id=1,
             name="Queue 1",
@@ -266,18 +255,15 @@ class TestListQueues:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues()
+        result = await _list_queues(mock_client)
 
         assert len(result) == 1
         assert isinstance(result[0], QueueListItem)
         assert result[0].settings == "<omitted>"
 
     @pytest.mark.asyncio
-    async def test_list_queues_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_queues_skips_broken_items(self, mock_client: AsyncMock) -> None:
         """Test list_queues gracefully skips items that fail deserialization."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queue = create_mock_queue(id=1, name="Good Queue")
 
         def mock_deserializer(resource, raw):
@@ -294,16 +280,13 @@ class TestListQueues:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues()
+        result = await _list_queues(mock_client)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_list_queues_with_regex_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_queues_with_regex_name_filter(self, mock_client: AsyncMock) -> None:
         """Test that use_regex=True filters queues client-side by regex pattern."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queues = [
             create_mock_queue(id=1, name="Invoice Queue"),
             create_mock_queue(id=2, name="Receipt Queue"),
@@ -319,8 +302,7 @@ class TestListQueues:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues(name="invoice", use_regex=True)
+        result = await _list_queues(mock_client, name="invoice", use_regex=True)
 
         assert len(result) == 2
         assert result[0].name == "Invoice Queue"
@@ -328,10 +310,8 @@ class TestListQueues:
         assert "name" not in received_filters
 
     @pytest.mark.asyncio
-    async def test_list_queues_with_regex_no_match(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_queues_with_regex_no_match(self, mock_client: AsyncMock) -> None:
         """Test that use_regex=True returns empty list when no queues match pattern."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queues = [create_mock_queue(id=1, name="Receipt Queue")]
 
         async def mock_fetch_all(resource, **filters):
@@ -340,16 +320,13 @@ class TestListQueues:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues(name="^invoice$", use_regex=True)
+        result = await _list_queues(mock_client, name="^invoice$", use_regex=True)
 
         assert len(result) == 0
 
     @pytest.mark.asyncio
-    async def test_list_queues_with_regex_no_name_returns_all(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_queues_with_regex_no_name_returns_all(self, mock_client: AsyncMock) -> None:
         """Test that use_regex=True without name returns all queues."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queues = [create_mock_queue(id=1, name="Queue A"), create_mock_queue(id=2, name="Queue B")]
 
         async def mock_fetch_all(resource, **filters):
@@ -358,50 +335,9 @@ class TestListQueues:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_queues = mock_mcp._tools["list_queues"]
-        result = await list_queues(use_regex=True)
+        result = await _list_queues(mock_client, use_regex=True)
 
         assert len(result) == 2
-
-
-@pytest.mark.unit
-class TestGetQueueSchema:
-    """Tests for get_queue_schema tool."""
-
-    @pytest.mark.asyncio
-    async def test_get_queue_schema_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test successful queue schema retrieval."""
-        register_queue_tools(mock_mcp, mock_client)
-
-        mock_queue = create_mock_queue(id=100, schema="https://api.test.rossum.ai/v1/schemas/50")
-        mock_schema = create_mock_schema(id=50, name="Invoice Schema")
-
-        mock_client.retrieve_queue.return_value = mock_queue
-        mock_client.retrieve_schema.return_value = mock_schema
-
-        get_queue_schema = mock_mcp._tools["get_queue_schema"]
-        result = await get_queue_schema(queue_id=100)
-
-        assert result.id == 50
-        assert result.name == "Invoice Schema"
-        mock_client.retrieve_queue.assert_called_once_with(100)
-        mock_client.retrieve_schema.assert_called_once_with(50)
-
-    @pytest.mark.asyncio
-    async def test_get_queue_schema_with_trailing_slash(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test queue schema retrieval handles trailing slash in URL."""
-        register_queue_tools(mock_mcp, mock_client)
-
-        mock_queue = create_mock_queue(id=100, schema="https://api.test.rossum.ai/v1/schemas/50/")
-        mock_schema = create_mock_schema(id=50)
-
-        mock_client.retrieve_queue.return_value = mock_queue
-        mock_client.retrieve_schema.return_value = mock_schema
-
-        get_queue_schema = mock_mcp._tools["get_queue_schema"]
-        await get_queue_schema(queue_id=100)
-
-        mock_client.retrieve_schema.assert_called_once_with(50)
 
 
 @pytest.mark.unit
@@ -409,10 +345,8 @@ class TestGetQueueEngine:
     """Tests for get_queue_engine tool."""
 
     @pytest.mark.asyncio
-    async def test_get_queue_engine_from_engine_field(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_queue_engine_from_engine_field(self, mock_client: AsyncMock) -> None:
         """Test queue engine retrieval from engine field."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queue = create_mock_queue(
             id=100,
             engine="https://api.test.rossum.ai/v1/engines/15",
@@ -424,18 +358,15 @@ class TestGetQueueEngine:
         mock_client.retrieve_queue.return_value = mock_queue
         mock_client.retrieve_engine.return_value = mock_engine
 
-        get_queue_engine = mock_mcp._tools["get_queue_engine"]
-        result = await get_queue_engine(queue_id=100)
+        result = await _get_queue_engine(mock_client, 100)
 
         assert result.id == 15
         assert result.name == "Custom Engine"
         mock_client.retrieve_engine.assert_called_once_with(15)
 
     @pytest.mark.asyncio
-    async def test_get_queue_engine_from_dedicated_engine(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_queue_engine_from_dedicated_engine(self, mock_client: AsyncMock) -> None:
         """Test queue engine retrieval prefers dedicated_engine."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queue = create_mock_queue(
             id=100,
             engine="https://api.test.rossum.ai/v1/engines/10",
@@ -447,17 +378,14 @@ class TestGetQueueEngine:
         mock_client.retrieve_queue.return_value = mock_queue
         mock_client.retrieve_engine.return_value = mock_engine
 
-        get_queue_engine = mock_mcp._tools["get_queue_engine"]
-        result = await get_queue_engine(queue_id=100)
+        result = await _get_queue_engine(mock_client, 100)
 
         assert result.id == 20
         mock_client.retrieve_engine.assert_called_once_with(20)
 
     @pytest.mark.asyncio
-    async def test_get_queue_engine_no_engine_assigned(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_queue_engine_no_engine_assigned(self, mock_client: AsyncMock) -> None:
         """Test queue engine retrieval when no engine is assigned."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queue = create_mock_queue(
             id=100,
             engine=None,
@@ -466,17 +394,14 @@ class TestGetQueueEngine:
         )
         mock_client.retrieve_queue.return_value = mock_queue
 
-        get_queue_engine = mock_mcp._tools["get_queue_engine"]
-        result = await get_queue_engine(queue_id=100)
+        result = await _get_queue_engine(mock_client, 100)
 
         assert result["message"] == "No engine assigned to this queue"
         mock_client.retrieve_engine.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_get_queue_engine_engine_not_found(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_queue_engine_engine_not_found(self, mock_client: AsyncMock) -> None:
         """Test queue engine retrieval when engine returns 404."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queue = create_mock_queue(
             id=100,
             engine="https://api.test.rossum.ai/v1/engines/999",
@@ -491,17 +416,14 @@ class TestGetQueueEngine:
             error=Exception("Not found"),
         )
 
-        get_queue_engine = mock_mcp._tools["get_queue_engine"]
-        result = await get_queue_engine(queue_id=100)
+        result = await _get_queue_engine(mock_client, 100)
 
         assert "Engine not found" in result["message"]
         assert "engines/999" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_get_queue_engine_from_generic_engine(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_queue_engine_from_generic_engine(self, mock_client: AsyncMock) -> None:
         """Test queue engine retrieval from generic_engine field."""
-        register_queue_tools(mock_mcp, mock_client)
-
         mock_queue = create_mock_queue(
             id=100,
             engine="https://api.test.rossum.ai/v1/engines/10",
@@ -513,18 +435,15 @@ class TestGetQueueEngine:
         mock_client.retrieve_queue.return_value = mock_queue
         mock_client.retrieve_engine.return_value = mock_engine
 
-        get_queue_engine = mock_mcp._tools["get_queue_engine"]
-        result = await get_queue_engine(queue_id=100)
+        result = await _get_queue_engine(mock_client, 100)
 
         assert result.id == 30
         assert result.name == "Generic Engine"
         mock_client.retrieve_engine.assert_called_once_with(30)
 
     @pytest.mark.asyncio
-    async def test_get_queue_engine_dict_engine(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_queue_engine_dict_engine(self, mock_client: AsyncMock) -> None:
         """Test queue engine retrieval when engine_url is a dict (uses deserialize_default)."""
-        register_queue_tools(mock_mcp, mock_client)
-
         engine_dict = {
             "id": 42,
             "url": "https://api.test.rossum.ai/v1/engines/42",
@@ -542,8 +461,7 @@ class TestGetQueueEngine:
         mock_client.retrieve_queue.return_value = mock_queue
 
         with patch("rossum_mcp.tools.queues.deserialize_default", return_value=mock_engine) as mock_deserialize:
-            get_queue_engine = mock_mcp._tools["get_queue_engine"]
-            result = await get_queue_engine(queue_id=100)
+            result = await _get_queue_engine(mock_client, 100)
 
             mock_deserialize.assert_called_once_with(Resource.Engine, engine_dict)
             assert result.id == 42

@@ -58,26 +58,6 @@ async def _delete_workspace(client: AsyncRossumAPIClient, workspace_id: int) -> 
 
 def register_workspace_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Retrieve workspace details.",
-        tags={"workspaces"},
-        annotations={"readOnlyHint": True},
-    )
-    async def get_workspace(workspace_id: int) -> Workspace:
-        return await _get_workspace(client, workspace_id)
-
-    @mcp.tool(
-        description="List all workspaces with optional filters. Set use_regex=True to filter name as a regex pattern (client-side); otherwise name is an exact API-side match.",
-        tags={"workspaces"},
-        annotations={"readOnlyHint": True},
-    )
-    async def list_workspaces(
-        organization_id: int | None = None,
-        name: str | None = None,
-        use_regex: bool = False,
-    ) -> list[Workspace]:
-        return await _list_workspaces(client, organization_id, name, use_regex)
-
-    @mcp.tool(
         description="Create a new workspace.",
         tags={"workspaces", "write"},
         annotations={"readOnlyHint": False},

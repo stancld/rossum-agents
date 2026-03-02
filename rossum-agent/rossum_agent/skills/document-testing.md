@@ -4,12 +4,12 @@
 
 ## Workflow
 
-1. Get schema: `list_queues` → `get_schema(schema_id)`
+1. Get schema: `search(query={"entity": "queue"})` → `get(entity="schema", id=schema_id)`
 2. Extract fields from schema content (walk sections → datapoints, multivalues → tuples)
 3. `generate_mock_pdf(fields=[...], document_type="invoice")`
 4. `upload_document(file_path, queue_id)`
-5. Poll: `list_annotations(queue_id, ordering=["-created_at"], first_n=1)` every 5s, max 12 attempts
-6. Verify: `get_annotation(annotation_id, sideloads=["content"])` → compare vs `expected_values`
+5. Poll: `search(query={"entity": "annotation", "queue_id": queue_id, "ordering": ["-created_at"], "first_n": 1})` every 5s, max 12 attempts
+6. Verify: `get_annotation_content(annotation_id)` → compare vs `expected_values`
 7. Optional: `test_hook(hook_id, event, action, annotation=annotation_url)`
 
 ## Field Extraction from Schema
@@ -32,7 +32,7 @@ Line item fields: `rir_field_names` containing `item_*` prefix, or `id` starting
 | Schema first | Always fetch the schema before generating — field list must match the queue's schema |
 | Overrides for specifics | Use `overrides={field_id: value}` to force values for edge-case testing |
 | One queue at a time | Upload to a single queue, verify there, then repeat for others |
-| Poll with backoff | Extraction takes 5-30s; poll `list_annotations` with 5s intervals, 12 max attempts |
+| Poll with backoff | Extraction takes 5-30s; poll `search(query={"entity": "annotation", ...})` with 5s intervals, 12 max attempts |
 
 ## Verification
 

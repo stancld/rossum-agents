@@ -11,6 +11,8 @@ from rossum_api import APIClientError
 from rossum_mcp.tools import base, schemas
 from rossum_mcp.tools.schemas import register_schema_tools
 from rossum_mcp.tools.schemas.models import SchemaListItem
+from rossum_mcp.tools.schemas.operations import get_schema as _get_schema
+from rossum_mcp.tools.schemas.operations import list_schemas as _list_schemas
 
 from .conftest import create_mock_schema
 
@@ -23,10 +25,8 @@ class TestGetSchema:
     """Tests for get_schema tool."""
 
     @pytest.mark.asyncio
-    async def test_get_schema_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_schema_success(self, mock_client: AsyncMock) -> None:
         """Test successful schema retrieval."""
-        register_schema_tools(mock_mcp, mock_client)
-
         mock_schema = create_mock_schema(
             id=50,
             name="Invoice Schema",
@@ -40,8 +40,7 @@ class TestGetSchema:
         )
         mock_client.retrieve_schema.return_value = mock_schema
 
-        get_schema = mock_mcp._tools["get_schema"]
-        result = await get_schema(schema_id=50)
+        result = await _get_schema(mock_client, 50)
 
         assert result.id == 50
         assert result.name == "Invoice Schema"
@@ -49,10 +48,8 @@ class TestGetSchema:
         mock_client.retrieve_schema.assert_called_once_with(50)
 
     @pytest.mark.asyncio
-    async def test_get_schema_not_found(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_schema_not_found(self, mock_client: AsyncMock) -> None:
         """Test schema not found returns error dict instead of raising exception."""
-        register_schema_tools(mock_mcp, mock_client)
-
         mock_client.retrieve_schema.side_effect = APIClientError(
             method="GET",
             url="https://api.test/schemas/999",
@@ -60,8 +57,7 @@ class TestGetSchema:
             error=Exception("Not found"),
         )
 
-        get_schema = mock_mcp._tools["get_schema"]
-        result = await get_schema(schema_id=999)
+        result = await _get_schema(mock_client, 999)
 
         assert isinstance(result, dict)
         assert "error" in result
@@ -74,10 +70,8 @@ class TestListSchemas:
     """Tests for list_schemas tool."""
 
     @pytest.mark.asyncio
-    async def test_list_schemas_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_schemas_success(self, mock_client: AsyncMock) -> None:
         """Test successful schema listing."""
-        register_schema_tools(mock_mcp, mock_client)
-
         mock_schemas = [
             create_mock_schema(id=1, name="Schema 1"),
             create_mock_schema(id=2, name="Schema 2"),
@@ -89,18 +83,15 @@ class TestListSchemas:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_schemas = mock_mcp._tools["list_schemas"]
-        result = await list_schemas()
+        result = await _list_schemas(mock_client)
 
         assert len(result) == 2
         assert result[0].id == 1
         assert result[1].id == 2
 
     @pytest.mark.asyncio
-    async def test_list_schemas_with_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_schemas_with_name_filter(self, mock_client: AsyncMock) -> None:
         """Test schema listing with name filter."""
-        register_schema_tools(mock_mcp, mock_client)
-
         mock_schemas = [create_mock_schema(id=1, name="Invoice Schema")]
         filters_received = {}
 
@@ -112,17 +103,14 @@ class TestListSchemas:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_schemas = mock_mcp._tools["list_schemas"]
-        result = await list_schemas(name="Invoice Schema")
+        result = await _list_schemas(mock_client, name="Invoice Schema")
 
         assert len(result) == 1
         assert filters_received["name"] == "Invoice Schema"
 
     @pytest.mark.asyncio
-    async def test_list_schemas_with_queue_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_schemas_with_queue_filter(self, mock_client: AsyncMock) -> None:
         """Test schema listing with queue filter."""
-        register_schema_tools(mock_mcp, mock_client)
-
         mock_schemas = [create_mock_schema(id=1, name="Schema 1")]
         filters_received = {}
 
@@ -134,17 +122,14 @@ class TestListSchemas:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_schemas = mock_mcp._tools["list_schemas"]
-        result = await list_schemas(queue_id=5)
+        result = await _list_schemas(mock_client, queue_id=5)
 
         assert len(result) == 1
         assert filters_received["queue"] == 5
 
     @pytest.mark.asyncio
-    async def test_list_schemas_with_all_filters(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_schemas_with_all_filters(self, mock_client: AsyncMock) -> None:
         """Test schema listing with all filters."""
-        register_schema_tools(mock_mcp, mock_client)
-
         mock_schemas = [create_mock_schema(id=1, name="Test Schema")]
         filters_received = {}
 
@@ -156,17 +141,15 @@ class TestListSchemas:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_schemas = mock_mcp._tools["list_schemas"]
-        result = await list_schemas(name="Test Schema", queue_id=3)
+        result = await _list_schemas(mock_client, name="Test Schema", queue_id=3)
 
         assert len(result) == 1
         assert filters_received["name"] == "Test Schema"
         assert filters_received["queue"] == 3
 
     @pytest.mark.asyncio
-    async def test_list_schemas_empty_result(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_schemas_empty_result(self, mock_client: AsyncMock) -> None:
         """Test schema listing with no results."""
-        register_schema_tools(mock_mcp, mock_client)
 
         async def mock_fetch_all(resource, **filters):
             return
@@ -174,16 +157,13 @@ class TestListSchemas:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_schemas = mock_mcp._tools["list_schemas"]
-        result = await list_schemas()
+        result = await _list_schemas(mock_client)
 
         assert len(result) == 0
 
     @pytest.mark.asyncio
-    async def test_list_schemas_truncates_content(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_schemas_truncates_content(self, mock_client: AsyncMock) -> None:
         """Test that content field is truncated in list response."""
-        register_schema_tools(mock_mcp, mock_client)
-
         mock_schema = create_mock_schema(
             id=1,
             name="Schema 1",
@@ -201,8 +181,7 @@ class TestListSchemas:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_schemas = mock_mcp._tools["list_schemas"]
-        result = await list_schemas()
+        result = await _list_schemas(mock_client)
 
         assert len(result) == 1
         item = result[0]
@@ -212,10 +191,8 @@ class TestListSchemas:
         assert item.id == 1
 
     @pytest.mark.asyncio
-    async def test_list_schemas_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_schemas_skips_broken_items(self, mock_client: AsyncMock) -> None:
         """Test list_schemas gracefully skips items that fail deserialization."""
-        register_schema_tools(mock_mcp, mock_client)
-
         good_schema = create_mock_schema(id=1, name="Good Schema")
 
         def mock_deserializer(resource, raw):
@@ -232,16 +209,13 @@ class TestListSchemas:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_schemas = mock_mcp._tools["list_schemas"]
-        result = await list_schemas()
+        result = await _list_schemas(mock_client)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_list_schemas_with_regex_name_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_schemas_with_regex_name_filter(self, mock_client: AsyncMock) -> None:
         """Test that use_regex=True filters schemas client-side by regex pattern."""
-        register_schema_tools(mock_mcp, mock_client)
-
         mock_schemas = [
             create_mock_schema(id=1, name="Invoice Schema"),
             create_mock_schema(id=2, name="Receipt Schema"),
@@ -257,8 +231,7 @@ class TestListSchemas:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_schemas = mock_mcp._tools["list_schemas"]
-        result = await list_schemas(name="invoice", use_regex=True)
+        result = await _list_schemas(mock_client, name="invoice", use_regex=True)
 
         assert len(result) == 2
         assert result[0].name == "Invoice Schema"
@@ -266,10 +239,8 @@ class TestListSchemas:
         assert "name" not in filters_received
 
     @pytest.mark.asyncio
-    async def test_list_schemas_with_regex_no_match(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_schemas_with_regex_no_match(self, mock_client: AsyncMock) -> None:
         """Test that use_regex=True returns empty list when no schemas match pattern."""
-        register_schema_tools(mock_mcp, mock_client)
-
         mock_schemas = [create_mock_schema(id=1, name="Receipt Schema")]
 
         async def mock_fetch_all(resource, **filters):
@@ -278,8 +249,7 @@ class TestListSchemas:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_schemas = mock_mcp._tools["list_schemas"]
-        result = await list_schemas(name="^invoice$", use_regex=True)
+        result = await _list_schemas(mock_client, name="^invoice$", use_regex=True)
 
         assert len(result) == 0
 

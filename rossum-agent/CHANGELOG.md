@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Removed `elis_openapi_grep` and `elis_openapi_jq` as direct agent tools — Elis API reference lookups now route exclusively through the `search_elis_docs` sub-agent ([#220](https://github.com/rossumai/rossum-agents/pull/220))
+- Updated skills and MCP integration for rossum-mcp's unified `get`/`search` read layer — base prompt, 5 skill files (document-testing, hooks, rossum-deployment, rules-and-actions, ui-settings), and copilot tools now reference new tool names instead of removed `get_*/list_*` tools [#221](https://github.com/stancld/rossum-agents/pull/221)
 
 ### Fixed
 - Fixed `packages.find` in `pyproject.toml` — removed `rossum_mcp*` and `rossum_deploy*` from the `include` list; only `rossum_agent*` belongs in this package's build

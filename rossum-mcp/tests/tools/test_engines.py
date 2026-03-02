@@ -10,7 +10,7 @@ import pytest
 from conftest import create_mock_engine, create_mock_engine_field
 from rossum_api.domain_logic.resources import Resource
 from rossum_mcp.tools import base
-from rossum_mcp.tools.engines import register_engine_tools
+from rossum_mcp.tools.engines import _get_engine, _list_engines, register_engine_tools
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -48,15 +48,12 @@ class TestGetEngine:
     """Tests for get_engine tool."""
 
     @pytest.mark.asyncio
-    async def test_get_engine_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_engine_success(self, mock_client: AsyncMock) -> None:
         """Test successful engine retrieval."""
-        register_engine_tools(mock_mcp, mock_client)
-
         mock_engine = create_mock_engine(id=123, name="Custom Engine", type="extractor")
         mock_client.retrieve_engine.return_value = mock_engine
 
-        get_engine = mock_mcp._tools["get_engine"]
-        result = await get_engine(engine_id=123)
+        result = await _get_engine(mock_client, engine_id=123)
 
         assert result.id == 123
         assert result.name == "Custom Engine"
@@ -69,10 +66,8 @@ class TestListEngines:
     """Tests for list_engines tool."""
 
     @pytest.mark.asyncio
-    async def test_list_engines_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_engines_success(self, mock_client: AsyncMock) -> None:
         """Test successful engines listing."""
-        register_engine_tools(mock_mcp, mock_client)
-
         mock_engine1 = create_mock_engine(id=1, name="Engine 1")
         mock_engine2 = create_mock_engine(id=2, name="Engine 2")
 
@@ -82,16 +77,13 @@ class TestListEngines:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_engines = mock_mcp._tools["list_engines"]
-        result = await list_engines()
+        result = await _list_engines(mock_client)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_list_engines_with_filters(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_engines_with_filters(self, mock_client: AsyncMock) -> None:
         """Test engines listing with filters."""
-        register_engine_tools(mock_mcp, mock_client)
-
         mock_engine = create_mock_engine(id=1, type="extractor")
         received_filters: dict = {}
 
@@ -101,17 +93,14 @@ class TestListEngines:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_engines = mock_mcp._tools["list_engines"]
-        result = await list_engines(engine_type="extractor")
+        result = await _list_engines(mock_client, engine_type="extractor")
 
         assert len(result) == 1
         assert received_filters["type"] == "extractor"
 
     @pytest.mark.asyncio
-    async def test_list_engines_with_id_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_engines_with_id_filter(self, mock_client: AsyncMock) -> None:
         """Test engines listing with id filter."""
-        register_engine_tools(mock_mcp, mock_client)
-
         mock_engine = create_mock_engine(id=42, type="extractor")
         received_filters: dict = {}
 
@@ -121,17 +110,14 @@ class TestListEngines:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_engines = mock_mcp._tools["list_engines"]
-        result = await list_engines(id=42)
+        result = await _list_engines(mock_client, id=42)
 
         assert len(result) == 1
         assert received_filters["id"] == 42
 
     @pytest.mark.asyncio
-    async def test_list_engines_with_agenda_id_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_engines_with_agenda_id_filter(self, mock_client: AsyncMock) -> None:
         """Test engines listing with agenda_id filter."""
-        register_engine_tools(mock_mcp, mock_client)
-
         mock_engine = create_mock_engine(id=1, agenda_id="my-agenda")
         received_filters: dict = {}
 
@@ -141,17 +127,14 @@ class TestListEngines:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_engines = mock_mcp._tools["list_engines"]
-        result = await list_engines(agenda_id="my-agenda")
+        result = await _list_engines(mock_client, agenda_id="my-agenda")
 
         assert len(result) == 1
         assert received_filters["agenda_id"] == "my-agenda"
 
     @pytest.mark.asyncio
-    async def test_list_engines_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_engines_skips_broken_items(self, mock_client: AsyncMock) -> None:
         """Test list_engines gracefully skips items that fail deserialization."""
-        register_engine_tools(mock_mcp, mock_client)
-
         mock_engine = create_mock_engine(id=1, name="Good Engine")
 
         def mock_deserializer(resource, raw):
@@ -168,8 +151,7 @@ class TestListEngines:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_engines = mock_mcp._tools["list_engines"]
-        result = await list_engines()
+        result = await _list_engines(mock_client)
 
         assert len(result) == 2
 

@@ -8,7 +8,7 @@ Call `suggest_rule(user_query, queue_id)`, then `create_rule(...)` immediately w
 
 If the user asks to test a rule, call `evaluate_rules(queue_id, annotation_id, schema_rules)` to preview which actions would trigger.
 `evaluate_rules` requires an existing annotation in the queue — upload documents first if none exist:
-1. Fetch schema fields (`get_schema`)
+1. Fetch schema fields (`get(entity="schema", id=schema_id)`)
 2. Generate test PDFs (`generate_mock_pdf` with `overrides` to control field values)
 3. Upload each PDF (`upload_document`)
 4. Call `evaluate_rules` with the returned annotation IDs
