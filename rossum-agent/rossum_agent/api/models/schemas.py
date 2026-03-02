@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -68,6 +69,14 @@ class DocumentContent(BaseModel):
     media_type: Literal["application/pdf"]
     data: str = Field(..., description="Base64-encoded document data")
     filename: str = Field(..., description="Original filename of the document")
+
+    @field_validator("filename")
+    @classmethod
+    def validate_filename(cls, v: str) -> str:
+        name = Path(v).name
+        if not name:
+            raise ValueError("filename must not be empty or a bare directory path")
+        return name
 
     @field_validator("data")
     @classmethod

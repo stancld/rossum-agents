@@ -9,6 +9,7 @@ import contextvars
 import dataclasses
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from rossum_agent.agent.core import RossumAgent, create_agent
@@ -53,7 +54,6 @@ from rossum_agent.utils import create_session_output_dir, get_display_tool_name
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-    from pathlib import Path
 
     from anthropic.types import ImageBlockParam, TextBlockParam
 
@@ -559,7 +559,7 @@ class AgentService:
 
     def _save_documents_to_output_dir(self, documents: list[DocumentContent], output_dir: Path) -> None:
         for doc in documents:
-            file_path = output_dir / doc.filename
+            file_path = output_dir / Path(doc.filename).name
             try:
                 file_data = base64.b64decode(doc.data)
                 file_path.write_bytes(file_data)
