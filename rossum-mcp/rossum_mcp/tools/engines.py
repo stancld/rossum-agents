@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.engine import Engine, EngineField, EngineFieldType
@@ -9,6 +9,14 @@ from rossum_api.models.engine import Engine, EngineField, EngineFieldType
 from rossum_mcp.tools.base import build_filters, build_resource_url, graceful_list
 
 type EngineType = Literal["extractor", "splitter"]
+
+
+class EngineUpdateData(TypedDict, total=False):
+    name: str
+    description: str
+    learning_enabled: bool
+    training_queues: list[str]
+
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -34,9 +42,9 @@ async def _list_engines(
     return result.items
 
 
-async def _update_engine(client: AsyncRossumAPIClient, engine_id: int, engine_data: dict) -> Engine | dict:
+async def _update_engine(client: AsyncRossumAPIClient, engine_id: int, engine_data: EngineUpdateData) -> Engine | dict:
     logger.debug(f"Updating engine: engine_id={engine_id}, data={engine_data}")
-    updated_engine_data = await client._http_client.update(Resource.Engine, engine_id, engine_data)
+    updated_engine_data = await client._http_client.update(Resource.Engine, engine_id, dict(engine_data))
     return cast("Engine", client._deserializer(Resource.Engine, updated_engine_data))
 
 
@@ -64,7 +72,7 @@ async def _create_engine_field(
     field_type: EngineFieldType,
     schema_ids: list[int],
     tabular: bool = False,
-    multiline: str = "false",
+    multiline: bool = False,
     subtype: str | None = None,
     pre_trained_field_id: str | None = None,
 ) -> EngineField | dict:
@@ -122,7 +130,7 @@ def register_engine_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         tags={"engines", "write"},
         annotations={"readOnlyHint": False},
     )
-    async def update_engine(engine_id: int, engine_data: dict) -> Engine | dict:
+    async def update_engine(engine_id: int, engine_data: EngineUpdateData) -> Engine | dict:
         return await _update_engine(client, engine_id, engine_data)
 
     @mcp.tool(
@@ -145,7 +153,7 @@ def register_engine_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         field_type: EngineFieldType,
         schema_ids: list[int],
         tabular: bool = False,
-        multiline: str = "false",
+        multiline: bool = False,
         subtype: str | None = None,
         pre_trained_field_id: str | None = None,
     ) -> EngineField | dict:

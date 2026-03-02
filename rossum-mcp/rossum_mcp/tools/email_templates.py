@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.email_template import EmailTemplate
 
-from rossum_mcp.tools.base import build_filters, graceful_list
+from rossum_mcp.tools.base import build_filters, build_resource_url, graceful_list
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -42,7 +42,7 @@ async def _list_email_templates(
 async def _create_email_template(
     client: AsyncRossumAPIClient,
     name: str,
-    queue: str,
+    queue: int,
     subject: str,
     message: str,
     type: EmailTemplateType = "custom",
@@ -56,7 +56,7 @@ async def _create_email_template(
 
     template_data: dict[str, Any] = {
         "name": name,
-        "queue": queue,
+        "queue": build_resource_url("queues", queue),
         "subject": subject,
         "message": message,
         "type": type,
@@ -106,7 +106,7 @@ def register_email_template_tools(mcp: FastMCP, client: AsyncRossumAPIClient) ->
     )
     async def create_email_template(
         name: str,
-        queue: str,
+        queue: int,
         subject: str,
         message: str,
         type: EmailTemplateType = "custom",

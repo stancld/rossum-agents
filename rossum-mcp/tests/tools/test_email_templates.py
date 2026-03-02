@@ -310,6 +310,7 @@ class TestCreateEmailTemplate:
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         """Test successful email template creation."""
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
         monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
 
         importlib.reload(base)
@@ -324,20 +325,22 @@ class TestCreateEmailTemplate:
         create_email_template = mock_mcp._tools["create_email_template"]
         result = await create_email_template(
             name="New Template",
-            queue="https://api.test.rossum.ai/v1/queues/1",
+            queue=1,
             subject="Welcome",
             message="<p>Hello</p>",
         )
 
         assert result.id == 200
         assert result.name == "New Template"
-        mock_client.create_new_email_template.assert_called_once()
+        call_args = mock_client.create_new_email_template.call_args[0][0]
+        assert call_args["queue"] == "https://api.test.rossum.ai/v1/queues/1"
 
     @pytest.mark.asyncio
     async def test_create_email_template_with_all_fields(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         """Test email template creation with all optional fields."""
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
         monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
 
         importlib.reload(base)
@@ -350,7 +353,7 @@ class TestCreateEmailTemplate:
         create_email_template = mock_mcp._tools["create_email_template"]
         result = await create_email_template(
             name="Full Template",
-            queue="https://api.test.rossum.ai/v1/queues/1",
+            queue=1,
             subject="Subject",
             message="<p>Message</p>",
             type="rejection",

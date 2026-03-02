@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Literal  # noqa: TC003 - needed at runtime for FastMCP schema generation
 
 from fastmcp import FastMCP
 from rossum_api import AsyncRossumAPIClient
@@ -75,7 +76,7 @@ def create_app() -> FastMCP:
     @mcp.tool(
         description="Set the MCP operation mode. Use 'read-only' to disable write operations, 'read-write' to enable them."
     )
-    async def set_mcp_mode_tool(mode: str) -> dict:
+    async def set_mcp_mode_tool(mode: Literal["read-only", "read-write"]) -> dict:
         try:
             set_mcp_mode(mode)
             current = get_mcp_mode()

@@ -4,7 +4,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, cast, get_args
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast, get_args
 
 from rossum_api import APIClientError
 from rossum_api.domain_logic.resources import Resource
@@ -45,6 +45,28 @@ class QueueListItem:
     status: str | None = None
     counts: dict[str, int] | None = None
     settings: str = "<omitted>"
+
+
+class QueueUpdateData(TypedDict, total=False):
+    name: str
+    automation_enabled: bool
+    automation_level: str
+    locale: str
+    metadata: dict[str, Any]
+    settings: dict[str, Any]
+    engine: str
+    dedicated_engine: str
+    training_enabled: bool
+    webhooks: list[str]
+    hooks: list[str]
+    default_score_threshold: float
+    session_timeout: str
+    document_lifetime: str | None
+    delete_after: str | None
+    schema: str
+    workspace: str
+    connector: str | None
+    inbox: str | None
 
 
 def _queue_to_list_item(queue: Queue) -> QueueListItem:
@@ -194,7 +216,7 @@ _VALID_META_NAMES = {
 }
 
 
-def _validate_queue_column_settings(queue_data: dict) -> str | None:
+def _validate_queue_column_settings(queue_data: QueueUpdateData) -> str | None:
     """Validate meta_name values in annotation_list_table columns. Returns error message or None."""
     columns = queue_data.get("settings", {}).get("annotation_list_table", {}).get("columns", [])
     if not isinstance(columns, list):
@@ -212,13 +234,13 @@ def _validate_queue_column_settings(queue_data: dict) -> str | None:
     return None
 
 
-async def _update_queue(client: AsyncRossumAPIClient, queue_id: int, queue_data: dict) -> Queue | dict:
+async def _update_queue(client: AsyncRossumAPIClient, queue_id: int, queue_data: QueueUpdateData) -> Queue | dict:
     validation_error = _validate_queue_column_settings(queue_data)
     if validation_error:
         return {"error": validation_error}
 
     logger.debug(f"Updating queue: queue_id={queue_id}, data={queue_data}")
-    updated_queue_data = await client._http_client.update(Resource.Queue, queue_id, queue_data)
+    updated_queue_data = await client._http_client.update(Resource.Queue, queue_id, dict(queue_data))
     return cast("Queue", client._deserializer(Resource.Queue, updated_queue_data))
 
 
@@ -397,7 +419,7 @@ def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         tags={"queues", "write"},
         annotations={"readOnlyHint": False},
     )
-    async def update_queue(queue_id: int, queue_data: dict) -> Queue | dict:
+    async def update_queue(queue_id: int, queue_data: QueueUpdateData) -> Queue | dict:
         return await _update_queue(client, queue_id, queue_data)
 
     @mcp.tool(

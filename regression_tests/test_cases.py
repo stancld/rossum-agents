@@ -332,7 +332,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "load_skill",
                 "create_queue_from_template",
                 "suggest_formula_field",
-                "patch_schema",
+                ("patch_schema", "patch_schema_with_subagent"),
                 "get_schema_tree_structure",
                 "prune_schema_fields",
             ],
@@ -340,6 +340,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         token_budget=TokenBudget(min_total_tokens=120000, max_total_tokens=300000),
         success_criteria=SuccessCriteria(
+            require_subagent=None,
             required_keywords=["Invoices", "Credit Notes"],
             max_steps=11,
             file_expectation=FileExpectation(),
