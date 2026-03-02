@@ -123,17 +123,21 @@ async def _get_relation(client: AsyncRossumAPIClient, relation_id: int) -> Relat
     return cast("Relation", client._deserializer(Resource.Relation, relation_data))
 
 
-async def _list_relations(client: AsyncRossumAPIClient, **kwargs: object) -> list[object]:
-    filters = build_filters(**kwargs)
-    result = await graceful_list(client, Resource.Relation, "relation", **filters)
-    return result.items
-
-
 async def _get_document_relation(client: AsyncRossumAPIClient, document_relation_id: int) -> DocumentRelation:
     return await client.retrieve_document_relation(document_relation_id)
 
 
-async def _list_document_relations(client: AsyncRossumAPIClient, **kwargs: object) -> list[object]:
+async def _list_by_resource(
+    client: AsyncRossumAPIClient, resource: Resource, name: str, **kwargs: object
+) -> list[object]:
     filters = build_filters(**kwargs)
-    result = await graceful_list(client, Resource.DocumentRelation, "document_relation", **filters)
+    result = await graceful_list(client, resource, name, **filters)
     return result.items
+
+
+async def _list_relations(client: AsyncRossumAPIClient, **kwargs: object) -> list[object]:
+    return await _list_by_resource(client, Resource.Relation, "relation", **kwargs)
+
+
+async def _list_document_relations(client: AsyncRossumAPIClient, **kwargs: object) -> list[object]:
+    return await _list_by_resource(client, Resource.DocumentRelation, "document_relation", **kwargs)

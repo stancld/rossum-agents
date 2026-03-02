@@ -50,20 +50,24 @@ def _to_plain(obj: Any) -> Any:
     return obj
 
 
-def _extract_schema_content(mcp_result: Any) -> list[dict[str, Any]]:
-    """Extract schema content list from MCP result, handling dict, dataclass, or Pydantic.
+def _unwrap_get_response(obj: Any) -> Any:
+    """Unwrap unified get response: {"entity": ..., "id": ..., "data": {...}} or FastMCP {"result": ...}."""
+    if isinstance(obj, dict):
+        if "data" in obj and "entity" in obj:
+            return obj["data"]
+        if "result" in obj:
+            return obj["result"]
+    elif hasattr(obj, "result"):
+        return obj.result
+    return obj
 
-    Handles both direct schema dicts and wrapped results like {"result": {...}}.
-    """
+
+def _extract_schema_content(mcp_result: Any) -> list[dict[str, Any]]:
+    """Extract schema content list from MCP result, handling dict, dataclass, or Pydantic."""
     if mcp_result is None:
         return []
 
-    # Unwrap structured_content {"result": {...}} wrapper from FastMCP
-    obj = mcp_result
-    if isinstance(obj, dict) and "result" in obj:
-        obj = obj["result"]
-    elif hasattr(obj, "result"):
-        obj = obj.result
+    obj = _unwrap_get_response(mcp_result)
 
     if isinstance(obj, dict):
         content = obj.get("content", [])
@@ -570,9 +574,7 @@ def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
 
     if tool_name == "get_full_schema":
         mcp_result = call_mcp_tool("get", {"entity": "schema", "entity_id": schema_id})
-        # Unwrap unified get response: {"entity": "schema", "id": X, "data": {...}}
-        if isinstance(mcp_result, dict) and "data" in mcp_result and "entity" in mcp_result:
-            mcp_result = mcp_result["data"]
+        mcp_result = _unwrap_get_response(mcp_result)
         if mcp_result and schema_id:
             content = _extract_schema_content(mcp_result)
             if not content:
@@ -630,10 +632,7 @@ def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> Su
     schema_id_int = int(schema_id)
 
     tree_result = call_mcp_tool("get_schema_tree_structure", {"schema_id": schema_id_int})
-    schema_result = call_mcp_tool("get", {"entity": "schema", "entity_id": schema_id_int})
-    # Unwrap unified get response: {"entity": "schema", "id": X, "data": {...}}
-    if isinstance(schema_result, dict) and "data" in schema_result and "entity" in schema_result:
-        schema_result = schema_result["data"]
+    schema_result = _unwrap_get_response(call_mcp_tool("get", {"entity": "schema", "entity_id": schema_id_int}))
     if schema_result:
         content = _extract_schema_content(schema_result)
         if not content:
@@ -686,8 +685,12 @@ Lookup fields MUST include: type "enum", ui_configuration {{"type": "lookup", "e
 
 Call apply_schema_changes with fields_to_keep (IDs to retain), fields_to_add, and/or fields_to_update, then return summary."""
 
-    sub_agent = SchemaPatchingSubAgent()
-    return sub_agent.run(user_content)
+    try:
+        sub_agent = SchemaPatchingSubAgent()
+        return sub_agent.run(user_content)
+    finally:
+        # Ensure cache is cleaned up even if the sub-agent fails or skips apply_schema_changes
+        _schema_content_cache.pop(schema_id_int, None)
 
 
 @beta_tool

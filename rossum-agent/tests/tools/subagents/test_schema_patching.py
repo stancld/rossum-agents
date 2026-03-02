@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
 from rossum_agent.tools.core import AgentContext, set_context
 from rossum_agent.tools.subagents.base import SubAgentResult
 from rossum_agent.tools.subagents.schema_patching import (
@@ -1258,6 +1259,27 @@ class TestCallOpusForPatching:
                 user_text = user_content[0]["text"] if isinstance(user_content, list) else user_content
                 assert "formula='field.a + field.b'" in user_text
         finally:
+            set_context(AgentContext())
+
+    def test_cache_cleaned_up_on_sub_agent_failure(self):
+        """Regression: cache must be cleared even if sub-agent run() raises."""
+        _schema_content_cache[123] = [{"id": "section1", "category": "section", "children": []}]
+
+        set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
+        try:
+            with (
+                patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
+                patch(
+                    "rossum_agent.tools.subagents.schema_patching.SchemaPatchingSubAgent.run",
+                    side_effect=RuntimeError("sub-agent crashed"),
+                ),
+                pytest.raises(RuntimeError, match="sub-agent crashed"),
+            ):
+                _call_opus_for_patching("123", [{"id": "f1", "parent_section": "s1", "type": "string"}])
+
+            assert 123 not in _schema_content_cache
+        finally:
+            _schema_content_cache.clear()
             set_context(AgentContext())
 
 
