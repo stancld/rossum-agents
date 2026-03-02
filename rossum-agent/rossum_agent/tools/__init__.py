@@ -53,8 +53,6 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     search_elis_docs,
     patch_schema_with_subagent,
     suggest_formula_field,
-    suggest_rule,
-    evaluate_rules,
     suggest_lookup_field,
     evaluate_lookup_field,
     get_lookup_dataset_raw_values,
@@ -80,6 +78,11 @@ _CHANGE_HISTORY_TOOLS: list[BetaTool[..., str]] = [
     restore_entity_version,
 ]
 
+_RULES_TOOLS: list[BetaTool[..., str]] = [
+    suggest_rule,
+    evaluate_rules,
+]
+
 _DEPLOYMENT_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     spawn_mcp_connection,
     call_on_connection,
@@ -87,7 +90,7 @@ _DEPLOYMENT_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
 ]
 
 _INTERNAL_TOOL_REGISTRY: dict[str, BetaTool[..., str]] = {
-    t.name: t for t in (_ALWAYS_INTERNAL_TOOLS + _CHANGE_HISTORY_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS)
+    t.name: t for t in (_ALWAYS_INTERNAL_TOOLS + _CHANGE_HISTORY_TOOLS + _RULES_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS)
 }
 
 
@@ -96,6 +99,8 @@ def _get_active_internal_tools() -> list[BetaTool[..., str]]:
     tools = _ALWAYS_INTERNAL_TOOLS
     if get_context().commit_store is not None:
         tools = tools + _CHANGE_HISTORY_TOOLS
+    if is_skill_loaded("rules-and-actions"):
+        tools = tools + _RULES_TOOLS
     if is_skill_loaded("rossum-deployment"):
         tools = tools + _DEPLOYMENT_INTERNAL_TOOLS
     return tools
@@ -151,7 +156,7 @@ def execute_tool(name: str, arguments: dict[str, object], tools: list[BetaTool[.
     raise ValueError(f"Unknown tool: {name}")
 
 
-INTERNAL_TOOLS = _ALWAYS_INTERNAL_TOOLS + _CHANGE_HISTORY_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS
+INTERNAL_TOOLS = _ALWAYS_INTERNAL_TOOLS + _CHANGE_HISTORY_TOOLS + _RULES_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS
 
 __all__ = [
     "INTERNAL_TOOLS",
