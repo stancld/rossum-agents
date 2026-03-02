@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -16,6 +17,19 @@ from rossum_agent.tools.spawn_mcp import (
     close_connection,
     spawn_mcp_connection,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+def _closing_mock(future: MagicMock) -> Callable:
+    """Return a side_effect for run_coroutine_threadsafe that closes any passed coroutine."""
+
+    def _run(coro, loop):
+        coro.close()
+        return future
+
+    return _run
 
 
 class TestSpawnMcpConnection:
@@ -84,7 +98,7 @@ class TestSpawnMcpConnection:
             with patch("rossum_agent.tools.spawn_mcp.asyncio.run_coroutine_threadsafe") as mock_run:
                 future = MagicMock()
                 future.result.side_effect = ValueError("Connection 'existing' already exists")
-                mock_run.return_value = future
+                mock_run.side_effect = _closing_mock(future)
 
                 result = spawn_mcp_connection(
                     connection_id="existing",
@@ -297,7 +311,7 @@ class TestCloseConnection:
             with patch("rossum_agent.tools.spawn_mcp.asyncio.run_coroutine_threadsafe") as mock_run:
                 future = MagicMock()
                 future.result.return_value = None
-                mock_run.return_value = future
+                mock_run.side_effect = _closing_mock(future)
 
                 result = close_connection(connection_id="test")
                 assert "Successfully closed" in result
@@ -322,7 +336,7 @@ class TestSpawnConnectionTimeout:
             with patch("rossum_agent.tools.spawn_mcp.asyncio.run_coroutine_threadsafe") as mock_run:
                 future = MagicMock()
                 future.result.side_effect = FuturesTimeoutError()
-                mock_run.return_value = future
+                mock_run.side_effect = _closing_mock(future)
 
                 result = spawn_mcp_connection(
                     connection_id="test",
@@ -342,7 +356,12 @@ class TestSpawnConnectionTimeout:
 
         try:
             with patch("rossum_agent.tools.spawn_mcp.asyncio.run_coroutine_threadsafe") as mock_run:
-                mock_run.side_effect = RuntimeError("Event loop closed")
+
+                def _run(coro, loop):
+                    coro.close()
+                    raise RuntimeError("Event loop closed")
+
+                mock_run.side_effect = _run
 
                 result = spawn_mcp_connection(
                     connection_id="test",
@@ -364,7 +383,7 @@ class TestSpawnConnectionTimeout:
             with patch("rossum_agent.tools.spawn_mcp.asyncio.run_coroutine_threadsafe") as mock_run:
                 future = MagicMock()
                 future.result.side_effect = Exception("Network error")
-                mock_run.return_value = future
+                mock_run.side_effect = _closing_mock(future)
 
                 result = spawn_mcp_connection(
                     connection_id="test",
@@ -526,7 +545,7 @@ class TestCloseConnectionEdgeCases:
             with patch("rossum_agent.tools.spawn_mcp.asyncio.run_coroutine_threadsafe") as mock_run:
                 future = MagicMock()
                 future.result.side_effect = FuturesTimeoutError()
-                mock_run.return_value = future
+                mock_run.side_effect = _closing_mock(future)
 
                 result = close_connection(connection_id="test")
                 assert "Timed out" in result
@@ -552,7 +571,7 @@ class TestCloseConnectionEdgeCases:
             with patch("rossum_agent.tools.spawn_mcp.asyncio.run_coroutine_threadsafe") as mock_run:
                 future = MagicMock()
                 future.result.side_effect = Exception("Close error")
-                mock_run.return_value = future
+                mock_run.side_effect = _closing_mock(future)
 
                 result = close_connection(connection_id="test")
                 assert "Error closing connection" in result
