@@ -178,6 +178,10 @@ class _SchemaStagger:
             await asyncio.sleep(delay)
 
 
+# How often to log streaming progress (seconds)
+_STREAM_PROGRESS_LOG_INTERVAL = 10.0
+
+
 @dataclasses.dataclass
 class _StreamState:
     """Mutable state for streaming model response.
@@ -197,6 +201,11 @@ class _StreamState:
     pending_tools: dict[int, dict[str, str]] = dataclasses.field(default_factory=dict)
     first_text_token_time: float | None = None
     initial_buffer_flushed: bool = False
+    # Streaming progress tracking
+    stream_start_time: float = dataclasses.field(default_factory=time.monotonic)
+    last_progress_log_time: float = dataclasses.field(default_factory=time.monotonic)
+    thinking_deltas: int = 0
+    text_deltas: int = 0
 
     def _should_flush_initial_buffer(self) -> bool:
         """Check if the initial buffer delay has elapsed and buffer should be flushed."""
@@ -228,6 +237,24 @@ class _StreamState:
     @property
     def contains_thinking(self) -> bool:
         return bool(self.thinking_text)
+
+    def maybe_log_progress(self, step_num: int) -> None:
+        """Log streaming progress periodically (every _STREAM_PROGRESS_LOG_INTERVAL seconds)."""
+        now = time.monotonic()
+        if now - self.last_progress_log_time < _STREAM_PROGRESS_LOG_INTERVAL:
+            return
+        self.last_progress_log_time = now
+        elapsed = now - self.stream_start_time
+        phase = "thinking" if not self.text_deltas else "text"
+        thinking_chars = len(self.thinking_text)
+        text_chars = len(self.response_text) + sum(len(t) for t in self.text_buffer)
+        total_chars = thinking_chars + text_chars
+        chars_per_sec = total_chars / elapsed if elapsed > 0 else 0
+        logger.info(
+            f"Step {step_num} streaming [{phase}]: {elapsed:.0f}s elapsed, "
+            f"chars={total_chars} ({chars_per_sec:.0f}/s), "
+            f"thinking={thinking_chars} chars, text={text_chars} chars"
+        )
 
 
 @dataclasses.dataclass
@@ -584,7 +611,9 @@ class RossumAgent:
 
             if delta.kind == "thinking":
                 state.thinking_text += delta.content
+                state.thinking_deltas += 1
                 state.first_text_token_time = state.first_text_token_time or time.monotonic()
+                state.maybe_log_progress(step_num)
                 # Yield #3: Streaming thinking tokens (extended thinking / chain-of-thought)
                 yield ThinkingStep(
                     step_number=step_num,
@@ -592,6 +621,8 @@ class RossumAgent:
                 )
                 continue
 
+            state.text_deltas += 1
+            state.maybe_log_progress(step_num)
             # Yield #4: Text delta - immediate flush after initial buffer period or when tool calls detected
             if step := self._handle_text_delta(step_num, delta.content, delta.kind, state):
                 yield step
@@ -610,6 +641,7 @@ class RossumAgent:
         tools = await self._get_tools()
         model_id = get_model_id()
         state = _StreamState()
+        logger.info(f"Step {step_num}: streaming started (model={model_id}, messages={len(messages)})")
 
         event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | Exception | None] = queue.Queue()
 
@@ -641,8 +673,10 @@ class RossumAgent:
         cache_read = getattr(state.final_message.usage, "cache_read_input_tokens", 0) or 0
         input_tokens = raw_input_tokens + cache_creation + cache_read
         self.tokens.accumulate_main(input_tokens, output_tokens, cache_creation, cache_read)
+        stream_elapsed = time.monotonic() - state.stream_start_time
         logger.info(
-            f"Step {step_num}: input_tokens={input_tokens}, output_tokens={output_tokens}, "
+            f"Step {step_num}: completed in {stream_elapsed:.1f}s, "
+            f"input_tokens={input_tokens}, output_tokens={output_tokens}, "
             f"cache_creation={cache_creation}, cache_read={cache_read}, "
             f"total_input={self.tokens.total_input}, total_output={self.tokens.total_output}"
         )

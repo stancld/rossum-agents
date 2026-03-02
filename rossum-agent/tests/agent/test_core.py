@@ -980,8 +980,12 @@ class TestStreamModelResponse:
 
         # Simulate: thinking token arrives at T=0, text token arrives at T=2.0
         # (past INITIAL_TEXT_BUFFER_DELAY=1.5), so text should be flushed immediately.
+        # Calls: _StreamState init (stream_start_time, last_progress_log_time),
+        # thinking delta (first_text_token_time, maybe_log_progress),
+        # text delta (maybe_log_progress, _handle_text_delta elapsed check),
+        # stream_elapsed after streaming completes.
         t0 = 1000.0
-        time_calls = iter([t0, t0 + 2.0, t0 + 2.0])
+        time_calls = iter([t0, t0, t0, t0, t0 + 2.0, t0 + 2.0, t0 + 2.0])
 
         with (
             patch.object(agent.client.messages, "stream", return_value=mock_stream),
