@@ -113,7 +113,7 @@ class HookLogSearch(BaseModel):
     queue_id: int | None = None
     annotation_id: int | None = None
     email_id: int | None = None
-    log_level: Literal["INFO", "ERROR", "WARNING"] | None = None
+    log_level: list[Literal["INFO", "ERROR", "WARNING"]] | Literal["INFO", "ERROR", "WARNING"] | None = None
     status: str | None = None
     status_code: int | None = None
     request_id: str | None = None

@@ -34,7 +34,6 @@ from rossum_agent.tools.dynamic_tools import (
     load_tool_category,
 )
 from rossum_agent.tools.file_tools import write_file
-from rossum_agent.tools.knowledge_base_search import kb_get_article, kb_grep
 from rossum_agent.tools.mock_pdf import generate_mock_pdf
 from rossum_agent.tools.skills import load_skill
 from rossum_agent.tools.spawn_mcp import call_on_connection, close_connection, spawn_mcp_connection
@@ -57,8 +56,6 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     list_tasks,
     run_jq,
     run_grep,
-    kb_grep,
-    kb_get_article,
     generate_mock_pdf,
 ]
 

@@ -202,15 +202,14 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "search:hook_log",
                 "search_knowledge_base",
                 "write_file",
-                ("get:schema", "get_schema_tree_structure"),  # OR: either is valid
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=200000),
+        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=150000),
         success_criteria=SuccessCriteria(
             require_subagent=True,
             required_keywords=[],
-            max_steps=7,
+            max_steps=6,
             file_expectation=FileExpectation(expected_files=["roast.md"]),
             custom_checks=[HIDDEN_MULTIVALUE_CHECK],
         ),
@@ -231,7 +230,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=["create_queue_from_template", "delete_queue"], mode=ToolMatchMode.SUBSET
         ),
-        token_budget=TokenBudget(min_total_tokens=20000, max_total_tokens=55000),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=55000),
         success_criteria=SuccessCriteria(
             required_keywords=["deleted"],
             max_steps=4,
@@ -271,7 +270,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             mode=ToolMatchMode.SUBSET,
             forbidden_tools=[
                 "search_knowledge_base",
-                "kb_grep",
                 "search_elis_docs",
             ],
         ),
@@ -408,7 +406,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             mode=ToolMatchMode.SUBSET,
             forbidden_tools=[
                 "search_knowledge_base",
-                "kb_grep",
                 "search_elis_docs",
             ],
         ),

@@ -1345,7 +1345,7 @@ wheels = [
 
 [[package]]
 name = "rossum-mcp"
-version = "1.4.0.dev0"
+version = "1.5.0.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },

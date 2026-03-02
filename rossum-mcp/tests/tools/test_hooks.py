@@ -547,6 +547,31 @@ class TestListHookLogs:
             "page_size": 50,
         }
 
+    @pytest.mark.asyncio
+    async def test_list_hook_logs_with_multiple_log_levels(self, mock_client: AsyncMock) -> None:
+        """Test hook logs listing with multiple log levels joined as comma-separated."""
+        received_filters: dict = {}
+
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
+            return
+            yield
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        result = await _list_hook_logs(
+            mock_client,
+            hook_id=123,
+            log_level=["ERROR", "WARNING"],
+        )
+
+        assert result == []
+        assert received_filters == {
+            "hook": 123,
+            "log_level": "ERROR,WARNING",
+        }
+
 
 @pytest.mark.unit
 class TestListHookTemplates:
