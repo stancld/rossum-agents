@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-import re
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -17,6 +16,7 @@ from rossum_mcp.tools.base import (
     build_filters,
     delete_resource,
     extract_id_from_url,
+    filter_by_name_regex,
     graceful_list,
 )
 from rossum_mcp.tools.schemas.models import (
@@ -112,9 +112,7 @@ async def list_schemas(
     filters = build_filters(name=None if use_regex else name, queue=queue_id)
     result = await graceful_list(client, Resource.Schema, "schema", **filters)
     items = [_truncate_schema_for_list(schema) for schema in result.items]
-    if use_regex and name is not None:
-        items = [s for s in items if s.name and re.search(name, s.name, re.IGNORECASE)]
-    return items
+    return filter_by_name_regex(items, name, use_regex)
 
 
 async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_data: dict) -> Schema | dict:

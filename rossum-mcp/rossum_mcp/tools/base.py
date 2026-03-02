@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generic, TypeVar
 
@@ -84,6 +85,17 @@ def build_resource_url(resource_type: str, resource_id: int) -> str:
 def build_filters(**kwargs: Any) -> dict[str, Any]:
     """Build a filter dict from kwargs, excluding None values."""
     return {k: v for k, v in kwargs.items() if v is not None}
+
+
+def filter_by_name_regex[T](items: list[T], name: str | None, use_regex: bool) -> list[T]:
+    """Apply client-side regex name filtering when use_regex is True."""
+    if not use_regex or name is None:
+        return items
+    return [
+        item
+        for item in items
+        if (item_name := item.name) and re.search(name, item_name, re.IGNORECASE)  # type: ignore[unresolved-attribute] - all callers pass items with .name
+    ]
 
 
 async def graceful_list(

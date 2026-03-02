@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast, get_args
 
@@ -18,6 +17,7 @@ from rossum_mcp.tools.base import (
     build_resource_url,
     delete_resource,
     extract_id_from_url,
+    filter_by_name_regex,
     graceful_list,
 )
 from rossum_mcp.tools.resource_tracking import embed_tracked_resources, track_resource
@@ -102,9 +102,7 @@ async def _list_queues(
     filters = build_filters(id=id, workspace=workspace_id, name=None if use_regex else name)
     result = await graceful_list(client, Resource.Queue, "queue", **filters)
     items = [_queue_to_list_item(queue) for queue in result.items]
-    if use_regex and name is not None:
-        items = [item for item in items if re.search(name, item.name, re.IGNORECASE)]
-    return items
+    return filter_by_name_regex(items, name, use_regex)
 
 
 async def _get_queue_schema(client: AsyncRossumAPIClient, queue_id: int) -> Schema:

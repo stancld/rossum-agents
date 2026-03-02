@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING
 
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.workspace import Workspace
 
-from rossum_mcp.tools.base import build_filters, build_resource_url, delete_resource, graceful_list
+from rossum_mcp.tools.base import (
+    build_filters,
+    build_resource_url,
+    delete_resource,
+    filter_by_name_regex,
+    graceful_list,
+)
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -30,9 +35,7 @@ async def _list_workspaces(
     logger.debug(f"Listing workspaces: organization_id={organization_id}, name={name}")
     filters = build_filters(organization=organization_id, name=None if use_regex else name)
     items = (await graceful_list(client, Resource.Workspace, "workspace", **filters)).items
-    if use_regex and name is not None:
-        items = [w for w in items if re.search(name, w.name, re.IGNORECASE)]
-    return items
+    return filter_by_name_regex(items, name, use_regex)
 
 
 async def _create_workspace(

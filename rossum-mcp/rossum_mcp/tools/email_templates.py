@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any, Literal
 
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.email_template import EmailTemplate
 
-from rossum_mcp.tools.base import build_filters, build_resource_url, graceful_list
+from rossum_mcp.tools.base import build_filters, build_resource_url, filter_by_name_regex, graceful_list
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -33,10 +32,7 @@ async def _list_email_templates(
     logger.info(f"Listing email templates: queue_id={queue_id}, type={type}, name={name}, first_n={first_n}")
     filters = build_filters(queue=queue_id, type=type, name=None if use_regex else name)
     result = await graceful_list(client, Resource.EmailTemplate, "email_template", max_items=first_n, **filters)
-    items = result.items
-    if use_regex and name is not None:
-        items = [t for t in items if re.search(name, t.name, re.IGNORECASE)]
-    return items
+    return filter_by_name_regex(result.items, name, use_regex)
 
 
 async def _create_email_template(
