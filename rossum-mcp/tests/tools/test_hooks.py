@@ -245,7 +245,7 @@ class TestCreateHook:
         mock_client.create_new_hook.assert_called_once()
         call_args = mock_client.create_new_hook.call_args[0][0]
         assert call_args["name"] == "Configured Hook"
-        assert "function" in call_args["config"]  # source converted to function
+        assert "code" in call_args["config"]  # source converted to code
 
     @pytest.mark.asyncio
     async def test_create_hook_with_settings_secret_timeout(

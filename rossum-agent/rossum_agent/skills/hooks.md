@@ -7,8 +7,7 @@
 | Constraint | Detail |
 |------------|--------|
 | Templates first | `search(query={"entity": "hook_template"})` before writing custom code — most use cases are covered |
-| Research before custom code | `search_knowledge_base` for hook configuration guides before resorting to custom serverless functions |
-| Custom code last resort | Load `txscript` skill only when no template covers the requirement |
+| Custom code last resort | Only write custom serverless functions when no template covers the requirement |
 
 ## Creating from Templates
 
@@ -36,9 +35,33 @@ create_hook(name="My Hook", type="function", queues=["https://..."], events=["an
 
 | Detail | Value |
 |--------|-------|
-| `config.source` | Auto-renamed to `config.function` |
+| `config.source` | Auto-renamed to `config.code` |
 | Default runtime | `python3.12` |
 | Max timeout | 60 seconds |
+
+### TxScript Boilerplate
+
+Custom hooks use TxScript — a Python 3.12 DSL for field manipulation:
+
+```python
+from txscript import TxScript, is_set, is_empty, default_to
+
+def rossum_hook_request_handler(payload):
+    t = TxScript.from_payload(payload)
+
+    # Read: t.field.<schema_id>
+    # Write: t.field.<schema_id> = new_value
+    # Check: is_set(t.field.x), is_empty(t.field.x)
+
+    return t.hook_response()
+```
+
+| Rule | Detail |
+|------|--------|
+| Never use `is None` | Use `is_empty()` / `is_set()` — fields are `None`-like but not `None` |
+| Always return `t.hook_response()` | Omitting causes silent failures |
+
+Load `txscript` skill for advanced patterns (line items, table columns, messaging, annotation actions).
 
 ## Testing
 
@@ -54,6 +77,5 @@ Generates a realistic payload and executes it in one call. No annotations on hoo
 
 ## Cross-Reference
 
-- Custom function hook code: load `txscript` skill
 - Formula fields (no hook needed): load `formula-fields` skill
 - Queue creation with hooks: load `organization-setup` skill

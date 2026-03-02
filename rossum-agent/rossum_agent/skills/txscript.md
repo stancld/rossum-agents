@@ -177,7 +177,7 @@ Trigger conditions are TxScript expressions evaluated in formula-field-like cont
 
 ## Deploying as Serverless Hook
 
-Before calling `create_hook`, check its tool schema to learn the exact parameter names, types, and allowed values. Pass the TxScript source code via `config={"source": "<code>"}`.
+Pass the TxScript source code via `config={"source": "<code>"}` — auto-renamed to `config.code`.
 
 ## Testing Serverless Hooks
 

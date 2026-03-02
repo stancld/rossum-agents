@@ -70,7 +70,7 @@ async def _create_hook(
     if config is None:
         config = {}
     if type == "function" and "source" in config:
-        config["function"] = config.pop("source")
+        config["code"] = config.pop("source")
     if type == "function" and "runtime" not in config:
         config["runtime"] = "python3.12"
     if "timeout_s" in config and config["timeout_s"] > 60:
@@ -294,7 +294,7 @@ async def _delete_hook(client: AsyncRossumAPIClient, hook_id: int) -> dict:
 
 def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Create a hook. Function hooks: config.source auto-renamed to config.function, default runtime python3.12, timeout_s capped at 60. token_owner cannot be an organization_group_admin user.",
+        description="Create a hook. Function hooks: config.source auto-renamed to config.code, default runtime python3.12, timeout_s capped at 60. token_owner cannot be an organization_group_admin user.",
         tags={"hooks", "write"},
         annotations={"readOnlyHint": False},
     )
