@@ -169,7 +169,11 @@ class MCPConnection:
         # because FastMCP's json_schema_to_type has a bug where nested dict fields
         # like config: dict[str, Any] become empty dataclasses, losing all data.
         if result.structured_content is not None:
-            return result.structured_content
+            raw = result.structured_content
+            # FastMCP sometimes wraps return values in {"result": ...}
+            if isinstance(raw, dict):
+                return unwrap(raw)
+            return raw
         if result.data is not None:
             return result.data
         if result.content:

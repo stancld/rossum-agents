@@ -273,7 +273,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "search_elis_docs",
             ],
         ),
-        token_budget=TokenBudget(min_total_tokens=70000, max_total_tokens=230000),
+        token_budget=TokenBudget(min_total_tokens=90000, max_total_tokens=180000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
@@ -338,7 +338,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=["Invoices", "Credit Notes"],
-            max_steps=11,
+            max_steps=10,
             file_expectation=FileExpectation(),
             custom_checks=[NET_TERMS_FORMULA_FIELD_CHECK],
         ),
@@ -374,7 +374,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
-            max_steps=8,
+            max_steps=7,
             file_expectation=FileExpectation(),
             custom_checks=[BUSINESS_VALIDATION_HOOK_CHECK],
         ),
@@ -628,11 +628,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=80000, max_total_tokens=200000),
+        token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=120000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
-            max_steps=12,
+            max_steps=7,
             file_expectation=FileExpectation(),
             custom_checks=[HOOK_DELETED_AND_REVERTED_CHECK],
         ),
@@ -660,7 +660,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=120000),
+        token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=100000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
