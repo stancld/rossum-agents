@@ -217,6 +217,78 @@ class TestGetRouting:
         assert result["id"] == 60
 
 
+# ───────────────────────── GET Batch (list[int]) ─────────────────────────
+
+
+@pytest.mark.unit
+class TestGetBatch:
+    @pytest.mark.asyncio
+    async def test_get_multiple_queues(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
+        q1 = create_mock_queue(id=1, name="Q1")
+        q2 = create_mock_queue(id=2, name="Q2")
+        mock_client.retrieve_queue.side_effect = lambda qid: {1: q1, 2: q2}[qid]
+        register_read_tools(mock_mcp, mock_client)
+
+        result = await mock_mcp._tools["get"](entity="queue", entity_id=[1, 2])
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0]["id"] == 1
+        assert result[1]["id"] == 2
+        assert result[0]["entity"] == "queue"
+
+    @pytest.mark.asyncio
+    async def test_get_single_id_returns_dict(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
+        mock_client.retrieve_queue.return_value = create_mock_queue(id=42)
+        register_read_tools(mock_mcp, mock_client)
+
+        result = await mock_mcp._tools["get"](entity="queue", entity_id=42)
+        assert isinstance(result, dict)
+        assert result["id"] == 42
+
+    @pytest.mark.asyncio
+    async def test_get_batch_with_include_related(
+        self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None
+    ) -> None:
+        q1 = create_mock_queue(id=1)
+        q2 = create_mock_queue(id=2)
+        mock_client.retrieve_queue.side_effect = lambda qid: {1: q1, 2: q2}[qid]
+
+        with (
+            patch("rossum_mcp.tools.read_layer.related.get_schema_tree_structure") as mock_tree,
+            patch("rossum_mcp.tools.read_layer.related._get_queue_engine") as mock_eng,
+            patch("rossum_mcp.tools.read_layer.related._list_hooks") as mock_hooks,
+        ):
+            mock_tree.return_value = [{"id": "section1"}]
+            mock_eng.return_value = create_mock_engine(id=10)
+            mock_hooks.return_value = [create_mock_hook(id=5, name="H1", active=True)]
+
+            register_read_tools(mock_mcp, mock_client)
+            result = await mock_mcp._tools["get"](entity="queue", entity_id=[1, 2], include_related=True)
+
+        assert isinstance(result, list)
+        assert len(result) == 2
+        for item in result:
+            assert "_related" in item
+            assert "schema_tree" in item["_related"]
+
+    @pytest.mark.asyncio
+    async def test_get_empty_list_returns_empty(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
+        register_read_tools(mock_mcp, mock_client)
+
+        result = await mock_mcp._tools["get"](entity="queue", entity_id=[])
+        assert isinstance(result, list)
+        assert len(result) == 0
+
+    @pytest.mark.asyncio
+    async def test_get_batch_error_entity_returns_error(
+        self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None
+    ) -> None:
+        register_read_tools(mock_mcp, mock_client)
+        result = await mock_mcp._tools["get"](entity="hook_log", entity_id=[1, 2])
+        assert isinstance(result, dict)
+        assert "error" in result
+
+
 # ───────────────────────── GET Error Cases ─────────────────────────
 
 

@@ -265,10 +265,14 @@ def _load_categories_impl(categories: list[str]) -> str:
 
 
 def preload_categories_for_request(request_text: str) -> str | None:
-    """Pre-load tool categories based on keywords in the user's request."""
+    """Pre-load tool categories based on keywords in the user's request.
+
+    The ``read`` category (``get``, ``search``) is always included because the
+    unified read layer is needed by virtually every request.
+    """
     suggestions = suggest_categories_for_request(request_text)
-    if not suggestions:
-        return None
+    if "read" not in suggestions:
+        suggestions.insert(0, "read")
 
     result = _load_categories_impl(suggestions)
     if result.startswith("Error") or result.startswith("Categories already"):
@@ -286,7 +290,7 @@ def get_load_tool_category_definition() -> ToolParam:
             "Load MCP tools from one or more categories. Once loaded, the tools become "
             "available for use. Use list_tool_categories first to see available categories.\n"
             "Categories: read, annotations, queues, schemas, engines, hooks, email_templates, "
-            "rules, users, workspaces"
+            "rules, organization_groups, users, workspaces"
         ),
         "input_schema": {
             "type": "object",

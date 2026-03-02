@@ -42,7 +42,7 @@ CATEGORY_META: dict[str, CategoryMeta] = {
     ),
     "hooks": CategoryMeta(
         description="Extensions/webhooks: create and manage automation hooks",
-        keywords=["hook", "extension", "webhook", "automation", "function", "serverless"],
+        keywords=["hook", "extension", "webhook", "automation", "function", "serverless", "workflow"],
     ),
     "email_templates": CategoryMeta(
         description="Email templates: configure automated email responses",

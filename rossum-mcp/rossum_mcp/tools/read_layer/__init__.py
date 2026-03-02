@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import logging
 from typing import TYPE_CHECKING, Literal, get_args
@@ -9,7 +10,7 @@ from typing import TYPE_CHECKING, Literal, get_args
 from rossum_mcp.tools.read_layer.models import (
     SearchQuery,  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
 )
-from rossum_mcp.tools.read_layer.registry import build_registry, extract_search_kwargs
+from rossum_mcp.tools.read_layer.registry import EntityConfig, build_registry, extract_search_kwargs
 from rossum_mcp.tools.read_layer.related import fetch_related
 
 if TYPE_CHECKING:
@@ -42,6 +43,38 @@ def _serialize(obj: object) -> object:
     return obj
 
 
+async def _get_one(
+    client: AsyncRossumAPIClient,
+    config: EntityConfig,
+    entity: str,
+    entity_id: int,
+    include_related: bool,
+) -> dict[str, object]:
+    assert config.retrieve_fn is not None  # Guarded by caller
+    result = await config.retrieve_fn(entity_id)
+    data = _serialize(result)
+
+    response: dict[str, object] = {"entity": entity, "id": entity_id, "data": data}
+
+    if include_related:
+        related = await fetch_related(client, entity, entity_id, result)
+        if related:
+            response["_related"] = related
+
+    return response
+
+
+async def _get_many(
+    client: AsyncRossumAPIClient,
+    config: EntityConfig,
+    entity: str,
+    entity_ids: list[int],
+    include_related: bool,
+) -> list[dict[str, object]]:
+    tasks = [_get_one(client, config, entity, eid, include_related) for eid in entity_ids]
+    return list(await asyncio.gather(*tasks))
+
+
 def register_read_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     registry = build_registry(client)
 
@@ -54,7 +87,7 @@ def register_read_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
 
     @mcp.tool(
         description=(
-            "Get one entity by ID. "
+            "Get entities by ID. Accepts a single ID or a list of IDs for batch retrieval. "
             "Supported entities: queue, schema, hook, engine, rule, user, workspace, "
             "email_template, organization_group, organization_limit, annotation, relation, document_relation. "
             "include_related=True enriches with related data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events)."
@@ -62,24 +95,19 @@ def register_read_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         tags={"read"},
         annotations={"readOnlyHint": True},
     )
-    async def get(entity: EntityType, entity_id: int, include_related: bool = False) -> dict[str, object]:
+    async def get(
+        entity: EntityType, entity_id: int | list[int], include_related: bool = False
+    ) -> dict[str, object] | list[dict[str, object]]:
         config = registry.get(entity)
         if config is None:
             return {"error": f"Unknown entity type: {entity}"}
         if config.retrieve_fn is None:
             return {"error": f"Entity '{entity}' does not support get by ID. Use search instead."}
 
-        result = await config.retrieve_fn(entity_id)
-        data = _serialize(result)
+        if isinstance(entity_id, list):
+            return await _get_many(client, config, entity, entity_id, include_related)
 
-        response: dict[str, object] = {"entity": entity, "id": entity_id, "data": data}
-
-        if include_related:
-            related = await fetch_related(client, entity, entity_id, result)
-            if related:
-                response["_related"] = related
-
-        return response
+        return await _get_one(client, config, entity, entity_id, include_related)
 
     @mcp.tool(
         description="Search/list entities with typed, entity-specific filters. Pass a query object with `entity` discriminator.",

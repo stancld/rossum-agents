@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Fixed `packages.find` in `pyproject.toml` — removed `rossum_mcp*` and `rossum_deploy*` from the `include` list; only `rossum_agent*` belongs in this package's build
+- Schema patching sub-agent now auto-recovers from engine restriction errors — when `update_schema` fails with "extracted field '...' is not present among names of engine fields", invalid `rir_field_names` are auto-stripped and the update retried [#221](https://github.com/stancld/rossum-agents/pull/221)
 
 ## [1.3.6] - 2026-03-02
 
