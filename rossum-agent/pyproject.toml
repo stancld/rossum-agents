@@ -111,7 +111,7 @@ markers = [
 asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
-include = ["rossum_mcp*", "rossum_agent*", "rossum_deploy*"]
+include = ["rossum_agent*"]
 
 [tool.setuptools.package-data]
 rossum_agent = ["assets/*.png", "skills/*.md"]
