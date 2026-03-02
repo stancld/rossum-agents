@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Changed
+- Removed generic `"template"` keyword from `email_templates` category to reduce false-positive tool pre-loads (e.g., queue template queries no longer trigger email template tools)
+
 ### Removed
 - Removed dead validation code (`_validate_node`, `_validate_id`, `_validate_datapoint`, `_validate_tuple`, `_validate_multivalue`, `_validate_section`, `SchemaValidationError`) superseded by the sanitization approach in `sanitize_schema_content`
 

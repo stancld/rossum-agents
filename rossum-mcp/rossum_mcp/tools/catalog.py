@@ -42,7 +42,7 @@ CATEGORY_META: dict[str, CategoryMeta] = {
     ),
     "email_templates": CategoryMeta(
         description="Email templates: configure automated email responses",
-        keywords=["email", "template", "notification", "rejection"],
+        keywords=["email", "notification", "rejection"],
     ),
     "document_relations": CategoryMeta(
         description="Document relations: manage export/einvoice document links",
