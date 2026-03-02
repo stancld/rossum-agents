@@ -92,13 +92,13 @@ class ChatService:
 
             if msg_type == "task_step":
                 task_content = msg.get("task", "")
-                messages.append(Message(role="user", content=task_content))
+                messages.append(Message(role="user", content=task_content, feedback=msg.get("feedback")))
             elif msg_type == "memory_step":
                 text = msg.get("text")
                 if text:
-                    messages.append(Message(role="assistant", content=text))
+                    messages.append(Message(role="assistant", content=text, feedback=msg.get("feedback")))
             elif role in ("user", "assistant"):
-                messages.append(Message(role=role, content=msg.get("content", "")))
+                messages.append(Message(role=role, content=msg.get("content", ""), feedback=msg.get("feedback")))
 
         files_data = self._storage.list_files(chat_id)
         files = [FileInfo(filename=f["filename"], size=f["size"], timestamp=f["timestamp"]) for f in files_data]
@@ -134,3 +134,12 @@ class ChatService:
         metadata: ChatMetadata | None = None,
     ) -> bool:
         return self._storage.save_chat(user_id, chat_id, messages, output_dir, metadata)
+
+    def save_feedback(self, user_id: str | None, chat_id: str, turn_index: int, is_positive: bool) -> bool:
+        return self._storage.save_feedback(user_id, chat_id, turn_index, is_positive)
+
+    def get_feedback(self, user_id: str | None, chat_id: str) -> dict[int, bool]:
+        return self._storage.get_feedback(user_id, chat_id)
+
+    def delete_feedback(self, user_id: str | None, chat_id: str, turn_index: int) -> bool:
+        return self._storage.delete_feedback(user_id, chat_id, turn_index)

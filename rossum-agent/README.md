@@ -239,6 +239,9 @@ flowchart TB
 | `GET /api/v1/chats/{id}` | Get chat details |
 | `DELETE /api/v1/chats/{id}` | Delete chat |
 | `POST /api/v1/chats/{id}/messages` | Send message (SSE) |
+| `PUT /api/v1/chats/{id}/feedback` | Submit thumbs up/down for a turn |
+| `GET /api/v1/chats/{id}/feedback` | Get all feedback for a chat |
+| `DELETE /api/v1/chats/{id}/feedback/{turn}` | Remove feedback for a turn |
 | `GET /api/v1/chats/{id}/files` | List files |
 | `GET /api/v1/chats/{id}/files/{name}` | Download file |
 | `GET /api/v1/commands` | List available slash commands |

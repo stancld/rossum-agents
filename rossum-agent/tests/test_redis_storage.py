@@ -6,6 +6,7 @@ import base64
 import json
 import tempfile
 from pathlib import Path
+from typing import ClassVar  # noqa: TC003 - used in class body annotation, not just type hints
 from unittest.mock import MagicMock, patch
 
 from rossum_agent.redis_storage import ChatData, ChatMetadata, RedisStorage, extract_text_from_content
@@ -1080,3 +1081,461 @@ class TestRedisStorageFileOperations:
             count = storage.load_all_files("chat_123", tmp_path)
 
         assert count == 0
+
+
+class TestRedisStorageFeedback:
+    """Test RedisStorage feedback operations."""
+
+    MESSAGES: ClassVar[list[dict]] = [
+        {"type": "task_step", "task": "Hello"},
+        {"type": "memory_step", "text": "Hi there"},
+        {"type": "task_step", "task": "Next"},
+    ]
+    CHAT_PAYLOAD = json.dumps({"messages": MESSAGES, "output_dir": None, "metadata": {}}).encode("utf-8")
+    # Message at index 1 has feedback embedded
+    CHAT_WITH_FEEDBACK = json.dumps(
+        {
+            "messages": [
+                {"type": "task_step", "task": "Hello"},
+                {"type": "memory_step", "text": "Hi there", "feedback": True},
+                {"type": "task_step", "task": "Next"},
+            ],
+            "output_dir": None,
+            "metadata": {},
+        }
+    ).encode("utf-8")
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_feedback_new(self, mock_redis):
+        """Test saving feedback for a chat with no existing feedback."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = self.CHAT_PAYLOAD
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.save_feedback("user123", "chat_123", 1, True)
+
+        assert result is True
+        mock_client.setex.assert_called_once()
+        call_args = mock_client.setex.call_args[0]
+        assert call_args[0] == "user:user123:chat:chat_123"
+        saved_data = json.loads(call_args[2].decode("utf-8"))
+        assert saved_data["messages"][1]["feedback"] is True
+        assert "feedback" not in saved_data  # no top-level feedback key
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_feedback_update_existing(self, mock_redis):
+        """Test saving feedback on another message when one already has feedback."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = self.CHAT_WITH_FEEDBACK
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.save_feedback("user123", "chat_123", 2, False)
+
+        assert result is True
+        call_args = mock_client.setex.call_args[0]
+        saved_data = json.loads(call_args[2].decode("utf-8"))
+        assert saved_data["messages"][1]["feedback"] is True
+        assert saved_data["messages"][2]["feedback"] is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_feedback_overwrite(self, mock_redis):
+        """Test overwriting feedback for the same message."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = self.CHAT_WITH_FEEDBACK
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.save_feedback("user123", "chat_123", 1, False)
+
+        assert result is True
+        call_args = mock_client.setex.call_args[0]
+        saved_data = json.loads(call_args[2].decode("utf-8"))
+        assert saved_data["messages"][1]["feedback"] is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_feedback_turn_index_out_of_bounds(self, mock_redis):
+        """Test saving feedback when turn_index exceeds message count."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = self.CHAT_PAYLOAD
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.save_feedback("user123", "chat_123", 99, True)
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_feedback_chat_not_found(self, mock_redis):
+        """Test saving feedback when chat does not exist."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = None
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.save_feedback("user123", "chat_123", 0, True)
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_feedback_failure(self, mock_redis):
+        """Test save feedback failure handling."""
+        mock_client = MagicMock()
+        mock_client.get.side_effect = Exception("Redis error")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.save_feedback("user123", "chat_123", 0, True)
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_get_feedback_success(self, mock_redis):
+        """Test getting feedback from per-message fields."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = json.dumps(
+            {
+                "messages": [
+                    {"type": "task_step", "task": "Hello"},
+                    {"type": "memory_step", "text": "Hi", "feedback": True},
+                    {"type": "task_step", "task": "Next"},
+                    {"type": "memory_step", "text": "Got it", "feedback": False},
+                ],
+                "output_dir": None,
+                "metadata": {},
+            }
+        ).encode("utf-8")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.get_feedback("user123", "chat_123")
+
+        assert result == {1: True, 3: False}
+        mock_client.get.assert_called_once_with("user:user123:chat:chat_123")
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_get_feedback_legacy_format(self, mock_redis):
+        """Test getting feedback from legacy top-level feedback dict."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = json.dumps(
+            {"messages": self.MESSAGES, "output_dir": None, "metadata": {}, "feedback": {"1": True, "3": False}}
+        ).encode("utf-8")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.get_feedback("user123", "chat_123")
+
+        assert result == {1: True, 3: False}
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_get_feedback_empty(self, mock_redis):
+        """Test getting feedback when none exists in chat."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = self.CHAT_PAYLOAD
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.get_feedback("user123", "chat_123")
+
+        assert result == {}
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_get_feedback_chat_not_found(self, mock_redis):
+        """Test getting feedback when chat does not exist."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = None
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.get_feedback("user123", "chat_123")
+
+        assert result == {}
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_get_feedback_failure(self, mock_redis):
+        """Test get feedback failure handling."""
+        mock_client = MagicMock()
+        mock_client.get.side_effect = Exception("Redis error")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.get_feedback("user123", "chat_123")
+
+        assert result == {}
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_feedback_success(self, mock_redis):
+        """Test deleting feedback from a specific message."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = json.dumps(
+            {
+                "messages": [
+                    {"type": "task_step", "task": "Hello"},
+                    {"type": "memory_step", "text": "Hi", "feedback": True},
+                    {"type": "task_step", "task": "Next"},
+                    {"type": "memory_step", "text": "Got it", "feedback": False},
+                ],
+                "output_dir": None,
+                "metadata": {},
+            }
+        ).encode("utf-8")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_feedback("user123", "chat_123", 1)
+
+        assert result is True
+        call_args = mock_client.setex.call_args[0]
+        saved_data = json.loads(call_args[2].decode("utf-8"))
+        assert "feedback" not in saved_data["messages"][1]
+        assert saved_data["messages"][3]["feedback"] is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_feedback_not_found(self, mock_redis):
+        """Test deleting feedback that doesn't exist on the message."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = self.CHAT_WITH_FEEDBACK
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_feedback("user123", "chat_123", 0)  # index 0 has no feedback
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_feedback_out_of_bounds(self, mock_redis):
+        """Test deleting feedback with out-of-bounds turn_index."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = self.CHAT_PAYLOAD
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_feedback("user123", "chat_123", 99)
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_feedback_chat_not_found(self, mock_redis):
+        """Test deleting feedback when chat does not exist."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = None
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_feedback("user123", "chat_123", 0)
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_feedback_failure(self, mock_redis):
+        """Test delete feedback failure handling."""
+        mock_client = MagicMock()
+        mock_client.get.side_effect = Exception("Redis error")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_feedback("user123", "chat_123", 0)
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_all_feedback_success(self, mock_redis):
+        """Test deleting all feedback from all messages."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = json.dumps(
+            {
+                "messages": [
+                    {"type": "task_step", "task": "Hello"},
+                    {"type": "memory_step", "text": "Hi", "feedback": True},
+                    {"type": "memory_step", "text": "Got it", "feedback": False},
+                ],
+                "output_dir": None,
+                "metadata": {},
+            }
+        ).encode("utf-8")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_all_feedback("user123", "chat_123")
+
+        assert result is True
+        call_args = mock_client.setex.call_args[0]
+        saved_data = json.loads(call_args[2].decode("utf-8"))
+        assert all("feedback" not in msg for msg in saved_data["messages"])
+        assert "feedback" not in saved_data  # no legacy top-level key
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_all_feedback_chat_not_found(self, mock_redis):
+        """Test deleting all feedback when chat does not exist."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = None
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_all_feedback("user123", "chat_123")
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_all_feedback_failure(self, mock_redis):
+        """Test delete all feedback failure handling."""
+        mock_client = MagicMock()
+        mock_client.get.side_effect = Exception("Redis error")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_all_feedback("user123", "chat_123")
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_chat_preserves_feedback(self, mock_redis):
+        """Test that save_chat preserves per-message feedback from existing data."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = self.CHAT_WITH_FEEDBACK  # message[1] has feedback=True
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        new_messages = [
+            {"type": "task_step", "task": "Hello"},
+            {"type": "memory_step", "text": "Hi there"},  # no feedback in new data
+            {"type": "task_step", "task": "Next"},
+        ]
+        storage.save_chat("user123", "chat_123", new_messages)
+
+        call_args = mock_client.setex.call_args[0]
+        saved_data = json.loads(call_args[2].decode("utf-8"))
+        assert saved_data["messages"][1]["feedback"] is True  # feedback preserved
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_chat_migrates_legacy_feedback(self, mock_redis):
+        """Test that save_chat migrates legacy top-level feedback into messages."""
+        legacy_data = json.dumps(
+            {"messages": self.MESSAGES, "output_dir": None, "metadata": {}, "feedback": {"1": True}}
+        ).encode("utf-8")
+        mock_client = MagicMock()
+        mock_client.get.return_value = legacy_data
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        storage.save_chat("user123", "chat_123", list(self.MESSAGES))
+
+        call_args = mock_client.setex.call_args[0]
+        saved_data = json.loads(call_args[2].decode("utf-8"))
+        assert saved_data["messages"][1]["feedback"] is True
+        assert "feedback" not in saved_data  # legacy key not carried over
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_chat_feedback_preservation_exception(self, mock_redis):
+        """Test that save_chat continues when the inner feedback-preservation read fails."""
+        mock_client = MagicMock()
+        mock_client.get.side_effect = Exception("Redis error")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        messages = [{"role": "user", "content": "Hello"}]
+        # setex should still be called after the inner exception is swallowed
+        mock_client.get.side_effect = None
+        mock_client.get.return_value = b"invalid json {"
+        result = storage.save_chat(None, "chat_123", messages)
+
+        assert result is True
+        mock_client.setex.assert_called_once()
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_feedback_legacy_list_data(self, mock_redis):
+        """Test save_feedback returns False when stored data is a raw list (very old format)."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = json.dumps([{"role": "user", "content": "Hello"}]).encode("utf-8")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.save_feedback("user123", "chat_123", 0, True)
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_save_feedback_preserves_other_legacy_entries(self, mock_redis):
+        """Test save_feedback keeps remaining legacy entries when others are still present."""
+        legacy_data = json.dumps(
+            {
+                "messages": list(self.MESSAGES),
+                "output_dir": None,
+                "metadata": {},
+                "feedback": {"0": True, "2": False},  # two legacy entries
+            }
+        ).encode("utf-8")
+        mock_client = MagicMock()
+        mock_client.get.return_value = legacy_data
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        # Saving feedback for index 1 pops "1" from legacy (not present), leaving "0" and "2"
+        result = storage.save_feedback("user123", "chat_123", 1, True)
+
+        assert result is True
+        call_args = mock_client.setex.call_args[0]
+        saved_data = json.loads(call_args[2].decode("utf-8"))
+        assert saved_data["messages"][1]["feedback"] is True
+        # Legacy entries for 0 and 2 survive because they were not popped
+        assert saved_data["feedback"] == {"0": True, "2": False}
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_get_feedback_legacy_list_data(self, mock_redis):
+        """Test get_feedback returns empty dict when stored data is a raw list (very old format)."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = json.dumps([{"role": "user", "content": "Hello"}]).encode("utf-8")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.get_feedback("user123", "chat_123")
+
+        assert result == {}
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_feedback_legacy_list_data(self, mock_redis):
+        """Test delete_feedback returns False when stored data is a raw list (very old format)."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = json.dumps([{"role": "user", "content": "Hello"}]).encode("utf-8")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_feedback("user123", "chat_123", 0)
+
+        assert result is False
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_feedback_from_legacy_top_level_dict(self, mock_redis):
+        """Test delete_feedback removes entry from legacy top-level feedback dict."""
+        legacy_data = json.dumps(
+            {
+                "messages": list(self.MESSAGES),
+                "output_dir": None,
+                "metadata": {},
+                "feedback": {"1": True},
+            }
+        ).encode("utf-8")
+        mock_client = MagicMock()
+        mock_client.get.return_value = legacy_data
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_feedback("user123", "chat_123", 1)
+
+        assert result is True
+        call_args = mock_client.setex.call_args[0]
+        saved_data = json.loads(call_args[2].decode("utf-8"))
+        assert saved_data.get("feedback") == {}  # entry removed from legacy dict
+
+    @patch("rossum_agent.redis_storage.redis.Redis")
+    def test_delete_all_feedback_legacy_list_data(self, mock_redis):
+        """Test delete_all_feedback returns False when stored data is a raw list (very old format)."""
+        mock_client = MagicMock()
+        mock_client.get.return_value = json.dumps([{"role": "user", "content": "Hello"}]).encode("utf-8")
+        mock_redis.return_value = mock_client
+
+        storage = RedisStorage()
+        result = storage.delete_all_feedback("user123", "chat_123")
+
+        assert result is False

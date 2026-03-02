@@ -26,9 +26,9 @@ router = APIRouter(prefix="/chats/{chat_id}/files", tags=["files"])
 async def list_files(
     request: Request,
     chat_id: str,
-    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
-    file_service: Annotated[FileService, Depends(get_file_service)] = None,  # type: ignore[assignment]
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
+    file_service: Annotated[FileService, Depends(get_file_service)],
 ) -> FileListResponse:
     """List all files for a chat session."""
     if not chat_service.chat_exists(credentials.user_id, chat_id):
@@ -60,9 +60,9 @@ async def download_file(
     request: Request,
     chat_id: str,
     filename: str,
-    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
-    file_service: Annotated[FileService, Depends(get_file_service)] = None,  # type: ignore[assignment]
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
+    file_service: Annotated[FileService, Depends(get_file_service)],
 ) -> Response:
     """Download a file from a chat session."""
     if not chat_service.chat_exists(credentials.user_id, chat_id):

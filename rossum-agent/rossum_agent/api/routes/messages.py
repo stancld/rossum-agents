@@ -289,9 +289,9 @@ async def send_message(  # noqa: C901 - endpoint handler with slash command inte
     request: Request,
     chat_id: str,
     message: MessageRequest,
-    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
-    agent_service: Annotated[AgentService, Depends(get_agent_service)] = None,  # type: ignore[assignment]
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
+    agent_service: Annotated[AgentService, Depends(get_agent_service)],
 ) -> StreamingResponse:
     """Send a message and stream the agent's response via SSE.
 
@@ -405,9 +405,9 @@ async def send_message(  # noqa: C901 - endpoint handler with slash command inte
 async def cancel_message(
     request: Request,
     chat_id: str,
-    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
-    agent_service: Annotated[AgentService, Depends(get_agent_service)] = None,  # type: ignore[assignment]
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
+    agent_service: Annotated[AgentService, Depends(get_agent_service)],
 ) -> CancelResponse:
     """Cancel a running agent request for a chat."""
     if not chat_service.chat_exists(credentials.user_id, chat_id):

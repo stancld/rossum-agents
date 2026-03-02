@@ -59,6 +59,22 @@ export async function listCommands(config: Config): Promise<CommandInfo[]> {
   }
 }
 
+export async function submitFeedback(
+  config: Config,
+  chatId: string,
+  turnIndex: number,
+  isPositive: boolean,
+): Promise<void> {
+  const res = await fetch(`${config.apiUrl}/api/v1/chats/${chatId}/feedback`, {
+    method: "PUT",
+    headers: buildHeaders(config),
+    body: JSON.stringify({ turn_index: turnIndex, is_positive: isPositive }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to submit feedback (${res.status})`);
+  }
+}
+
 export async function listChats(
   config: Config,
   limit = 50,
