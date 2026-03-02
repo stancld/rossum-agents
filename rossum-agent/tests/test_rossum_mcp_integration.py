@@ -294,7 +294,7 @@ class TestHandleWriteUpdate:
         async def mock_call_tool(name, args):
             nonlocal call_count
             call_count += 1
-            if name == "get_queue":
+            if name == "get":
                 return _make_mcp_result(before if call_count == 1 else after)
             return _make_mcp_result({"ok": True})
 
@@ -311,14 +311,52 @@ class TestHandleWriteUpdate:
         assert change.before == before
         assert change.after == after
 
+    @pytest.mark.asyncio
+    async def test_update_unwraps_fastmcp_result_wrapper_for_unified_get(self):
+        """Regression: FastMCP wraps structured_content in {"result": ...}.
+
+        When _fetch_snapshot calls get(entity=..., entity_id=...), the response
+        is {"entity": ..., "id": ..., "data": {actual_entity}}. If FastMCP wraps
+        this in {"result": ...}, _call_mcp must unwrap it so _fetch_snapshot can
+        extract the inner "data" dict. Without this fix, before/after snapshots
+        for schemas would be missing the "content" field, breaking revert_commit.
+        """
+        conn = _make_connection(write_tools={"patch_schema"})
+        schema_before = {"id": 1, "name": "Schema", "content": [{"id": "field_1"}]}
+        schema_after = {"id": 1, "name": "Schema", "content": [{"id": "field_1"}, {"id": "field_2"}]}
+
+        call_count = 0
+
+        async def mock_call_tool(name, args):
+            nonlocal call_count
+            call_count += 1
+            if name == "get":
+                # Simulate FastMCP wrapping the unified get response
+                inner = schema_before if call_count == 1 else schema_after
+                wrapped = {"result": {"entity": "schema", "id": 1, "data": inner}}
+                return _make_mcp_result(wrapped)
+            return _make_mcp_result({"ok": True})
+
+        conn.client.call_tool = mock_call_tool
+
+        await conn.call_tool("patch_schema", {"schema_id": 1, "nodes": []})
+
+        change = conn.get_changes()[0]
+        assert change.entity_type == "schema"
+        # Verify the before snapshot has content (the bug was that it didn't)
+        assert change.before == schema_before
+        assert isinstance(change.before["content"], list)
+        assert change.after == schema_after
+
 
 class TestHandleWriteCreate:
     @pytest.mark.asyncio
     async def test_create_extracts_id_from_result(self):
         conn = _make_connection(write_tools={"create_queue"})
-        created = {"result": {"id": 99, "name": "New Queue"}}
+        # FastMCP wraps structured_content in {"result": ...}; _call_mcp unwraps it
+        created_wrapped = {"result": {"id": 99, "name": "New Queue"}}
 
-        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created_wrapped))
 
         await conn.call_tool("create_queue", {"name": "New Queue"})
 
@@ -327,7 +365,7 @@ class TestHandleWriteCreate:
         assert change.entity_id == "99"
         assert change.operation == "create"
         assert change.before is None
-        assert change.after == created
+        assert change.after == {"id": 99, "name": "New Queue"}
 
 
 class TestHandleWriteDelete:
@@ -499,6 +537,18 @@ class TestTryCacheRead:
         conn._try_cache_read("get_queue", {}, {"id": 42, "name": "Q"})
         assert conn._cache_get("queue", "42") == {"id": 42, "name": "Q"}
 
+    def test_unified_get_caches_data_from_wrapper(self):
+        conn = _make_connection()
+        result = {"entity": "queue", "id": 1, "data": {"id": 1, "name": "Q"}}
+        conn._try_cache_read("get", {"entity": "queue", "entity_id": 1}, result)
+        assert conn._cache_get("queue", "1") == {"id": 1, "name": "Q"}
+
+    def test_unified_get_caches_fallback_when_no_data_key(self):
+        conn = _make_connection()
+        result = {"id": 1, "name": "Q"}
+        conn._try_cache_read("get", {"entity": "queue", "entity_id": 1}, result)
+        assert conn._cache_get("queue", "1") == {"id": 1, "name": "Q"}
+
 
 class TestFetchSnapshot:
     @pytest.mark.asyncio
@@ -527,6 +577,16 @@ class TestFetchSnapshot:
         result = await conn._fetch_snapshot("queue", "1")
 
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_unwraps_unified_get_response(self):
+        conn = _make_connection()
+        unified = {"entity": "queue", "id": 1, "data": {"id": 1, "name": "Q", "schema": "https://..."}}
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(unified))
+
+        result = await conn._fetch_snapshot("queue", "1")
+
+        assert result == {"id": 1, "name": "Q", "schema": "https://..."}
 
 
 class TestChangeTrackerState:
@@ -574,12 +634,16 @@ class TestHandleWriteTrackedResources:
     @pytest.mark.asyncio
     async def test_records_tracked_resources_as_changes(self):
         conn = _make_connection(write_tools={"create_queue_from_template"})
+        # _tracked_resources lives inside the result dict, then FastMCP wraps in {"result": ...}
         created = {
-            "result": {"id": 99, "name": "New Queue"},
-            "_tracked_resources": [
-                {"entity_type": "schema", "entity_id": "50", "data": {"id": 50, "name": "S"}},
-                {"entity_type": "engine", "entity_id": "60", "data": {"id": 60, "name": "E"}},
-            ],
+            "result": {
+                "id": 99,
+                "name": "New Queue",
+                "_tracked_resources": [
+                    {"entity_type": "schema", "entity_id": "50", "data": {"id": 50, "name": "S"}},
+                    {"entity_type": "engine", "entity_id": "60", "data": {"id": 60, "name": "E"}},
+                ],
+            }
         }
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
 
@@ -610,10 +674,13 @@ class TestHandleWriteTrackedResources:
     async def test_tracked_resources_are_cached(self):
         conn = _make_connection(write_tools={"create_queue_from_template"})
         created = {
-            "result": {"id": 99, "name": "Q"},
-            "_tracked_resources": [
-                {"entity_type": "schema", "entity_id": "50", "data": {"id": 50, "name": "S"}},
-            ],
+            "result": {
+                "id": 99,
+                "name": "Q",
+                "_tracked_resources": [
+                    {"entity_type": "schema", "entity_id": "50", "data": {"id": 50, "name": "S"}},
+                ],
+            }
         }
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
 
@@ -625,10 +692,13 @@ class TestHandleWriteTrackedResources:
     async def test_tracked_resources_stripped_from_main_snapshot(self):
         conn = _make_connection(write_tools={"create_queue_from_template"})
         created = {
-            "result": {"id": 99, "name": "Q"},
-            "_tracked_resources": [
-                {"entity_type": "schema", "entity_id": "50", "data": {"id": 50}},
-            ],
+            "result": {
+                "id": 99,
+                "name": "Q",
+                "_tracked_resources": [
+                    {"entity_type": "schema", "entity_id": "50", "data": {"id": 50}},
+                ],
+            }
         }
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
 
@@ -689,13 +759,16 @@ class TestHandleWriteTrackedResources:
     async def test_skips_malformed_tracked_entries(self):
         conn = _make_connection(write_tools={"create_queue_from_template"})
         created = {
-            "result": {"id": 99, "name": "Q"},
-            "_tracked_resources": [
-                {"entity_type": "", "entity_id": "50", "data": {"id": 50}},
-                {"entity_type": "schema", "entity_id": "", "data": {"id": 50}},
-                {"entity_type": "engine", "entity_id": "60", "data": "not a dict"},
-                {"entity_type": "schema", "entity_id": "70", "data": {"id": 70, "name": "Valid"}},
-            ],
+            "result": {
+                "id": 99,
+                "name": "Q",
+                "_tracked_resources": [
+                    {"entity_type": "", "entity_id": "50", "data": {"id": 50}},
+                    {"entity_type": "schema", "entity_id": "", "data": {"id": 50}},
+                    {"entity_type": "engine", "entity_id": "60", "data": "not a dict"},
+                    {"entity_type": "schema", "entity_id": "70", "data": {"id": 70, "name": "Valid"}},
+                ],
+            }
         }
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
 

@@ -60,7 +60,7 @@ def suggest_formula_field(
     Args:
         label: Display label for the field (e.g., 'Net Terms').
         hint: Natural language description of the formula logic.
-        schema_id: The numeric schema ID (e.g., 9389721). Get this from get_schema or list_queues.
+        schema_id: The numeric schema ID (e.g., 9389721). Get this from get(entity="queue", id=queue_id) or search(query={"entity": "queue"}).
         section_id: Section ID where the field belongs. Ask the user if not specified.
         field_schema_id: Optional ID for the formula field. Defaults to label.lower().replace(" ", "_").
 

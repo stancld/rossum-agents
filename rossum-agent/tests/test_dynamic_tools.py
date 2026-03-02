@@ -232,22 +232,39 @@ class TestPreloadCategoriesForRequest:
 
     @patch("rossum_agent.tools.dynamic_tools._load_categories_impl")
     @patch("rossum_agent.tools.dynamic_tools.suggest_categories_for_request")
-    def test_preloads_suggested_categories(self, mock_suggest: MagicMock, mock_load: MagicMock) -> None:
+    def test_preloads_suggested_categories_with_read(self, mock_suggest: MagicMock, mock_load: MagicMock) -> None:
         mock_suggest.return_value = ["queues", "schemas"]
         mock_load.return_value = "Loaded 10 tools from ['queues', 'schemas']"
 
         result = preload_categories_for_request("Show me all queues and schemas")
 
-        mock_load.assert_called_once_with(["queues", "schemas"])
+        # read is already not in suggestions, so it gets prepended
+        mock_load.assert_called_once_with(["read", "queues", "schemas"])
         assert result is not None
 
+    @patch("rossum_agent.tools.dynamic_tools._load_categories_impl")
     @patch("rossum_agent.tools.dynamic_tools.suggest_categories_for_request")
-    def test_returns_none_when_no_suggestions(self, mock_suggest: MagicMock) -> None:
+    def test_does_not_duplicate_read_when_already_suggested(
+        self, mock_suggest: MagicMock, mock_load: MagicMock
+    ) -> None:
+        mock_suggest.return_value = ["read", "queues"]
+        mock_load.return_value = "Loaded 10 tools from ['read', 'queues']"
+
+        result = preload_categories_for_request("List all queues")
+
+        mock_load.assert_called_once_with(["read", "queues"])
+        assert result is not None
+
+    @patch("rossum_agent.tools.dynamic_tools._load_categories_impl")
+    @patch("rossum_agent.tools.dynamic_tools.suggest_categories_for_request")
+    def test_preloads_read_even_when_no_keyword_matches(self, mock_suggest: MagicMock, mock_load: MagicMock) -> None:
         mock_suggest.return_value = []
+        mock_load.return_value = "Loaded 2 tools from ['read']"
 
         result = preload_categories_for_request("Hello, how are you?")
 
-        assert result is None
+        mock_load.assert_called_once_with(["read"])
+        assert result is not None
 
     @patch("rossum_agent.tools.dynamic_tools._load_categories_impl")
     @patch("rossum_agent.tools.dynamic_tools.suggest_categories_for_request")

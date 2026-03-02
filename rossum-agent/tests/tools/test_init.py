@@ -59,6 +59,37 @@ class TestInternalToolsRegistration:
         assert "search_knowledge_base" in names
         assert "load_skill" in names
 
+    def test_copilot_tools_hidden_until_skill_loaded(self) -> None:
+        """Copilot tools only appear in get_internal_tools() after their skill is loaded."""
+        from rossum_agent.tools.dynamic_tools import mark_skill_loaded
+
+        # Without skills: copilot tools absent from visible tools
+        set_context(AgentContext())
+        try:
+            tools = get_internal_tools()
+            tool_names = {t["name"] for t in tools}
+            assert "suggest_formula_field" not in tool_names
+            assert "suggest_lookup_field" not in tool_names
+
+            # Load formula-fields skill
+            mark_skill_loaded("formula-fields")
+            tools = get_internal_tools()
+            tool_names = {t["name"] for t in tools}
+            assert "suggest_formula_field" in tool_names
+            assert "suggest_lookup_field" not in tool_names
+
+            # Load lookup-fields skill
+            mark_skill_loaded("lookup-fields")
+            tools = get_internal_tools()
+            tool_names = {t["name"] for t in tools}
+            assert "suggest_formula_field" in tool_names
+            assert "suggest_lookup_field" in tool_names
+            assert "evaluate_lookup_field" in tool_names
+            assert "get_lookup_dataset_raw_values" in tool_names
+            assert "query_lookup_dataset" in tool_names
+        finally:
+            set_context(AgentContext())
+
 
 class TestExecuteTool:
     """Tests for execute_tool function."""

@@ -16,6 +16,7 @@ from rossum_agent.tools.change_history import (
     _deduplicate_changes,
     _flush_pending_changes,
     _revert_schema_with_retry,
+    _unwrap_snapshot,
     diff_objects,
     restore_entity_version,
     revert_commit,
@@ -483,6 +484,27 @@ class TestUnwrap:
     def test_returns_as_is_when_result_is_not_dict(self) -> None:
         data = {"result": "not a dict"}
         assert unwrap(data) == data
+
+
+class TestUnwrapSnapshot:
+    """Tests for _unwrap_snapshot defense-in-depth helper."""
+
+    def test_bare_entity_dict(self) -> None:
+        data = {"id": 1, "name": "Schema", "content": [{"id": "f1"}]}
+        assert _unwrap_snapshot(data) == data
+
+    def test_fastmcp_result_wrapper(self) -> None:
+        data = {"result": {"id": 1, "name": "Schema", "content": [{"id": "f1"}]}}
+        assert _unwrap_snapshot(data) == {"id": 1, "name": "Schema", "content": [{"id": "f1"}]}
+
+    def test_unified_get_wrapper(self) -> None:
+        data = {"entity": "schema", "id": 1, "data": {"id": 1, "content": [{"id": "f1"}]}}
+        assert _unwrap_snapshot(data) == {"id": 1, "content": [{"id": "f1"}]}
+
+    def test_double_wrapped_fastmcp_plus_unified_get(self) -> None:
+        """Regression: the exact scenario that caused the 'before snapshot has no content' error."""
+        data = {"result": {"entity": "schema", "id": 1, "data": {"id": 1, "content": [{"id": "f1"}]}}}
+        assert _unwrap_snapshot(data) == {"id": 1, "content": [{"id": "f1"}]}
 
 
 class TestDeduplicateChanges:

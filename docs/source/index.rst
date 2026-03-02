@@ -44,13 +44,17 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **71 tools** organized into fourteen categories:
+The MCP server provides **43 tools** organized into categories:
+
+**Unified Read Layer**
+
+* **get** - Get entities by ID (single or batch). Supports ``include_related`` for enriched responses (queue→schema+engine+hooks, schema→queues+rules, hook→queues+events)
+* **search** - Search/list entities with typed, entity-specific filters. Supports: queue, schema, hook, engine, rule, user, workspace, email_template, organization_group, annotation, relation, document_relation, hook_log, hook_template, user_role
 
 **Document Processing**
 
 * **upload_document** - Upload documents for AI extraction
-* **get_annotation** - Retrieve extracted data and status
-* **list_annotations** - List all annotations with filtering
+* **get_annotation_content** - Fetch annotation extracted content to a local JSON file
 * **start_annotation** - Start annotation for field updates
 * **bulk_update_annotation_fields** - Update field values with JSON Patch
 * **confirm_annotation** - Confirm and finalize annotations
@@ -59,10 +63,6 @@ The MCP server provides **71 tools** organized into fourteen categories:
 
 **Queue Management**
 
-* **get_queue** - Retrieve queue details
-* **list_queues** - List queues with optional filtering
-* **get_queue_schema** - Retrieve queue schema in one call
-* **get_queue_engine** - Get engine information
 * **create_queue** - Create new queues
 * **create_queue_from_template** - Create queues from predefined templates (EU/US/UK/CZ/CN)
 * **get_queue_template_names** - List available queue template names
@@ -71,8 +71,6 @@ The MCP server provides **71 tools** organized into fourteen categories:
 
 **Schema Management**
 
-* **get_schema** - Retrieve schema details
-* **list_schemas** - List schemas with optional filtering
 * **create_schema** - Create new schemas
 * **update_schema** - Configure field-level thresholds
 * **patch_schema** - Add, update, or remove individual schema nodes
@@ -82,34 +80,21 @@ The MCP server provides **71 tools** organized into fourteen categories:
 
 **Workspace Management**
 
-* **get_workspace** - Retrieve workspace details by ID
-* **list_workspaces** - List all workspaces with optional filtering
 * **create_workspace** - Create a new workspace
 * **delete_workspace** - Delete a workspace
 
 **Organization Groups**
 
-* **get_organization_group** - Retrieve organization group (license) details by ID
-* **list_organization_groups** - List organization groups with optional name filter
 * **are_lookup_fields_enabled** - Check if lookup fields are enabled for an organization group
 * **are_reasoning_fields_enabled** - Check if reasoning fields are enabled for an organization group
 
-**Organization Limits**
-
-* **get_organization_limit** - Retrieve email sending limits and usage counters for an organization
-
 **User Management**
 
-* **get_user** - Retrieve user details by ID
-* **list_users** - List users with filtering (for finding user URLs for token_owner)
-* **list_user_roles** - List all user roles (permission groups) in the organization
 * **create_user** - Create a new user
 * **update_user** - Update user properties
 
 **Engine Management**
 
-* **get_engine** - Retrieve a single engine by ID
-* **list_engines** - List all engines with optional filters
 * **create_engine** - Create extraction or splitting engines
 * **update_engine** - Configure learning and training queues
 * **create_engine_field** - Define engine fields and link to schemas
@@ -117,41 +102,27 @@ The MCP server provides **71 tools** organized into fourteen categories:
 
 **Extensions (Hooks)**
 
-* **get_hook** - Get hook/extension details
-* **list_hooks** - List webhooks and extensions
 * **create_hook** - Create webhooks or serverless function hooks
 * **update_hook** - Update hook properties (name, queues, events, config, settings, active)
-* **list_hook_templates** - List available hook templates from Rossum Store
 * **create_hook_from_template** - Create hooks from pre-built templates
-* **list_hook_logs** - List hook execution logs for debugging and monitoring
 * **delete_hook** - Delete a hook/extension
 * **test_hook** - Test a hook with sample payloads
 
 **Rules & Actions**
 
-* **get_rule** - Get business rule details
-* **list_rules** - List business rules with trigger conditions and actions
 * **create_rule** - Create business rules with trigger conditions and actions
 * **update_rule** - Full update of business rules (PUT)
 * **patch_rule** - Partial update of business rules (PATCH)
 * **delete_rule** - Delete a business rule
 
-**Relations Management**
-
-* **get_relation** - Retrieve relation details by ID
-* **list_relations** - List all relations between annotations (edit, attachment, duplicate)
-* **get_document_relation** - Retrieve document relation details by ID
-* **list_document_relations** - List all document relations (export, einvoice)
-
 **Email Templates**
 
-* **get_email_template** - Retrieve email template details
-* **list_email_templates** - List email templates with optional filtering
 * **create_email_template** - Create new email templates
 
 **Tool Discovery**
 
 * **list_tool_categories** - List available tool categories with descriptions and keywords
+* **load_tool_category** - Dynamically load tools for a specific category
 
 **MCP Mode**
 
@@ -175,7 +146,7 @@ The ``rossum_agent`` package provides additional capabilities:
 * Formula field suggestions via Rossum Local Copilot integration
 * Lookup field setup/evaluation plus raw MDH dataset verification for unmatched cases
 * Elis API OpenAPI search via jq queries and free-text grep with sub-agent analysis
-* Knowledge Base search with direct regex tools (``kb_grep``, ``kb_get_article``) and Opus-powered sub-agent analysis
+* Knowledge Base search with Opus-powered sub-agent analysis
 * Hook testing via native Rossum API endpoints
 * Deployment tools for pull/push/diff of Rossum configurations across environments
 * Multi-environment support with spawnable MCP connections

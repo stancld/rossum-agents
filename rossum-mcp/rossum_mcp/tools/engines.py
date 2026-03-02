@@ -108,24 +108,6 @@ async def _get_engine_fields(client: AsyncRossumAPIClient, engine_id: int | None
 
 def register_engine_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Retrieve a single engine by ID.",
-        tags={"engines"},
-        annotations={"readOnlyHint": True},
-    )
-    async def get_engine(engine_id: int) -> Engine:
-        return await _get_engine(client, engine_id)
-
-    @mcp.tool(
-        description="List all engines with optional filters.",
-        tags={"engines"},
-        annotations={"readOnlyHint": True},
-    )
-    async def list_engines(
-        id: int | None = None, engine_type: EngineType | None = None, agenda_id: str | None = None
-    ) -> list[Engine]:
-        return await _list_engines(client, id, engine_type, agenda_id)
-
-    @mcp.tool(
         description="Update engine settings.",
         tags={"engines", "write"},
         annotations={"readOnlyHint": False},

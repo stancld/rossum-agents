@@ -370,7 +370,7 @@ def suggest_lookup_field(
     Args:
         label: Display label for the field (e.g., 'Vendor Match').
         hint: Natural language description of the lookup logic (e.g., 'Match vendors by VAT ID').
-        schema_id: The numeric schema ID. Get this from get_schema or list_queues.
+        schema_id: The numeric schema ID. Get this from get(entity="queue", id=queue_id) or search(query={"entity": "queue"}).
         section_id: Section ID where the field belongs. Ask the user if not specified.
         field_schema_id: Optional ID for the lookup field. Defaults to label.lower().replace(" ", "_").
         dataset: Optional Master Data Hub dataset name (e.g., 'Vendors'). Appended to hint for the API.

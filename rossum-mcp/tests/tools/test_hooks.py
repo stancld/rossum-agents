@@ -10,7 +10,15 @@ import pytest
 from conftest import create_mock_hook
 from rossum_api.models.hook_template import HookTemplate
 from rossum_mcp.tools import base
-from rossum_mcp.tools.hooks import _generate_hook_payload, _validate_events, register_hook_tools
+from rossum_mcp.tools.hooks import (
+    _generate_hook_payload,
+    _get_hook,
+    _list_hook_logs,
+    _list_hook_templates,
+    _list_hooks,
+    _validate_events,
+    register_hook_tools,
+)
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -45,18 +53,15 @@ def mock_mcp() -> Mock:
 
 @pytest.mark.unit
 class TestGetHook:
-    """Tests for get_hook tool."""
+    """Tests for _get_hook private function."""
 
     @pytest.mark.asyncio
-    async def test_get_hook_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_hook_success(self, mock_client: AsyncMock) -> None:
         """Test successful hook retrieval."""
-        register_hook_tools(mock_mcp, mock_client)
-
         mock_hook = create_mock_hook(id=123, name="Validation Hook", type="function")
         mock_client.retrieve_hook.return_value = mock_hook
 
-        get_hook = mock_mcp._tools["get_hook"]
-        result = await get_hook(hook_id=123)
+        result = await _get_hook(mock_client, hook_id=123)
 
         assert result.id == 123
         assert result.name == "Validation Hook"
@@ -66,13 +71,11 @@ class TestGetHook:
 
 @pytest.mark.unit
 class TestListHooks:
-    """Tests for list_hooks tool."""
+    """Tests for _list_hooks private function."""
 
     @pytest.mark.asyncio
-    async def test_list_hooks_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_hooks_success(self, mock_client: AsyncMock) -> None:
         """Test successful hooks listing."""
-        register_hook_tools(mock_mcp, mock_client)
-
         mock_hook1 = create_mock_hook(id=1, name="Hook 1")
         mock_hook2 = create_mock_hook(id=2, name="Hook 2")
 
@@ -82,16 +85,13 @@ class TestListHooks:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_hooks = mock_mcp._tools["list_hooks"]
-        result = await list_hooks()
+        result = await _list_hooks(mock_client)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_list_hooks_with_queue_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_hooks_with_queue_filter(self, mock_client: AsyncMock) -> None:
         """Test hooks listing filtered by queue."""
-        register_hook_tools(mock_mcp, mock_client)
-
         mock_hook = create_mock_hook(id=1, name="Queue Hook")
         received_filters: dict = {}
 
@@ -102,17 +102,14 @@ class TestListHooks:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_hooks = mock_mcp._tools["list_hooks"]
-        result = await list_hooks(queue_id=100)
+        result = await _list_hooks(mock_client, queue_id=100)
 
         assert len(result) == 1
         assert received_filters["queue"] == 100
 
     @pytest.mark.asyncio
-    async def test_list_hooks_with_active_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_hooks_with_active_filter(self, mock_client: AsyncMock) -> None:
         """Test hooks listing filtered by active status."""
-        register_hook_tools(mock_mcp, mock_client)
-
         mock_hook = create_mock_hook(id=1, active=True)
         received_filters: dict = {}
 
@@ -123,17 +120,14 @@ class TestListHooks:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_hooks = mock_mcp._tools["list_hooks"]
-        result = await list_hooks(active=True)
+        result = await _list_hooks(mock_client, active=True)
 
         assert len(result) == 1
         assert received_filters["active"] is True
 
     @pytest.mark.asyncio
-    async def test_list_hooks_with_first_n(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_hooks_with_first_n(self, mock_client: AsyncMock) -> None:
         """Test hooks listing with first_n limit."""
-        register_hook_tools(mock_mcp, mock_client)
-
         mock_hook1 = create_mock_hook(id=1, name="Hook 1")
         mock_hook2 = create_mock_hook(id=2, name="Hook 2")
         mock_hook3 = create_mock_hook(id=3, name="Hook 3")
@@ -144,18 +138,13 @@ class TestListHooks:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_hooks = mock_mcp._tools["list_hooks"]
-        result = await list_hooks(first_n=2)
+        result = await _list_hooks(mock_client, first_n=2)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_list_hooks_with_first_n_greater_than_available(
-        self, mock_mcp: Mock, mock_client: AsyncMock
-    ) -> None:
+    async def test_list_hooks_with_first_n_greater_than_available(self, mock_client: AsyncMock) -> None:
         """Test hooks listing when first_n exceeds available items (should not crash)."""
-        register_hook_tools(mock_mcp, mock_client)
-
         mock_hook1 = create_mock_hook(id=1, name="Hook 1")
 
         async def mock_fetch_all(resource, **filters):
@@ -163,15 +152,13 @@ class TestListHooks:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_hooks = mock_mcp._tools["list_hooks"]
-        result = await list_hooks(first_n=10)
+        result = await _list_hooks(mock_client, first_n=10)
 
         assert len(result) == 1
 
     @pytest.mark.asyncio
-    async def test_list_hooks_with_first_n_empty_result(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_hooks_with_first_n_empty_result(self, mock_client: AsyncMock) -> None:
         """Test hooks listing when no hooks exist but first_n is specified."""
-        register_hook_tools(mock_mcp, mock_client)
 
         async def mock_fetch_all(resource, **filters):
             return
@@ -179,16 +166,13 @@ class TestListHooks:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_hooks = mock_mcp._tools["list_hooks"]
-        result = await list_hooks(first_n=5)
+        result = await _list_hooks(mock_client, first_n=5)
 
         assert len(result) == 0
 
     @pytest.mark.asyncio
-    async def test_list_hooks_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_hooks_skips_broken_items(self, mock_client: AsyncMock) -> None:
         """Test list_hooks gracefully skips items that fail deserialization."""
-        register_hook_tools(mock_mcp, mock_client)
-
         mock_hook = create_mock_hook(id=1, name="Good Hook")
 
         def mock_deserializer(resource, raw):
@@ -205,8 +189,7 @@ class TestListHooks:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_hooks = mock_mcp._tools["list_hooks"]
-        result = await list_hooks()
+        result = await _list_hooks(mock_client)
 
         assert len(result) == 2
 
@@ -262,7 +245,7 @@ class TestCreateHook:
         mock_client.create_new_hook.assert_called_once()
         call_args = mock_client.create_new_hook.call_args[0][0]
         assert call_args["name"] == "Configured Hook"
-        assert "function" in call_args["config"]  # source converted to function
+        assert "code" in call_args["config"]  # source converted to code
 
     @pytest.mark.asyncio
     async def test_create_hook_with_settings_secret_timeout(
@@ -512,13 +495,11 @@ class TestUpdateHook:
 
 @pytest.mark.unit
 class TestListHookLogs:
-    """Tests for list_hook_logs tool."""
+    """Tests for _list_hook_logs private function."""
 
     @pytest.mark.asyncio
-    async def test_list_hook_logs_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_hook_logs_success(self, mock_client: AsyncMock) -> None:
         """Test successful hook logs listing."""
-        register_hook_tools(mock_mcp, mock_client)
-
         mock_log = Mock()
         mock_log.id = 1
         received_filters: dict = {}
@@ -530,17 +511,14 @@ class TestListHookLogs:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_hook_logs = mock_mcp._tools["list_hook_logs"]
-        result = await list_hook_logs(hook_id=123)
+        result = await _list_hook_logs(mock_client, hook_id=123)
 
         assert len(result) == 1
         assert received_filters["hook"] == 123
 
     @pytest.mark.asyncio
-    async def test_list_hook_logs_with_filters(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_hook_logs_with_filters(self, mock_client: AsyncMock) -> None:
         """Test hook logs listing with multiple filters."""
-        register_hook_tools(mock_mcp, mock_client)
-
         received_filters: dict = {}
 
         async def mock_fetch_all(resource, **filters):
@@ -551,9 +529,13 @@ class TestListHookLogs:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_hook_logs = mock_mcp._tools["list_hook_logs"]
-        result = await list_hook_logs(
-            hook_id=123, queue_id=456, log_level="ERROR", timestamp_after="2024-01-15T10:30:00Z", page_size=50
+        result = await _list_hook_logs(
+            mock_client,
+            hook_id=123,
+            queue_id=456,
+            log_level="ERROR",
+            timestamp_after="2024-01-15T10:30:00Z",
+            page_size=50,
         )
 
         assert result == []
@@ -565,16 +547,39 @@ class TestListHookLogs:
             "page_size": 50,
         }
 
+    @pytest.mark.asyncio
+    async def test_list_hook_logs_with_multiple_log_levels(self, mock_client: AsyncMock) -> None:
+        """Test hook logs listing with multiple log levels joined as comma-separated."""
+        received_filters: dict = {}
+
+        async def mock_fetch_all(resource, **filters):
+            nonlocal received_filters
+            received_filters = filters
+            return
+            yield
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        result = await _list_hook_logs(
+            mock_client,
+            hook_id=123,
+            log_level=["ERROR", "WARNING"],
+        )
+
+        assert result == []
+        assert received_filters == {
+            "hook": 123,
+            "log_level": "ERROR,WARNING",
+        }
+
 
 @pytest.mark.unit
 class TestListHookTemplates:
-    """Tests for list_hook_templates tool."""
+    """Tests for _list_hook_templates private function."""
 
     @pytest.mark.asyncio
-    async def test_list_hook_templates_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_hook_templates_success(self, mock_client: AsyncMock) -> None:
         """Test successful hook templates listing."""
-        register_hook_tools(mock_mcp, mock_client)
-
         templates = [
             HookTemplate(
                 id=1,
@@ -600,8 +605,7 @@ class TestListHookTemplates:
         mock_client._http_client.fetch_all = mock_fetch_all
         mock_client._deserializer = Mock(side_effect=lambda resource, raw: raw)
 
-        list_hook_templates = mock_mcp._tools["list_hook_templates"]
-        result = await list_hook_templates()
+        result = await _list_hook_templates(mock_client)
 
         assert len(result) == 2
         assert result[0].id == 1

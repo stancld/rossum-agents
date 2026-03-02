@@ -53,7 +53,7 @@ async def _upload_document(client: AsyncRossumAPIClient, file_path: str, queue_i
         "task_id": task.id,
         "task_status": task.status,
         "queue_id": queue_id,
-        "message": "Document upload initiated. Use `list_annotations` to find the annotation ID for this queue.",
+        "message": 'Document upload initiated. Use `search(query={"entity": "annotation", "queue_id": ...})` to find the annotation ID for this queue.',
     }
 
 
@@ -153,20 +153,12 @@ async def _delete_annotation(client: AsyncRossumAPIClient, annotation_id: int) -
 
 def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Upload a document; use list_annotations to find the created annotation.",
+        description="Upload a document; use search(entity='annotation', queue_id=...) to find the created annotation.",
         tags={"annotations", "write"},
         annotations={"readOnlyHint": False},
     )
     async def upload_document(file_path: str, queue_id: int) -> dict:
         return await _upload_document(client, file_path, queue_id)
-
-    @mcp.tool(
-        description="Retrieve an annotation (metadata only, no extracted content).",
-        tags={"annotations"},
-        annotations={"readOnlyHint": True},
-    )
-    async def get_annotation(annotation_id: int) -> Annotation:
-        return await _get_annotation(client, annotation_id)
 
     @mcp.tool(
         description="Fetch annotation extracted content and save to a local JSON file; returns the path for jq/grep.",
@@ -175,19 +167,6 @@ def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> Non
     )
     async def get_annotation_content(annotation_id: int) -> dict:
         return await _get_annotation_content(client, annotation_id)
-
-    @mcp.tool(
-        description="List queue annotations; ordering=['-created_at'] returns newest first.",
-        tags={"annotations"},
-        annotations={"readOnlyHint": True},
-    )
-    async def list_annotations(
-        queue_id: int,
-        status: str | None = "importing,to_review,confirmed,exported",
-        ordering: Sequence[str] = (),
-        first_n: int | None = None,
-    ) -> list[Annotation]:
-        return await _list_annotations(client, queue_id, status, ordering, first_n)
 
     @mcp.tool(
         description="Set annotation status to 'reviewing' (from 'to_review').",

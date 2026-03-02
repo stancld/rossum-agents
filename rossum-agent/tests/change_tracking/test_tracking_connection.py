@@ -255,7 +255,7 @@ class TestWriteTracking:
         conn._call_mcp = AsyncMock(
             side_effect=[
                 {"id": 1, "name": "Updated"},  # update_queue result
-                {"id": 1, "name": "Updated"},  # get_queue after-snapshot
+                {"id": 1, "name": "Updated"},  # get(entity="queue") after-snapshot
             ]
         )
 
@@ -302,7 +302,7 @@ class TestWriteTracking:
         conn._call_mcp = AsyncMock(
             side_effect=[
                 "ok",  # update_queue result
-                {"id": 1, "name": "After"},  # get_queue after-snapshot
+                {"id": 1, "name": "After"},  # get(entity="queue") after-snapshot
             ]
         )
 
@@ -311,7 +311,8 @@ class TestWriteTracking:
         # Before is cached so only 2 calls: write + after-snapshot
         assert conn._call_mcp.call_count == 2
         after_call = conn._call_mcp.call_args_list[1]
-        assert after_call.args[0] == "get_queue"
+        assert after_call.args[0] == "get"
+        assert after_call.args[1] == {"entity": "queue", "entity_id": 1}
 
     @pytest.mark.anyio
     async def test_entity_name_from_before(self, conn):
@@ -340,9 +341,9 @@ class TestWriteTracking:
         """When the entity was never read, _handle_write proactively fetches a before snapshot."""
         conn._call_mcp = AsyncMock(
             side_effect=[
-                {"id": 1, "name": "Before"},  # proactive before-snapshot fetch
+                {"id": 1, "name": "Before"},  # proactive get(entity="queue") before-snapshot
                 "ok",  # update_queue result
-                {"id": 1, "name": "After"},  # after-snapshot fetch
+                {"id": 1, "name": "After"},  # get(entity="queue") after-snapshot
             ]
         )
 
@@ -350,7 +351,7 @@ class TestWriteTracking:
 
         assert conn._call_mcp.call_count == 3
         before_call = conn._call_mcp.call_args_list[0]
-        assert before_call.args == ("get_queue", {"queue_id": 1})
+        assert before_call.args == ("get", {"entity": "queue", "entity_id": 1})
         write_call = conn._call_mcp.call_args_list[1]
         assert write_call.args == ("update_queue", {"queue_id": "1", "name": "After"})
 
@@ -617,9 +618,9 @@ class TestOverrideToolTracking:
 
         conn._call_mcp = AsyncMock(
             side_effect=[
-                original,  # get_schema before-snapshot
+                original,  # get(entity="schema") before-snapshot
                 {"status": "ok"},  # prune result
-                pruned,  # get_schema after-snapshot
+                pruned,  # get(entity="schema") after-snapshot
             ]
         )
 
@@ -645,11 +646,11 @@ class TestOverrideToolTracking:
 
         conn._call_mcp = AsyncMock(
             side_effect=[
-                original,  # get_schema before prune
+                original,  # get(entity="schema") before prune
                 {"status": "ok"},  # prune result
-                pruned,  # get_schema after prune
+                pruned,  # get(entity="schema") after prune
                 {"status": "ok"},  # patch result
-                patched,  # get_schema after patch
+                patched,  # get(entity="schema") after patch
             ]
         )
 
@@ -691,20 +692,20 @@ class TestSubAgentSchemaFlow:
 
     @pytest.mark.anyio
     async def test_read_then_update_captures_before(self, schema_conn):
-        """Simulates: get_schema (read) → update_schema (write). Before must be captured."""
+        """Simulates: get (read) → update_schema (write). Before must be captured."""
         original = {"result": {"id": 100, "name": "My Schema", "content": [{"id": "section", "category": "section"}]}}
         updated = {"result": {"id": 100, "name": "My Schema", "content": []}}
 
         schema_conn._call_mcp = AsyncMock(
             side_effect=[
-                original,  # get_schema (read)
+                original,  # get (read)
                 "ok",  # update_schema (write)
-                updated,  # get_schema (after-snapshot)
+                updated,  # get(entity="schema") after-snapshot
             ]
         )
 
-        # Sub-agent step 1: read schema
-        await schema_conn.call_tool("get_schema", {"schema_id": 100})
+        # Sub-agent step 1: read schema via unified get tool
+        await schema_conn.call_tool("get", {"entity": "schema", "entity_id": 100})
 
         # Sub-agent step 2: update schema
         await schema_conn.call_tool("update_schema", {"schema_id": 100, "schema_data": {"content": []}})
@@ -730,13 +731,13 @@ class TestSubAgentSchemaFlow:
 
         schema_conn._call_mcp = AsyncMock(
             side_effect=[
-                original_model,  # get_schema (read) — Pydantic model
+                original_model,  # get (read) — Pydantic model
                 "ok",  # update_schema (write)
-                updated_model,  # get_schema (after-snapshot) — Pydantic model
+                updated_model,  # get(entity="schema") after-snapshot — Pydantic model
             ]
         )
 
-        await schema_conn.call_tool("get_schema", {"schema_id": 100})
+        await schema_conn.call_tool("get", {"entity": "schema", "entity_id": 100})
         await schema_conn.call_tool("update_schema", {"schema_id": 100, "schema_data": {"content": []}})
 
         assert len(schema_conn._changes) == 1
@@ -889,9 +890,9 @@ class TestRedisCacheHelpers:
         """When a write triggers a proactive before-fetch, it stores to Redis."""
         redis_conn._call_mcp = AsyncMock(
             side_effect=[
-                {"id": 1, "name": "Before"},  # proactive before-snapshot
+                {"id": 1, "name": "Before"},  # proactive get(entity="queue") before-snapshot
                 "ok",  # update result
-                {"id": 1, "name": "After"},  # after-snapshot
+                {"id": 1, "name": "After"},  # get(entity="queue") after-snapshot
             ]
         )
 
@@ -947,7 +948,7 @@ class TestSchemaRewriteAndRevert:
         # 1. Optionally read schema first (populates cache)
         if with_prior_read:
             schema_conn._call_mcp.return_value = original
-            await schema_conn.call_tool("get_schema", {"schema_id": 100})
+            await schema_conn.call_tool("get", {"entity": "schema", "entity_id": 100})
             assert schema_conn._read_cache[("schema", "100")] == original
 
         # 2. Rewrite schema content to []
@@ -956,15 +957,15 @@ class TestSchemaRewriteAndRevert:
             schema_conn._call_mcp = AsyncMock(
                 side_effect=[
                     "ok",  # update_schema result
-                    empty,  # get_schema after-snapshot
+                    empty,  # get(entity="schema") after-snapshot
                 ]
             )
         else:
             schema_conn._call_mcp = AsyncMock(
                 side_effect=[
-                    original,  # proactive get_schema before-snapshot
+                    original,  # proactive get(entity="schema") before-snapshot
                     "ok",  # update_schema result
-                    empty,  # get_schema after-snapshot
+                    empty,  # get(entity="schema") after-snapshot
                 ]
             )
         await schema_conn.call_tool("update_schema", {"schema_id": 100, "content": []})

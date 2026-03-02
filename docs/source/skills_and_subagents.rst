@@ -70,7 +70,7 @@ Hooks Skill
 
 **Goal**: Create, configure, and test hooks — prefer Rossum Store templates over custom code.
 
-Workflow: ``list_hook_templates()`` → ``create_hook_from_template()`` or ``create_hook()`` → ``test_hook()`` → ``list_hook_logs()``.
+Workflow: ``search(query={"entity": "hook_template"})`` → ``create_hook_from_template()`` or ``create_hook()`` → ``test_hook()`` → ``search(query={"entity": "hook_log", ...})``.
 
 Rossum Deployment Skill
 """""""""""""""""""""""
@@ -143,7 +143,7 @@ Document Testing Skill
 
 **Goal**: Test document processing end-to-end — generate a schema-aware mock PDF, upload it, verify extraction, optionally trigger hooks.
 
-Workflow: ``get_schema`` → extract fields → ``generate_mock_pdf(fields=[...])`` → ``upload_document`` → poll ``list_annotations`` → ``get_annotation`` with sideloads → compare expected vs extracted values.
+Workflow: ``get(entity="schema", entity_id=schema_id)`` → extract fields → ``generate_mock_pdf(fields=[...])`` → ``upload_document`` → poll ``search(query={"entity": "annotation", "queue_id": ..., "ordering": ["-created_at"], "first_n": 1})`` → ``get_annotation_content(annotation_id)`` → compare expected vs extracted values.
 
 ``generate_mock_pdf`` tool parameters:
 

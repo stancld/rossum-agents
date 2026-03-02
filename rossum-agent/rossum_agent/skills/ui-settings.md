@@ -4,7 +4,7 @@
 
 ## Workflow
 
-1. Fetch current settings via `get_queue`
+1. Fetch current settings via `get(entity="queue", id=queue_id)`
 2. Modify only `columns` array, preserve all other keys
 3. Patch via `update_queue(queue_id, queue_data={"settings": settings})`
 

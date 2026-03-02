@@ -70,7 +70,7 @@ async def _create_hook(
     if config is None:
         config = {}
     if type == "function" and "source" in config:
-        config["function"] = config.pop("source")
+        config["code"] = config.pop("source")
     if type == "function" and "runtime" not in config:
         config["runtime"] = "python3.12"
     if "timeout_s" in config and config["timeout_s"] > 60:
@@ -128,7 +128,7 @@ async def _list_hook_logs(
     queue_id: int | None = None,
     annotation_id: int | None = None,
     email_id: int | None = None,
-    log_level: Literal["INFO", "ERROR", "WARNING"] | None = None,
+    log_level: list[Literal["INFO", "ERROR", "WARNING"]] | Literal["INFO", "ERROR", "WARNING"] | None = None,
     status: str | None = None,
     status_code: int | None = None,
     request_id: str | None = None,
@@ -149,7 +149,7 @@ async def _list_hook_logs(
         queue=queue_id,
         annotation=annotation_id,
         email=email_id,
-        log_level=log_level,
+        log_level=",".join(log_level) if isinstance(log_level, list) else log_level,
         status=status,
         status_code=status_code,
         request_id=request_id,
@@ -294,25 +294,7 @@ async def _delete_hook(client: AsyncRossumAPIClient, hook_id: int) -> dict:
 
 def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Retrieve one hook by ID (function hook code is in hook.config['code']).",
-        tags={"hooks"},
-        annotations={"readOnlyHint": True},
-    )
-    async def get_hook(hook_id: int) -> Hook:
-        return await _get_hook(client, hook_id)
-
-    @mcp.tool(
-        description="List hooks for a queue; returns full config/settings (function hook code in config['code']).",
-        tags={"hooks"},
-        annotations={"readOnlyHint": True},
-    )
-    async def list_hooks(
-        queue_id: int | None = None, active: bool | None = None, first_n: int | None = None
-    ) -> list[Hook]:
-        return await _list_hooks(client, queue_id, active, first_n)
-
-    @mcp.tool(
-        description="Create a hook. Function hooks: config.source auto-renamed to config.function, default runtime python3.12, timeout_s capped at 60. token_owner cannot be an organization_group_admin user.",
+        description="Create a hook. Function hooks: config.source auto-renamed to config.code, default runtime python3.12, timeout_s capped at 60. token_owner cannot be an organization_group_admin user.",
         tags={"hooks", "write"},
         annotations={"readOnlyHint": False},
     )
@@ -342,57 +324,6 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         active: bool | None = None,
     ) -> Hook | dict:
         return await _update_hook(client, hook_id, name, queues, events, config, settings, active)
-
-    @mcp.tool(
-        description="List hook execution logs (7-day retention, max 100 per call).",
-        tags={"hooks"},
-        annotations={"readOnlyHint": True},
-    )
-    async def list_hook_logs(
-        hook_id: int | None = None,
-        queue_id: int | None = None,
-        annotation_id: int | None = None,
-        email_id: int | None = None,
-        log_level: Literal["INFO", "ERROR", "WARNING"] | None = None,
-        status: str | None = None,
-        status_code: int | None = None,
-        request_id: str | None = None,
-        timestamp_before: Timestamp | None = None,
-        timestamp_after: Timestamp | None = None,
-        start_before: Timestamp | None = None,
-        start_after: Timestamp | None = None,
-        end_before: Timestamp | None = None,
-        end_after: Timestamp | None = None,
-        search: str | None = None,
-        page_size: int | None = None,
-    ) -> list[HookRunData]:
-        return await _list_hook_logs(
-            client,
-            hook_id,
-            queue_id,
-            annotation_id,
-            email_id,
-            log_level,
-            status,
-            status_code,
-            request_id,
-            timestamp_before,
-            timestamp_after,
-            start_before,
-            start_after,
-            end_before,
-            end_after,
-            search,
-            page_size,
-        )
-
-    @mcp.tool(
-        description="List Rossum Store hook templates (use with create_hook_from_template).",
-        tags={"hooks"},
-        annotations={"readOnlyHint": True},
-    )
-    async def list_hook_templates() -> list[HookTemplate]:
-        return await _list_hook_templates(client)
 
     @mcp.tool(
         description="Create a hook from a template; events may override template defaults. If template requires use_token_owner, provide token_owner (not an organization_group_admin user).",

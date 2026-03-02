@@ -153,7 +153,7 @@ Building Your Own Agents
 
 The examples follow a common pattern for building AI agents that process Rossum data:
 
-1. **Fetch data** using the Rossum API (``get_annotation``, ``list_annotations``, etc.)
+1. **Fetch data** using the Rossum API (``get``, ``search``, etc.)
 2. **Process/aggregate** the retrieved data according to your needs
 3. **Output results** in your desired format (visualizations, reports, exports, etc.)
 

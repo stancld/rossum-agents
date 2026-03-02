@@ -6,10 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Added
+- Added `get` tool: fetch any entity by ID with a single unified tool — supports `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`; `include_related=True` enriches with linked data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events) [#221](https://github.com/stancld/rossum-agents/pull/221)
+- Added `search` tool: list/filter any entity with typed, entity-specific query objects — covers all `get`-supported types plus search-only entities `hook_log`, `hook_template`, `user_role` [#221](https://github.com/stancld/rossum-agents/pull/221)
+
 ### Changed
+- `update_queue` parameter `queue_data` is now a typed `QueueUpdateData` schema instead of an untyped dict — LLMs see valid field names and types directly in the JSON schema [#221](https://github.com/stancld/rossum-agents/pull/221)
+- `update_engine` parameter `engine_data` is now a typed `EngineUpdateData` schema instead of an untyped dict [#221](https://github.com/stancld/rossum-agents/pull/221)
+- `create_engine_field` parameter `multiline` changed from `str` to `bool` [#221](https://github.com/stancld/rossum-agents/pull/221)
+- **Breaking**: `create_hook` now maps `config.source` to `config.code` (previously mapped to `config.function`) to match the current API field name [#221](https://github.com/stancld/rossum-agents/pull/221)
 - Removed generic `"template"` keyword from `email_templates` category to reduce false-positive tool pre-loads (e.g., queue template queries no longer trigger email template tools)
 
 ### Removed
+- **Breaking**: Replaced 25+ individual read tools with the unified `get` and `search` tools. Removed standalone tools: `get_annotation`, `list_annotations`, `get_queue`, `list_queues`, `get_queue_schema`, `get_queue_engine`, `get_schema`, `list_schemas`, `get_hook`, `list_hooks`, `list_hook_logs`, `list_hook_templates`, `get_engine`, `list_engines`, `get_email_template`, `list_email_templates`, `get_user`, `list_users`, `list_user_roles`, `get_organization_group`, `list_organization_groups`, `get_rule`, `list_rules`, `get_workspace`, `list_workspaces`, `get_relation`, `list_relations`, `get_document_relation`, `list_document_relations`, `get_organization_limit` [#221](https://github.com/stancld/rossum-agents/pull/221)
 - Removed dead validation code (`_validate_node`, `_validate_id`, `_validate_datapoint`, `_validate_tuple`, `_validate_multivalue`, `_validate_section`, `SchemaValidationError`) superseded by the sanitization approach in `sanitize_schema_content`
 
 ## [1.4.1] - 2026-02-26

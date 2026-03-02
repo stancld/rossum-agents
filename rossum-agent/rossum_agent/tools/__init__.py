@@ -34,7 +34,6 @@ from rossum_agent.tools.dynamic_tools import (
     load_tool_category,
 )
 from rossum_agent.tools.file_tools import write_file
-from rossum_agent.tools.knowledge_base_search import kb_get_article, kb_grep
 from rossum_agent.tools.mock_pdf import generate_mock_pdf
 from rossum_agent.tools.skills import load_skill
 from rossum_agent.tools.spawn_mcp import call_on_connection, close_connection, spawn_mcp_connection
@@ -51,20 +50,24 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     search_knowledge_base,
     search_elis_docs,
     patch_schema_with_subagent,
-    suggest_formula_field,
-    suggest_lookup_field,
-    evaluate_lookup_field,
-    get_lookup_dataset_raw_values,
-    query_lookup_dataset,
     load_skill,
     create_task,
     update_task,
     list_tasks,
     run_jq,
     run_grep,
-    kb_grep,
-    kb_get_article,
     generate_mock_pdf,
+]
+
+_FORMULA_TOOLS: list[BetaTool[..., str]] = [
+    suggest_formula_field,
+]
+
+_LOOKUP_TOOLS: list[BetaTool[..., str]] = [
+    suggest_lookup_field,
+    evaluate_lookup_field,
+    get_lookup_dataset_raw_values,
+    query_lookup_dataset,
 ]
 
 _CHANGE_HISTORY_TOOLS: list[BetaTool[..., str]] = [
@@ -87,13 +90,25 @@ _DEPLOYMENT_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
 ]
 
 _INTERNAL_TOOL_REGISTRY: dict[str, BetaTool[..., str]] = {
-    t.name: t for t in (_ALWAYS_INTERNAL_TOOLS + _CHANGE_HISTORY_TOOLS + _RULES_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS)
+    t.name: t
+    for t in (
+        _ALWAYS_INTERNAL_TOOLS
+        + _FORMULA_TOOLS
+        + _LOOKUP_TOOLS
+        + _CHANGE_HISTORY_TOOLS
+        + _RULES_TOOLS
+        + _DEPLOYMENT_INTERNAL_TOOLS
+    )
 }
 
 
 def _get_active_internal_tools() -> list[BetaTool[..., str]]:
     """Get internal tools based on loaded skills."""
     tools = _ALWAYS_INTERNAL_TOOLS
+    if is_skill_loaded("formula-fields"):
+        tools = tools + _FORMULA_TOOLS
+    if is_skill_loaded("lookup-fields"):
+        tools = tools + _LOOKUP_TOOLS
     if get_context().commit_store is not None:
         tools = tools + _CHANGE_HISTORY_TOOLS
     if is_skill_loaded("rules-and-actions"):
@@ -153,7 +168,14 @@ def execute_tool(name: str, arguments: dict[str, object], tools: list[BetaTool[.
     raise ValueError(f"Unknown tool: {name}")
 
 
-INTERNAL_TOOLS = _ALWAYS_INTERNAL_TOOLS + _CHANGE_HISTORY_TOOLS + _RULES_TOOLS + _DEPLOYMENT_INTERNAL_TOOLS
+INTERNAL_TOOLS = (
+    _ALWAYS_INTERNAL_TOOLS
+    + _FORMULA_TOOLS
+    + _LOOKUP_TOOLS
+    + _CHANGE_HISTORY_TOOLS
+    + _RULES_TOOLS
+    + _DEPLOYMENT_INTERNAL_TOOLS
+)
 
 __all__ = [
     "INTERNAL_TOOLS",

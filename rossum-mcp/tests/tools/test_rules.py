@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from rossum_api.models.rule import Rule, RuleAction, ShowMessagePayload
 from rossum_mcp.tools import base
-from rossum_mcp.tools.rules import _actions_to_dicts
+from rossum_mcp.tools.rules import _actions_to_dicts, _get_rule, _list_rules
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -69,17 +69,12 @@ class TestGetRule:
     """Tests for get_rule tool."""
 
     @pytest.mark.asyncio
-    async def test_get_rule_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_rule_success(self, mock_client: AsyncMock) -> None:
         """Test successful rule retrieval."""
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
         mock_rule = create_mock_rule(id=123, name="Validation Rule", enabled=True)
         mock_client.retrieve_rule.return_value = mock_rule
 
-        get_rule = mock_mcp._tools["get_rule"]
-        result = await get_rule(rule_id=123)
+        result = await _get_rule(mock_client, rule_id=123)
 
         assert result.id == 123
         assert result.name == "Validation Rule"
@@ -92,12 +87,8 @@ class TestListRules:
     """Tests for list_rules tool."""
 
     @pytest.mark.asyncio
-    async def test_list_rules_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_rules_success(self, mock_client: AsyncMock) -> None:
         """Test successful rules listing."""
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
         mock_rule1 = create_mock_rule(id=1, name="Rule 1")
         mock_rule2 = create_mock_rule(id=2, name="Rule 2")
 
@@ -107,18 +98,13 @@ class TestListRules:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_rules = mock_mcp._tools["list_rules"]
-        result = await list_rules()
+        result = await _list_rules(mock_client)
 
         assert len(result) == 2
 
     @pytest.mark.asyncio
-    async def test_list_rules_with_schema_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_rules_with_schema_filter(self, mock_client: AsyncMock) -> None:
         """Test rules listing filtered by schema."""
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
         mock_rule = create_mock_rule(id=1, name="Schema Rule")
         received_filters: dict = {}
 
@@ -129,19 +115,14 @@ class TestListRules:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_rules = mock_mcp._tools["list_rules"]
-        result = await list_rules(schema_id=50)
+        result = await _list_rules(mock_client, schema_id=50)
 
         assert len(result) == 1
         assert received_filters["schema"] == 50
 
     @pytest.mark.asyncio
-    async def test_list_rules_with_organization_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_rules_with_organization_filter(self, mock_client: AsyncMock) -> None:
         """Test rules listing filtered by organization."""
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
         mock_rule = create_mock_rule(id=1, name="Org Rule")
         received_filters: dict = {}
 
@@ -152,19 +133,14 @@ class TestListRules:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_rules = mock_mcp._tools["list_rules"]
-        result = await list_rules(organization_id=100)
+        result = await _list_rules(mock_client, organization_id=100)
 
         assert len(result) == 1
         assert received_filters["organization"] == 100
 
     @pytest.mark.asyncio
-    async def test_list_rules_with_enabled_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_rules_with_enabled_filter(self, mock_client: AsyncMock) -> None:
         """Test rules listing filtered by enabled status."""
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
         mock_rule = create_mock_rule(id=1, enabled=True)
         received_filters: dict = {}
 
@@ -175,18 +151,14 @@ class TestListRules:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_rules = mock_mcp._tools["list_rules"]
-        result = await list_rules(enabled=True)
+        result = await _list_rules(mock_client, enabled=True)
 
         assert len(result) == 1
         assert received_filters["enabled"] is True
 
     @pytest.mark.asyncio
-    async def test_list_rules_empty(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_rules_empty(self, mock_client: AsyncMock) -> None:
         """Test rules listing when none exist."""
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
 
         async def mock_fetch_all(resource, **filters):
             return
@@ -194,19 +166,14 @@ class TestListRules:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_rules = mock_mcp._tools["list_rules"]
-        result = await list_rules()
+        result = await _list_rules(mock_client)
 
         assert len(result) == 0
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_list_rules_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_rules_skips_broken_items(self, mock_client: AsyncMock) -> None:
         """Test list_rules gracefully skips items that fail deserialization."""
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
         good_rule = create_mock_rule(id=1, name="Good Rule")
 
         def mock_deserializer(resource, raw):
@@ -223,8 +190,7 @@ class TestListRules:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_rules = mock_mcp._tools["list_rules"]
-        result = await list_rules()
+        result = await _list_rules(mock_client)
 
         assert len(result) == 2
 

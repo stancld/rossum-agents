@@ -35,7 +35,8 @@ class ToolExpectation:
 
     Attributes:
         expected_tools: List of tool names expected to be called.
-            For OR conditions, use tuple: ("get_schema", "get_queue_schema") means either is valid.
+            For OR conditions, use tuple: ("get:schema", "get_schema_tree_structure") means either is valid.
+            Read-layer tools use synthesized names: "get:queue", "search:hook", etc.
         mode: How to match tool calls (see ToolMatchMode enum).
         forbidden_tools: List of tool names that must NOT be called.
     """

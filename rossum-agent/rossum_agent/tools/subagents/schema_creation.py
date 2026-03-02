@@ -90,7 +90,7 @@ Optional: rir_field_names (e.g., ["line_items"]), min_occurrences, max_occurrenc
 ## Constraints
 
 - Field `id` must be valid identifier (lowercase, underscores, no spaces)
-- Do NOT set `rir_field_names` unless user explicitly provides engine field names
+- Do NOT set `rir_field_names` unless user explicitly provides engine field names — the API rejects schemas when `rir_field_names` contains values unknown to the engine ("Engine restriction: extracted field '...' is not present among names of engine fields")
 - `ui_configuration.type`: captured, data, manual, formula, reasoning
 - `ui_configuration.edit`: enabled, enabled_without_warning, disabled
 

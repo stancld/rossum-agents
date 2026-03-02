@@ -164,10 +164,136 @@ Available commands can be discovered via ``GET /api/v1/commands``.
 Available Tools
 ---------------
 
+Read Layer
+^^^^^^^^^^
+
+The read layer provides two unified tools — ``get`` and ``search`` — that replace all
+previous per-entity get/list tools.
+
+get
+"""
+
+Unified tool to fetch any entity by ID (single or batch).
+
+**Parameters:**
+
+- ``entity`` (string, required): Entity type. One of: ``queue``, ``schema``, ``hook``,
+  ``engine``, ``rule``, ``user``, ``workspace``, ``email_template``,
+  ``organization_group``, ``organization_limit``, ``annotation``, ``relation``,
+  ``document_relation``
+- ``entity_id`` (integer or list of integers, required): ID or list of IDs to fetch
+- ``include_related`` (boolean, optional, default false): Enriches the result with related
+  data. ``queue`` adds ``schema_tree``, ``engine``, ``hooks``, ``hooks_count``;
+  ``schema`` adds ``queues``, ``rules``; ``hook`` adds ``queues``, ``events``
+
+**Returns:**
+
+Single entity:
+
+.. code-block:: json
+
+   {"entity": "queue", "id": 12345, "data": {"id": 12345, "name": "Invoices"}}
+
+Batch: list of the above.
+
+**Example usage:**
+
+.. code-block:: python
+
+   # Get a single queue
+   get(entity="queue", entity_id=12345)
+
+   # Get queue with related schema, engine, and hooks
+   get(entity="queue", entity_id=12345, include_related=True)
+
+   # Batch fetch multiple schemas
+   get(entity="schema", entity_id=[100, 200, 300])
+
+   # Get annotation metadata
+   get(entity="annotation", entity_id=67890)
+
+search
+""""""
+
+Unified tool to list/filter entities with typed, entity-specific query objects.
+
+**Parameters:**
+
+- ``query`` (object, required): A discriminated query object with ``entity`` as the
+  discriminator. Each entity type exposes only its valid filter fields.
+
+**Supported entities and their filters:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Entity
+     - Available filters
+   * - ``queue``
+     - ``id``, ``workspace_id``, ``name``, ``use_regex``
+   * - ``schema``
+     - ``name``, ``queue_id``, ``use_regex``
+   * - ``hook``
+     - ``queue_id``, ``active``, ``first_n``
+   * - ``engine``
+     - ``id``, ``engine_type``, ``agenda_id``
+   * - ``rule``
+     - ``schema_id``, ``organization_id``, ``enabled``
+   * - ``user``
+     - ``username``, ``email``, ``first_name``, ``last_name``, ``is_active``, ``is_organization_group_admin``
+   * - ``workspace``
+     - ``organization_id``, ``name``, ``use_regex``
+   * - ``email_template``
+     - ``queue_id``, ``type``, ``name``, ``first_n``, ``use_regex``
+   * - ``organization_group``
+     - ``name``, ``use_regex``
+   * - ``annotation``
+     - ``queue_id`` (required), ``status``, ``ordering``, ``first_n``
+   * - ``relation``
+     - ``id``, ``type``, ``parent``, ``key``, ``annotation``
+   * - ``document_relation``
+     - ``id``, ``type``, ``annotation``, ``key``, ``documents``
+   * - ``hook_log``
+     - ``hook_id``, ``queue_id``, ``annotation_id``, ``email_id``, ``log_level``, ``status``,
+       ``status_code``, ``request_id``, ``timestamp_before``, ``timestamp_after``, ``start_before``,
+       ``start_after``, ``end_before``, ``end_after``, ``search``, ``page_size``
+   * - ``hook_template``
+     - *(no filters)*
+   * - ``user_role``
+     - *(no filters)*
+
+**Returns:** List of entity objects.
+
+**Example usage:**
+
+.. code-block:: python
+
+   # List all queues in a workspace
+   search(query={"entity": "queue", "workspace_id": 11111})
+
+   # List active hooks for a queue
+   search(query={"entity": "hook", "queue_id": 12345, "active": True})
+
+   # List recent annotations
+   search(query={"entity": "annotation", "queue_id": 12345, "ordering": ["-created_at"], "first_n": 1})
+
+   # List error hook logs for a hook
+   search(query={"entity": "hook_log", "hook_id": 12345, "log_level": "ERROR"})
+
+   # List all hook templates (Rossum Store)
+   search(query={"entity": "hook_template"})
+
+   # Find user by email for token_owner
+   search(query={"entity": "user", "email": "john.doe@example.com", "is_organization_group_admin": False})
+
+   # List enabled rules for a schema
+   search(query={"entity": "rule", "schema_id": 200, "enabled": True})
+
 upload_document
 ^^^^^^^^^^^^^^^
 
-Uploads a document to Rossum for processing. Returns a task ID. Use ``list_annotations``
+Uploads a document to Rossum for processing. Returns a task ID. Use ``search(query={"entity": "annotation", "queue_id": <id>})``
 to get the annotation ID.
 
 **Parameters:**
@@ -183,157 +309,7 @@ to get the annotation ID.
      "task_id": "12345",
      "task_status": "created",
      "queue_id": 12345,
-     "message": "Document upload initiated. Use `list_annotations` to find the annotation ID for this queue."
-   }
-
-get_annotation
-^^^^^^^^^^^^^^
-
-Retrieves annotation data for a previously uploaded document. Use this to check the
-status of a document.
-
-**Parameters:**
-
-- ``annotation_id`` (integer, required): The annotation ID obtained from list_annotations
-- ``sideloads`` (array, optional): List of sideloads to include. Use ``['content']`` to
-  fetch annotation content with datapoints
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": "12345",
-     "status": "to_review",
-     "url": "https://elis.rossum.ai/api/v1/annotations/12345",
-     "schema": "67890",
-     "modifier": "11111",
-     "document": "22222",
-     "content": ["..."],
-     "created_at": "2024-01-01T00:00:00Z",
-     "modified_at": "2024-01-01T00:00:00Z"
-   }
-
-list_annotations
-^^^^^^^^^^^^^^^^
-
-Lists all annotations for a queue with optional filtering. Useful for checking the
-status of multiple uploaded documents.
-
-**Parameters:**
-
-- ``queue_id`` (integer, required): Rossum queue ID to list annotations from
-- ``status`` (string, optional): Filter by annotation status
-  (default: 'importing,to_review,confirmed,exported')
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "count": 42,
-     "results": [
-       {
-         "id": "12345",
-         "status": "to_review",
-         "url": "https://elis.rossum.ai/api/v1/annotations/12345",
-         "document": "67890",
-         "created_at": "2024-01-01T00:00:00Z",
-         "modified_at": "2024-01-01T00:00:00Z"
-       }
-     ]
-   }
-
-get_queue
-^^^^^^^^^
-
-Retrieves queue details including the schema_id. Use this to get the schema_id for
-use with get_schema.
-
-**Parameters:**
-
-- ``queue_id`` (integer, required): Rossum queue ID to retrieve
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": "12345",
-     "name": "Invoices",
-     "url": "https://elis.rossum.ai/api/v1/queues/12345",
-     "schema_id": "67890",
-     "workspace": "11111",
-     "inbox": "22222",
-     "created_at": "2024-01-01T00:00:00Z",
-     "modified_at": "2024-01-01T00:00:00Z"
-   }
-
-get_schema
-^^^^^^^^^^
-
-Retrieves schema details including the schema content/structure. Use get_queue first
-to obtain the schema_id.
-
-**Parameters:**
-
-- ``schema_id`` (integer, required): Rossum schema ID to retrieve
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": "67890",
-     "name": "Invoice Schema",
-     "url": "https://elis.rossum.ai/api/v1/schemas/67890",
-     "content": ["..."]
-   }
-
-get_queue_schema
-^^^^^^^^^^^^^^^^
-
-Retrieves the complete schema for a queue in a single call. This is the recommended
-way to get a queue's schema.
-
-**Parameters:**
-
-- ``queue_id`` (integer, required): Rossum queue ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "queue_id": "12345",
-     "queue_name": "Invoices",
-     "schema_id": "67890",
-     "schema_name": "Invoice Schema",
-     "schema_url": "https://elis.rossum.ai/api/v1/schemas/67890",
-     "schema_content": ["..."]
-   }
-
-get_queue_engine
-^^^^^^^^^^^^^^^^
-
-Retrieves the complete engine information for a given queue in a single call. Returns
-engine type (dedicated, generic, or standard) and details.
-
-**Parameters:**
-
-- ``queue_id`` (integer, required): Rossum queue ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "queue_id": "12345",
-     "queue_name": "Invoices",
-     "engine_id": 67890,
-     "engine_name": "My Engine",
-     "engine_url": "https://elis.rossum.ai/api/v1/engines/67890",
-     "engine_type": "dedicated"
+     "message": "Document upload initiated. Use `search` with entity=\"annotation\" to find the annotation ID for this queue."
    }
 
 get_queue_template_names
@@ -498,7 +474,8 @@ Field-level thresholds override the queue's default_score_threshold.
 
 **Workflow:**
 
-1. First get the schema using ``get_queue_schema``
+1. First get the schema using ``get(entity="queue", entity_id=queue_id, include_related=True)``
+   or ``get(entity="schema", entity_id=schema_id)``
 2. Modify the ``content`` array by adding/updating ``score_threshold`` properties on specific fields
 3. Call this tool with the modified content
 
@@ -704,80 +681,6 @@ Deletes a schema. Schemas can only be deleted if they are not currently assigned
    }
 
 **Note:** This operation is only available in read-write mode.
-
-get_engine
-^^^^^^^^^^
-
-Retrieves a single engine by ID.
-
-**Parameters:**
-
-- ``engine_id`` (integer, required): The engine ID to retrieve
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "My Engine",
-     "url": "https://elis.rossum.ai/api/v1/engines/12345",
-     "type": "extractor",
-     "learning_enabled": true,
-     "training_queues": ["https://elis.rossum.ai/api/v1/queues/100"],
-     "description": "Engine description",
-     "agenda_id": "abc123",
-     "organization": "https://elis.rossum.ai/api/v1/organizations/123"
-   }
-
-list_engines
-^^^^^^^^^^^^
-
-Lists all engines with optional filtering.
-
-**Parameters:**
-
-- ``id`` (integer, optional): Filter by engine ID
-- ``engine_type`` (string, optional): Filter by engine type ('extractor' or 'splitter')
-- ``agenda_id`` (string, optional): Filter by agenda ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "count": 2,
-     "results": [
-       {
-         "id": 12345,
-         "name": "My Engine",
-         "url": "https://elis.rossum.ai/api/v1/engines/12345",
-         "type": "extractor",
-         "learning_enabled": true,
-         "training_queues": ["https://elis.rossum.ai/api/v1/queues/100"],
-         "description": "Engine description",
-         "agenda_id": "abc123",
-         "organization": "https://elis.rossum.ai/api/v1/organizations/123"
-       }
-     ],
-     "message": "Retrieved 2 engine(s)"
-   }
-
-**Example:**
-
-.. code-block:: python
-
-   # List all engines
-   all_engines = list_engines()
-
-   # List specific engine by ID
-   engine = list_engines(id=12345)
-
-   # List extractors only
-   extractors = list_engines(engine_type="extractor")
-
-   # List engines by agenda
-   agenda_engines = list_engines(agenda_id="abc123")
 
 create_engine
 ^^^^^^^^^^^^^
@@ -1020,90 +923,6 @@ permanently removed but marked as deleted.
 
 **Note:** This operation is only available in read-write mode.
 
-get_hook
-^^^^^^^^
-
-Retrieves details of a specific hook/extension by its ID.
-
-**Parameters:**
-
-- ``hook_id`` (integer, required): Hook ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "Validation Hook",
-     "url": "https://elis.rossum.ai/api/v1/hooks/12345",
-     "type": "webhook",
-     "active": true,
-     "queues": ["https://elis.rossum.ai/api/v1/queues/100"],
-     "events": ["annotation_status", "annotation_content"],
-     "config": {
-       "url": "https://example.com/webhook",
-       "secret": "***"
-     },
-     "settings": {},
-     "extension_source": "rossum_store"
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # Get hook details
-   hook = get_hook(hook_id=12345)
-
-list_hooks
-^^^^^^^^^^
-
-Lists all hooks/extensions configured in your organization. Hooks (also called extensions)
-are webhooks or serverless functions that respond to Rossum events.
-
-**Parameters:**
-
-- ``queue_id`` (integer, optional): Filter hooks by queue ID
-- ``active`` (boolean, optional): Filter by active status (true for active hooks, false for inactive)
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "count": 2,
-     "results": [
-       {
-         "id": 12345,
-         "name": "Validation Hook",
-         "url": "https://elis.rossum.ai/api/v1/hooks/12345",
-         "type": "webhook",
-         "active": true,
-         "queues": ["https://elis.rossum.ai/api/v1/queues/100"],
-         "events": ["annotation_status", "annotation_content"],
-         "config": {
-           "url": "https://example.com/webhook",
-           "secret": "***"
-         },
-         "extension_source": "rossum_store"
-       }
-     ]
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # List all hooks
-   all_hooks = list_hooks()
-
-   # List hooks for a specific queue
-   queue_hooks = list_hooks(queue_id=12345)
-
-   # List only active hooks
-   active_hooks = list_hooks(active=True)
-
 create_hook
 ^^^^^^^^^^^
 
@@ -1193,61 +1012,20 @@ settings, or active status. Only provide the fields you want to change - other f
    # Change hook events
    update_hook(hook_id=12345, events=["annotation_content.confirm"])
 
-list_hook_templates
-^^^^^^^^^^^^^^^^^^^
-
-Lists available hook templates from Rossum Store. Hook templates provide pre-built extension
-configurations (e.g., data validation, field mapping, notifications) that can be used to
-quickly create hooks instead of writing code from scratch.
-
-**Parameters:**
-
-None
-
-**Returns:**
-
-.. code-block:: json
-
-   [
-     {
-       "id": 5,
-       "url": "https://elis.rossum.ai/api/v1/hook_templates/5",
-       "name": "Document Splitting",
-       "description": "Automatically split multi-page documents into separate annotations",
-       "type": "function",
-       "events": ["annotation_content.initialize"],
-       "config": {"runtime": "python3.12", "function": "..."},
-       "settings_schema": {"type": "object", "properties": {}},
-       "guide": "https://knowledge-base.rossum.ai/docs/..."
-     }
-   ]
-
-**Example usage:**
-
-.. code-block:: python
-
-   # List all available hook templates
-   templates = list_hook_templates()
-
-   # Find a template by name
-   for template in templates:
-       if "splitting" in template.name.lower():
-           print(f"Found: {template.name} (ID: {template.id})")
-
 create_hook_from_template
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Creates a hook from a Rossum Store template. Use ``list_hook_templates`` first to find
-available templates and their IDs. This is the recommended way to create hooks as it
+Creates a hook from a Rossum Store template. Use ``search(query={"entity": "hook_template"})``
+first to find available templates and their IDs. This is the recommended way to create hooks as it
 uses battle-tested configurations from the Rossum Store.
 
 **Parameters:**
 
 - ``name`` (string, required): Name for the new hook
-- ``hook_template_id`` (integer, required): ID of the hook template to use (from ``list_hook_templates``)
+- ``hook_template_id`` (integer, required): ID of the hook template to use (from ``search(query={"entity": "hook_template"})``)
 - ``queues`` (array, required): List of queue URLs to attach the hook to
 - ``events`` (array, optional): List of events to trigger the hook (overrides template defaults if provided)
-- ``token_owner`` (string, optional but required for some templates): User URL to use as token owner when the template has ``use_token_owner=True``. Obtain this via ``list_users``.
+- ``token_owner`` (string, optional but required for some templates): User URL to use as token owner when the template has ``use_token_owner=True``. Obtain this via ``search(query={"entity": "user", ...})``.
 
 **Returns:**
 
@@ -1277,75 +1055,6 @@ uses battle-tested configurations from the Rossum Store.
        token_owner="https://api.elis.rossum.ai/v1/users/12345"
    )
 
-list_hook_logs
-^^^^^^^^^^^^^^
-
-Lists hook execution logs for debugging, monitoring performance, and troubleshooting errors.
-Logs are retained for 7 days and at most 100 logs are returned per call.
-
-**Parameters:**
-
-- ``hook_id`` (integer, optional): Filter by hook ID
-- ``queue_id`` (integer, optional): Filter by queue ID
-- ``annotation_id`` (integer, optional): Filter by annotation ID
-- ``email_id`` (integer, optional): Filter by email ID
-- ``log_level`` (string, optional): Filter by log level - 'INFO', 'ERROR', or 'WARNING'
-- ``status`` (string, optional): Filter by execution status
-- ``status_code`` (integer, optional): Filter by HTTP status code
-- ``request_id`` (string, optional): Filter by request ID
-- ``timestamp_before`` (string, optional): ISO 8601 timestamp, filter logs triggered before this time
-- ``timestamp_after`` (string, optional): ISO 8601 timestamp, filter logs triggered after this time
-- ``start_before`` (string, optional): ISO 8601 timestamp, filter logs started before this time
-- ``start_after`` (string, optional): ISO 8601 timestamp, filter logs started after this time
-- ``end_before`` (string, optional): ISO 8601 timestamp, filter logs ended before this time
-- ``end_after`` (string, optional): ISO 8601 timestamp, filter logs ended after this time
-- ``search`` (string, optional): Full-text search across log messages
-- ``page_size`` (integer, optional): Number of results per page (default 100, max 100)
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "count": 2,
-     "results": [
-       {
-         "log_level": "INFO",
-         "action": "initialize",
-         "event": "annotation_content",
-         "request_id": "abc123",
-         "organization_id": 100,
-         "hook_id": 12345,
-         "hook_type": "function",
-         "queue_id": 200,
-         "annotation_id": 300,
-         "message": "Hook executed successfully",
-         "start": "2024-01-01T00:00:00Z",
-         "end": "2024-01-01T00:00:01Z",
-         "status": "success",
-         "status_code": 200,
-         "timestamp": "2024-01-01T00:00:00Z",
-         "uuid": "uuid-here"
-       }
-     ]
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # List all logs for a specific hook
-   logs = list_hook_logs(hook_id=12345)
-
-   # List error logs only
-   error_logs = list_hook_logs(log_level="ERROR")
-
-   # List logs for a specific annotation
-   annotation_logs = list_hook_logs(annotation_id=300)
-
-   # Search logs by message content
-   search_logs = list_hook_logs(search="validation failed")
-
 delete_hook
 ^^^^^^^^^^^
 
@@ -1364,116 +1073,6 @@ Deletes a hook/extension.
    }
 
 **Note:** This operation is only available in read-write mode.
-
-get_rule
-^^^^^^^^
-
-Retrieves details of a specific business rule by its ID.
-
-**Parameters:**
-
-- ``rule_id`` (integer, required): Rule ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "Auto-calculate Total",
-     "url": "https://elis.rossum.ai/api/v1/rules/12345",
-     "enabled": true,
-     "organization": "https://elis.rossum.ai/api/v1/organizations/100",
-     "schema": "https://elis.rossum.ai/api/v1/schemas/200",
-     "trigger_condition": "field.amount_total.changed",
-     "created_by": "https://elis.rossum.ai/api/v1/users/300",
-     "created_at": "2024-01-01T00:00:00Z",
-     "modified_by": "https://elis.rossum.ai/api/v1/users/300",
-     "modified_at": "2024-01-01T00:00:00Z",
-     "rule_template": null,
-     "synchronized_from_template": false,
-     "actions": [
-       {
-         "id": 54321,
-         "type": "set_datapoint_value",
-         "payload": {
-           "datapoint_id": "tax_amount",
-           "value": "field.amount_total.value * 0.2"
-         },
-         "event": "trigger",
-         "enabled": true
-       }
-     ]
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # Get rule details
-   rule = get_rule(rule_id=12345)
-
-list_rules
-^^^^^^^^^^
-
-Lists all business rules configured in your organization. Rules define custom business
-logic with trigger conditions (TxScript formulas) and actions that execute when conditions are met.
-
-**Parameters:**
-
-- ``schema_id`` (integer, optional): Filter rules by schema ID
-- ``organization_id`` (integer, optional): Filter rules by organization ID
-- ``enabled`` (boolean, optional): Filter by enabled status (true for enabled rules, false for disabled)
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "count": 2,
-     "results": [
-       {
-         "id": 12345,
-         "name": "Auto-calculate Total",
-         "url": "https://elis.rossum.ai/api/v1/rules/12345",
-         "enabled": true,
-         "organization": "https://elis.rossum.ai/api/v1/organizations/100",
-         "schema": "https://elis.rossum.ai/api/v1/schemas/200",
-         "trigger_condition": "field.amount_total.changed",
-         "created_by": "https://elis.rossum.ai/api/v1/users/300",
-         "created_at": "2024-01-01T00:00:00Z",
-         "modified_by": "https://elis.rossum.ai/api/v1/users/300",
-         "modified_at": "2024-01-01T00:00:00Z",
-         "rule_template": null,
-         "synchronized_from_template": false,
-         "actions": [
-           {
-             "id": 54321,
-             "type": "set_datapoint_value",
-             "payload": {
-               "datapoint_id": "tax_amount",
-               "value": "field.amount_total.value * 0.2"
-             },
-             "event": "trigger",
-             "enabled": true
-           }
-         ]
-       }
-     ]
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # List all rules
-   all_rules = list_rules()
-
-   # List rules for a specific schema
-   schema_rules = list_rules(schema_id=12345)
-
-   # List only enabled rules
-   enabled_rules = list_rules(enabled=True)
 
 create_rule
 ^^^^^^^^^^^
@@ -1622,54 +1221,6 @@ Deletes a business rule.
 Workspace Management
 --------------------
 
-get_workspace
-^^^^^^^^^^^^^
-
-Retrieves details of a specific workspace by its ID.
-
-**Parameters:**
-
-- ``workspace_id`` (integer, required): Workspace ID to retrieve
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "My Workspace",
-     "url": "https://elis.rossum.ai/api/v1/workspaces/12345",
-     "organization": "https://elis.rossum.ai/api/v1/organizations/100",
-     "queues": ["https://elis.rossum.ai/api/v1/queues/200"]
-   }
-
-list_workspaces
-^^^^^^^^^^^^^^^
-
-Lists all workspaces with optional filtering.
-
-**Parameters:**
-
-- ``organization_id`` (integer, optional): Filter by organization ID
-- ``name`` (string, optional): Filter by workspace name
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "count": 2,
-     "results": [
-       {
-         "id": 12345,
-         "name": "Production Workspace",
-         "url": "https://elis.rossum.ai/api/v1/workspaces/12345",
-         "organization": "https://elis.rossum.ai/api/v1/organizations/100",
-         "queues": ["https://elis.rossum.ai/api/v1/queues/200"]
-       }
-     ]
-   }
-
 create_workspace
 ^^^^^^^^^^^^^^^^
 
@@ -1714,472 +1265,22 @@ Deletes a workspace. The workspace must be empty (no queues) before deletion.
 User Management
 ---------------
 
-get_user
-^^^^^^^^
+create_user
+^^^^^^^^^^^
 
-Retrieves a single user by ID. Use ``list_users`` first to find users by username or email.
+Creates a new user in the organization.
 
-**Parameters:**
+**Parameters:** See API documentation for full parameter list.
 
-- ``user_id`` (integer, required): The user ID to retrieve
+update_user
+^^^^^^^^^^^
 
-**Returns:**
+Updates an existing user's properties.
 
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "url": "https://elis.rossum.ai/api/v1/users/12345",
-     "username": "john.doe@example.com",
-     "first_name": "John",
-     "last_name": "Doe",
-     "email": "john.doe@example.com",
-     "organization": "https://elis.rossum.ai/api/v1/organizations/100",
-     "is_active": true,
-     "date_joined": "2024-01-01T00:00:00Z",
-     "last_login": "2024-01-15T10:30:00Z"
-   }
-
-list_users
-^^^^^^^^^^
-
-Lists users in the organization. Use this to find a user's URL when you need it for
-``token_owner`` in ``create_hook_from_template``.
-
-**Parameters:**
-
-- ``username`` (string, optional): Filter by exact username
-- ``email`` (string, optional): Filter by email address
-- ``first_name`` (string, optional): Filter by first name
-- ``last_name`` (string, optional): Filter by last name
-- ``is_active`` (boolean, optional): Filter by active status
-
-**Returns:**
-
-.. code-block:: json
-
-   [
-     {
-       "id": 12345,
-       "url": "https://elis.rossum.ai/api/v1/users/12345",
-       "username": "john.doe@example.com",
-       "first_name": "John",
-       "last_name": "Doe",
-       "email": "john.doe@example.com",
-       "organization": "https://elis.rossum.ai/api/v1/organizations/100",
-       "is_active": true
-     }
-   ]
-
-**Example usage:**
-
-.. code-block:: python
-
-   # Find user by username to get their URL for token_owner
-   users = list_users(username="john.doe@example.com")
-   if users:
-       user_url = users[0].url
-       # Use user_url in create_hook_from_template
-
-list_user_roles
-^^^^^^^^^^^^^^^
-
-Lists all user roles (groups of permissions) in the organization.
-
-**Parameters:**
-
-None
-
-**Returns:**
-
-.. code-block:: json
-
-   [
-     {
-       "id": 12345,
-       "name": "Organization group admin",
-       "url": "https://elis.rossum.ai/api/v1/groups/12345"
-     },
-     {
-       "id": 12346,
-       "name": "Admin",
-       "url": "https://elis.rossum.ai/api/v1/groups/12346"
-     }
-   ]
-
-**Example usage:**
-
-.. code-block:: python
-
-   # List all available roles
-   roles = list_user_roles()
-   for role in roles:
-       print(f"{role.name} (ID: {role.id})")
-
-Organization Groups
--------------------
-
-get_organization_group
-^^^^^^^^^^^^^^^^^^^^^^
-
-Retrieves organization group (license) details by ID.
-
-**Parameters:**
-
-- ``organization_group_id`` (integer, required): Organization group ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 1,
-     "name": "Production Group",
-     "is_trial": false,
-     "is_production": true,
-     "deployment_location": "eu"
-   }
-
-list_organization_groups
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-Lists organization groups with optional name filter.
-
-**Parameters:**
-
-- ``name`` (string, optional): Filter by name
-
-**Returns:**
-
-.. code-block:: json
-
-   [
-     {
-       "id": 1,
-       "name": "Production Group",
-       "is_trial": false,
-       "is_production": true,
-       "deployment_location": "eu"
-     }
-   ]
-
-Organization Limits
--------------------
-
-get_organization_limit
-^^^^^^^^^^^^^^^^^^^^^^
-
-Retrieves email sending limits and usage counters for an organization.
-
-**Parameters:**
-
-- ``organization_id`` (integer, required): Organization ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "email_limits": {
-       "count_today": 5,
-       "count_today_notification": 2,
-       "count_total": 100,
-       "email_per_day_limit": 50,
-       "email_per_day_limit_notification": 20,
-       "email_total_limit": 10000,
-       "last_sent_at": "2026-02-09T10:00:00Z",
-       "last_sent_at_notification": "2026-02-09T09:00:00Z"
-     }
-   }
-
-Relations Management
---------------------
-
-get_relation
-^^^^^^^^^^^^
-
-Retrieves details of a specific relation by its ID. Relations introduce common relations between annotations.
-
-**Parameters:**
-
-- ``relation_id`` (integer, required): Relation ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "type": "duplicate",
-     "key": "abc123def456",
-     "parent": "https://elis.rossum.ai/api/v1/annotations/100",
-     "annotations": [
-       "https://elis.rossum.ai/api/v1/annotations/100",
-       "https://elis.rossum.ai/api/v1/annotations/101"
-     ],
-     "url": "https://elis.rossum.ai/api/v1/relations/12345"
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # Get relation details
-   relation = get_relation(relation_id=12345)
-
-list_relations
-^^^^^^^^^^^^^^
-
-Lists all relations between annotations with optional filters. Relations introduce common relations between annotations:
-
-- **edit**: Created after editing annotation in user interface (rotation or split of the document)
-- **attachment**: One or more documents are attachments to another document
-- **duplicate**: Created after importing the same document that already exists in Rossum
-
-**Parameters:**
-
-- ``id`` (integer, optional): Filter by relation ID
-- ``type`` (string, optional): Filter by relation type ('edit', 'attachment', 'duplicate')
-- ``parent`` (integer, optional): Filter by parent annotation ID
-- ``key`` (string, optional): Filter by relation key
-- ``annotation`` (integer, optional): Filter by annotation ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "count": 2,
-     "results": [
-       {
-         "id": 12345,
-         "type": "duplicate",
-         "key": "abc123def456",
-         "parent": "https://elis.rossum.ai/api/v1/annotations/100",
-         "annotations": [
-           "https://elis.rossum.ai/api/v1/annotations/100",
-           "https://elis.rossum.ai/api/v1/annotations/101"
-         ],
-         "url": "https://elis.rossum.ai/api/v1/relations/12345"
-       },
-       {
-         "id": 12346,
-         "type": "edit",
-         "key": null,
-         "parent": "https://elis.rossum.ai/api/v1/annotations/200",
-         "annotations": [
-           "https://elis.rossum.ai/api/v1/annotations/201",
-           "https://elis.rossum.ai/api/v1/annotations/202"
-         ],
-         "url": "https://elis.rossum.ai/api/v1/relations/12346"
-       }
-     ]
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # List all relations
-   all_relations = list_relations()
-
-   # List duplicate relations
-   duplicate_relations = list_relations(type="duplicate")
-
-   # List relations for a specific parent annotation
-   parent_relations = list_relations(parent=12345)
-
-   # List relations containing a specific annotation
-   annotation_relations = list_relations(annotation=12345)
-
-get_document_relation
-^^^^^^^^^^^^^^^^^^^^^
-
-Retrieves details of a specific document relation by its ID. Document relations introduce additional relations between annotations and documents.
-
-**Parameters:**
-
-- ``document_relation_id`` (integer, required): Document relation ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "type": "export",
-     "annotation": "https://elis.rossum.ai/api/v1/annotations/100",
-     "key": "exported_file_key",
-     "documents": [
-       "https://elis.rossum.ai/api/v1/documents/200",
-       "https://elis.rossum.ai/api/v1/documents/201"
-     ],
-     "url": "https://elis.rossum.ai/api/v1/document_relations/12345"
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # Get document relation details
-   doc_relation = get_document_relation(document_relation_id=12345)
-
-list_document_relations
-^^^^^^^^^^^^^^^^^^^^^^^
-
-Lists all document relations with optional filters. Document relations introduce additional relations between annotations and documents:
-
-- **export**: Documents generated from exporting an annotation
-- **einvoice**: Electronic invoice documents associated with an annotation
-
-**Parameters:**
-
-- ``id`` (integer, optional): Filter by document relation ID
-- ``type`` (string, optional): Filter by relation type ('export', 'einvoice')
-- ``annotation`` (integer, optional): Filter by annotation ID
-- ``key`` (string, optional): Filter by relation key
-- ``documents`` (integer, optional): Filter by document ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "count": 2,
-     "results": [
-       {
-         "id": 12345,
-         "type": "export",
-         "annotation": "https://elis.rossum.ai/api/v1/annotations/100",
-         "key": "exported_file_key",
-         "documents": [
-           "https://elis.rossum.ai/api/v1/documents/200",
-           "https://elis.rossum.ai/api/v1/documents/201"
-         ],
-         "url": "https://elis.rossum.ai/api/v1/document_relations/12345"
-       },
-       {
-         "id": 12346,
-         "type": "einvoice",
-         "annotation": "https://elis.rossum.ai/api/v1/annotations/102",
-         "key": null,
-         "documents": [
-           "https://elis.rossum.ai/api/v1/documents/300"
-         ],
-         "url": "https://elis.rossum.ai/api/v1/document_relations/12346"
-       }
-     ]
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # List all document relations
-   all_doc_relations = list_document_relations()
-
-   # List export-type document relations
-   export_relations = list_document_relations(type="export")
-
-   # List document relations for a specific annotation
-   annotation_doc_relations = list_document_relations(annotation=100)
-
-   # List document relations containing a specific document
-   document_relations = list_document_relations(documents=200)
+**Parameters:** See API documentation for full parameter list.
 
 Email Template Tools
 ^^^^^^^^^^^^^^^^^^^^
-
-get_email_template
-""""""""""""""""""
-
-Retrieves details of a specific email template by its ID.
-
-**Parameters:**
-
-- ``email_template_id`` (integer, required): Email template ID
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 1500,
-     "name": "Rejection Email",
-     "url": "https://elis.rossum.ai/api/v1/email_templates/1500",
-     "queue": "https://elis.rossum.ai/api/v1/queues/8199",
-     "organization": "https://elis.rossum.ai/api/v1/organizations/1",
-     "subject": "Document Rejected",
-     "message": "<p>Your document has been rejected.</p>",
-     "type": "rejection",
-     "enabled": true,
-     "automate": false,
-     "triggers": [],
-     "to": [{"type": "annotator", "value": ""}],
-     "cc": [],
-     "bcc": []
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # Get email template details
-   template = get_email_template(email_template_id=1500)
-
-list_email_templates
-""""""""""""""""""""
-
-Lists all email templates with optional filters. Email templates define automated or
-manual email responses sent from Rossum queues.
-
-**Parameters:**
-
-- ``queue_id`` (integer, optional): Filter by queue ID
-- ``type`` (string, optional): Filter by template type ('rejection', 'rejection_default',
-  'email_with_no_processable_attachments', 'custom')
-- ``name`` (string, optional): Filter by template name
-- ``first_n`` (integer, optional): Limit results to first N templates
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "count": 2,
-     "results": [
-       {
-         "id": 1500,
-         "name": "Rejection Email",
-         "type": "rejection",
-         "queue": "https://elis.rossum.ai/api/v1/queues/8199",
-         "automate": false
-       },
-       {
-         "id": 1501,
-         "name": "No Attachments Notification",
-         "type": "email_with_no_processable_attachments",
-         "queue": "https://elis.rossum.ai/api/v1/queues/8199",
-         "automate": true
-       }
-     ]
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # List all email templates
-   all_templates = list_email_templates()
-
-   # List email templates for a specific queue
-   queue_templates = list_email_templates(queue_id=8199)
-
-   # List rejection templates
-   rejection_templates = list_email_templates(type="rejection")
-
-   # List first 5 templates
-   first_templates = list_email_templates(first_n=5)
 
 create_email_template
 """""""""""""""""""""

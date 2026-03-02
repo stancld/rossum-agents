@@ -11,7 +11,7 @@ import anyio
 import pytest
 from conftest import create_mock_annotation
 from rossum_mcp.tools import base
-from rossum_mcp.tools.annotations import register_annotation_tools
+from rossum_mcp.tools.annotations import _get_annotation, _list_annotations, register_annotation_tools
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -77,7 +77,7 @@ class TestUploadDocument:
         assert result["task_id"] == 12345
         assert result["task_status"] == "importing"
         assert result["queue_id"] == 100
-        assert "list_annotations" in result["message"]
+        assert "search" in result["message"]
 
     @pytest.mark.asyncio
     async def test_upload_document_file_not_found(
@@ -166,15 +166,12 @@ class TestGetAnnotation:
     """Tests for get_annotation tool."""
 
     @pytest.mark.asyncio
-    async def test_get_annotation_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_get_annotation_success(self, mock_client: AsyncMock) -> None:
         """Test successful annotation retrieval."""
-        register_annotation_tools(mock_mcp, mock_client)
-
         mock_annotation = create_mock_annotation(id=67890, status="confirmed")
         mock_client.retrieve_annotation.return_value = mock_annotation
 
-        get_annotation = mock_mcp._tools["get_annotation"]
-        result = await get_annotation(annotation_id=67890)
+        result = await _get_annotation(mock_client, annotation_id=67890)
 
         assert result.id == 67890
         assert result.status == "confirmed"
@@ -210,10 +207,8 @@ class TestListAnnotations:
     """Tests for list_annotations tool."""
 
     @pytest.mark.asyncio
-    async def test_list_annotations_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_annotations_success(self, mock_client: AsyncMock) -> None:
         """Test successful annotations listing."""
-        register_annotation_tools(mock_mcp, mock_client)
-
         mock_ann1 = create_mock_annotation(id=1, status="confirmed")
         mock_ann2 = create_mock_annotation(id=2, status="to_review")
 
@@ -223,17 +218,15 @@ class TestListAnnotations:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_annotations = mock_mcp._tools["list_annotations"]
-        result = await list_annotations(queue_id=100, status="confirmed,to_review")
+        result = await _list_annotations(mock_client, queue_id=100, status="confirmed,to_review")
 
         assert len(result) == 2
         assert result[0].id == 1
         assert result[1].id == 2
 
     @pytest.mark.asyncio
-    async def test_list_annotations_no_status_filter(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_annotations_no_status_filter(self, mock_client: AsyncMock) -> None:
         """Test annotations listing without status filter."""
-        register_annotation_tools(mock_mcp, mock_client)
 
         async def mock_fetch_all(resource, **filters):
             return
@@ -241,17 +234,14 @@ class TestListAnnotations:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_annotations = mock_mcp._tools["list_annotations"]
-        result = await list_annotations(queue_id=100, status=None)
+        result = await _list_annotations(mock_client, queue_id=100, status=None)
 
         assert len(result) == 0
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_list_annotations_skips_broken_items(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+    async def test_list_annotations_skips_broken_items(self, mock_client: AsyncMock) -> None:
         """Test list_annotations gracefully skips items that fail deserialization."""
-        register_annotation_tools(mock_mcp, mock_client)
-
         mock_ann = create_mock_annotation(id=1, status="confirmed")
 
         def mock_deserializer(resource, raw):
@@ -268,8 +258,7 @@ class TestListAnnotations:
 
         mock_client._http_client.fetch_all = mock_fetch_all
 
-        list_annotations = mock_mcp._tools["list_annotations"]
-        result = await list_annotations(queue_id=100, status="confirmed,to_review")
+        result = await _list_annotations(mock_client, queue_id=100, status="confirmed,to_review")
 
         assert len(result) == 2
 
