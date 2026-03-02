@@ -610,7 +610,7 @@ def restore_entity_version(entity_type: str, entity_id: str, commit_hash: str) -
         return json.dumps({"error": str(e), "entity_type": entity_type, "entity_id": entity_id})
 
 
-def _parse_json_arg(value: str) -> object:
+def _parse_json_arg(value: str | object) -> object:
     """Parse a JSON argument, tolerating dicts passed directly or double-encoded strings."""
     if not isinstance(value, str):
         # Agent passed a dict/list object directly instead of a JSON string

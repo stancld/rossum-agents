@@ -33,24 +33,6 @@ upload_document
   The tool wraps the SDK's upload_document method in an async executor to maintain
   compatibility with MCP's async interface. See ``rossum_mcp.server:45-67``
 
-get_annotation
-^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_annotation(annotation_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_annotation(annotation_id)``
-
-**API Endpoint:**
-  ``GET /v1/annotations/{annotation_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  See ``rossum_mcp.tools.annotations``
-
 get_annotation_content
 ^^^^^^^^^^^^^^^^^^^^^^
 
@@ -138,7 +120,7 @@ search
    * - ``document_relation``
      - ``id``, ``type``, ``annotation``, ``key``, ``documents``
    * - ``hook_log``
-     - ``hook_id``, ``queue_id``, ``annotation_id``, ``log_level``, ``status``, ``status_code``, ``timestamp_before/after``, ``start/end_before/after``, ``search``, ``page_size``
+     - ``hook_id``, ``queue_id``, ``annotation_id``, ``email_id``, ``log_level``, ``status``, ``status_code``, ``request_id``, ``timestamp_before/after``, ``start/end_before/after``, ``search``, ``page_size``
    * - ``hook_template``
      - *(no filters)*
    * - ``user_role``
@@ -152,54 +134,6 @@ search
 
 **Implementation:**
   See ``rossum_mcp.tools.read_layer``
-
-get_queue_schema
-^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_queue_schema(queue_id: int)``
-
-**Rossum SDK Methods:**
-  Combines two SDK calls:
-
-  1. ``AsyncRossumAPIClient.retrieve_queue(queue_id)``
-  2. ``AsyncRossumAPIClient.retrieve_schema(schema_id)``
-
-**API Endpoints:**
-  1. ``GET /v1/queues/{queue_id}``
-  2. ``GET /v1/schemas/{schema_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  This is a convenience method that retrieves both queue and schema information
-  in a single MCP tool call. See ``rossum_mcp.server:226-263``
-
-get_queue_engine
-^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_queue_engine(queue_id: int)``
-
-**Rossum SDK Methods:**
-  Combines two SDK calls:
-
-  1. ``AsyncRossumAPIClient.retrieve_queue(queue_id)``
-  2. ``AsyncRossumAPIClient.retrieve_engine(engine_id)`` (if engine URL is a string)
-
-**API Endpoints:**
-  1. ``GET /v1/queues/{queue_id}``
-  2. ``GET /v1/engines/{engine_id}`` (if needed)
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  This convenience method retrieves both queue and engine information. It handles
-  three types of engines: dedicated, generic, and standard. If the engine is
-  embedded in the queue response, it deserializes it directly without an additional
-  API call. See ``rossum_mcp.server:265-337``
 
 get_queue_template_names
 ^^^^^^^^^^^^^^^^^^^^^^^^

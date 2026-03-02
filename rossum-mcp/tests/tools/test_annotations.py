@@ -77,7 +77,7 @@ class TestUploadDocument:
         assert result["task_id"] == 12345
         assert result["task_status"] == "importing"
         assert result["queue_id"] == 100
-        assert "list_annotations" in result["message"]
+        assert "search" in result["message"]
 
     @pytest.mark.asyncio
     async def test_upload_document_file_not_found(

@@ -53,7 +53,7 @@ async def _upload_document(client: AsyncRossumAPIClient, file_path: str, queue_i
         "task_id": task.id,
         "task_status": task.status,
         "queue_id": queue_id,
-        "message": "Document upload initiated. Use `list_annotations` to find the annotation ID for this queue.",
+        "message": 'Document upload initiated. Use `search(query={"entity": "annotation", "queue_id": ...})` to find the annotation ID for this queue.',
     }
 
 
@@ -153,7 +153,7 @@ async def _delete_annotation(client: AsyncRossumAPIClient, annotation_id: int) -
 
 def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Upload a document; use list_annotations to find the created annotation.",
+        description="Upload a document; use search(entity='annotation', queue_id=...) to find the created annotation.",
         tags={"annotations", "write"},
         annotations={"readOnlyHint": False},
     )

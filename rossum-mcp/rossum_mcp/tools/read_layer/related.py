@@ -69,8 +69,10 @@ async def _fetch_queue_related(
 async def _fetch_schema_related(
     client: AsyncRossumAPIClient, schema_id: int, _obj: object | None = None
 ) -> dict[str, object]:
-    queue_result = await graceful_list(client, Resource.Queue, "queue", **build_filters(schema=schema_id))
-    rules_result = await graceful_list(client, Resource.Rule, "rule", **build_filters(schema=schema_id))
+    queue_result, rules_result = await asyncio.gather(
+        graceful_list(client, Resource.Queue, "queue", **build_filters(schema=schema_id)),
+        graceful_list(client, Resource.Rule, "rule", **build_filters(schema=schema_id)),
+    )
 
     return {
         "queues": [q.url for q in queue_result.items],

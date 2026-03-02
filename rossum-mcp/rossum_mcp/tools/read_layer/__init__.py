@@ -50,7 +50,8 @@ async def _get_one(
     entity_id: int,
     include_related: bool,
 ) -> dict[str, object]:
-    assert config.retrieve_fn is not None  # Guarded by caller
+    if config.retrieve_fn is None:
+        raise RuntimeError(f"Entity '{entity}' has no retrieve_fn — use search instead")
     result = await config.retrieve_fn(entity_id)
     data = _serialize(result)
 
@@ -80,16 +81,15 @@ def register_read_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
 
     # Fail fast at startup if EntityType drifts from the registry
     for _entity in get_args(EntityType):
-        assert _entity in registry and registry[_entity].retrieve_fn is not None, (
-            f"EntityType member '{_entity}' is missing from registry or has no retrieve_fn — "
-            "update EntityType or build_registry to keep them in sync"
-        )
+        if _entity not in registry or registry[_entity].retrieve_fn is None:
+            raise RuntimeError(
+                f"EntityType member '{_entity}' is missing from registry or has no retrieve_fn — "
+                "update EntityType or build_registry to keep them in sync"
+            )
 
     @mcp.tool(
         description=(
             "Get entities by ID. Accepts a single ID or a list of IDs for batch retrieval. "
-            "Supported entities: queue, schema, hook, engine, rule, user, workspace, "
-            "email_template, organization_group, organization_limit, annotation, relation, document_relation. "
             "include_related=True enriches with related data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events)."
         ),
         tags={"read"},

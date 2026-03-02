@@ -30,17 +30,7 @@ def _synthesize_tool_name(tc: ToolCall) -> str:
 
 
 async def run_multiturn_regression_test(agent: RossumAgent, prompts: list[str]) -> RegressionRun:
-    """Run the agent through multiple conversation turns, accumulating all steps.
-
-    The agent's memory persists between turns so each prompt sees the full prior context.
-
-    Args:
-        agent: The RossumAgent instance to run.
-        prompts: Ordered list of user prompts for each conversation turn.
-
-    Returns:
-        RegressionRun with all steps from all turns aggregated, final answer from last turn.
-    """
+    """Run the agent through multiple turns. Memory persists so each prompt sees prior context."""
     all_steps: list[AgentStep] = []
 
     for prompt in prompts:
@@ -75,15 +65,7 @@ async def run_multiturn_regression_test(agent: RossumAgent, prompts: list[str]) 
 
 
 async def run_regression_test(agent: RossumAgent, prompt: str) -> RegressionRun:
-    """Run the agent and collect all steps + aggregated metrics.
-
-    Args:
-        agent: The RossumAgent instance to run.
-        prompt: The prompt to send to the agent.
-
-    Returns:
-        RegressionRun with all steps and aggregated metrics.
-    """
+    """Run the agent and collect all steps + aggregated metrics."""
     steps: list[AgentStep] = []
 
     async for step in agent.run(prompt):

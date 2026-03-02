@@ -1,8 +1,7 @@
 """Pydantic search query models for the unified read layer.
 
-Each entity has a typed model with entity-specific filters.
-The discriminated union on `entity` produces a JSON Schema with `oneOf`,
-so the LLM sees exactly which filters are valid per entity.
+Each entity type has specific filter fields. The discriminated union on `entity`
+produces a JSON Schema oneOf, so the LLM sees valid filters per entity type.
 """
 
 from __future__ import annotations

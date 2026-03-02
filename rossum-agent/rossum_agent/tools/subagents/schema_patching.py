@@ -571,7 +571,7 @@ def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
     if tool_name == "get_full_schema":
         mcp_result = call_mcp_tool("get", {"entity": "schema", "entity_id": schema_id})
         # Unwrap unified get response: {"entity": "schema", "id": X, "data": {...}}
-        if isinstance(mcp_result, dict) and "data" in mcp_result:
+        if isinstance(mcp_result, dict) and "data" in mcp_result and "entity" in mcp_result:
             mcp_result = mcp_result["data"]
         if mcp_result and schema_id:
             content = _extract_schema_content(mcp_result)
@@ -631,8 +631,8 @@ def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> Su
 
     tree_result = call_mcp_tool("get_schema_tree_structure", {"schema_id": schema_id_int})
     schema_result = call_mcp_tool("get", {"entity": "schema", "entity_id": schema_id_int})
-    # Unwrap unified get response
-    if isinstance(schema_result, dict) and "data" in schema_result:
+    # Unwrap unified get response: {"entity": "schema", "id": X, "data": {...}}
+    if isinstance(schema_result, dict) and "data" in schema_result and "entity" in schema_result:
         schema_result = schema_result["data"]
     if schema_result:
         content = _extract_schema_content(schema_result)
