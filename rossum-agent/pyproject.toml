@@ -58,6 +58,9 @@ api = [
 slack = [
     "slack-sdk[optional]>=3.27.0",
 ]
+scripts = [
+    "tqdm>=4.0.0",
+]
 docs = [
     "myst-parser>=2.0.0",
     "sphinx>=7.0.0",
