@@ -6,7 +6,6 @@ for formula fields based on natural language descriptions.
 
 from __future__ import annotations
 
-import copy
 import json
 import logging
 import re
@@ -14,6 +13,7 @@ import re
 import httpx
 from anthropic import beta_tool
 
+from rossum_agent.tools.copilot._shared import _fetch_schema_content, _inject_field_into_schema, _json_headers
 from rossum_agent.tools.core import get_context
 
 logger = logging.getLogger(__name__)
@@ -28,15 +28,6 @@ def _build_suggest_formula_url(api_base_url: str) -> str:
     and appends the internal endpoint path.
     """
     return f"{api_base_url.rstrip('/')}/internal/schemas/suggest_formula"
-
-
-def _fetch_schema_content(api_base_url: str, token: str, schema_id: int) -> list[dict]:
-    """Fetch schema content from Rossum API."""
-    url = f"{api_base_url.rstrip('/')}/schemas/{schema_id}"
-    with httpx.Client(timeout=30) as client:
-        response = client.get(url, headers={"Authorization": f"Bearer {token}"})
-        response.raise_for_status()
-        return response.json()["content"]
 
 
 def _create_formula_field_definition(label: str, field_schema_id: str | None = None) -> dict:
@@ -58,49 +49,6 @@ def _create_formula_field_definition(label: str, field_schema_id: str | None = N
         "suggest": True,
         "ui_configuration": {"type": "formula", "edit": "disabled"},
     }
-
-
-def _find_field_in_schema(nodes: list[dict], field_id: str) -> bool:
-    """Recursively search for a field ID in schema content."""
-    for node in nodes:
-        if node.get("id") == field_id:
-            return True
-        if "children" in node:
-            children = node["children"]
-            if isinstance(children, list) and _find_field_in_schema(children, field_id):
-                return True
-            if isinstance(children, dict) and _find_field_in_schema([children], field_id):
-                return True
-    return False
-
-
-def _inject_formula_field(
-    schema_content: list[dict], label: str, section_id: str, field_schema_id: str | None = None
-) -> list[dict]:
-    """Inject a formula field into the specified section of schema_content.
-
-    The suggest_formula API requires the target field to exist in schema_content.
-    """
-    if not field_schema_id:
-        field_schema_id = label.lower().replace(" ", "_")
-
-    if _find_field_in_schema(schema_content, field_schema_id):
-        return schema_content
-
-    modified = copy.deepcopy(schema_content)
-    formula_field = _create_formula_field_definition(label, field_schema_id)
-
-    for section in modified:
-        if section.get("id") == section_id and section.get("category") == "section":
-            section.setdefault("children", []).append(formula_field)
-            return modified
-
-    if modified and modified[0].get("category") == "section":
-        modified[0].setdefault("children", []).append(formula_field)
-    else:
-        modified.append(formula_field)
-
-    return modified
 
 
 @beta_tool
@@ -127,7 +75,8 @@ def suggest_formula_field(
         url = _build_suggest_formula_url(api_base_url)
 
         schema_content = _fetch_schema_content(api_base_url, token, schema_id)
-        enriched_schema = _inject_formula_field(schema_content, label, section_id, field_schema_id)
+        field_def = _create_formula_field_definition(label, field_schema_id)
+        enriched_schema = _inject_field_into_schema(schema_content, field_def, section_id)
 
         payload = {"field_schema_id": field_schema_id, "hint": hint, "schema_content": enriched_schema}
 
@@ -135,11 +84,7 @@ def suggest_formula_field(
         logger.debug(f"suggest_formula payload: {json.dumps(payload, indent=2)}")
 
         with httpx.Client(timeout=_SUGGEST_FORMULA_TIMEOUT) as client:
-            response = client.post(
-                url,
-                json=payload,
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            )
+            response = client.post(url, json=payload, headers=_json_headers(token))
             response.raise_for_status()
             result = response.json()
 

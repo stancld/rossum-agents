@@ -12,6 +12,7 @@ import logging
 import httpx
 from anthropic import beta_tool
 
+from rossum_agent.tools.copilot._shared import _json_headers
 from rossum_agent.tools.core import get_context
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ def suggest_rule(user_query: str, queue_id: int) -> str:
             response = client.post(
                 _build_suggest_rule_url(api_base_url),
                 json=payload,
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                headers=_json_headers(token),
             )
             response.raise_for_status()
             result = response.json()
@@ -108,7 +109,7 @@ def evaluate_rules(queue_id: int, annotation_id: int, schema_rules: list[dict]) 
 
     try:
         api_base_url, token = get_context().require_rossum_credentials()
-        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        headers = _json_headers(token)
 
         with httpx.Client(timeout=_SUGGEST_RULE_TIMEOUT) as client:
             content_response = client.get(

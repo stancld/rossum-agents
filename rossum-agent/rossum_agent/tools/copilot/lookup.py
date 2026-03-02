@@ -16,8 +16,12 @@ import httpx
 import jq as jq_lib  # ty: ignore[unresolved-import] - no type stubs for jq
 from anthropic import beta_tool
 
+from rossum_agent.tools.copilot._shared import (
+    _fetch_schema_content,
+    _inject_field_into_schema,
+    _json_headers,
+)
 from rossum_agent.tools.core import get_context
-from rossum_agent.tools.formula import _fetch_schema_content, _find_field_in_schema
 from rossum_agent.tools.utils import _truncate_output
 
 logger = logging.getLogger(__name__)
@@ -69,10 +73,6 @@ _dataset_cache: dict[str, object] = {}
 _field_definition_cache: dict[str, dict] = {}
 
 _JQ_OUTPUT_LIMIT = 50000
-
-
-def _json_headers(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 
 def _get_cached_dataset(dataset: str) -> object | None:
@@ -216,35 +216,6 @@ def _create_lookup_field_definition(label: str, field_schema_id: str | None = No
             "configuration": {},
         },
     }
-
-
-def _inject_lookup_field(
-    schema_content: list[dict], label: str, section_id: str, field_schema_id: str | None = None
-) -> list[dict]:
-    """Inject a lookup field stub into the specified section of schema_content.
-
-    The suggest_computed_field API requires the target field to exist in schema_content.
-    """
-    if not field_schema_id:
-        field_schema_id = label.lower().replace(" ", "_")
-
-    if _find_field_in_schema(schema_content, field_schema_id):
-        return schema_content
-
-    modified = copy.deepcopy(schema_content)
-    lookup_field = _create_lookup_field_definition(label, field_schema_id)
-
-    for section in modified:
-        if section.get("id") == section_id and section.get("category") == "section":
-            section.setdefault("children", []).append(lookup_field)
-            return modified
-
-    if modified and modified[0].get("category") == "section":
-        modified[0].setdefault("children", []).append(lookup_field)
-    else:
-        modified.append(lookup_field)
-
-    return modified
 
 
 def _fetch_annotation_content(api_base_url: str, token: str, annotation_url: str) -> list[dict]:
@@ -417,7 +388,8 @@ def suggest_lookup_field(
         url = _build_suggest_computed_field_url(api_base_url)
 
         schema_content = _fetch_schema_content(api_base_url, token, schema_id)
-        enriched_schema = _inject_lookup_field(schema_content, label, section_id, field_schema_id)
+        field_def = _create_lookup_field_definition(label, field_schema_id)
+        enriched_schema = _inject_field_into_schema(schema_content, field_def, section_id)
 
         # Pre-populate dataset in the stub so the backend prompt shows "Preselected dataset: <name>".
         # Only injected when we can resolve to a concrete imported identifier.
