@@ -735,12 +735,12 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=["create_queue_from_template"],
             mode=ToolMatchMode.SUBSET,
-            forbidden_tools=["patch_schema", "patch_schema_with_subagent"],
+            forbidden_tools=["patch_schema", "patch_schema_with_subagent", "suggest_formula_field"],
         ),
-        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=85000),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=65000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
-            max_steps=5,
+            max_steps=4,
             file_expectation=FileExpectation(),
             custom_checks=[CAUTIOUS_PERSONA_CLARIFICATION_CHECK],
         ),
