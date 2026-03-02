@@ -1516,6 +1516,12 @@ class TestAgentServiceUrlContext:
             patch("rossum_agent.api.services.agent_service.get_system_prompt", return_value="Base prompt"),
             patch("rossum_agent.api.services.agent_service.extract_url_context") as mock_extract,
             patch("rossum_agent.api.services.agent_service.format_context_for_prompt", return_value="URL context"),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, None, "https://api.rossum.ai"),
+            ),
         ):
             mock_url_context = MagicMock()
             mock_url_context.is_empty.return_value = False

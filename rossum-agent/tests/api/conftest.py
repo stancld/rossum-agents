@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from rossum_agent.api.main import app
@@ -12,6 +12,13 @@ from rossum_agent.api.routes.messages import limiter
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
+
+
+@pytest.fixture(autouse=True)
+def mock_chat_summary():
+    """Prevent real AWS Bedrock calls from _generate_chat_summary in route tests."""
+    with patch("rossum_agent.api.routes.messages._generate_chat_summary", return_value=None):
+        yield
 
 
 @pytest.fixture(autouse=True)
