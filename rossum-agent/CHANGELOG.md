@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [1.3.6] - 2026-03-02
 
 ### Fixed
 - Fixed Rossum Elis OpenAPI spec URL — upstream renamed `openapi.external.json` to `openapi.json`, breaking spec downloads
