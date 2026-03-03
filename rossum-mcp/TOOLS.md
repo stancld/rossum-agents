@@ -1,12 +1,82 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 71 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 41 MCP tools. For quick start and setup, see [README.md](README.md).
 
-## Document Processing (9 tools)
+---
+
+## Unified Read Layer (2 tools)
+
+The read layer replaces all individual `get_X` and `list_X` tools with two generic tools that cover every entity type.
+
+### get
+
+Retrieves one or more entities by ID.
+
+**Parameters:**
+- `entity` (EntityType, required): One of `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `annotation`, `relation`, `document_relation`, `organization_limit`
+- `entity_id` (integer or list of integers, required): Single ID or list of IDs for batch retrieval
+- `include_related` (boolean, optional, default: false): Enriches with related data:
+  - `queue` → `schema_tree`, `engine`, `hooks`
+  - `schema` → `queues`, `rules`
+  - `hook` → `queues`, `events`
+
+**Returns:**
+```json
+{
+  "entity": "queue",
+  "id": 12345,
+  "data": { "...": "full entity data" },
+  "_related": { "...": "only when include_related=true" }
+}
+```
+
+Batch retrieval (list of IDs) returns an array of the same structure.
+
+---
+
+### search
+
+Lists/searches entities with typed, entity-specific filters. Pass a query object with an `entity` discriminator field.
+
+**Supported entities and their filters:**
+
+| Entity | Filters |
+|--------|---------|
+| `queue` | `id`, `workspace_id`, `name`, `use_regex` |
+| `schema` | `name`, `queue_id`, `use_regex` |
+| `hook` | `queue_id`, `active`, `first_n` |
+| `engine` | `id`, `engine_type` (`extractor`\|`splitter`), `agenda_id` |
+| `rule` | `schema_id`, `organization_id`, `enabled` |
+| `user` | `username`, `email`, `first_name`, `last_name`, `is_active`, `is_organization_group_admin` |
+| `workspace` | `organization_id`, `name`, `use_regex` |
+| `email_template` | `queue_id`, `type`, `name`, `first_n`, `use_regex` |
+| `organization_group` | `name`, `use_regex` |
+| `annotation` | `queue_id` (required), `status`, `ordering`, `first_n` |
+| `relation` | `id`, `type`, `parent`, `key`, `annotation` |
+| `document_relation` | `id`, `type`, `annotation`, `key`, `documents` |
+| `hook_log` | `hook_id`, `queue_id`, `annotation_id`, `email_id`, `log_level`, `status`, `status_code`, `request_id`, `timestamp_before`, `timestamp_after`, `start_before`, `start_after`, `end_before`, `end_after`, `search`, `page_size` |
+| `hook_template` | _(no filters)_ |
+| `user_role` | _(no filters)_ |
+
+**Example:**
+```json
+{
+  "entity": "annotation",
+  "queue_id": 12345,
+  "status": "to_review,confirmed",
+  "first_n": 10
+}
+```
+
+**Returns:** Array of entity objects.
+
+---
+
+## Document Processing (7 tools)
 
 ### upload_document
 
-Uploads a document to Rossum for processing. Returns a task ID. Use `list_annotations` to get the annotation ID.
+Uploads a document to Rossum for processing. Returns a task ID. Use `search` with `entity='annotation'` to find the created annotation.
 
 **Parameters:**
 - `file_path` (string, required): Absolute path to the document file
@@ -18,28 +88,7 @@ Uploads a document to Rossum for processing. Returns a task ID. Use `list_annota
   "task_id": "12345",
   "task_status": "created",
   "queue_id": 12345,
-  "message": "Document upload initiated. Use `list_annotations` to find the annotation ID for this queue."
-}
-```
-
-### get_annotation
-
-Retrieves annotation metadata. Use this to check the status of a document.
-
-**Parameters:**
-- `annotation_id` (integer, required): The annotation ID obtained from list_annotations
-
-**Returns:**
-```json
-{
-  "id": "12345",
-  "status": "to_review",
-  "url": "https://elis.rossum.ai/api/v1/annotations/12345",
-  "schema": "67890",
-  "modifier": "11111",
-  "document": "22222",
-  "created_at": "2024-01-01T00:00:00Z",
-  "modified_at": "2024-01-01T00:00:00Z"
+  "message": "Document upload initiated. Use `search(query={\"entity\": \"annotation\", \"queue_id\": ...})` to find the annotation ID for this queue."
 }
 ```
 
@@ -57,34 +106,9 @@ Fetches annotation extracted content and saves it to a local JSON file. Returns 
 }
 ```
 
-### list_annotations
-
-Lists all annotations for a queue with optional filtering. Useful for checking the status of multiple uploaded documents.
-
-**Parameters:**
-- `queue_id` (integer, required): Rossum queue ID to list annotations from
-- `status` (string, optional): Filter by annotation status (default: 'importing,to_review,confirmed,exported')
-
-**Returns:**
-```json
-{
-  "count": 42,
-  "results": [
-    {
-      "id": "12345",
-      "status": "to_review",
-      "url": "https://elis.rossum.ai/api/v1/annotations/12345",
-      "document": "67890",
-      "created_at": "2024-01-01T00:00:00Z",
-      "modified_at": "2024-01-01T00:00:00Z"
-    }
-  ]
-}
-```
-
 ### start_annotation
 
-Starts an annotation to move it from 'importing' to 'reviewing' status. This is required before you can update annotation fields.
+Sets annotation status to `reviewing` (from `to_review`). Required before updating annotation fields.
 
 **Parameters:**
 - `annotation_id` (integer, required): Rossum annotation ID to start
@@ -99,7 +123,7 @@ Starts an annotation to move it from 'importing' to 'reviewing' status. This is 
 
 ### bulk_update_annotation_fields
 
-Bulk update annotation field values using JSON Patch operations. This is the correct way to update annotation field values. Must be called after `start_annotation`.
+Bulk updates annotation field values using JSON Patch operations. Requires annotation in `reviewing` status. Call `start_annotation` first.
 
 **Parameters:**
 - `annotation_id` (integer, required): Rossum annotation ID to update
@@ -133,7 +157,7 @@ Bulk update annotation field values using JSON Patch operations. This is the cor
 
 ### confirm_annotation
 
-Confirms an annotation to move it to 'confirmed' status. Can be called after `bulk_update_annotation_fields`.
+Confirms an annotation to move it to `confirmed` status. Call after `bulk_update_annotation_fields`.
 
 **Parameters:**
 - `annotation_id` (integer, required): Rossum annotation ID to confirm
@@ -154,7 +178,7 @@ Copies annotations to another queue. Use `reimport=True` to re-extract data in t
 - `annotation_ids` (array of integers, required): List of annotation IDs to copy
 - `target_queue_id` (integer, required): Queue ID to copy annotations into
 - `target_status` (string, optional): Target annotation status after copying
-- `reimport` (boolean, optional): Whether to re-extract data in the target queue (default: false)
+- `reimport` (boolean, optional, default: false): Whether to re-extract data in the target queue
 
 **Returns:**
 ```json
@@ -162,8 +186,8 @@ Copies annotations to another queue. Use `reimport=True` to re-extract data in t
   "copied": 2,
   "failed": 0,
   "results": [
-    {"annotation_id": 12345, "copied_annotation": {...}},
-    {"annotation_id": 12346, "copied_annotation": {...}}
+    {"annotation_id": 12345, "copied_annotation": {"...": "..."}},
+    {"annotation_id": 12346, "copied_annotation": {"...": "..."}}
   ],
   "errors": []
 }
@@ -171,88 +195,39 @@ Copies annotations to another queue. Use `reimport=True` to re-extract data in t
 
 ### delete_annotation
 
-Soft deletes an annotation (moves to 'deleted' status, can be restored).
+Soft deletes an annotation (moves to `deleted` status, can be restored).
 
 **Parameters:**
 - `annotation_id` (integer, required): Rossum annotation ID to delete
 
 ---
 
-## Queue Management (9 tools)
-
-### get_queue
-
-Retrieves queue details including the schema_id.
-
-**Parameters:**
-- `queue_id` (integer, required): Rossum queue ID to retrieve
-
-### list_queues
-
-Lists all queues with optional filtering by ID, workspace, or name.
-
-**Parameters:**
-- `id` (integer, optional): Filter by queue ID
-- `workspace_id` (integer, optional): Filter by workspace ID
-- `name` (string, optional): Filter by queue name
-
-**Returns:**
-```json
-[
-  {
-    "id": 12345,
-    "name": "Invoice Processing",
-    "url": "https://elis.rossum.ai/api/v1/queues/12345",
-    "workspace": "https://elis.rossum.ai/api/v1/workspaces/100",
-    "schema": "https://elis.rossum.ai/api/v1/schemas/200",
-    "inbox": "https://elis.rossum.ai/api/v1/inboxes/300",
-    "status": "active",
-    "locale": "en_GB",
-    "automation_enabled": true
-  }
-]
-```
-
-### get_queue_schema
-
-Retrieves the complete schema for a queue in a single call. This is the recommended way to get a queue's schema.
-
-**Parameters:**
-- `queue_id` (integer, required): Rossum queue ID
-
-### get_queue_engine
-
-Retrieves the complete engine information for a given queue in a single call.
-
-**Parameters:**
-- `queue_id` (integer, required): Rossum queue ID
+## Queue Management (5 tools)
 
 ### create_queue
 
-Creates a new queue with schema and optional engine assignment.
+Creates a new queue.
 
 **Parameters:**
 - `name` (string, required): Name of the queue to create
 - `workspace_id` (integer, required): Workspace ID where the queue should be created
 - `schema_id` (integer, required): Schema ID to assign to the queue
-- `engine_id` (integer, optional): Optional engine ID to assign for document processing
-- Additional optional parameters for automation, locale, training, etc.
-
-### create_queue_from_template
-
-Create queues from predefined regional templates (EU/US/UK/CZ/CN).
-
-### get_queue_template_names
-
-List available queue template names.
+- `engine_id` (integer, optional): Engine ID to assign for document processing
+- `inbox_id` (integer, optional): Inbox ID to associate with the queue
+- `connector_id` (integer, optional): Connector ID to associate with the queue
+- `locale` (string, optional, default: `en_GB`): Queue locale
+- `automation_enabled` (boolean, optional, default: false): Enable automation
+- `automation_level` (string, optional, default: `never`): Automation level
+- `training_enabled` (boolean, optional, default: true): Enable training
+- `splitting_screen_feature_flag` (boolean, optional, default: false): Enable splitting screen feature
 
 ### update_queue
 
-Updates an existing queue's settings including automation thresholds.
+Updates an existing queue's settings.
 
 **Parameters:**
 - `queue_id` (integer, required): Queue ID to update
-- `queue_data` (object, required): Dictionary containing queue fields to update
+- `queue_data` (object, required): Dictionary containing queue fields to update. Supported keys: `name`, `automation_enabled`, `automation_level`, `locale`, `metadata`, `settings`, `engine`, `dedicated_engine`, `training_enabled`, `webhooks`, `hooks`, `default_score_threshold`, `session_timeout`, `document_lifetime`, `delete_after`, `schema`, `workspace`, `connector`, `inbox`
 
 ### delete_queue
 
@@ -261,39 +236,52 @@ Deletes a queue. Deletion begins after approximately 24 hours and cascades to an
 **Parameters:**
 - `queue_id` (integer, required): Queue ID to delete
 
----
+### get_queue_template_names
 
-## Schema Management (8 tools)
+Lists all available queue template names usable with `create_queue_from_template`.
 
-### get_schema
-
-Retrieves schema details including the schema content/structure.
-
-**Parameters:**
-- `schema_id` (integer, required): Rossum schema ID to retrieve
-
-### list_schemas
-
-Lists all schemas with optional filtering by name or queue.
-
-**Parameters:**
-- `name` (string, optional): Filter by schema name
-- `queue_id` (integer, optional): Filter by queue ID
-
-**Returns:**
+**Returns:** Array of template name strings:
 ```json
 [
-  {
-    "id": 12345,
-    "name": "Invoice Schema",
-    "url": "https://elis.rossum.ai/api/v1/schemas/12345",
-    "queues": ["https://elis.rossum.ai/api/v1/queues/100"],
-    "content": "<omitted>",
-    "metadata": {},
-    "modified_at": "2025-01-15T10:00:00Z"
-  }
+  "EU Demo Template",
+  "AP&R EU Demo Template",
+  "Tax Invoice EU Demo Template",
+  "US Demo Template",
+  "AP&R US Demo Template",
+  "Tax Invoice US Demo Template",
+  "UK Demo Template",
+  "AP&R UK Demo Template",
+  "Tax Invoice UK Demo Template",
+  "CZ Demo Template",
+  "Empty Organization Template",
+  "Delivery Notes Demo Template",
+  "Delivery Note Demo Template",
+  "Chinese Invoices (Fapiao) Demo Template",
+  "Tax Invoice CN Demo Template",
+  "Certificates of Analysis Demo Template",
+  "Purchase Order Demo Template",
+  "Credit Note Demo Template",
+  "Debit Note Demo Template",
+  "Proforma Invoice Demo Template"
 ]
 ```
+
+### create_queue_from_template
+
+Creates a queue from a predefined regional template. Automatically creates a matching schema and optionally assigns an engine.
+
+**Parameters:**
+- `name` (string, required): Name for the new queue
+- `template_name` (string, required): Template name from `get_queue_template_names`
+- `workspace_id` (integer, required): Workspace ID where the queue should be created
+- `include_documents` (boolean, optional, default: false): Include sample documents from the template
+- `engine_id` (integer, optional): Engine ID to assign; if not provided, the template's default engine is used
+
+**Returns:** Queue object with `_tracked_resources` listing the schema and engine created as side effects.
+
+---
+
+## Schema Management (6 tools)
 
 ### create_schema
 
@@ -301,7 +289,7 @@ Creates a new schema with sections and datapoints.
 
 **Parameters:**
 - `name` (string, required): Schema name
-- `content` (array, required): Schema content array containing sections with datapoints
+- `content` (array, required): Schema content array; must contain at least one section with datapoints
 
 **Example content structure:**
 ```json
@@ -330,23 +318,23 @@ Creates a new schema with sections and datapoints.
 
 ### update_schema
 
-Updates an existing schema, typically used to set field-level automation thresholds.
+Full update of an existing schema. Typically used to set field-level automation thresholds.
 
 **Parameters:**
 - `schema_id` (integer, required): Schema ID to update
-- `schema_data` (object, required): Dictionary containing schema fields to update
+- `schema_data` (object, required): Dictionary containing schema fields to update (full schema required)
 
 ### patch_schema
 
-Patch a schema by adding, updating, or removing individual nodes without replacing the entire content.
+Patches a schema by adding, updating, or removing individual nodes without replacing the entire content.
 
 **Parameters:**
 - `schema_id` (integer, required): Schema ID to patch
-- `operation` (string, required): One of "add", "update", or "remove"
+- `operation` (string, required): One of `add`, `update`, or `remove`
 - `node_id` (string, required): ID of the node to operate on
-- `node_data` (object, optional): Data for add/update operations
-- `parent_id` (string, optional): Parent node ID for add operation
-- `position` (integer, optional): Position for add operation
+- `node_data` (object, optional): Data for `add`/`update` operations
+- `parent_id` (string, optional): Parent node ID for `add` operation
+- `position` (integer, optional): Position for `add` operation
 
 **Example usage:**
 ```python
@@ -373,70 +361,58 @@ patch_schema(schema_id=123, operation="remove", node_id="old_field")
 
 ### get_schema_tree_structure
 
-Get lightweight tree view of schema with only ids, labels, categories, and types.
+Gets a lightweight tree view of a schema with only ids, labels, categories, and types. Accepts either `schema_id` or `queue_id`.
+
+**Parameters:**
+- `schema_id` (integer, optional): Schema ID
+- `queue_id` (integer, optional): Queue ID (resolves the queue's schema)
 
 ### prune_schema_fields
 
-Efficiently remove multiple fields from schema at once (for organization setup).
+Efficiently removes multiple fields from a schema at once.
+
+**Parameters:**
+- `schema_id` (integer, required): Schema ID to prune
+- `fields_to_keep` (array of strings, optional): Keep only these leaf field IDs; parent containers are preserved automatically; pass section IDs to preserve them as empty containers
+- `fields_to_remove` (array of strings, optional): Remove these leaf field IDs
+
+Provide exactly one of `fields_to_keep` or `fields_to_remove`.
+
+**Returns:**
+```json
+{
+  "removed_fields": ["old_field_1", "old_field_2"],
+  "remaining_fields": ["vendor_name", "invoice_number"]
+}
+```
 
 ### delete_schema
 
-Deletes a schema by ID.
+Deletes a schema by ID. Fails with `409 Conflict` if the schema is linked to any queue or annotation.
 
 **Parameters:**
 - `schema_id` (integer, required): Schema ID to delete
 
 ---
 
-## Engine Management (6 tools)
-
-### get_engine
-
-Retrieves detailed information about a specific engine by its ID.
-
-**Parameters:**
-- `engine_id` (integer, required): Engine ID to retrieve
-
-**Returns:**
-```json
-{
-  "id": 12345,
-  "name": "Invoice Extractor",
-  "url": "https://elis.rossum.ai/api/v1/engines/12345",
-  "type": "extractor",
-  "learning_enabled": true,
-  "training_queues": ["https://elis.rossum.ai/api/v1/queues/100"],
-  "description": "Extracts invoice data",
-  "agenda_id": "agenda-123",
-  "organization": "https://elis.rossum.ai/api/v1/organizations/10"
-}
-```
-
-### list_engines
-
-Lists all engines with optional filtering.
-
-**Parameters:**
-- `id` (integer, optional): Filter by engine ID
-- `engine_type` (string, optional): Filter by engine type ('extractor' or 'splitter')
-- `agenda_id` (string, optional): Filter by agenda ID
+## Engine Management (4 tools)
 
 ### create_engine
 
-Creates a new engine for document processing.
+Creates a new engine for document processing. After creating an engine, immediately create matching engine fields for the target schema.
 
 **Parameters:**
 - `name` (string, required): Engine name
 - `organization_id` (integer, required): Organization ID
-- `engine_type` (string, required): Engine type - 'extractor' or 'splitter'
+- `engine_type` (string, required): `extractor` or `splitter`
 
 ### update_engine
 
-Updates an existing engine's settings including learning and training queues.
+Updates an existing engine's settings.
 
 **Parameters:**
 - `engine_id` (integer, required): Engine ID to update
-- `engine_data` (object, required): Dictionary containing engine fields to update
+- `engine_data` (object, required): Dictionary with fields to update. Supported keys: `name`, `description`, `learning_enabled`, `training_queues`
 
 ### create_engine_field
 
@@ -446,34 +422,23 @@ Creates a new engine field and links it to schemas.
 - `engine_id` (integer, required): Engine ID
 - `name` (string, required): Field name (slug format, max 50 chars)
 - `label` (string, required): Human-readable label (max 100 chars)
-- `field_type` (string, required): Field type - 'string', 'number', 'date', or 'enum'
-- `schema_ids` (array, required): List of schema IDs to link
+- `field_type` (string, required): `string`, `number`, `date`, or `enum`
+- `schema_ids` (array of integers, required): List of schema IDs to link (at least one required)
+- `tabular` (boolean, optional, default: false): Whether the field is tabular (line item)
+- `multiline` (boolean, optional, default: false): Whether the field is multiline
+- `subtype` (string, optional): Field subtype
+- `pre_trained_field_id` (string, optional): Pre-trained field ID to link
 
 ### get_engine_fields
 
 Retrieves engine fields for a specific engine or all engine fields.
 
 **Parameters:**
-- `engine_id` (integer, optional): Engine ID to filter fields by
+- `engine_id` (integer, optional): Engine ID to filter fields; omit to retrieve all engine fields
 
 ---
 
-## Extensions — Hooks (9 tools)
-
-### get_hook
-
-Get hook/extension details.
-
-**Parameters:**
-- `hook_id` (integer, required): Hook ID
-
-### list_hooks
-
-Lists all hooks/extensions configured in your organization.
-
-**Parameters:**
-- `queue_id` (integer, optional): Filter hooks by queue ID
-- `active` (boolean, optional): Filter by active status
+## Extensions — Hooks (5 tools)
 
 ### create_hook
 
@@ -481,50 +446,44 @@ Creates a new hook (webhook or serverless function).
 
 **Parameters:**
 - `name` (string, required): Hook name
-- `type` (string, required): Hook type - 'webhook' or 'function'
-- `queues` (array, optional): List of queue URLs
-- `events` (array, optional): List of trigger events
-- `config` (object, optional): Hook configuration
+- `type` (string, required): `webhook` or `function`
+- `queues` (array of strings, optional): List of queue URLs
+- `events` (array of strings, optional): List of trigger events in `event.action` format
+- `config` (object, optional): Hook configuration. For function hooks: `config.source` is auto-renamed to `config.code`, default runtime is `python3.12`, `timeout_s` is capped at 60
 - `settings` (object, optional): Hook settings
 - `secret` (string, optional): Secret key for webhooks
 
+**Note:** `token_owner` cannot be an `organization_group_admin` user.
+
 **Common events:**
-- `annotation_content.initialize` - When annotation is first created
-- `annotation_content.confirm` - When annotation is confirmed
-- `annotation_content.export` - When annotation is exported
-- `annotation_status` - When annotation status changes
+- `annotation_content.initialize` — When annotation is first created
+- `annotation_content.confirm` — When annotation is confirmed
+- `annotation_content.export` — When annotation is exported
+- `annotation_status.changed` — When annotation status changes
 
 ### update_hook
 
-Updates an existing hook.
+Patches an existing hook; only provided fields change.
 
 **Parameters:**
 - `hook_id` (integer, required): Hook ID to update
-- `name`, `queues`, `events`, `config`, `settings`, `active` (optional): Fields to update
-
-### list_hook_templates
-
-Lists available hook templates from Rossum Store.
+- `name` (string, optional): New hook name
+- `queues` (array of strings, optional): New list of queue URLs
+- `events` (array of strings, optional): New list of trigger events
+- `config` (object, optional): New hook configuration
+- `settings` (object, optional): New hook settings
+- `active` (boolean, optional): Enable or disable the hook
 
 ### create_hook_from_template
 
-Creates a hook from a Rossum Store template.
+Creates a hook from a Rossum Store template. Use `search(query={"entity": "hook_template"})` to browse available templates.
 
 **Parameters:**
 - `name` (string, required): Name for the new hook
-- `hook_template_id` (integer, required): Template ID from `list_hook_templates`
-- `queues` (array, required): List of queue URLs
-- `events` (array, optional): Override template defaults
-- `token_owner` (string, optional): User URL for token ownership
-
-### list_hook_logs
-
-Lists hook execution logs for debugging.
-
-**Parameters:**
-- `hook_id`, `queue_id`, `annotation_id` (optional): Filter options
-- `log_level` (string, optional): 'INFO', 'ERROR', or 'WARNING'
-- `timestamp_before`, `timestamp_after` (string, optional): ISO 8601 timestamps
+- `hook_template_id` (integer, required): Template ID from `search`
+- `queues` (array of strings, required): List of queue URLs
+- `events` (array of strings, optional): Override template default events
+- `token_owner` (string, optional): User URL for token ownership (required if template has `use_token_owner`; cannot be an `organization_group_admin` user)
 
 ### test_hook
 
@@ -532,12 +491,12 @@ Tests a hook by auto-generating a realistic payload and executing it. For `annot
 
 **Parameters:**
 - `hook_id` (integer, required): Hook ID to test
-- `event` (HookEvent, required): Hook event (e.g., `annotation_content`, `upload`)
-- `action` (HookAction, required): Hook action (e.g., `initialize`, `export`)
-- `annotation` (string, optional): Annotation URL for real data
+- `event` (string, required): Hook event (e.g., `annotation_content`, `annotation_status`)
+- `action` (string, required): Hook action (e.g., `initialize`, `confirm`, `export`)
+- `annotation` (string, optional): Annotation URL to use for real data
 - `status` (string, optional): Annotation status
 - `previous_status` (string, optional): Previous annotation status
-- `config` (dict, optional): Config override for the test run
+- `config` (object, optional): Config override for the test run
 
 **Returns:** Dict with hook response and execution logs.
 
@@ -550,45 +509,26 @@ Deletes a hook by ID.
 
 ---
 
-## Rules & Actions (6 tools)
-
-### get_rule
-
-Get business rule details.
-
-**Parameters:**
-- `rule_id` (integer, required): Rule ID
-
-### list_rules
-
-Lists all business rules.
-
-**Parameters:**
-- `schema_id` (integer, optional): Filter by schema ID
-- `organization_id` (integer, optional): Filter by organization ID
-- `enabled` (boolean, optional): Filter by enabled status
+## Rules & Actions (4 tools)
 
 ### create_rule
 
-Creates a new business rule. Rules automate field operations based on trigger conditions.
+Creates a new business rule. At least one of `schema_id` or `queue_ids` is required to scope the rule.
 
 **Parameters:**
 - `name` (string, required): Rule name
-- `schema_id` (integer, required): Schema ID to associate the rule with
 - `trigger_condition` (string, required): TxScript formula (e.g., `"field.amount > 10000"`)
-- `actions` (array, required): List of actions with required fields: `id` (unique string), `type`, `event`, `payload`
-- `enabled` (boolean, optional): Whether the rule is enabled (default: true)
-- `queue_ids` (array of integers, optional): List of queue IDs to limit the rule to specific queues
+- `actions` (array, required): List of actions. Each action requires: `id` (unique string), `type`, `event`, `payload`
+- `enabled` (boolean, optional, default: true): Whether the rule is enabled
+- `schema_id` (integer, optional): Schema ID to scope the rule
+- `queue_ids` (array of integers, optional): Queue IDs to scope the rule to specific queues
 
 **Action types:** `show_message`, `add_automation_blocker`, `add_validation_source`, `change_queue`, `send_email`, `hide_field`, `show_field`, `show_hide_field`, `change_status`, `add_label`, `remove_label`, `custom`
-
-**Event:** `validation`
 
 **Example:**
 ```json
 {
   "name": "High Value Alert",
-  "schema_id": 12345,
   "trigger_condition": "field.amount > 10000",
   "actions": [
     {
@@ -599,26 +539,14 @@ Creates a new business rule. Rules automate field operations based on trigger co
     }
   ],
   "enabled": true,
+  "schema_id": 12345,
   "queue_ids": [101, 102]
-}
-```
-
-**Returns:**
-```json
-{
-  "id": 67890,
-  "name": "High Value Alert",
-  "url": "https://elis.rossum.ai/api/v1/rules/67890",
-  "schema": "https://elis.rossum.ai/api/v1/schemas/12345",
-  "trigger_condition": "field.amount > 10000",
-  "actions": [...],
-  "enabled": true
 }
 ```
 
 ### update_rule
 
-Full update (PUT) of a business rule. All fields are required.
+Full replacement (PUT) of a business rule. All fields are required.
 
 **Parameters:**
 - `rule_id` (integer, required): Rule ID to update
@@ -626,26 +554,7 @@ Full update (PUT) of a business rule. All fields are required.
 - `trigger_condition` (string, required): TxScript formula
 - `actions` (array, required): List of actions with required fields: `id`, `type`, `event`, `payload`
 - `enabled` (boolean, required): Whether the rule is enabled
-- `queue_ids` (array of integers, optional): List of queue IDs to limit the rule to specific queues
-
-**Example:**
-```json
-{
-  "rule_id": 67890,
-  "name": "Updated High Value Alert",
-  "trigger_condition": "field.amount > 5000",
-  "actions": [
-    {
-      "id": "alert1",
-      "type": "show_message",
-      "event": "validation",
-      "payload": {"type": "warning", "content": "Check this value", "schema_id": "amount"}
-    }
-  ],
-  "enabled": true,
-  "queue_ids": [101, 102]
-}
-```
+- `queue_ids` (array of integers, required): Queue IDs (pass empty list to remove all queue associations)
 
 ### patch_rule
 
@@ -657,7 +566,7 @@ Partial update (PATCH) of a business rule. Only provided fields are updated.
 - `trigger_condition` (string, optional): TxScript formula
 - `actions` (array, optional): List of actions
 - `enabled` (boolean, optional): Whether the rule is enabled
-- `queue_ids` (array of integers, optional): List of queue IDs (empty list removes all queue associations)
+- `queue_ids` (array of integers, optional): Queue IDs; pass `[]` to clear queue scoping
 
 **Example:**
 ```python
@@ -683,47 +592,27 @@ Deletes a rule by ID.
 
 ---
 
-## Workspace Management (4 tools)
-
-### get_workspace
-
-Retrieves workspace details by ID.
-
-**Parameters:**
-- `workspace_id` (integer, required): Workspace ID
-
-### list_workspaces
-
-Lists all workspaces with optional filtering.
+## Workspace Management (2 tools)
 
 ### create_workspace
 
 Creates a new workspace.
 
+**Parameters:**
+- `name` (string, required): Workspace name
+- `organization_id` (integer, required): Organization ID
+- `metadata` (object, optional): Custom metadata
+
 ### delete_workspace
 
-Deletes a workspace by ID.
+Deletes a workspace by ID. Fails if the workspace still contains queues.
 
 **Parameters:**
 - `workspace_id` (integer, required): Workspace ID to delete
 
 ---
 
-## Organization Groups (4 tools)
-
-### get_organization_group
-
-Retrieves organization group details by ID.
-
-**Parameters:**
-- `organization_group_id` (integer, required): Organization group ID
-
-### list_organization_groups
-
-Lists organization groups with optional name filter.
-
-**Parameters:**
-- `name` (string, optional): Filter by name
+## Organization Groups (2 tools)
 
 ### are_lookup_fields_enabled
 
@@ -745,73 +634,34 @@ Checks whether reasoning fields are available. The `reasoning_fields` feature mu
 
 ---
 
-## Organization Limits (1 tool)
-
-### get_organization_limit
-
-Retrieves email sending limits and usage counters for an organization.
-
-**Parameters:**
-- `organization_id` (integer, required): Organization ID
-
-**Returns:**
-```json
-{
-  "email_limits": {
-    "count_today": 5,
-    "count_today_notification": 2,
-    "count_total": 100,
-    "email_per_day_limit": 50,
-    "email_per_day_limit_notification": 20,
-    "email_total_limit": 10000,
-    "last_sent_at": "2026-02-09T10:00:00Z",
-    "last_sent_at_notification": "2026-02-09T09:00:00Z"
-  }
-}
-```
-
----
-
-## User Management (5 tools)
-
-### get_user
-
-Retrieves a single user by ID.
-
-**Parameters:**
-- `user_id` (integer, required): User ID
-
-### list_users
-
-Lists users in the organization. Use this to find a user's URL for `token_owner` in `create_hook_from_template`.
-
-**Parameters:**
-- `username`, `email`, `first_name`, `last_name` (optional): Filter options
-- `is_active` (boolean, optional): Filter by active status
-- `is_organization_group_admin` (boolean, optional): Filter by admin role
+## User Management (2 tools)
 
 ### create_user
 
-Creates a new user. Use `list_user_roles` for role/group URLs; queue/group fields take full API URLs.
+Creates a new user. Use `search(query={"entity": "user_role"})` to get role/group URLs.
 
 **Parameters:**
 - `username` (string, required): Username for the new user
 - `email` (string, required): Email address for the new user
 - `queues` (array of strings, optional): List of queue URLs to assign
 - `groups` (array of strings, optional): List of group/role URLs to assign
-- `first_name`, `last_name` (string, optional): User's name
+- `first_name` (string, optional): User's first name
+- `last_name` (string, optional): User's last name
 - `is_active` (boolean, optional, default: true): Whether the user is active
 - `metadata` (object, optional): Custom metadata
 - `oidc_id` (string, optional): OIDC identity for SSO
-- `auth_type` (string, optional, default: "password"): Authentication type
+- `auth_type` (string, optional, default: `password`): Authentication type
 
 ### update_user
 
-Patches a user; only provided fields change. Use `list_user_roles` for role/group URLs.
+Patches a user; only provided fields change. Use `search(query={"entity": "user_role"})` for role/group URLs.
 
 **Parameters:**
 - `user_id` (integer, required): User ID to update
-- `username`, `email`, `first_name`, `last_name` (string, optional): Updated fields
+- `username` (string, optional): Updated username
+- `email` (string, optional): Updated email
+- `first_name` (string, optional): Updated first name
+- `last_name` (string, optional): Updated last name
 - `queues` (array of strings, optional): New list of queue URLs
 - `groups` (array of strings, optional): New list of group/role URLs
 - `is_active` (boolean, optional): Active status
@@ -820,71 +670,9 @@ Patches a user; only provided fields change. Use `list_user_roles` for role/grou
 - `auth_type` (string, optional): Updated authentication type
 - `ui_settings` (object, optional): Updated UI settings
 
-### list_user_roles
-
-Lists all user roles (groups of permissions) in the organization.
-
 ---
 
-## Relations Management (4 tools)
-
-### get_relation
-
-Retrieves annotation relation details by ID.
-
-**Parameters:**
-- `relation_id` (integer, required): Relation ID
-
-### list_relations
-
-Lists all relations between annotations.
-
-**Relation types:**
-- `edit` - Created after editing annotation (rotation/split)
-- `attachment` - Documents attached to another
-- `duplicate` - Same document imported twice
-
-**Parameters:**
-- `type` (string, optional): Filter by type
-- `parent` (integer, optional): Filter by parent annotation ID
-
-### get_document_relation
-
-Retrieves document relation details by ID.
-
-**Parameters:**
-- `document_relation_id` (integer, required): Document relation ID
-
-### list_document_relations
-
-Lists all document relations.
-
-**Relation types:**
-- `export` - Documents generated from exporting
-- `einvoice` - Electronic invoice documents
-
-**Parameters:**
-- `type` (string, optional): Filter by type
-- `annotation` (integer, optional): Filter by annotation ID
-
----
-
-## Email Templates (3 tools)
-
-### get_email_template
-
-Retrieves email template details by ID.
-
-**Parameters:**
-- `email_template_id` (integer, required): Email template ID
-
-### list_email_templates
-
-Lists all email templates.
-
-**Parameters:**
-- `queue_id` (integer, optional): Filter by queue ID
-- `type` (string, optional): 'rejection', 'rejection_default', 'email_with_no_processable_attachments', 'custom'
+## Email Templates (1 tool)
 
 ### create_email_template
 
@@ -892,51 +680,30 @@ Creates a new email template.
 
 **Parameters:**
 - `name` (string, required): Template name
-- `queue` (string, required): Queue URL
+- `queue` (integer, required): Queue ID
 - `subject` (string, required): Email subject
 - `message` (string, required): Email body (HTML supported)
-- `type` (string, optional): Template type (default: 'custom')
-- `automate` (boolean, optional): Auto-send on trigger (default: false)
-- `to`, `cc`, `bcc` (array, optional): Recipient objects
+- `type` (string, optional, default: `custom`): Template type — `rejection`, `rejection_default`, `email_with_no_processable_attachments`, or `custom`
+- `automate` (boolean, optional, default: false): Auto-send on trigger
+- `to` (array, optional): Recipient objects
+- `cc` (array, optional): CC recipient objects
+- `bcc` (array, optional): BCC recipient objects
+- `triggers` (array of strings, optional): Trigger event names for automatic sending
 
-**Recipient types:**
-- `{"type": "annotator", "value": ""}` - Document annotator
-- `{"type": "constant", "value": "email@example.com"}` - Fixed email
-- `{"type": "datapoint", "value": "email_field_id"}` - From field
+**Recipient object types:**
+- `{"type": "annotator", "value": ""}` — Document annotator
+- `{"type": "constant", "value": "email@example.com"}` — Fixed email address
+- `{"type": "datapoint", "value": "email_field_id"}` — Value from a document field
 
 ---
 
-## MCP Mode & Discovery (3 tools)
-
-### get_mcp_mode_tool
-
-Get the current MCP operation mode (read-only or read-write).
-
-### set_mcp_mode_tool
-
-Set the MCP operation mode. Use 'read-only' to disable write operations, 'read-write' to enable them.
-
-**Parameters:**
-- `mode` (string, required): Target mode — "read-only" or "read-write"
+## Discovery (1 tool)
 
 ### list_tool_categories
 
-Lists all available tool categories with descriptions, tool names, and keywords for dynamic tool loading.
+Lists all available tool categories with descriptions, tool names, read/write status, and keywords for dynamic tool loading.
 
-**Available Categories:**
-- `annotations` - Document processing (9 tools)
-- `queues` - Queue management (9 tools)
-- `schemas` - Schema management (8 tools)
-- `engines` - AI engine management (6 tools)
-- `hooks` - Extensions/webhooks (9 tools)
-- `email_templates` - Email templates (3 tools)
-- `document_relations` - Document relations (2 tools)
-- `relations` - Annotation relations (2 tools)
-- `rules` - Validation rules (6 tools)
-- `users` - User management (5 tools)
-- `workspaces` - Workspace management (4 tools)
-- `organization_groups` - Organization group management (4 tools)
-- `organization_limits` - Organization limits (1 tool)
+**Available categories:** `read`, `annotations`, `queues`, `schemas`, `engines`, `hooks`, `email_templates`, `rules`, `organization_groups`, `users`, `workspaces`
 
 ---
 
@@ -944,12 +711,12 @@ Lists all available tool categories with descriptions, tool names, and keywords 
 
 When a document is uploaded, the annotation progresses through various states:
 
-1. **importing** - Initial state after upload. Document is being processed.
-2. **to_review** - Extraction complete, ready for user validation.
-3. **reviewing** - Annotation is being reviewed (triggered by `start_annotation`).
-4. **confirmed** - Validated and confirmed (via `confirm_annotation`).
-5. **exporting** - Being exported.
-6. **exported** - Final state for successfully processed documents.
+1. **importing** — Initial state after upload. Document is being processed.
+2. **to_review** — Extraction complete, ready for user validation.
+3. **reviewing** — Annotation is being reviewed (triggered by `start_annotation`).
+4. **confirmed** — Validated and confirmed (via `confirm_annotation`).
+5. **exporting** — Being exported.
+6. **exported** — Final state for successfully processed documents.
 
 Other states: `created`, `failed_import`, `split`, `in_workflow`, `rejected`, `failed_export`, `postponed`, `deleted`, `purged`.
 
@@ -965,19 +732,18 @@ Other states: `created`, `failed_import`, `split`, `in_workflow`, `rejected`, `f
 ### Single Document Upload
 
 1. Upload using `upload_document`
-2. Get annotation ID using `list_annotations`
-3. Check status using `get_annotation`
+2. Get annotation ID using `search(query={"entity": "annotation", "queue_id": ..., "status": "importing,to_review"})`
+3. Check status using `get(entity='annotation', entity_id=...)`
 4. Wait until status is `to_review`, `confirmed`, or `exported`
 
 ### Document Upload with Field Updates
 
 1. Upload using `upload_document`
-2. Get annotation ID using `list_annotations`
-3. Wait until status is `importing` or `to_review`
-4. Start annotation using `start_annotation`
-5. Get content using `get_annotation_content`
-6. Update fields using `bulk_update_annotation_fields`
-7. Confirm using `confirm_annotation`
+2. Get annotation ID using `search(query={"entity": "annotation", "queue_id": ...})`
+3. Start annotation using `start_annotation`
+4. Get content using `get_annotation_content`
+5. Update fields using `bulk_update_annotation_fields`
+6. Confirm using `confirm_annotation`
 
 ### Create Queue with Engine
 
@@ -986,3 +752,24 @@ Other states: `created`, `failed_import`, `split`, `in_workflow`, `rejected`, `f
 3. Create engine fields using `create_engine_field`
 4. Create queue using `create_queue`
 5. Optionally update engine training queues using `update_engine`
+
+### Explore a Queue
+
+```python
+# Get queue with all related data in one call
+get(entity="queue", entity_id=12345, include_related=True)
+# Returns queue data + schema_tree + engine + hooks summary
+```
+
+### Find and Test a Hook
+
+```python
+# Browse available templates
+search(query={"entity": "hook_template"})
+
+# List hooks for a specific queue
+search(query={"entity": "hook", "queue_id": 12345})
+
+# View hook logs for debugging
+search(query={"entity": "hook_log", "hook_id": 678, "log_level": "ERROR"})
+```
