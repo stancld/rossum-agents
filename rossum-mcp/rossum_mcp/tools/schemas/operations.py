@@ -19,11 +19,7 @@ from rossum_mcp.tools.base import (
     filter_by_name_regex,
     graceful_list,
 )
-from rossum_mcp.tools.schemas.models import (
-    SchemaListItem,
-    SchemaNode,
-    SchemaNodeUpdate,
-)
+from rossum_mcp.tools.schemas.models import SchemaListItem, SchemaNode, SchemaNodeUpdate
 from rossum_mcp.tools.schemas.patching import PatchOperation, _find_node_anywhere, apply_schema_patch
 from rossum_mcp.tools.schemas.pruning import (
     _collect_all_field_ids,

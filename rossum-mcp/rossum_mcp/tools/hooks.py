@@ -8,12 +8,7 @@ from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.hook import Hook, HookAction, HookEvent, HookEventAndAction, HookRunData, HookType
 from rossum_api.models.hook_template import HookTemplate
 
-from rossum_mcp.tools.base import (
-    build_filters,
-    delete_resource,
-    extract_id_from_url,
-    graceful_list,
-)
+from rossum_mcp.tools.base import build_filters, delete_resource, extract_id_from_url, graceful_list
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP

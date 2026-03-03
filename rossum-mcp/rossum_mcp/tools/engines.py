@@ -8,6 +8,10 @@ from rossum_api.models.engine import Engine, EngineField, EngineFieldType
 
 from rossum_mcp.tools.base import build_filters, build_resource_url, graceful_list
 
+if TYPE_CHECKING:
+    from fastmcp import FastMCP
+    from rossum_api import AsyncRossumAPIClient
+
 type EngineType = Literal["extractor", "splitter"]
 
 
@@ -17,10 +21,6 @@ class EngineUpdateData(TypedDict, total=False):
     learning_enabled: bool
     training_queues: list[str]
 
-
-if TYPE_CHECKING:
-    from fastmcp import FastMCP
-    from rossum_api import AsyncRossumAPIClient
 
 logger = logging.getLogger(__name__)
 
