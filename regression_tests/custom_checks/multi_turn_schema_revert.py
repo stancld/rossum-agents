@@ -16,15 +16,11 @@ def check_multi_turn_schema_reverted(steps: list[AgentStep], api_base_url: str, 
 
     Checks:
     - revert_commit was called
-    - are_reasoning_fields_enabled was called (agent verified feature availability)
     - Session-added fields (the_net_terms, recipient_country) are gone from the schema
     - Schema still has the original EU template fields (>= 5 datapoints)
     """
     if not agent_called_tool(steps, "restore_entity_version"):
         return False, "Agent never called restore_entity_version"
-
-    if not agent_called_tool(steps, "are_reasoning_fields_enabled"):
-        return False, "Agent never checked reasoning field availability (are_reasoning_fields_enabled not called)"
 
     schema_id = _extract_schema_id_from_steps(steps)
     if not schema_id:

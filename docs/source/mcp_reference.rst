@@ -587,40 +587,6 @@ prune_schema_fields
   Removes multiple fields from a schema at once, keeping only specified fields and their
   ancestor sections/multivalues. Efficient for pruning unwanted fields during setup.
 
-are_lookup_fields_enabled
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``are_lookup_fields_enabled()``
-
-**API Endpoint:**
-  ``GET /v1/organization_groups``
-
-**Returns:**
-  ``{"enabled": bool}``
-
-**Implementation:**
-  Returns ``{"enabled": True}`` if any organization group has both ``datasets`` and
-  ``lookup_fields`` features set to ``{"enabled": True}`` in its ``features`` dict.
-  Returns ``{"enabled": False}`` otherwise.
-
-are_reasoning_fields_enabled
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``are_reasoning_fields_enabled()``
-
-**API Endpoint:**
-  ``GET /v1/organization_groups``
-
-**Returns:**
-  ``{"enabled": bool}``
-
-**Implementation:**
-  Returns ``{"enabled": True}`` if any organization group has the ``reasoning_fields``
-  feature set to ``{"enabled": True}`` in its ``features`` dict. Returns
-  ``{"enabled": False}`` otherwise.
-
 list_tool_categories
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -684,10 +650,6 @@ list_tool_categories
    * - ``workspaces``
      - Workspace management: organize queues
      - workspace, organization
-   * - ``organization_groups``
-     - Organization group management: view license groups
-     - organization group, license, trial, production, deployment
-
 **Example:**
 
 .. code-block:: python

@@ -52,19 +52,6 @@ CATEGORY_META: dict[str, CategoryMeta] = {
         description="Validation rules: manage schema validation rules",
         keywords=["rule", "validation", "constraint"],
     ),
-    "organization_groups": CategoryMeta(
-        description="Organization group management: view license groups shared across organizations",
-        keywords=[
-            "organization group",
-            "license",
-            "trial",
-            "production",
-            "deployment",
-            "lookup fields",
-            "datasets",
-            "reasoning fields",
-        ],
-    ),
     "users": CategoryMeta(
         description="User management: create, update, list users and roles",
         keywords=["user", "role", "permission", "token_owner"],

@@ -16,7 +16,6 @@ from rossum_mcp.tools import (
     register_email_template_tools,
     register_engine_tools,
     register_hook_tools,
-    register_organization_group_tools,
     register_queue_tools,
     register_read_tools,
     register_rule_tools,
@@ -59,7 +58,6 @@ def create_app() -> FastMCP:
     register_schema_tools(mcp, client)
     register_engine_tools(mcp, client)
     register_hook_tools(mcp, client)
-    register_organization_group_tools(mcp, client)
     register_email_template_tools(mcp, client)
     register_rule_tools(mcp, client)
     register_user_tools(mcp, client)

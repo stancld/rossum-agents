@@ -9,7 +9,6 @@ from rossum_api.models.organization_group import OrganizationGroup
 from rossum_mcp.tools.base import build_filters, filter_by_name_regex, graceful_list
 
 if TYPE_CHECKING:
-    from fastmcp import FastMCP
     from rossum_api import AsyncRossumAPIClient
 
 logger = logging.getLogger(__name__)
@@ -27,43 +26,3 @@ async def _list_organization_groups(
     filters = build_filters(name=None if use_regex else name)
     items = (await graceful_list(client, Resource.OrganizationGroup, "organization_group", **filters)).items
     return filter_by_name_regex(items, name, use_regex)
-
-
-def _is_feature_enabled(features: dict, key: str) -> bool:
-    return bool(features.get(key, {}).get("enabled"))
-
-
-async def _are_lookup_fields_enabled(client: AsyncRossumAPIClient) -> dict:
-    groups = await _list_organization_groups(client)
-    for group in groups:
-        features = group.features or {}
-        if _is_feature_enabled(features, "datasets") and _is_feature_enabled(features, "lookup_fields"):
-            return {"enabled": True}
-    return {"enabled": False}
-
-
-async def _are_reasoning_fields_enabled(client: AsyncRossumAPIClient) -> dict:
-    groups = await _list_organization_groups(client)
-    for group in groups:
-        features = group.features or {}
-        if _is_feature_enabled(features, "reasoning_fields"):
-            return {"enabled": True}
-    return {"enabled": False}
-
-
-def register_organization_group_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(
-        description="Check if lookup fields are enabled. Both 'datasets' and 'lookup_fields' features must be enabled in an organization group.",
-        tags={"organization_groups"},
-        annotations={"readOnlyHint": True},
-    )
-    async def are_lookup_fields_enabled() -> dict:
-        return await _are_lookup_fields_enabled(client)
-
-    @mcp.tool(
-        description="Check if reasoning fields are enabled. The 'reasoning_fields' feature must be enabled in an organization group.",
-        tags={"organization_groups"},
-        annotations={"readOnlyHint": True},
-    )
-    async def are_reasoning_fields_enabled() -> dict:
-        return await _are_reasoning_fields_enabled(client)

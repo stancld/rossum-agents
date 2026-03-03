@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 43 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 41 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ---
 
@@ -612,28 +612,6 @@ Deletes a workspace by ID. Fails if the workspace still contains queues.
 
 ---
 
-## Organization Groups (2 tools)
-
-### are_lookup_fields_enabled
-
-Checks whether lookup fields are available. Both `datasets` and `lookup_fields` features must be enabled in at least one organization group.
-
-**Returns:**
-```json
-{"enabled": true}
-```
-
-### are_reasoning_fields_enabled
-
-Checks whether reasoning fields are available. The `reasoning_fields` feature must be enabled in at least one organization group.
-
-**Returns:**
-```json
-{"enabled": true}
-```
-
----
-
 ## User Management (2 tools)
 
 ### create_user
@@ -725,7 +703,7 @@ Set the MCP operation mode. Use `read-only` to disable write operations, `read-w
 
 Lists all available tool categories with descriptions, tool names, read/write status, and keywords for dynamic tool loading.
 
-**Available categories:** `read`, `annotations`, `queues`, `schemas`, `engines`, `hooks`, `email_templates`, `rules`, `organization_groups`, `users`, `workspaces`
+**Available categories:** `read`, `annotations`, `queues`, `schemas`, `engines`, `hooks`, `email_templates`, `rules`, `users`, `workspaces`
 
 ---
 

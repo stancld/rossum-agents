@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **43 tools** organized into categories:
+The MCP server provides **41 tools** organized into categories:
 
 **Unified Read Layer**
 
@@ -82,11 +82,6 @@ The MCP server provides **43 tools** organized into categories:
 
 * **create_workspace** - Create a new workspace
 * **delete_workspace** - Delete a workspace
-
-**Organization Groups**
-
-* **are_lookup_fields_enabled** - Check if lookup fields are enabled for an organization group
-* **are_reasoning_fields_enabled** - Check if reasoning fields are enabled for an organization group
 
 **User Management**
 
