@@ -6,20 +6,17 @@ Reuses existing private functions from individual tool modules.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
-
-from rossum_api.domain_logic.resources import Resource
-from rossum_api.models.document_relation import DocumentRelation
-from rossum_api.models.relation import Relation
+from typing import TYPE_CHECKING
 
 from rossum_mcp.tools.annotations import _get_annotation, _list_annotations
-from rossum_mcp.tools.base import build_filters, graceful_list
+from rossum_mcp.tools.document_relations import _get_document_relation, _list_document_relations
 from rossum_mcp.tools.email_templates import _get_email_template, _list_email_templates
 from rossum_mcp.tools.engines import _get_engine, _list_engines
 from rossum_mcp.tools.hooks import _get_hook, _list_hook_logs, _list_hook_templates, _list_hooks
 from rossum_mcp.tools.organization_groups import _get_organization_group, _list_organization_groups
 from rossum_mcp.tools.organization_limits import _get_organization_limit
 from rossum_mcp.tools.queues import _get_queue, _list_queues
+from rossum_mcp.tools.relations import _get_relation, _list_relations
 from rossum_mcp.tools.rules import _get_rule, _list_rules
 from rossum_mcp.tools.schemas.operations import get_schema, list_schemas
 from rossum_mcp.tools.users import _get_user, _list_user_roles, _list_users
@@ -113,31 +110,3 @@ def extract_search_kwargs(query: SearchQuery) -> dict[str, object]:
     data = query.model_dump(exclude_none=True)
     data.pop("entity", None)
     return data
-
-
-# --- Helpers for relations/document_relations (were inline in the original modules) ---
-
-
-async def _get_relation(client: AsyncRossumAPIClient, relation_id: int) -> Relation:
-    relation_data = await client._http_client.fetch_one(Resource.Relation, relation_id)
-    return cast("Relation", client._deserializer(Resource.Relation, relation_data))
-
-
-async def _get_document_relation(client: AsyncRossumAPIClient, document_relation_id: int) -> DocumentRelation:
-    return await client.retrieve_document_relation(document_relation_id)
-
-
-async def _list_by_resource(
-    client: AsyncRossumAPIClient, resource: Resource, name: str, **kwargs: object
-) -> list[object]:
-    filters = build_filters(**kwargs)
-    result = await graceful_list(client, resource, name, **filters)
-    return result.items
-
-
-async def _list_relations(client: AsyncRossumAPIClient, **kwargs: object) -> list[object]:
-    return await _list_by_resource(client, Resource.Relation, "relation", **kwargs)
-
-
-async def _list_document_relations(client: AsyncRossumAPIClient, **kwargs: object) -> list[object]:
-    return await _list_by_resource(client, Resource.DocumentRelation, "document_relation", **kwargs)
