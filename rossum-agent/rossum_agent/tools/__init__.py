@@ -7,6 +7,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rossum_agent.tools.ask_user import (
+    ask_user_question,
+    get_ask_user_question_definition,
+)
 from rossum_agent.tools.change_history import (
     diff_objects,
     restore_entity_version,
@@ -123,12 +127,13 @@ def get_internal_tools() -> list[ToolParam]:
     return [tool.to_dict() for tool in _get_active_internal_tools()] + [
         get_load_tool_category_definition(),
         get_load_tool_definition(),
+        get_ask_user_question_definition(),
     ]
 
 
 def get_internal_tool_names() -> set[str]:
     """Get names of all executable internal tools (always includes all for dispatch)."""
-    return set(_INTERNAL_TOOL_REGISTRY.keys()) | {"load_tool_category", "load_tool"}
+    return set(_INTERNAL_TOOL_REGISTRY.keys()) | {"load_tool_category", "load_tool", "ask_user_question"}
 
 
 def execute_internal_tool(name: str, arguments: dict[str, object]) -> str:
@@ -153,6 +158,15 @@ def execute_internal_tool(name: str, arguments: dict[str, object]) -> str:
         raw_tool_names = arguments.get("tool_names", [])
         tool_names = [str(t) for t in raw_tool_names] if isinstance(raw_tool_names, list) else [str(raw_tool_names)]
         return load_tool(tool_names)
+
+    if name == "ask_user_question":
+        q = arguments.get("question")
+        return ask_user_question(
+            question=str(q) if q is not None else None,
+            options=arguments.get("options"),  # type: ignore[arg-type]
+            multi_select=bool(arguments.get("multi_select", False)),
+            questions=arguments.get("questions"),  # type: ignore[arg-type]
+        )
 
     if tool := _INTERNAL_TOOL_REGISTRY.get(name):
         return tool(**arguments)

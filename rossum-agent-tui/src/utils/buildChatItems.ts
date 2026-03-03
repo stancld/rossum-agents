@@ -81,6 +81,7 @@ function appendTrailingItems(
   items: ChatItem[],
   state: ChatState,
   paired: Array<{ step: CompletedStep; resultStep?: CompletedStep }>,
+  questionIndex?: number,
 ): void {
   for (const f of state.files) {
     items.push({ kind: "file_created", filename: f.filename, url: f.url });
@@ -88,6 +89,21 @@ function appendTrailingItems(
 
   if (state.configCommit) {
     items.push({ kind: "config_commit", commit: state.configCommit });
+  }
+
+  if (state.pendingQuestion) {
+    const qi = questionIndex ?? 0;
+    const currentQ = state.pendingQuestion.questions[qi];
+    if (currentQ) {
+      items.push({
+        kind: "agent_question",
+        question: currentQ.question,
+        options: currentQ.options,
+        multiSelect: currentQ.multi_select,
+        questionIndex: qi,
+        totalQuestions: state.pendingQuestion.questions.length,
+      });
+    }
   }
 
   if (
@@ -107,7 +123,10 @@ function appendTrailingItems(
   }
 }
 
-export function buildChatItems(state: ChatState): ChatItem[] {
+export function buildChatItems(
+  state: ChatState,
+  questionIndex?: number,
+): ChatItem[] {
   const items: ChatItem[] = [];
   const paired = pairSteps(state.completedSteps);
   const feedback = state.feedback;
@@ -146,7 +165,7 @@ export function buildChatItems(state: ChatState): ChatItem[] {
     msgIdx++;
   }
 
-  appendTrailingItems(items, state, paired);
+  appendTrailingItems(items, state, paired, questionIndex);
   return items;
 }
 

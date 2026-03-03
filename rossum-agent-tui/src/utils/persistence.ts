@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import type {
+  AgentQuestionEvent,
   ChatState,
   CompletedStep,
   UserMessage,
@@ -22,6 +23,7 @@ interface PersistedState {
   tokenUsage: TokenUsageBreakdown | null;
   finalAnswer: string | null;
   feedback: Record<number, boolean>;
+  pendingQuestion: AgentQuestionEvent | null;
 }
 
 export function loadPersistedState(): ChatState | null {
@@ -44,6 +46,10 @@ export function loadPersistedState(): ChatState | null {
       error: null,
       userMessages: p.userMessages ?? [],
       feedback: p.feedback ?? {},
+      pendingQuestion:
+        p.pendingQuestion && Array.isArray(p.pendingQuestion.questions)
+          ? p.pendingQuestion
+          : null,
     };
   } catch {
     return null;
@@ -62,6 +68,7 @@ export function savePersistedState(state: ChatState): void {
       tokenUsage: state.tokenUsage,
       finalAnswer: state.finalAnswer,
       feedback: state.feedback,
+      pendingQuestion: state.pendingQuestion,
     };
     writeFileSync(FILE, JSON.stringify(p));
   } catch {

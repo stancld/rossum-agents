@@ -83,13 +83,14 @@ def _evaluate_criteria(
     final_step = final_steps[-1] if final_steps else None
     final_answer = final_step.final_answer if final_step else ""
 
-    # Always required checks
-    all_passed &= _check("Final answer present", bool(final_answer), "No final answer", failures)
+    criteria = case.success_criteria
+
+    # Final answer check (can be disabled for tests where agent asks a question instead)
+    if criteria.require_final_answer:
+        all_passed &= _check("Final answer present", bool(final_answer), "No final answer", failures)
 
     errors = [s.error for s in run.steps if isinstance(s, ErrorStep)]
     all_passed &= _check("No agent errors", not errors, f"Errors: {errors}", failures)
-
-    criteria = case.success_criteria
 
     if criteria.required_keywords:
         answer_lower = (final_answer or "").lower()

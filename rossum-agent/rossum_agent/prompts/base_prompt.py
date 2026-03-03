@@ -120,7 +120,11 @@ For complex multi-step operations (3+ steps), keep progress visible with task up
 | When a step starts | Call `update_task(status="in_progress")` |
 | When a step finishes | Call `update_task(status="completed")` |
 
-Skip task tracking for simple requests. Create tasks in execution order and keep at most one task `in_progress` at a time."""
+Skip task tracking for simple requests. Create tasks in execution order and keep at most one task `in_progress` at a time.
+
+**Asking Questions**: Prefer using `ask_user_question` tool — do not ask questions as plain text in your response if not really suitable. Use it when you need required information that you cannot determine on your own (e.g. queue name, template choice, workspace ID). Also use it when the user explicitly asks you to confirm before proceeding, or when the `cautious` persona is active. For optional or inferable details, make your best judgment and act. Stop after calling it — do not call other tools or produce text in the same turn.
+
+When you need multiple pieces of information, use the `questions` array parameter to ask them all at once — each question is presented to the user one at a time with its own input control (free-text or selector). Gather what you can from context or tools first, then ask everything remaining in a single call."""
 
 PERSONA_BEHAVIORS: dict[str, str] = {
     "default": "# Persona: default",

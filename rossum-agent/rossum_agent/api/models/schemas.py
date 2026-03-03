@@ -216,6 +216,29 @@ class TaskSnapshotEvent(BaseModel):
     tasks: list[dict[str, object]]
 
 
+class QuestionOptionSchema(BaseModel):
+    """A single option for an agent question."""
+
+    value: str
+    label: str
+    description: str = ""
+
+
+class AgentQuestionItemSchema(BaseModel):
+    """A single question within an agent question event."""
+
+    question: str
+    options: list[QuestionOptionSchema] = Field(default_factory=list)
+    multi_select: bool = False
+
+
+class AgentQuestionEvent(BaseModel):
+    """Event emitted when the agent asks the user a structured question."""
+
+    type: Literal["agent_question"] = "agent_question"
+    questions: list[AgentQuestionItemSchema]
+
+
 class TokenUsageBySource(BaseModel):
     """Token usage for a specific source (main agent or sub-agent)."""
 
