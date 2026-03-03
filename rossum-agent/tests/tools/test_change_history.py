@@ -11,11 +11,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from rossum_agent.change_tracking.models import ConfigCommit, EntityChange
 from rossum_agent.rossum_mcp_integration import unwrap
 from rossum_agent.tools.change_history import (
+    _build_node_index,
     _collapsed_operation,
     _compute_revert_patch,
     _deduplicate_changes,
+    _describe_node,
+    _diff_snapshots,
     _flush_pending_changes,
     _revert_schema_with_retry,
+    _summarize_non_schema_diff,
+    _summarize_schema_diff,
+    _truncate_value,
     _unwrap_snapshot,
     diff_objects,
     restore_entity_version,
@@ -133,8 +139,11 @@ class TestShowCommitDetails:
             assert result["parent"] == "parent_hash"
             assert len(result["changes"]) == 1
             assert result["changes"][0]["entity_type"] == "queue"
-            assert result["changes"][0]["before"] == {"timeout": 60}
-            assert result["changes"][0]["after"] == {"timeout": 120}
+            assert result["changes"][0]["operation"] == "update"
+            assert "diff" in result["changes"][0]
+            assert "timeout:" in result["changes"][0]["diff"]
+            assert "60" in result["changes"][0]["diff"]
+            assert "120" in result["changes"][0]["diff"]
         finally:
             set_context(AgentContext())
 
@@ -1573,3 +1582,404 @@ class TestDiffObjects:
         assert "2" in result
         # Must produce a structured diff, not a single-line string diff
         assert result.startswith("---")
+
+
+# ---------------------------------------------------------------------------
+# Semantic schema diff tests
+# ---------------------------------------------------------------------------
+
+
+def _section(sid: str, label: str, children: list[dict] | None = None) -> dict:
+    """Helper to build a schema section node."""
+    node: dict = {"id": sid, "label": label, "category": "section"}
+    if children is not None:
+        node["children"] = children
+    return node
+
+
+def _field(fid: str, label: str, dtype: str = "string", **extra: object) -> dict:
+    """Helper to build a schema datapoint node."""
+    node: dict = {"id": fid, "label": label, "category": "datapoint", "type": dtype}
+    node.update(extra)
+    return node
+
+
+def _multivalue(mid: str, label: str, children: list[dict] | dict | None = None) -> dict:
+    """Helper to build a multivalue node."""
+    node: dict = {"id": mid, "label": label, "category": "multivalue"}
+    if children is not None:
+        node["children"] = children
+    return node
+
+
+class TestBuildNodeIndex:
+    def test_flat_section(self) -> None:
+        content = [
+            _section(
+                "sec1",
+                "Header",
+                [
+                    _field("f1", "Invoice Number"),
+                    _field("f2", "Date"),
+                ],
+            )
+        ]
+        idx = _build_node_index(content)
+        assert "sec1" in idx
+        assert "f1" in idx
+        assert "f2" in idx
+        assert idx["f1"]["parent_label"] == "Header"
+        assert idx["sec1"]["parent_label"] == ""
+
+    def test_nested_multivalue_with_dict_children(self) -> None:
+        content = [
+            _section(
+                "sec1",
+                "Items",
+                [
+                    _multivalue(
+                        "mv1",
+                        "Line Items",
+                        {
+                            "id": "tuple1",
+                            "category": "tuple",
+                            "children": [
+                                _field("item_desc", "Description"),
+                            ],
+                        },
+                    ),
+                ],
+            )
+        ]
+        idx = _build_node_index(content)
+        assert "mv1" in idx
+        assert "tuple1" in idx
+        assert "item_desc" in idx
+        assert idx["tuple1"]["parent_label"] == "Line Items"
+        assert idx["item_desc"]["parent_label"] == "tuple1"
+
+    def test_empty_content(self) -> None:
+        assert _build_node_index([]) == {}
+
+    def test_multivalue_with_list_children(self) -> None:
+        content = [
+            _multivalue(
+                "mv1",
+                "Items",
+                [
+                    _field("item1", "Item 1"),
+                    _field("item2", "Item 2"),
+                ],
+            )
+        ]
+        idx = _build_node_index(content)
+        assert "mv1" in idx
+        assert "item1" in idx
+        assert idx["item1"]["parent_label"] == "Items"
+
+
+class TestDescribeNode:
+    def test_datapoint(self) -> None:
+        node = _field("f1", "Invoice Number", "string")
+        assert _describe_node(node) == 'datapoint "Invoice Number" (string)'
+
+    def test_section(self) -> None:
+        node = _section("sec1", "Header")
+        assert _describe_node(node) == 'section "Header"'
+
+    def test_multivalue(self) -> None:
+        node = _multivalue("mv1", "Line Items")
+        assert _describe_node(node) == 'multivalue "Line Items"'
+
+    def test_formula_field(self) -> None:
+        node = _field("f1", "Total", "number", formula="=sum()")
+        result = _describe_node(node)
+        assert "formula" in result
+        assert "number" in result
+
+    def test_ai_field(self) -> None:
+        node = _field("f1", "Vendor", "string", rir_field_names=["sender_name"])
+        result = _describe_node(node)
+        assert "AI" in result
+
+    def test_tuple(self) -> None:
+        node = {"id": "t1", "label": "Row", "category": "tuple"}
+        assert _describe_node(node) == 'tuple "Row"'
+
+
+class TestSummarizeSchemasDiff:
+    def test_field_added(self) -> None:
+        before = {"content": [_section("sec1", "Header", [_field("f1", "Number")])]}
+        after = {"content": [_section("sec1", "Header", [_field("f1", "Number"), _field("f2", "Date")])]}
+        result = _summarize_schema_diff(before, after)
+        assert "Added" in result
+        assert "Date" in result
+        assert "Header" in result
+
+    def test_field_removed(self) -> None:
+        before = {"content": [_section("sec1", "Header", [_field("f1", "Number"), _field("f2", "Date")])]}
+        after = {"content": [_section("sec1", "Header", [_field("f1", "Number")])]}
+        result = _summarize_schema_diff(before, after)
+        assert "Removed" in result
+        assert "Date" in result
+
+    def test_field_moved(self) -> None:
+        before = {
+            "content": [
+                _section("sec1", "Header", [_field("f1", "Number")]),
+                _section("sec2", "Footer", []),
+            ]
+        }
+        after = {
+            "content": [
+                _section("sec1", "Header", []),
+                _section("sec2", "Footer", [_field("f1", "Number")]),
+            ]
+        }
+        result = _summarize_schema_diff(before, after)
+        assert "Moved" in result
+        assert "Header" in result
+        assert "Footer" in result
+
+    def test_property_changed(self) -> None:
+        before = {"content": [_section("sec1", "Header", [_field("f1", "Number", "string")])]}
+        after = {"content": [_section("sec1", "Header", [_field("f1", "Number", "number")])]}
+        result = _summarize_schema_diff(before, after)
+        assert "Changed" in result
+        assert "'string'" in result
+        assert "'number'" in result
+
+    def test_section_added(self) -> None:
+        before = {"content": [_section("sec1", "Header", [_field("f1", "Number")])]}
+        after = {
+            "content": [
+                _section("sec1", "Header", [_field("f1", "Number")]),
+                _section("sec2", "Footer", [_field("f2", "Total"), _field("f3", "Tax")]),
+            ]
+        }
+        result = _summarize_schema_diff(before, after)
+        assert 'Added section "Footer" with 2 fields' in result
+        # Individual fields within the new section should NOT be double-reported
+        assert result.count("Added") == 1
+
+    def test_section_removed(self) -> None:
+        before = {
+            "content": [
+                _section("sec1", "Header", [_field("f1", "Number")]),
+                _section("sec2", "Footer", [_field("f2", "Total"), _field("f3", "Tax")]),
+            ]
+        }
+        after = {"content": [_section("sec1", "Header", [_field("f1", "Number")])]}
+        result = _summarize_schema_diff(before, after)
+        assert 'Removed section "Footer" with 2 fields' in result
+        assert result.count("Removed") == 1
+
+    def test_create_schema(self) -> None:
+        after = {"name": "Invoice", "content": [_section("sec1", "Header", [_field("f1", "Number")])]}
+        result = _summarize_schema_diff(None, after)
+        assert "Created" in result
+        assert "Invoice" in result
+
+    def test_delete_schema(self) -> None:
+        before = {"name": "Invoice", "content": [_section("sec1", "Header", [_field("f1", "Number")])]}
+        result = _summarize_schema_diff(before, None)
+        assert "Deleted" in result
+        assert "Invoice" in result
+
+    def test_no_changes(self) -> None:
+        schema = {"content": [_section("sec1", "Header", [_field("f1", "Number")])]}
+        result = _summarize_schema_diff(schema, schema)
+        assert result == "No differences found."
+
+    def test_both_none(self) -> None:
+        assert _summarize_schema_diff(None, None) == "No differences found."
+
+    def test_multivalue_added(self) -> None:
+        before = {"content": [_section("sec1", "Header", [])]}
+        after = {
+            "content": [_section("sec1", "Header", [_multivalue("mv1", "Line Items", [_field("item1", "Desc")])])]
+        }
+        result = _summarize_schema_diff(before, after)
+        assert "Line Items" in result
+        assert "Added" in result
+
+    def test_wrapped_snapshots(self) -> None:
+        before = {"result": {"content": [_section("sec1", "Header", [_field("f1", "Number")])]}}
+        after = {"result": {"content": [_section("sec1", "Header", [_field("f1", "Number"), _field("f2", "Date")])]}}
+        result = _summarize_schema_diff(before, after)
+        assert "Added" in result
+        assert "Date" in result
+
+    def test_non_content_changes(self) -> None:
+        before = {"name": "Old Name", "content": []}
+        after = {"name": "New Name", "content": []}
+        result = _summarize_schema_diff(before, after)
+        assert "name:" in result
+        assert "Old Name" in result
+        assert "New Name" in result
+
+    def test_bulk_removal_grouped_by_parent(self) -> None:
+        """The motivating scenario: wiping many fields from a section."""
+        fields = [_field(f"f{i}", f"Field {i}") for i in range(12)]
+        before = {"content": [_section("sec1", "Basic Information", fields)]}
+        after = {"content": [_section("sec1", "Basic Information", [])]}
+        result = _summarize_schema_diff(before, after)
+        assert 'Removed 12 fields from "Basic Information"' in result
+        # Should list field IDs
+        assert "f0" in result
+        assert "f11" in result
+
+
+class TestDiffSnapshotsDispatch:
+    def test_schema_uses_semantic_diff(self) -> None:
+        before = {"content": [_section("sec1", "Header", [_field("f1", "Number")])]}
+        after = {"content": [_section("sec1", "Header", [_field("f1", "Number"), _field("f2", "Date")])]}
+        result = _diff_snapshots(before, after, entity_type="schema")
+        # Semantic diff -- no unified diff markers
+        assert "---" not in result
+        assert "Added" in result
+
+    def test_non_schema_uses_concise_summary(self) -> None:
+        before = {"timeout": 60}
+        after = {"timeout": 120}
+        result = _diff_snapshots(before, after, entity_type="queue")
+        assert "timeout:" in result
+        assert "60" in result
+        assert "120" in result
+        assert "---" not in result
+
+    def test_default_entity_type_uses_concise_summary(self) -> None:
+        before = {"timeout": 60}
+        after = {"timeout": 120}
+        result = _diff_snapshots(before, after)
+        assert "timeout:" in result
+        assert "---" not in result
+
+
+class TestShowCommitDetailsSemanticDiff:
+    """Verify show_commit_details uses semantic diff for schemas."""
+
+    def test_schema_change_uses_semantic_diff(self) -> None:
+        before = {"content": [_section("sec1", "Header", [_field("f1", "Number")])]}
+        after = {"content": [_section("sec1", "Header", [])]}
+        store = MagicMock()
+        store.get_commit.return_value = _make_commit(
+            changes=[_ec("schema", "100", "Invoice", "update", before, after)]
+        )
+        set_context(AgentContext(commit_store=store, rossum_environment="https://api.elis.rossum.ai/v1"))
+        try:
+            result = json.loads(show_commit_details(commit_hash="abc123"))
+            diff = result["changes"][0]["diff"]
+            assert "Removed" in diff
+            assert "Number" in diff
+            # No raw JSON diff markers
+            assert "---" not in diff
+        finally:
+            set_context(AgentContext())
+
+    def test_queue_change_uses_concise_summary(self) -> None:
+        store = MagicMock()
+        store.get_commit.return_value = _make_commit(
+            changes=[_ec("queue", "123", "My Queue", "update", {"timeout": 60}, {"timeout": 120})]
+        )
+        set_context(AgentContext(commit_store=store, rossum_environment="https://api.elis.rossum.ai/v1"))
+        try:
+            result = json.loads(show_commit_details(commit_hash="abc123"))
+            diff = result["changes"][0]["diff"]
+            assert "timeout:" in diff
+            assert "60" in diff
+            assert "120" in diff
+            assert "---" not in diff
+        finally:
+            set_context(AgentContext())
+
+
+class TestTruncateValue:
+    def test_dict(self) -> None:
+        assert _truncate_value({"a": 1, "b": 2}) == "{...2 keys}"
+
+    def test_list(self) -> None:
+        assert _truncate_value([1, 2, 3]) == "[...3 items]"
+
+    def test_short_string(self) -> None:
+        assert _truncate_value("hello") == "'hello'"
+
+    def test_long_string(self) -> None:
+        result = _truncate_value("x" * 100, max_len=20)
+        assert len(result) == 20
+        assert result.endswith("...")
+
+    def test_number(self) -> None:
+        assert _truncate_value(42) == "42"
+
+    def test_none(self) -> None:
+        assert _truncate_value(None) == "None"
+
+
+class TestSummarizeNonSchemaDiff:
+    def test_create(self) -> None:
+        after = {"name": "New Queue", "timeout": 60, "locale": "en_US"}
+        result = _summarize_non_schema_diff(None, after)
+        assert result == 'Created with name "New Queue".'
+
+    def test_create_empty_before(self) -> None:
+        after = {"name": "New Queue"}
+        result = _summarize_non_schema_diff({}, after)
+        assert result == 'Created with name "New Queue".'
+
+    def test_delete(self) -> None:
+        before = {"name": "Old Queue", "timeout": 60}
+        result = _summarize_non_schema_diff(before, None)
+        assert result == 'Deleted "Old Queue".'
+
+    def test_delete_empty_after(self) -> None:
+        before = {"name": "Old Queue"}
+        result = _summarize_non_schema_diff(before, {})
+        assert result == 'Deleted "Old Queue".'
+
+    def test_update_simple_fields(self) -> None:
+        before = {"name": "Queue", "session_timeout": "00:30:00"}
+        after = {"name": "Queue", "session_timeout": "01:00:00"}
+        result = _summarize_non_schema_diff(before, after)
+        assert "session_timeout:" in result
+        assert "'00:30:00'" in result
+        assert "'01:00:00'" in result
+
+    def test_update_nested_dict_truncated(self) -> None:
+        before = {"name": "Queue", "settings": {"key1": "val1", "key2": "val2"}}
+        after = {"name": "Queue", "settings": {"key1": "changed"}}
+        result = _summarize_non_schema_diff(before, after)
+        assert "settings:" in result
+        assert "{...2 keys}" in result
+        assert "{...1 keys}" in result
+
+    def test_update_nested_list_truncated(self) -> None:
+        before = {"name": "Queue", "rir_params": [1, 2, 3]}
+        after = {"name": "Queue", "rir_params": [1, 2]}
+        result = _summarize_non_schema_diff(before, after)
+        assert "rir_params:" in result
+        assert "[...3 items]" in result
+        assert "[...2 items]" in result
+
+    def test_no_changes(self) -> None:
+        data = {"name": "Queue", "timeout": 60}
+        result = _summarize_non_schema_diff(data, data)
+        assert result == "No differences found."
+
+    def test_both_none(self) -> None:
+        result = _summarize_non_schema_diff(None, None)
+        assert result == "No differences found."
+
+    def test_skips_read_only_fields(self) -> None:
+        before = {"name": "Queue", "modified_at": "2024-01-01", "url": "https://old"}
+        after = {"name": "Queue", "modified_at": "2024-02-01", "url": "https://new"}
+        result = _summarize_non_schema_diff(before, after)
+        assert result == "No differences found."
+
+    def test_unwraps_fastmcp_wrapper(self) -> None:
+        before = {"result": {"name": "Queue", "timeout": 30}}
+        after = {"result": {"name": "Queue", "timeout": 60}}
+        result = _summarize_non_schema_diff(before, after)
+        assert "timeout:" in result
+        assert "30" in result
+        assert "60" in result

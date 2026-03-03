@@ -241,15 +241,279 @@ def show_change_history(limit: int = 10) -> str:
     )
 
 
+def _build_node_index(
+    content: list[dict],
+    parent_label: str = "",
+) -> dict[str, dict]:
+    """Recursively index schema content nodes by ID.
+
+    Returns ``{node_id: {"node": dict, "parent_label": str, "category": str}}``.
+    Handles both list and dict children (multivalue pattern).
+    """
+    index: dict[str, dict] = {}
+    for node in content:
+        node_id = node.get("id", "")
+        category = node.get("category", "")
+        if node_id:
+            index[node_id] = {
+                "node": node,
+                "parent_label": parent_label,
+                "category": category,
+            }
+        label = node.get("label", node_id)
+        children = node.get("children")
+        if children is not None:
+            if isinstance(children, list):
+                index.update(_build_node_index(children, parent_label=label))
+            elif isinstance(children, dict):
+                index.update(_build_node_index([children], parent_label=label))
+    return index
+
+
+def _describe_node(node: dict) -> str:
+    """One-line description of a schema node."""
+    category = node.get("category", "")
+    label = node.get("label", node.get("id", "?"))
+    dtype = node.get("type", "")
+
+    qualifiers: list[str] = []
+    if dtype:
+        qualifiers.append(dtype)
+    if node.get("formula"):
+        qualifiers.append("formula")
+    if node.get("rir_field_names"):
+        qualifiers.append("AI")
+    qualifier_str = f" ({', '.join(qualifiers)})" if qualifiers else ""
+
+    if category == "section":
+        return f'section "{label}"'
+    if category == "multivalue":
+        return f'multivalue "{label}"'
+    if category == "tuple":
+        return f'tuple "{label}"'
+    return f'{category} "{label}"{qualifier_str}'
+
+
+_SCHEMA_DIFF_SKIP_KEYS = frozenset({"id", "children"})
+_SCHEMA_READ_ONLY_KEYS = frozenset({"url", "created_at", "modified_at", "modified_by", "created_by"})
+
+
+def _collect_section_changes(
+    changed_ids: set[str],
+    idx: dict[str, dict],
+    verb: str,
+) -> tuple[list[str], set[str]]:
+    """Report added/removed sections and return child IDs to skip."""
+    lines: list[str] = []
+    section_children: set[str] = set()
+    for nid in sorted(changed_ids):
+        entry = idx[nid]
+        if entry["category"] != "section":
+            continue
+        children = entry["node"].get("children", [])
+        if isinstance(children, list):
+            child_idx = _build_node_index(children)
+            section_children.update(child_idx)
+            lines.append(f"{verb} {_describe_node(entry['node'])} with {len(child_idx)} fields")
+        else:
+            lines.append(f"{verb} {_describe_node(entry['node'])}")
+    return lines, section_children
+
+
+def _collect_field_additions(
+    added_ids: set[str],
+    skip_ids: set[str],
+    idx: dict[str, dict],
+) -> list[str]:
+    """Group added non-section fields by parent."""
+    by_parent: dict[str, list[str]] = {}
+    for nid in sorted(added_ids):
+        if nid in skip_ids:
+            continue
+        entry = idx[nid]
+        if entry["category"] == "section":
+            continue
+        parent = entry["parent_label"] or "(root)"
+        by_parent.setdefault(parent, []).append(_describe_node(entry["node"]))
+
+    lines: list[str] = []
+    for parent, descriptions in by_parent.items():
+        if len(descriptions) == 1:
+            lines.append(f'Added {descriptions[0]} in "{parent}"')
+        else:
+            lines.append(f'Added {len(descriptions)} fields in "{parent}": {", ".join(descriptions)}')
+    return lines
+
+
+def _collect_field_removals(
+    removed_ids: set[str],
+    skip_ids: set[str],
+    idx: dict[str, dict],
+) -> list[str]:
+    """Group removed non-section fields by parent."""
+    by_parent: dict[str, list[str]] = {}
+    for nid in sorted(removed_ids):
+        if nid in skip_ids:
+            continue
+        entry = idx[nid]
+        if entry["category"] == "section":
+            continue
+        parent = entry["parent_label"] or "(root)"
+        by_parent.setdefault(parent, []).append(nid)
+
+    lines: list[str] = []
+    for parent, ids in by_parent.items():
+        if len(ids) == 1:
+            lines.append(f'Removed {_describe_node(idx[ids[0]]["node"])} from "{parent}"')
+        else:
+            lines.append(f'Removed {len(ids)} fields from "{parent}": {", ".join(ids)}')
+    return lines
+
+
+def _collect_moved_fields(
+    common_ids: set[str],
+    before_idx: dict[str, dict],
+    after_idx: dict[str, dict],
+) -> list[str]:
+    """Report fields that moved between parents."""
+    lines: list[str] = []
+    for nid in sorted(common_ids):
+        old_parent = before_idx[nid]["parent_label"]
+        new_parent = after_idx[nid]["parent_label"]
+        if old_parent != new_parent:
+            lines.append(
+                f"Moved {_describe_node(after_idx[nid]['node'])} "
+                f'from "{old_parent or "(root)"}" to "{new_parent or "(root)"}"'
+            )
+    return lines
+
+
+def _collect_property_changes(
+    common_ids: set[str],
+    before_idx: dict[str, dict],
+    after_idx: dict[str, dict],
+) -> list[str]:
+    """Report changed properties on nodes present in both snapshots."""
+    lines: list[str] = []
+    for nid in sorted(common_ids):
+        old_node = before_idx[nid]["node"]
+        new_node = after_idx[nid]["node"]
+        changed_props: list[str] = []
+        for prop in sorted((set(old_node) | set(new_node)) - _SCHEMA_DIFF_SKIP_KEYS):
+            old_val = old_node.get(prop)
+            new_val = new_node.get(prop)
+            if old_val != new_val:
+                changed_props.append(f"{prop}: {old_val!r} -> {new_val!r}")
+        if changed_props:
+            lines.append(f"Changed {_describe_node(new_node)}: {', '.join(changed_props)}")
+    return lines
+
+
+def _summarize_schema_diff(before: dict | None, after: dict | None) -> str:
+    """Produce a concise semantic summary of schema changes."""
+    if before is None and after is None:
+        return "No differences found."
+    if before is None:
+        after_inner = _unwrap_snapshot(after)  # type: ignore[arg-type]
+        name = after_inner.get("name", "unknown")
+        idx = _build_node_index(after_inner.get("content", []))
+        return f'Created schema "{name}" with {len(idx)} nodes.'
+    if after is None:
+        before_inner = _unwrap_snapshot(before)
+        name = before_inner.get("name", "unknown")
+        idx = _build_node_index(before_inner.get("content", []))
+        return f'Deleted schema "{name}" ({len(idx)} nodes).'
+
+    before_inner = _unwrap_snapshot(before)
+    after_inner = _unwrap_snapshot(after)
+    lines: list[str] = []
+
+    # Non-content top-level changes
+    all_keys = set(before_inner) | set(after_inner)
+    for key in sorted(all_keys - _SCHEMA_READ_ONLY_KEYS - _SCHEMA_DIFF_SKIP_KEYS - {"content"}):
+        old_val = before_inner.get(key)
+        new_val = after_inner.get(key)
+        if old_val != new_val:
+            lines.append(f"{key}: {old_val!r} -> {new_val!r}")
+
+    before_idx = _build_node_index(before_inner.get("content", []))
+    after_idx = _build_node_index(after_inner.get("content", []))
+
+    added_ids = set(after_idx) - set(before_idx)
+    removed_ids = set(before_idx) - set(after_idx)
+    common_ids = set(before_idx) & set(after_idx)
+
+    added_section_lines, added_section_children = _collect_section_changes(added_ids, after_idx, "Added")
+    removed_section_lines, removed_section_children = _collect_section_changes(removed_ids, before_idx, "Removed")
+    lines.extend(added_section_lines)
+    lines.extend(removed_section_lines)
+    lines.extend(_collect_field_additions(added_ids, added_section_children, after_idx))
+    lines.extend(_collect_field_removals(removed_ids, removed_section_children, before_idx))
+    lines.extend(_collect_moved_fields(common_ids, before_idx, after_idx))
+    lines.extend(_collect_property_changes(common_ids, before_idx, after_idx))
+
+    return "\n".join(lines) if lines else "No differences found."
+
+
+def _truncate_value(val: object, max_len: int = 80) -> str:
+    """Return a concise string representation of a value for diff display."""
+    if isinstance(val, dict):
+        return f"{{...{len(val)} keys}}"
+    if isinstance(val, list):
+        return f"[...{len(val)} items]"
+    text = repr(val)
+    if len(text) > max_len:
+        return text[: max_len - 3] + "..."
+    return text
+
+
+def _summarize_non_schema_diff(before: dict | None, after: dict | None) -> str:
+    """Produce a concise summary of changes for non-schema entities."""
+    if before is None and after is None:
+        return "No differences found."
+
+    if before is None or before == {}:
+        after_inner = _unwrap_snapshot(after)  # type: ignore[arg-type]
+        name = after_inner.get("name", after_inner.get("queue_name", "unknown"))
+        return f'Created with name "{name}".'
+
+    if after is None or after == {}:
+        before_inner = _unwrap_snapshot(before)
+        name = before_inner.get("name", before_inner.get("queue_name", "unknown"))
+        return f'Deleted "{name}".'
+
+    before_inner = _unwrap_snapshot(before)
+    after_inner = _unwrap_snapshot(after)
+    lines: list[str] = []
+    all_keys = sorted((set(before_inner) | set(after_inner)) - _READ_ONLY_FIELDS)
+    for key in all_keys:
+        old_val = before_inner.get(key)
+        new_val = after_inner.get(key)
+        if old_val != new_val:
+            lines.append(f"{key}: {_truncate_value(old_val)} -> {_truncate_value(new_val)}")
+
+    return "\n".join(lines) if lines else "No differences found."
+
+
+def _diff_snapshots(before: dict | None, after: dict | None, entity_type: str = "") -> str:
+    """Compute a diff between two snapshots (either may be None for creates/deletes).
+
+    Produces concise semantic summaries for all entity types.
+    """
+    if entity_type == "schema":
+        return _summarize_schema_diff(before, after)
+    return _summarize_non_schema_diff(before, after)
+
+
 @beta_tool
 def show_commit_details(commit_hash: str) -> str:
-    """Show full details and diffs for a specific configuration commit.
+    """Show details and diffs for a specific configuration commit.
 
     Args:
         commit_hash: The hash of the commit to inspect.
 
     Returns:
-        JSON with commit metadata and before/after snapshots for each change.
+        JSON with commit metadata and a unified diff per change.
     """
     ctx = get_context()
     if ctx.commit_store is None or ctx.rossum_environment is None:
@@ -266,7 +530,16 @@ def show_commit_details(commit_hash: str) -> str:
             "timestamp": commit.timestamp.isoformat(),
             "user_request": commit.user_request,
             "parent": commit.parent,
-            "changes": [c.model_dump() for c in commit.changes],
+            "changes": [
+                {
+                    "entity_type": c.entity_type,
+                    "entity_id": c.entity_id,
+                    "entity_name": c.entity_name,
+                    "operation": c.operation,
+                    "diff": _diff_snapshots(c.before, c.after, entity_type=c.entity_type),
+                }
+                for c in commit.changes
+            ],
         }
     )
 
