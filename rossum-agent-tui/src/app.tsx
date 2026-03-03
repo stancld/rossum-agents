@@ -119,7 +119,8 @@ function isExpandable(kind: string): boolean {
 }
 
 export function App({ config }: AppProps) {
-  const { state, sendMessage, resetChat, abortStreaming } = useChat(config);
+  const { state, sendMessage, resetChat, abortStreaming, submitFeedback } =
+    useChat(config);
   const { commands } = useCommands(config);
   const { rows, columns } = useTerminalSize();
 
@@ -254,6 +255,18 @@ export function App({ config }: AppProps) {
     [chatAreaHeight],
   );
 
+  const handleBrowseFeedback = useCallback(
+    (input: string) => {
+      if (input !== "+" && input !== "-") return false;
+      const item = items[selectedIndex];
+      if (item && item.kind === "final_answer") {
+        submitFeedback(item.turnIndex, input === "+");
+      }
+      return true;
+    },
+    [items, selectedIndex, submitFeedback],
+  );
+
   useInput(
     (input, key) => {
       if (input === "i" || key.tab) {
@@ -262,6 +275,7 @@ export function App({ config }: AppProps) {
       }
       if (handleBrowseNavigation(input, key)) return;
       if (handleBrowseScroll(input, key)) return;
+      if (handleBrowseFeedback(input)) return;
 
       if (key.return || input === " ") {
         const item = items[selectedIndex];

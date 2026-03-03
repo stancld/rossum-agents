@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { createChat } from "../api/client.js";
+import { createChat, submitFeedback as apiFeedback } from "../api/client.js";
 import { streamMessage } from "../api/sse.js";
 import {
   loadPersistedState,
@@ -39,6 +39,7 @@ const INITIAL_STATE: ChatState = {
   files: [],
   error: null,
   userMessages: [],
+  feedback: {},
 };
 
 function stepToCompleted(step: StepEvent): CompletedStep {
@@ -339,5 +340,30 @@ export function useChat(config: Config) {
     });
   }, []);
 
-  return { state, sendMessage, resetChat, abortStreaming };
+  const submitFeedback = useCallback(
+    async (turnIndex: number, isPositive: boolean) => {
+      const chatId = chatIdRef.current;
+      if (!chatId) return;
+
+      // Optimistic update
+      setState((prev) => ({
+        ...prev,
+        feedback: { ...prev.feedback, [turnIndex]: isPositive },
+      }));
+
+      try {
+        await apiFeedback(config, chatId, turnIndex, isPositive);
+      } catch {
+        // Silent revert on failure
+        setState((prev) => {
+          const next = { ...prev.feedback };
+          delete next[turnIndex];
+          return { ...prev, feedback: next };
+        });
+      }
+    },
+    [config],
+  );
+
+  return { state, sendMessage, resetChat, abortStreaming, submitFeedback };
 }

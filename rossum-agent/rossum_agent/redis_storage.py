@@ -117,6 +117,24 @@ class RedisStorage:
     ) -> bool:
         try:
             key = self._get_chat_key(user_id, chat_id)
+            # Shallow-copy messages so we can attach feedback without mutating caller's list
+            messages = [dict(msg) for msg in messages]
+            try:
+                existing_raw = self.client.get(key)
+                if isinstance(existing_raw, bytes):
+                    existing_data = json.loads(existing_raw.decode("utf-8"))
+                    if isinstance(existing_data, dict):
+                        # Preserve per-message feedback from existing messages
+                        for i, old_msg in enumerate(existing_data.get("messages", [])):
+                            if i < len(messages) and old_msg.get("feedback") is not None:
+                                messages[i]["feedback"] = old_msg["feedback"]
+                        # Migrate legacy top-level feedback dict
+                        for k, v in (existing_data.get("feedback") or {}).items():
+                            idx = int(k)
+                            if idx < len(messages) and "feedback" not in messages[idx]:
+                                messages[idx]["feedback"] = v
+            except Exception:
+                logger.warning(f"Failed to preserve feedback from existing chat {chat_id}")
             payload = {
                 "messages": messages,
                 "output_dir": str(output_dir) if output_dir else None,
@@ -373,6 +391,104 @@ class RedisStorage:
         except Exception as e:
             logger.error(f"Failed to load files for chat {chat_id}: {e}", exc_info=True)
             return loaded_count
+
+    def save_feedback(self, user_id: str | None, chat_id: str, turn_index: int, is_positive: bool) -> bool:
+        try:
+            key = self._get_chat_key(user_id, chat_id)
+            raw = self.client.get(key)
+            if raw is None:
+                return False
+            data: dict[str, Any] = json.loads(cast("bytes", raw).decode("utf-8"))
+            if isinstance(data, list):
+                return False
+            messages: list[dict[str, Any]] = data.get("messages", [])
+            if turn_index >= len(messages):
+                return False
+            messages[turn_index]["feedback"] = is_positive
+            # Remove from legacy top-level feedback dict if present
+            legacy: dict[str, bool] = data.get("feedback") or {}
+            legacy.pop(str(turn_index), None)
+            if legacy:
+                data["feedback"] = legacy
+            else:
+                data.pop("feedback", None)
+            data["messages"] = messages
+            self.client.setex(key, self.ttl, json.dumps(data).encode("utf-8"))
+            logger.info(f"Saved feedback for chat {chat_id} turn {turn_index}: {is_positive}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save feedback for chat {chat_id}: {e}", exc_info=True)
+            return False
+
+    def get_feedback(self, user_id: str | None, chat_id: str) -> dict[int, bool]:
+        try:
+            key = self._get_chat_key(user_id, chat_id)
+            raw = self.client.get(key)
+            if raw is None:
+                return {}
+            data: dict[str, Any] = json.loads(cast("bytes", raw).decode("utf-8"))
+            if isinstance(data, list):
+                return {}
+            result: dict[int, bool] = {}
+            for i, msg in enumerate(data.get("messages", [])):
+                fb = msg.get("feedback")
+                if fb is not None:
+                    result[i] = fb
+            # Also include legacy top-level feedback (for old data not yet migrated)
+            for k, v in (data.get("feedback") or {}).items():
+                idx = int(k)
+                if idx not in result:
+                    result[idx] = v
+            return result
+        except Exception as e:
+            logger.error(f"Failed to get feedback for chat {chat_id}: {e}", exc_info=True)
+            return {}
+
+    def delete_feedback(self, user_id: str | None, chat_id: str, turn_index: int) -> bool:
+        try:
+            key = self._get_chat_key(user_id, chat_id)
+            raw = self.client.get(key)
+            if raw is None:
+                return False
+            data: dict[str, Any] = json.loads(cast("bytes", raw).decode("utf-8"))
+            if isinstance(data, list):
+                return False
+            messages: list[dict[str, Any]] = data.get("messages", [])
+            changed = turn_index < len(messages) and messages[turn_index].pop("feedback", None) is not None
+            # Also remove from legacy top-level feedback dict if present
+            legacy: dict[str, bool] = data.get("feedback") or {}
+            if str(turn_index) in legacy:
+                del legacy[str(turn_index)]
+                data["feedback"] = legacy
+                changed = True
+            if not changed:
+                return False
+            data["messages"] = messages
+            self.client.setex(key, self.ttl, json.dumps(data).encode("utf-8"))
+            logger.info(f"Deleted feedback for chat {chat_id} turn {turn_index}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete feedback for chat {chat_id}: {e}", exc_info=True)
+            return False
+
+    def delete_all_feedback(self, user_id: str | None, chat_id: str) -> bool:
+        try:
+            key = self._get_chat_key(user_id, chat_id)
+            raw = self.client.get(key)
+            if raw is None:
+                return False
+            data: dict[str, Any] = json.loads(cast("bytes", raw).decode("utf-8"))
+            if isinstance(data, list):
+                return False
+            for msg in data.get("messages", []):
+                msg.pop("feedback", None)
+            data.pop("feedback", None)  # Remove legacy top-level feedback dict
+            self.client.setex(key, self.ttl, json.dumps(data).encode("utf-8"))
+            logger.info(f"Deleted all feedback for chat {chat_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete all feedback for chat {chat_id}: {e}", exc_info=True)
+            return False
 
     def close(self) -> None:
         if self._client is not None:

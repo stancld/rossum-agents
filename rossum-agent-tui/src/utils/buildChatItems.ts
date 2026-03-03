@@ -30,10 +30,14 @@ function pairSteps(
   return pairs;
 }
 
-function pairedStepToItem(pair: {
-  step: CompletedStep;
-  resultStep?: CompletedStep;
-}): ChatItem {
+function pairedStepToItem(
+  pair: {
+    step: CompletedStep;
+    resultStep?: CompletedStep;
+  },
+  turnIndex: number,
+  feedback: Record<number, boolean>,
+): ChatItem {
   const { step, resultStep } = pair;
   switch (step.type) {
     case "thinking":
@@ -56,7 +60,12 @@ function pairedStepToItem(pair: {
         content: step.content || "",
       };
     case "final_answer":
-      return { kind: "final_answer", content: step.content || "" };
+      return {
+        kind: "final_answer",
+        content: step.content || "",
+        turnIndex,
+        feedback: turnIndex in feedback ? feedback[turnIndex]! : null,
+      };
     case "error":
       return { kind: "error", content: step.content || "Unknown error" };
     default:
@@ -68,39 +77,11 @@ function pairedStepToItem(pair: {
   }
 }
 
-export function buildChatItems(state: ChatState): ChatItem[] {
-  const items: ChatItem[] = [];
-  const paired = pairSteps(state.completedSteps);
-
-  let msgIdx = 0;
-
-  for (let i = 0; i < paired.length; i++) {
-    while (
-      msgIdx < state.userMessages.length &&
-      state.userMessages[msgIdx]!.stepIndexBefore <=
-        getOriginalStepIndex(paired, i)
-    ) {
-      const msg = state.userMessages[msgIdx]!;
-      items.push({
-        kind: "user_message",
-        text: msg.text,
-        attachments: msg.attachments,
-      });
-      msgIdx++;
-    }
-    items.push(pairedStepToItem(paired[i]!));
-  }
-
-  while (msgIdx < state.userMessages.length) {
-    const msg = state.userMessages[msgIdx]!;
-    items.push({
-      kind: "user_message",
-      text: msg.text,
-      attachments: msg.attachments,
-    });
-    msgIdx++;
-  }
-
+function appendTrailingItems(
+  items: ChatItem[],
+  state: ChatState,
+  paired: Array<{ step: CompletedStep; resultStep?: CompletedStep }>,
+): void {
   for (const f of state.files) {
     items.push({ kind: "file_created", filename: f.filename, url: f.url });
   }
@@ -124,7 +105,48 @@ export function buildChatItems(state: ChatState): ChatItem[] {
       subAgentText: state.subAgentText,
     });
   }
+}
 
+export function buildChatItems(state: ChatState): ChatItem[] {
+  const items: ChatItem[] = [];
+  const paired = pairSteps(state.completedSteps);
+  const feedback = state.feedback;
+
+  let msgIdx = 0;
+  let turnIndex = 0;
+
+  for (let i = 0; i < paired.length; i++) {
+    while (
+      msgIdx < state.userMessages.length &&
+      state.userMessages[msgIdx]!.stepIndexBefore <=
+        getOriginalStepIndex(paired, i)
+    ) {
+      const msg = state.userMessages[msgIdx]!;
+      items.push({
+        kind: "user_message",
+        text: msg.text,
+        attachments: msg.attachments,
+      });
+      msgIdx++;
+    }
+    const pair = paired[i]!;
+    items.push(pairedStepToItem(pair, turnIndex, feedback));
+    if (pair.step.type === "final_answer") {
+      turnIndex++;
+    }
+  }
+
+  while (msgIdx < state.userMessages.length) {
+    const msg = state.userMessages[msgIdx]!;
+    items.push({
+      kind: "user_message",
+      text: msg.text,
+      attachments: msg.attachments,
+    });
+    msgIdx++;
+  }
+
+  appendTrailingItems(items, state, paired);
   return items;
 }
 

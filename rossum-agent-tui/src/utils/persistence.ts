@@ -21,6 +21,7 @@ interface PersistedState {
   files: FileCreatedEvent[];
   tokenUsage: TokenUsageBreakdown | null;
   finalAnswer: string | null;
+  feedback: Record<number, boolean>;
 }
 
 export function loadPersistedState(): ChatState | null {
@@ -42,6 +43,7 @@ export function loadPersistedState(): ChatState | null {
       files: p.files ?? [],
       error: null,
       userMessages: p.userMessages ?? [],
+      feedback: p.feedback ?? {},
     };
   } catch {
     return null;
@@ -59,6 +61,7 @@ export function savePersistedState(state: ChatState): void {
       files: state.files,
       tokenUsage: state.tokenUsage,
       finalAnswer: state.finalAnswer,
+      feedback: state.feedback,
     };
     writeFileSync(FILE, JSON.stringify(p));
   } catch {

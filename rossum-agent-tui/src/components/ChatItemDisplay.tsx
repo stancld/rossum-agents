@@ -71,14 +71,24 @@ function ConfigCommitItem({ commit }: { commit: ConfigCommitInfo }) {
   );
 }
 
+function FeedbackBadge({ feedback }: { feedback: boolean | null }) {
+  if (feedback === null) return null;
+  if (feedback) {
+    return <Text color="green"> [+1]</Text>;
+  }
+  return <Text color="red"> [-1]</Text>;
+}
+
 function FinalAnswerBlock({
   content,
   expanded,
   selected,
+  feedback,
 }: {
   content: string;
   expanded: boolean;
   selected: boolean;
+  feedback: boolean | null;
 }) {
   const lines = content.split("\n");
   const lineCount = lines.length;
@@ -96,6 +106,7 @@ function FinalAnswerBlock({
         </Text>
         {firstLine || "(empty)"}
         {lineCount > 1 ? ` ... (${lineCount} lines)` : ""}
+        <FeedbackBadge feedback={feedback} />
       </Text>
     );
   }
@@ -108,6 +119,7 @@ function FinalAnswerBlock({
           {"● "}
         </Text>
         Response
+        <FeedbackBadge feedback={feedback} />
       </Text>
       <Box marginLeft={2}>
         <Text wrap="wrap">{renderMarkdown(content)}</Text>
@@ -175,6 +187,7 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
           content={item.content}
           expanded={expanded}
           selected={selected}
+          feedback={item.feedback}
         />
       );
 

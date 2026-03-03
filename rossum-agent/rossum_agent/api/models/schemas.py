@@ -100,6 +100,7 @@ class Message(BaseModel):
 
     role: Literal["user", "assistant"]
     content: str | list[TextContent | ImageContent]
+    feedback: bool | None = None
 
 
 class FileInfo(BaseModel):
@@ -494,3 +495,17 @@ class CommandListResponse(BaseModel):
     """Response for listing available slash commands."""
 
     commands: list[CommandInfo]
+
+
+class FeedbackRequest(BaseModel):
+    turn_index: int = Field(..., ge=0)
+    is_positive: bool
+
+
+class FeedbackResponse(BaseModel):
+    turn_index: int
+    is_positive: bool
+
+
+class FeedbackListResponse(BaseModel):
+    feedback: dict[int, bool]

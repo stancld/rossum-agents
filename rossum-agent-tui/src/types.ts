@@ -178,7 +178,12 @@ export type ChatItem =
       resultStep?: CompletedStep;
     }
   | { kind: "intermediate"; stepNumber: number; content: string }
-  | { kind: "final_answer"; content: string }
+  | {
+      kind: "final_answer";
+      content: string;
+      turnIndex: number;
+      feedback: boolean | null;
+    }
   | { kind: "error"; content: string }
   | { kind: "file_created"; filename: string; url: string }
   | { kind: "config_commit"; commit: ConfigCommitInfo }
@@ -237,4 +242,5 @@ export interface ChatState {
   files: FileCreatedEvent[];
   error: string | null;
   userMessages: UserMessage[];
+  feedback: Record<number, boolean>;
 }
