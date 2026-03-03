@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 41 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 43 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ---
 
@@ -694,6 +694,28 @@ Creates a new email template.
 - `{"type": "annotator", "value": ""}` — Document annotator
 - `{"type": "constant", "value": "email@example.com"}` — Fixed email address
 - `{"type": "datapoint", "value": "email_field_id"}` — Value from a document field
+
+---
+
+## MCP Mode (2 tools)
+
+### get_mcp_mode
+
+Get the current MCP operation mode (read-only or read-write).
+
+**Returns:** `{"mode": "read-only" | "read-write"}`
+
+### set_mcp_mode
+
+Set the MCP operation mode. Use `read-only` to disable write operations, `read-write` to enable them.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `mode` | `"read-only" \| "read-write"` | Yes | The operation mode to set |
+
+**Returns:** `{"message": "MCP mode set to '<mode>'"}`
 
 ---
 
