@@ -208,11 +208,3 @@ def register_annotation_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> Non
         reimport: bool = False,
     ) -> dict:
         return await _copy_annotations(client, annotation_ids, target_queue_id, target_status, reimport)
-
-    @mcp.tool(
-        description="Soft-delete an annotation (status 'deleted').",
-        tags={"annotations", "write"},
-        annotations={"readOnlyHint": False, "destructiveHint": True},
-    )
-    async def delete_annotation(annotation_id: int) -> dict:
-        return await _delete_annotation(client, annotation_id)

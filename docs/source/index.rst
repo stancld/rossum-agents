@@ -44,12 +44,16 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **41 tools** organized into categories:
+The MCP server provides **36 tools** organized into categories:
 
 **Unified Read Layer**
 
 * **get** - Get entities by ID (single or batch). Supports ``include_related`` for enriched responses (queue→schema+engine+hooks, schema→queues+rules, hook→queues+events)
 * **search** - Search/list entities with typed, entity-specific filters. Supports: queue, schema, hook, engine, rule, user, workspace, email_template, organization_group, annotation, relation, document_relation, hook_log, hook_template, user_role
+
+**Delete Layer**
+
+* **delete** - Unified delete for any supported entity by ID. Supported entities: ``queue``, ``schema``, ``hook``, ``rule``, ``workspace``, ``annotation``
 
 **Document Processing**
 
@@ -59,7 +63,6 @@ The MCP server provides **41 tools** organized into categories:
 * **bulk_update_annotation_fields** - Update field values with JSON Patch
 * **confirm_annotation** - Confirm and finalize annotations
 * **copy_annotations** - Copy annotations to another queue
-* **delete_annotation** - Delete an annotation
 
 **Queue Management**
 
@@ -67,7 +70,6 @@ The MCP server provides **41 tools** organized into categories:
 * **create_queue_from_template** - Create queues from predefined templates (EU/US/UK/CZ/CN)
 * **get_queue_template_names** - List available queue template names
 * **update_queue** - Configure automation thresholds
-* **delete_queue** - Delete a queue
 
 **Schema Management**
 
@@ -76,12 +78,10 @@ The MCP server provides **41 tools** organized into categories:
 * **patch_schema** - Add, update, or remove individual schema nodes
 * **get_schema_tree_structure** - Get lightweight tree structure of schema
 * **prune_schema_fields** - Remove multiple fields from schema at once
-* **delete_schema** - Delete a schema
 
 **Workspace Management**
 
 * **create_workspace** - Create a new workspace
-* **delete_workspace** - Delete a workspace
 
 **User Management**
 
@@ -100,7 +100,6 @@ The MCP server provides **41 tools** organized into categories:
 * **create_hook** - Create webhooks or serverless function hooks
 * **update_hook** - Update hook properties (name, queues, events, config, settings, active)
 * **create_hook_from_template** - Create hooks from pre-built templates
-* **delete_hook** - Delete a hook/extension
 * **test_hook** - Test a hook with sample payloads
 
 **Rules & Actions**
@@ -108,7 +107,6 @@ The MCP server provides **41 tools** organized into categories:
 * **create_rule** - Create business rules with trigger conditions and actions
 * **update_rule** - Full update of business rules (PUT)
 * **patch_rule** - Partial update of business rules (PATCH)
-* **delete_rule** - Delete a business rule
 
 **Email Templates**
 

@@ -417,26 +417,3 @@ class TestCopyAnnotations:
 
         call_kwargs = mock_client._http_client.request_json.call_args[1]
         assert call_kwargs["json"]["target_status"] == "confirmed"
-
-
-@pytest.mark.unit
-class TestDeleteAnnotation:
-    """Tests for delete_annotation tool."""
-
-    @pytest.mark.asyncio
-    async def test_delete_annotation_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test successful annotation deletion."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_annotation_tools(mock_mcp, mock_client)
-
-        mock_client.delete_annotation.return_value = None
-
-        delete_annotation = mock_mcp._tools["delete_annotation"]
-        result = await delete_annotation(annotation_id=12345)
-
-        assert "deleted" in result["message"]
-        assert "12345" in result["message"]
-        mock_client.delete_annotation.assert_called_once_with(12345)

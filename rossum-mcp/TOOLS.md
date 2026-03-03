@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 41 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 36 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ---
 
@@ -72,7 +72,34 @@ Lists/searches entities with typed, entity-specific filters. Pass a query object
 
 ---
 
-## Document Processing (7 tools)
+## Delete Layer (1 tool)
+
+The delete layer replaces all individual `delete_X` tools with a single unified `delete` tool.
+
+### delete
+
+Deletes any supported entity by ID.
+
+**Parameters:**
+- `entity` (string, required): One of `queue`, `schema`, `hook`, `rule`, `workspace`, `annotation`
+- `entity_id` (integer, required): ID of the entity to delete
+
+**Entity-specific behavior:**
+- **queue** — Deletion begins after ~24h; cascades to annotations/documents
+- **schema** — Fails with `409 Conflict` if linked to any queue/annotation
+- **workspace** — Fails if workspace still contains queues
+- **annotation** — Soft delete (moves to `deleted` status)
+
+**Returns:**
+```json
+{
+  "message": "Queue 12345 scheduled for deletion (starts after 24 hours)"
+}
+```
+
+---
+
+## Document Processing (6 tools)
 
 ### upload_document
 
@@ -193,16 +220,9 @@ Copies annotations to another queue. Use `reimport=True` to re-extract data in t
 }
 ```
 
-### delete_annotation
-
-Soft deletes an annotation (moves to `deleted` status, can be restored).
-
-**Parameters:**
-- `annotation_id` (integer, required): Rossum annotation ID to delete
-
 ---
 
-## Queue Management (5 tools)
+## Queue Management (4 tools)
 
 ### create_queue
 
@@ -228,13 +248,6 @@ Updates an existing queue's settings.
 **Parameters:**
 - `queue_id` (integer, required): Queue ID to update
 - `queue_data` (object, required): Dictionary containing queue fields to update. Supported keys: `name`, `automation_enabled`, `automation_level`, `locale`, `metadata`, `settings`, `engine`, `dedicated_engine`, `training_enabled`, `webhooks`, `hooks`, `default_score_threshold`, `session_timeout`, `document_lifetime`, `delete_after`, `schema`, `workspace`, `connector`, `inbox`
-
-### delete_queue
-
-Deletes a queue. Deletion begins after approximately 24 hours and cascades to annotations and documents.
-
-**Parameters:**
-- `queue_id` (integer, required): Queue ID to delete
 
 ### get_queue_template_names
 
@@ -281,7 +294,7 @@ Creates a queue from a predefined regional template. Automatically creates a mat
 
 ---
 
-## Schema Management (6 tools)
+## Schema Management (5 tools)
 
 ### create_schema
 
@@ -386,13 +399,6 @@ Provide exactly one of `fields_to_keep` or `fields_to_remove`.
 }
 ```
 
-### delete_schema
-
-Deletes a schema by ID. Fails with `409 Conflict` if the schema is linked to any queue or annotation.
-
-**Parameters:**
-- `schema_id` (integer, required): Schema ID to delete
-
 ---
 
 ## Engine Management (4 tools)
@@ -438,7 +444,7 @@ Retrieves engine fields for a specific engine or all engine fields.
 
 ---
 
-## Extensions — Hooks (5 tools)
+## Extensions — Hooks (4 tools)
 
 ### create_hook
 
@@ -500,16 +506,9 @@ Tests a hook by auto-generating a realistic payload and executing it. For `annot
 
 **Returns:** Dict with hook response and execution logs.
 
-### delete_hook
-
-Deletes a hook by ID.
-
-**Parameters:**
-- `hook_id` (integer, required): Hook ID to delete
-
 ---
 
-## Rules & Actions (4 tools)
+## Rules & Actions (3 tools)
 
 ### create_rule
 
@@ -583,16 +582,9 @@ patch_rule(rule_id=67890, queue_ids=[101, 102])
 patch_rule(rule_id=67890, queue_ids=[])
 ```
 
-### delete_rule
-
-Deletes a rule by ID.
-
-**Parameters:**
-- `rule_id` (integer, required): Rule ID to delete
-
 ---
 
-## Workspace Management (2 tools)
+## Workspace Management (1 tool)
 
 ### create_workspace
 
@@ -602,13 +594,6 @@ Creates a new workspace.
 - `name` (string, required): Workspace name
 - `organization_id` (integer, required): Organization ID
 - `metadata` (object, optional): Custom metadata
-
-### delete_workspace
-
-Deletes a workspace by ID. Fails if the workspace still contains queues.
-
-**Parameters:**
-- `workspace_id` (integer, required): Workspace ID to delete
 
 ---
 

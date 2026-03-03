@@ -39,7 +39,7 @@ from rossum_agent.agent.models import (
     ToolResultStep,
     ToolStartStep,
 )
-from rossum_agent.tools.core import SubAgentTokenUsage
+from rossum_agent.tools.core import AgentContext, SubAgentTokenUsage, reset_context, set_context
 from rossum_agent.utils import add_message_cache_breakpoint
 
 
@@ -1884,6 +1884,58 @@ class TestAgentGetTools:
 
         # Should include additional tools
         assert any(t.get("name") == "custom_tool" for t in tools if isinstance(t, dict))
+
+    @pytest.mark.asyncio
+    async def test_includes_delete_tool_in_read_write_mode(self):
+        """Test that the unified delete tool is loaded when not in read-only mode."""
+        mock_client = MagicMock()
+        mock_mcp_connection = AsyncMock()
+        delete_tool = MagicMock()
+        delete_tool.name = "delete"
+        delete_tool.description = "Delete an entity"
+        delete_tool.inputSchema = {"type": "object", "properties": {}}
+        mock_mcp_connection.get_tools.return_value = [delete_tool]
+
+        agent = RossumAgent(
+            client=mock_client,
+            mcp_connection=mock_mcp_connection,
+            system_prompt="Test",
+        )
+
+        token = set_context(AgentContext(mcp_mode="read-write"))
+        try:
+            tools = await agent._get_tools()
+        finally:
+            reset_context(token)
+
+        tool_names = [t.get("name") for t in tools if isinstance(t, dict)]
+        assert "delete" in tool_names
+
+    @pytest.mark.asyncio
+    async def test_excludes_delete_tool_in_read_only_mode(self):
+        """Test that the unified delete tool is NOT loaded in read-only mode."""
+        mock_client = MagicMock()
+        mock_mcp_connection = AsyncMock()
+        delete_tool = MagicMock()
+        delete_tool.name = "delete"
+        delete_tool.description = "Delete an entity"
+        delete_tool.inputSchema = {"type": "object", "properties": {}}
+        mock_mcp_connection.get_tools.return_value = [delete_tool]
+
+        agent = RossumAgent(
+            client=mock_client,
+            mcp_connection=mock_mcp_connection,
+            system_prompt="Test",
+        )
+
+        token = set_context(AgentContext(mcp_mode="read-only"))
+        try:
+            tools = await agent._get_tools()
+        finally:
+            reset_context(token)
+
+        tool_names = [t.get("name") for t in tools if isinstance(t, dict)]
+        assert "delete" not in tool_names
 
 
 class TestCreateAgentFactory:

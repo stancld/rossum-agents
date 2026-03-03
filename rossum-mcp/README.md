@@ -97,18 +97,19 @@ Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
 
 ## Available Tools
 
-The server provides **41 tools** organized into categories:
+The server provides **36 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
 | **Read Layer** | 2 | Get any entity by ID or search/list with typed filters |
-| **Document Processing** | 7 | Upload documents, retrieve content, update/confirm/copy/delete annotations |
-| **Queue Management** | 5 | Create, configure, and delete queues |
-| **Schema Management** | 6 | Define, modify, and delete field structures |
+| **Delete Layer** | 1 | Unified delete for any supported entity by ID |
+| **Document Processing** | 6 | Upload documents, retrieve content, update/confirm/copy annotations |
+| **Queue Management** | 4 | Create and configure queues |
+| **Schema Management** | 5 | Define and modify field structures |
 | **Engine Management** | 4 | Configure extraction and splitting engines |
-| **Extensions (Hooks)** | 5 | Webhooks, serverless functions, testing |
-| **Rules & Actions** | 4 | Business rules with triggers and actions |
-| **Workspace Management** | 2 | Create and delete workspaces |
+| **Extensions (Hooks)** | 4 | Webhooks, serverless functions, testing |
+| **Rules & Actions** | 3 | Business rules with triggers and actions |
+| **Workspace Management** | 1 | Create workspaces |
 | **Organization Groups** | 2 | Check feature flags across organizations |
 | **User Management** | 2 | Create and update users |
 | **Email Templates** | 1 | Create automated email responses |
@@ -125,26 +126,31 @@ Supported entities for `get` (by ID): `queue`, `schema`, `hook`, `engine`, `rule
 
 Supported entities for `search` (with typed filters): all `get` entities plus `hook_log`, `hook_template`, `user_role`
 
+**Delete Layer** (unified delete replacing individual delete_X tools):
+`delete`
+
+Supported entities: `queue`, `schema`, `hook`, `rule`, `workspace`, `annotation`
+
 **Document Processing:**
-`upload_document`, `get_annotation_content`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`, `delete_annotation`
+`upload_document`, `get_annotation_content`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`
 
 **Queue Management:**
-`create_queue`, `create_queue_from_template`, `get_queue_template_names`, `update_queue`, `delete_queue`
+`create_queue`, `create_queue_from_template`, `get_queue_template_names`, `update_queue`
 
 **Schema Management:**
-`create_schema`, `update_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`, `delete_schema`
+`create_schema`, `update_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`
 
 **Engine Management:**
 `create_engine`, `update_engine`, `create_engine_field`, `get_engine_fields`
 
 **Extensions (Hooks):**
-`create_hook`, `update_hook`, `create_hook_from_template`, `test_hook`, `delete_hook`
+`create_hook`, `update_hook`, `create_hook_from_template`, `test_hook`
 
 **Rules & Actions:**
-`create_rule`, `update_rule`, `patch_rule`, `delete_rule`
+`create_rule`, `update_rule`, `patch_rule`
 
 **Workspace Management:**
-`create_workspace`, `delete_workspace`
+`create_workspace`
 
 **User Management:**
 `create_user`, `update_user`

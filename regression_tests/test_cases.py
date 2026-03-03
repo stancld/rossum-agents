@@ -228,7 +228,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "Return the queue_id that was deleted."
         ),
         tool_expectation=ToolExpectation(
-            expected_tools=["create_queue_from_template", "delete_queue"], mode=ToolMatchMode.SUBSET
+            expected_tools=["create_queue_from_template", "delete:queue"], mode=ToolMatchMode.SUBSET
         ),
         token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=55000),
         success_criteria=SuccessCriteria(
@@ -615,13 +615,13 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "    - URL: https://example.com/webhook\n"
             "3. Delete the hook you just created\n"
             "4. Revert the last commit to restore the deleted hook\n\n"
-            "Return only the new hook_id as a one-word answer."
+            "Return only the new hook_id as a one-word answer. Do not use task planning."
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
                 "create_hook",
-                "delete_hook",
+                "delete:hook",
                 "show_change_history",
                 "revert_commit",
             ],

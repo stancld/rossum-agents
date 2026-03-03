@@ -53,6 +53,9 @@ _catalog_cache: CatalogData | None = None
 # Discovery tool that's always loaded
 DISCOVERY_TOOL_NAME = "list_tool_categories"
 
+# Unified delete tool — always loaded in read-write mode (not part of any category)
+DELETE_TOOL_NAME = "delete"
+
 
 # ---------------------------------------------------------------------------
 # Convenience accessors - read from the per-request AgentContext
@@ -171,7 +174,10 @@ def get_category_keywords() -> dict[str, list[str]]:
 
 
 def get_write_tools() -> set[str]:
-    return _fetch_catalog_from_mcp().write_tools
+    tools = _fetch_catalog_from_mcp().write_tools
+    # The unified delete tool lives outside any category but is always a write tool
+    tools.add(DELETE_TOOL_NAME)
+    return tools
 
 
 def get_cached_category_tool_names() -> dict[str, set[str]] | None:
@@ -180,7 +186,10 @@ def get_cached_category_tool_names() -> dict[str, set[str]] | None:
 
 
 async def get_write_tools_async(mcp_connection: MCPConnection) -> set[str]:
-    return (await _fetch_catalog_async(mcp_connection)).write_tools
+    tools = (await _fetch_catalog_async(mcp_connection)).write_tools
+    # The unified delete tool lives outside any category but is always a write tool
+    tools.add(DELETE_TOOL_NAME)
+    return tools
 
 
 def suggest_categories_for_request(request_text: str) -> list[str]:

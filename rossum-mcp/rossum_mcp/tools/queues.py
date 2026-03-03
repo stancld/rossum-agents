@@ -374,14 +374,6 @@ def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await _update_queue(client, queue_id, queue_data)
 
     @mcp.tool(
-        description="Delete a queue (deletion begins after ~24h); cascades to annotations/documents.",
-        tags={"queues", "write"},
-        annotations={"readOnlyHint": False, "destructiveHint": True},
-    )
-    async def delete_queue(queue_id: int) -> dict:
-        return await _delete_queue(client, queue_id)
-
-    @mcp.tool(
         description="List template names usable by create_queue_from_template.",
         tags={"queues"},
         annotations={"readOnlyHint": True},

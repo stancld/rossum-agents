@@ -8,6 +8,7 @@ from rossum_mcp.tools.catalog import (
     CategoryMeta,
     get_catalog_summary,
 )
+from rossum_mcp.tools.delete_layer import register_delete_tools
 from rossum_mcp.tools.discovery import register_discovery_tools
 from rossum_mcp.tools.email_templates import register_email_template_tools
 from rossum_mcp.tools.engines import register_engine_tools
@@ -24,6 +25,7 @@ __all__ = [
     "CategoryMeta",
     "get_catalog_summary",
     "register_annotation_tools",
+    "register_delete_tools",
     "register_discovery_tools",
     "register_email_template_tools",
     "register_engine_tools",

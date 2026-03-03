@@ -64,11 +64,3 @@ def register_workspace_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None
     )
     async def create_workspace(name: str, organization_id: int, metadata: dict | None = None) -> Workspace | dict:
         return await _create_workspace(client, name, organization_id, metadata)
-
-    @mcp.tool(
-        description="Delete a workspace; fails if it still contains queues.",
-        tags={"workspaces", "write"},
-        annotations={"readOnlyHint": False, "destructiveHint": True},
-    )
-    async def delete_workspace(workspace_id: int) -> dict:
-        return await _delete_workspace(client, workspace_id)

@@ -181,11 +181,3 @@ def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         queue_ids: list[int] | None = None,
     ) -> Rule | dict:
         return await _patch_rule(client, rule_id, name, trigger_condition, actions, enabled, queue_ids)
-
-    @mcp.tool(
-        description="Delete a rule.",
-        tags={"rules", "write"},
-        annotations={"readOnlyHint": False, "destructiveHint": True},
-    )
-    async def delete_rule(rule_id: int) -> dict:
-        return await _delete_rule(client, rule_id)

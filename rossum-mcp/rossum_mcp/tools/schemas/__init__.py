@@ -120,11 +120,3 @@ def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         fields_to_remove: list[str] | None = None,
     ) -> dict:
         return await ops.prune_schema_fields(client, schema_id, fields_to_keep, fields_to_remove)
-
-    @mcp.tool(
-        description="Delete a schema; fails with 409 if linked to any queue/annotation.",
-        tags={"schemas", "write"},
-        annotations={"readOnlyHint": False, "destructiveHint": True},
-    )
-    async def delete_schema(schema_id: int) -> dict:
-        return await ops.delete_schema(client, schema_id)

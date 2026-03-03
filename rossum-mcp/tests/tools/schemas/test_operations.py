@@ -783,28 +783,3 @@ class TestGetSchemaTreeStructure:
 
         assert isinstance(result, dict)
         assert "error" in result
-
-
-@pytest.mark.unit
-class TestDeleteSchema:
-    """Tests for delete_schema tool."""
-
-    @pytest.mark.asyncio
-    async def test_delete_schema_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test successful schema deletion."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        importlib.reload(schemas)
-
-        schemas.register_schema_tools(mock_mcp, mock_client)
-
-        mock_client.delete_schema.return_value = None
-
-        delete_schema = mock_mcp._tools["delete_schema"]
-        result = await delete_schema(schema_id=50)
-
-        assert "deleted successfully" in result["message"]
-        assert "50" in result["message"]
-        mock_client.delete_schema.assert_called_once_with(50)

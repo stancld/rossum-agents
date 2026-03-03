@@ -676,97 +676,57 @@ copy_annotations
   results and errors separately for graceful partial failure handling. Uses
   ``_http_client.request_json`` directly since the SDK has no copy method.
 
-Delete Operations
------------------
+Delete Layer
+------------
 
-All delete tools follow a consistent pattern using the ``delete_resource`` helper
-from ``rossum_mcp.tools.base``. They check read-only mode and return standardized
-success/error messages.
+The unified ``delete`` tool replaces all individual ``delete_X`` tools. It routes
+to the appropriate SDK method based on the ``entity`` parameter, using the
+``delete_resource`` helper from ``rossum_mcp.tools.base`` for consistent
+read-only mode checks and response formatting.
 
-delete_annotation
-^^^^^^^^^^^^^^^^^
+delete
+^^^^^^
 
 **MCP Tool:**
-  ``delete_annotation(annotation_id: int)``
+  ``delete(entity: str, entity_id: int)``
 
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_annotation(annotation_id)``
+**Supported entities and SDK methods:**
 
-**API Endpoint:**
-  ``DELETE /v1/annotations/{annotation_id}``
+.. list-table::
+   :header-rows: 1
+
+   * - Entity
+     - SDK Method
+     - API Endpoint
+     - Notes
+   * - ``queue``
+     - ``AsyncRossumAPIClient.delete_queue(id)``
+     - ``DELETE /v1/queues/{id}``
+     - Schedules deletion after 24h; cascades to annotations/documents
+   * - ``schema``
+     - ``AsyncRossumAPIClient.delete_schema(id)``
+     - ``DELETE /v1/schemas/{id}``
+     - Fails with 409 if linked to any queue/annotation
+   * - ``hook``
+     - ``AsyncRossumAPIClient.delete_hook(id)``
+     - ``DELETE /v1/hooks/{id}``
+     -
+   * - ``rule``
+     - ``AsyncRossumAPIClient.delete_rule(id)``
+     - ``DELETE /v1/rules/{id}``
+     -
+   * - ``workspace``
+     - ``AsyncRossumAPIClient.delete_workspace(id)``
+     - ``DELETE /v1/workspaces/{id}``
+     - Fails if workspace contains queues
+   * - ``annotation``
+     - ``AsyncRossumAPIClient.delete_annotation(id)``
+     - ``DELETE /v1/annotations/{id}``
+     - Soft delete — moves to 'deleted' status
 
 **Implementation:**
-  Soft delete - moves annotation to 'deleted' status rather than permanent removal.
-
-delete_queue
-^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``delete_queue(queue_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_queue(queue_id)``
-
-**API Endpoint:**
-  ``DELETE /v1/queues/{queue_id}``
-
-**Implementation:**
-  Schedules queue for deletion after 24-hour delay. Also deletes all related
-  objects (annotations, documents).
-
-delete_schema
-^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``delete_schema(schema_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_schema(schema_id)``
-
-**API Endpoint:**
-  ``DELETE /v1/schemas/{schema_id}``
-
-**Implementation:**
-  Fails with HTTP 409 if schema is linked to a queue or annotation.
-
-delete_hook
-^^^^^^^^^^^
-
-**MCP Tool:**
-  ``delete_hook(hook_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_hook(hook_id)``
-
-**API Endpoint:**
-  ``DELETE /v1/hooks/{hook_id}``
-
-delete_rule
-^^^^^^^^^^^
-
-**MCP Tool:**
-  ``delete_rule(rule_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_rule(rule_id)``
-
-**API Endpoint:**
-  ``DELETE /v1/rules/{rule_id}``
-
-delete_workspace
-^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``delete_workspace(workspace_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_workspace(workspace_id)``
-
-**API Endpoint:**
-  ``DELETE /v1/workspaces/{workspace_id}``
-
-**Implementation:**
-  Fails if workspace contains queues.
+  Defined in ``rossum_mcp/tools/delete_layer/__init__.py``. A registry maps entity
+  names to existing private delete functions from individual tool modules.
 
 Rossum API Resources
 ---------------------
