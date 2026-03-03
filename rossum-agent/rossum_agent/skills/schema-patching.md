@@ -75,7 +75,17 @@ For formula updates, provide the full formula code in the `formula` property.
 For simple property updates (formula text, label, hidden), use MCP `patch_schema` directly:
 
 ```
-patch_schema(schema_id=12345, operation="update", node_id="field_id", node_data={"formula": "new_code"})
+patch_schema(schema_id=12345, operations=[{"operation": "update", "node_id": "field_id", "node_data": {"formula": "new_code"}}])
+```
+
+Multiple operations in one call (single API round-trip):
+
+```
+patch_schema(schema_id=12345, operations=[
+  {"operation": "add", "node_id": "new_field", "parent_id": "header_section", "node_data": {"label": "New", "type": "string", "category": "datapoint"}},
+  {"operation": "update", "node_id": "existing_field", "node_data": {"hidden": true}},
+  {"operation": "remove", "node_id": "old_field"}
+])
 ```
 
 Load the `schemas` tool category first: `load_tool_category(["schemas"])`

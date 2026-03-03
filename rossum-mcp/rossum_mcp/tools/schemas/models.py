@@ -152,6 +152,17 @@ SchemaNode = SchemaDatapoint | SchemaMultivalue | SchemaTuple
 
 
 @dataclass
+class SchemaPatchOp:
+    """Single patch operation for batch schema patching."""
+
+    operation: Literal["add", "update", "remove"]
+    node_id: str
+    node_data: SchemaNode | SchemaNodeUpdate | None = None
+    parent_id: str | None = None
+    position: int | None = None
+
+
+@dataclass
 class SchemaListItem:
     """Schema summary for list responses (content omitted to save context)."""
 

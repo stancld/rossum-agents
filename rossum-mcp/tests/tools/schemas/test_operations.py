@@ -10,7 +10,7 @@ import pytest
 from rossum_api import APIClientError
 from rossum_mcp.tools import base, schemas
 from rossum_mcp.tools.schemas import register_schema_tools
-from rossum_mcp.tools.schemas.models import SchemaListItem
+from rossum_mcp.tools.schemas.models import SchemaListItem, SchemaNodeUpdate, SchemaPatchOp
 from rossum_mcp.tools.schemas.operations import get_schema as _get_schema
 from rossum_mcp.tools.schemas.operations import list_schemas as _list_schemas
 
@@ -372,24 +372,27 @@ class TestPatchSchema:
             }
         ]
 
-        mock_schema = create_mock_schema(id=50, content=existing_content)
-        mock_client.retrieve_schema.return_value = mock_schema
         mock_client._http_client.request_json.return_value = {"content": existing_content}
         mock_client._http_client.update.return_value = {}
 
         patch_schema = mock_mcp._tools["patch_schema"]
         result = await patch_schema(
             schema_id=50,
-            operation="add",
-            node_id="vendor_name",
-            parent_id="header_section",
-            node_data={"label": "Vendor Name", "type": "string", "category": "datapoint"},
+            operations=[
+                {
+                    "operation": "add",
+                    "node_id": "vendor_name",
+                    "parent_id": "header_section",
+                    "node_data": {"label": "Vendor Name", "type": "string", "category": "datapoint"},
+                }
+            ],
         )
 
         assert result["status"] == "success"
         assert result["schema_id"] == 50
-        assert result["node_id"] == "vendor_name"
-        assert result["node"]["label"] == "Vendor Name"
+        assert result["operations_count"] == 1
+        assert result["results"][0]["node_id"] == "vendor_name"
+        assert result["results"][0]["node"]["label"] == "Vendor Name"
         mock_client._http_client.update.assert_called_once()
         call_args = mock_client._http_client.update.call_args
         updated_content = call_args[1]["content"] if "content" in call_args[1] else call_args[0][2]["content"]
@@ -424,27 +427,80 @@ class TestPatchSchema:
             }
         ]
 
-        mock_schema = create_mock_schema(id=50, content=existing_content)
-        mock_client.retrieve_schema.return_value = mock_schema
         mock_client._http_client.request_json.return_value = {"content": existing_content}
         mock_client._http_client.update.return_value = {}
 
         patch_schema = mock_mcp._tools["patch_schema"]
         result = await patch_schema(
             schema_id=50,
-            operation="update",
-            node_id="invoice_number",
-            node_data={"label": "Invoice #", "score_threshold": 0.9},
+            operations=[
+                {
+                    "operation": "update",
+                    "node_id": "invoice_number",
+                    "node_data": {"label": "Invoice #", "score_threshold": 0.9},
+                }
+            ],
         )
 
         assert result["status"] == "success"
         assert result["schema_id"] == 50
-        assert result["node"]["label"] == "Invoice #"
+        assert result["results"][0]["node"]["label"] == "Invoice #"
         call_args = mock_client._http_client.update.call_args
         updated_content = call_args[1]["content"] if "content" in call_args[1] else call_args[0][2]["content"]
         datapoint = updated_content[0]["children"][0]
         assert datapoint["label"] == "Invoice #"
         assert datapoint["score_threshold"] == 0.9
+
+    @pytest.mark.asyncio
+    async def test_patch_schema_update_with_dataclass_preserves_id(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Regression: SchemaPatchOp with SchemaNodeUpdate must not overwrite node id with None."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        importlib.reload(schemas)
+
+        schemas.register_schema_tools(mock_mcp, mock_client)
+
+        existing_content = [
+            {
+                "id": "header_section",
+                "label": "Header",
+                "category": "section",
+                "children": [
+                    {
+                        "id": "sender_address",
+                        "label": "Sender Address",
+                        "category": "datapoint",
+                        "type": "string",
+                    }
+                ],
+            }
+        ]
+
+        mock_client._http_client.request_json.return_value = {"content": existing_content}
+        mock_client._http_client.update.return_value = {}
+
+        from rossum_mcp.tools.schemas.operations import patch_schema as _patch_schema
+
+        result = await _patch_schema(
+            mock_client,
+            schema_id=50,
+            operations=[
+                SchemaPatchOp(
+                    operation="update",
+                    node_id="sender_address",
+                    node_data=SchemaNodeUpdate(label="Vendor Address", stretch=True),
+                )
+            ],
+        )
+
+        assert result["status"] == "success"
+        call_args = mock_client._http_client.update.call_args
+        updated_content = call_args[1]["content"] if "content" in call_args[1] else call_args[0][2]["content"]
+        datapoint = updated_content[0]["children"][0]
+        assert datapoint["id"] == "sender_address"
+        assert datapoint["label"] == "Vendor Address"
 
     @pytest.mark.asyncio
     async def test_patch_schema_remove_datapoint(
@@ -469,26 +525,83 @@ class TestPatchSchema:
             }
         ]
 
-        mock_schema = create_mock_schema(id=50, content=existing_content)
-        mock_client.retrieve_schema.return_value = mock_schema
         mock_client._http_client.request_json.return_value = {"content": existing_content}
         mock_client._http_client.update.return_value = {}
 
         patch_schema = mock_mcp._tools["patch_schema"]
         result = await patch_schema(
             schema_id=50,
-            operation="remove",
-            node_id="old_field",
+            operations=[{"operation": "remove", "node_id": "old_field"}],
         )
 
         assert result["status"] == "success"
         assert result["schema_id"] == 50
-        assert result["node"] is None
+        assert result["results"][0]["node"] is None
         call_args = mock_client._http_client.update.call_args
         updated_content = call_args[1]["content"] if "content" in call_args[1] else call_args[0][2]["content"]
         header_section = updated_content[0]
         assert len(header_section["children"]) == 1
         assert header_section["children"][0]["id"] == "invoice_number"
+
+    @pytest.mark.asyncio
+    async def test_patch_schema_multiple_operations(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test multiple operations applied in a single API call."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        importlib.reload(schemas)
+
+        schemas.register_schema_tools(mock_mcp, mock_client)
+
+        existing_content = [
+            {
+                "id": "header_section",
+                "label": "Header",
+                "category": "section",
+                "children": [
+                    {"id": "invoice_number", "label": "Invoice Number", "category": "datapoint"},
+                    {"id": "old_field", "label": "Old Field", "category": "datapoint"},
+                ],
+            }
+        ]
+
+        mock_client._http_client.request_json.return_value = {"content": existing_content}
+        mock_client._http_client.update.return_value = {}
+
+        patch_schema = mock_mcp._tools["patch_schema"]
+        result = await patch_schema(
+            schema_id=50,
+            operations=[
+                {"operation": "remove", "node_id": "old_field"},
+                {
+                    "operation": "add",
+                    "node_id": "vendor_name",
+                    "parent_id": "header_section",
+                    "node_data": {"label": "Vendor Name", "type": "string", "category": "datapoint"},
+                },
+                {
+                    "operation": "update",
+                    "node_id": "invoice_number",
+                    "node_data": {"label": "Invoice #"},
+                },
+            ],
+        )
+
+        assert result["status"] == "success"
+        assert result["operations_count"] == 3
+        assert result["results"][0]["node"] is None
+        assert result["results"][1]["node"]["label"] == "Vendor Name"
+        assert result["results"][2]["node"]["label"] == "Invoice #"
+        # Single API call for all operations
+        mock_client._http_client.update.assert_called_once()
+        call_args = mock_client._http_client.update.call_args
+        updated_content = call_args[1]["content"] if "content" in call_args[1] else call_args[0][2]["content"]
+        header_children = updated_content[0]["children"]
+        assert len(header_children) == 2
+        assert header_children[0]["id"] == "invoice_number"
+        assert header_children[0]["label"] == "Invoice #"
+        assert header_children[1]["id"] == "vendor_name"
 
     @pytest.mark.asyncio
     async def test_patch_schema_retries_on_412(
@@ -510,8 +623,6 @@ class TestPatchSchema:
             }
         ]
 
-        mock_schema = create_mock_schema(id=50, content=existing_content)
-        mock_client.retrieve_schema.return_value = mock_schema
         mock_client._http_client.request_json.return_value = {"content": existing_content}
         mock_client._http_client.update.side_effect = [
             APIClientError("PATCH", "schemas/50", 412, "Precondition Failed"),
@@ -522,10 +633,14 @@ class TestPatchSchema:
         with patch("rossum_mcp.tools.schemas.operations.asyncio.sleep", new_callable=AsyncMock):
             result = await patch_schema(
                 schema_id=50,
-                operation="add",
-                node_id="vendor_name",
-                parent_id="header_section",
-                node_data={"label": "Vendor Name", "type": "string", "category": "datapoint"},
+                operations=[
+                    {
+                        "operation": "add",
+                        "node_id": "vendor_name",
+                        "parent_id": "header_section",
+                        "node_data": {"label": "Vendor Name", "type": "string", "category": "datapoint"},
+                    }
+                ],
             )
 
         assert result["status"] == "success"
@@ -563,10 +678,14 @@ class TestPatchSchema:
         ):
             await patch_schema(
                 schema_id=50,
-                operation="add",
-                node_id="vendor_name",
-                parent_id="header_section",
-                node_data={"label": "Vendor Name", "type": "string", "category": "datapoint"},
+                operations=[
+                    {
+                        "operation": "add",
+                        "node_id": "vendor_name",
+                        "parent_id": "header_section",
+                        "node_data": {"label": "Vendor Name", "type": "string", "category": "datapoint"},
+                    }
+                ],
             )
 
     @pytest.mark.asyncio
@@ -583,8 +702,7 @@ class TestPatchSchema:
         patch_schema = mock_mcp._tools["patch_schema"]
         result = await patch_schema(
             schema_id=50,
-            operation="invalid",
-            node_id="some_field",
+            operations=[{"operation": "invalid", "node_id": "some_field"}],
         )
 
         assert result["error"] == "Invalid operation 'invalid'. Must be 'add', 'update', or 'remove'."
@@ -605,10 +723,14 @@ class TestPatchSchema:
         patch_schema = mock_mcp._tools["patch_schema"]
         result = await patch_schema(
             schema_id=50,
-            operation="add",
-            node_id="new_field",
-            parent_id="section1",
-            node_data={"label": "New Field"},
+            operations=[
+                {
+                    "operation": "add",
+                    "node_id": "new_field",
+                    "parent_id": "section1",
+                    "node_data": {"label": "New Field"},
+                }
+            ],
         )
 
         assert result["error"] == "Unexpected schema content format"
@@ -618,7 +740,7 @@ class TestPatchSchema:
     async def test_patch_schema_node_not_found(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
-        """Test that updating a non-existent node returns error."""
+        """Test that updating a non-existent node returns error (fail fast)."""
         monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
         importlib.reload(base)
         importlib.reload(schemas)
@@ -634,19 +756,63 @@ class TestPatchSchema:
             }
         ]
 
-        mock_schema = create_mock_schema(id=50, content=existing_content)
-        mock_client.retrieve_schema.return_value = mock_schema
         mock_client._http_client.request_json.return_value = {"content": existing_content}
 
         patch_schema = mock_mcp._tools["patch_schema"]
         result = await patch_schema(
             schema_id=50,
-            operation="update",
-            node_id="nonexistent_field",
-            node_data={"label": "Updated Label"},
+            operations=[
+                {
+                    "operation": "update",
+                    "node_id": "nonexistent_field",
+                    "node_data": {"label": "Updated Label"},
+                }
+            ],
         )
 
         assert "not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_patch_schema_fails_fast_on_error(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test that batch fails fast — no API call when any operation is invalid."""
+        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
+        importlib.reload(base)
+        importlib.reload(schemas)
+
+        schemas.register_schema_tools(mock_mcp, mock_client)
+
+        existing_content = [
+            {
+                "id": "header_section",
+                "label": "Header",
+                "category": "section",
+                "children": [{"id": "invoice_number", "label": "Invoice Number", "category": "datapoint"}],
+            }
+        ]
+
+        mock_client._http_client.request_json.return_value = {"content": existing_content}
+
+        patch_schema = mock_mcp._tools["patch_schema"]
+        result = await patch_schema(
+            schema_id=50,
+            operations=[
+                {
+                    "operation": "update",
+                    "node_id": "invoice_number",
+                    "node_data": {"label": "OK"},
+                },
+                {
+                    "operation": "update",
+                    "node_id": "nonexistent",
+                    "node_data": {"label": "Bad"},
+                },
+            ],
+        )
+
+        assert "not found" in result["error"]
+        mock_client._http_client.update.assert_not_called()
 
 
 @pytest.mark.unit

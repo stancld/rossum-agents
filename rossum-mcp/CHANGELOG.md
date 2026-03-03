@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Added `search` tool: list/filter any entity with typed, entity-specific query objects — covers all `get`-supported types plus search-only entities `hook_log`, `hook_template`, `user_role` [#221](https://github.com/stancld/rossum-agents/pull/221)
 
 ### Changed
+- **Breaking**: `patch_schema` now accepts `operations: list[SchemaPatchOp]` instead of single-operation parameters — multiple add/update/remove operations are applied in one API call (single GET→PATCH round-trip); fails fast on first error [#226](https://github.com/stancld/rossum-agents/pull/226)
 - `update_queue` parameter `queue_data` is now a typed `QueueUpdateData` schema instead of an untyped dict — LLMs see valid field names and types directly in the JSON schema [#221](https://github.com/stancld/rossum-agents/pull/221)
 - `update_engine` parameter `engine_data` is now a typed `EngineUpdateData` schema instead of an untyped dict [#221](https://github.com/stancld/rossum-agents/pull/221)
 - `create_engine_field` parameter `multiline` changed from `str` to `bool` [#221](https://github.com/stancld/rossum-agents/pull/221)

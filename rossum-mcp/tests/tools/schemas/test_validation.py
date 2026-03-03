@@ -273,7 +273,8 @@ class TestSanitizeSchemaContent:
         result = schemas.sanitize_schema_content(content)
         assert result[0]["children"][0]["type"] == "number"
 
-    def test_removes_non_string_type_without_type_key(self) -> None:
+    def test_defaults_type_when_non_string_type_without_type_key(self) -> None:
+        """When type is a bad dict (no 'type' key), it's removed and defaults to 'string'."""
         content = [
             {
                 "category": "section",
@@ -290,7 +291,7 @@ class TestSanitizeSchemaContent:
             }
         ]
         result = schemas.sanitize_schema_content(content)
-        assert "type" not in result[0]["children"][0]
+        assert result[0]["children"][0]["type"] == "string"
 
     def test_strips_none_values_from_nodes(self) -> None:
         content = [
@@ -320,3 +321,149 @@ class TestSanitizeSchemaContent:
         # Non-None values are preserved
         assert dp["id"] == "field"
         assert dp["label"] == "Field"
+
+    def test_strips_null_required_fields(self) -> None:
+        """None values for id/type/category/label are stripped.
+
+        The API rejects explicit nulls ("id may not be null") and also rejects
+        absence for some fields ("type is required"). For id/category/label,
+        absence in a PATCH payload means "keep existing value". For type on
+        datapoints, we add a "string" default after stripping.
+        """
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": None,
+                        "label": None,
+                        "type": None,
+                    },
+                    {
+                        "category": None,
+                        "id": "field2",
+                        "label": "Field 2",
+                        "type": "string",
+                        "formula": None,
+                    },
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        dp1 = result[0]["children"][0]
+        assert "id" not in dp1
+        assert "label" not in dp1
+        # type defaults to "string" for datapoints
+        assert dp1["type"] == "string"
+        dp2 = result[0]["children"][1]
+        assert "category" not in dp2
+        assert "formula" not in dp2
+
+    def test_defaults_type_on_datapoint_with_null_type(self) -> None:
+        """Datapoint nodes with type=None get type="string" as a safe default."""
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "field",
+                        "label": "Field",
+                        "type": None,
+                    }
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        assert result[0]["children"][0]["type"] == "string"
+
+    def test_no_default_type_on_non_datapoint(self) -> None:
+        """Non-datapoint nodes (sections, multivalues, tuples) don't get a default type."""
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "type": None,
+                "children": [],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        assert "type" not in result[0]
+
+    def test_preserves_formula_on_formula_type_node(self) -> None:
+        """formula field must not be stripped on formula-type nodes.
+
+        The API requires 'formula' to be present on datapoints with
+        ui_configuration.type == "formula", even if it's null.
+        """
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "formula_field",
+                        "label": "Total",
+                        "type": "number",
+                        "ui_configuration": {"type": "formula"},
+                        "formula": None,
+                    },
+                    {
+                        "category": "datapoint",
+                        "id": "regular_field",
+                        "label": "Name",
+                        "type": "string",
+                        "formula": None,
+                    },
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        formula_node = result[0]["children"][0]
+        assert "formula" in formula_node and formula_node["formula"] is None
+        regular_node = result[0]["children"][1]
+        assert "formula" not in regular_node
+
+    def test_preserves_prompt_and_context_on_reasoning_type_node(self) -> None:
+        """prompt/context fields must not be stripped on reasoning-type nodes."""
+        content = [
+            {
+                "category": "section",
+                "id": "header",
+                "label": "Header",
+                "children": [
+                    {
+                        "category": "datapoint",
+                        "id": "reasoning_field",
+                        "label": "Reasoning",
+                        "type": "string",
+                        "ui_configuration": {"type": "reasoning"},
+                        "prompt": None,
+                        "context": None,
+                    },
+                    {
+                        "category": "datapoint",
+                        "id": "regular_field",
+                        "label": "Name",
+                        "type": "string",
+                        "prompt": None,
+                        "context": None,
+                    },
+                ],
+            }
+        ]
+        result = schemas.sanitize_schema_content(content)
+        reasoning_node = result[0]["children"][0]
+        assert "prompt" in reasoning_node and reasoning_node["prompt"] is None
+        assert "context" in reasoning_node and reasoning_node["context"] is None
+        regular_node = result[0]["children"][1]
+        assert "prompt" not in regular_node
+        assert "context" not in regular_node

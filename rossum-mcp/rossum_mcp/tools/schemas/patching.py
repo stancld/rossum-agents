@@ -200,3 +200,21 @@ def apply_schema_patch(
         return _apply_remove_operation(content, node_id)
 
     return content
+
+
+def apply_schema_patches(content: list[dict], operations: list[dict]) -> list[dict]:
+    """Apply multiple patch operations to schema content in a single pass (one deepcopy)."""
+    content = copy.deepcopy(content)
+    for op in operations:
+        operation = op["operation"]
+        node_id = op["node_id"]
+        node_data = op.get("node_data")
+        parent_id = op.get("parent_id")
+        position = op.get("position")
+        if operation == "add":
+            _apply_add_operation(content, node_id, node_data, parent_id, position)
+        elif operation == "update":
+            _apply_update_operation(content, node_id, node_data)
+        elif operation == "remove":
+            _apply_remove_operation(content, node_id)
+    return content

@@ -529,7 +529,9 @@ patch_schema
 ^^^^^^^^^^^^
 
 **MCP Tool:**
-  ``patch_schema(schema_id: int, operation: str, node_id: str, node_data: dict | None, parent_id: str | None, position: int | None)``
+  ``patch_schema(schema_id: int, operations: list[SchemaPatchOp])``
+
+  Each ``SchemaPatchOp``: ``{operation: "add"|"update"|"remove", node_id: str, node_data?: dict, parent_id?: str, position?: int}``
 
 **Rossum SDK Method:**
   ``AsyncRossumAPIClient.update_schema(schema_id, data)`` (with modified content)
@@ -544,9 +546,9 @@ patch_schema
   https://github.com/rossumai/rossum-api
 
 **Implementation:**
-  Patches a schema by adding, updating, or removing individual nodes without replacing the
-  entire content. Operations: "add" (requires parent_id, node_data), "update" (requires node_data),
-  "remove" (only node_id needed).
+  Applies one or more patch operations to a schema in a single API call. Operations:
+  "add" (requires parent_id, node_data), "update" (requires node_data), "remove" (only node_id).
+  All operations are applied atomically — fails fast on first error with no API call made.
 
 get_schema_tree_structure
 ^^^^^^^^^^^^^^^^^^^^^^^^^

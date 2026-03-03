@@ -13,23 +13,11 @@ from rossum_mcp.tools.schemas.models import (
     SchemaMultivalue,
     SchemaNode,
     SchemaNodeUpdate,
+    SchemaPatchOp,
     SchemaTreeNode,
     SchemaTuple,
 )
-from rossum_mcp.tools.schemas.operations import (
-    create_schema,
-    delete_schema,
-    get_schema,
-    get_schema_tree_structure,
-    list_schemas,
-    patch_schema,
-    prune_schema_fields,
-    update_schema,
-)
-from rossum_mcp.tools.schemas.patching import (
-    PatchOperation,
-    apply_schema_patch,
-)
+from rossum_mcp.tools.schemas.patching import PatchOperation, apply_schema_patch, apply_schema_patches
 from rossum_mcp.tools.schemas.validation import (
     VALID_UI_CONFIGURATION_EDIT,
     VALID_UI_CONFIGURATION_TYPES,
@@ -51,19 +39,13 @@ __all__ = [
     "SchemaMultivalue",
     "SchemaNode",
     "SchemaNodeUpdate",
+    "SchemaPatchOp",
     "SchemaTreeNode",
     "SchemaTuple",
     "apply_schema_patch",
-    "create_schema",
-    "delete_schema",
-    "get_schema",
-    "get_schema_tree_structure",
-    "list_schemas",
-    "patch_schema",
-    "prune_schema_fields",
+    "apply_schema_patches",
     "register_schema_tools",
     "sanitize_schema_content",
-    "update_schema",
 ]
 
 
@@ -85,19 +67,15 @@ def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await ops.create_schema(client, name, content)
 
     @mcp.tool(
-        description="Patch schema nodes (add/update/remove). Prereq: load schema-patching skill. Ops: add (parent_id + node_data), update (node_id + node_data), remove (node_id only). Tuple datapoints require explicit id; section-level datapoints use the passed node_id.",
+        description="Batch-patch schema nodes. Each operation: {operation, node_id, node_data?, parent_id?, position?}. Ops: add (parent_id + node_data), update (node_data), remove (node_id only). All applied in one API call; fails fast on first error.",
         tags={"schemas", "write"},
         annotations={"readOnlyHint": False},
     )
     async def patch_schema(
         schema_id: int,
-        operation: PatchOperation,
-        node_id: str,
-        node_data: SchemaNode | SchemaNodeUpdate | None = None,
-        parent_id: str | None = None,
-        position: int | None = None,
+        operations: list[SchemaPatchOp],
     ) -> dict:
-        return await ops.patch_schema(client, schema_id, operation, node_id, node_data, parent_id, position)
+        return await ops.patch_schema(client, schema_id, operations)
 
     @mcp.tool(
         description="Lightweight schema tree (ids/labels/categories/types); accepts schema_id or queue_id.",

@@ -20,7 +20,7 @@ from rossum_mcp.tools.base import (
     graceful_list,
 )
 from rossum_mcp.tools.schemas.models import SchemaListItem, SchemaNode, SchemaNodeUpdate
-from rossum_mcp.tools.schemas.patching import PatchOperation, _find_node_anywhere, apply_schema_patch
+from rossum_mcp.tools.schemas.patching import _find_node_anywhere, apply_schema_patches
 from rossum_mcp.tools.schemas.pruning import (
     _collect_all_field_ids,
     _collect_ancestor_ids,
@@ -131,53 +131,81 @@ async def create_schema(client: AsyncRossumAPIClient, name: str, content: list[d
     return schema
 
 
+def _normalize_node_data(node_data: SchemaNode | SchemaNodeUpdate | dict | None) -> dict | None:
+    """Convert node_data from dataclass/dict to plain dict."""
+    if node_data is None:
+        return None
+    if isinstance(node_data, dict):
+        return node_data
+    if hasattr(node_data, "to_dict"):
+        return node_data.to_dict()
+    if is_dataclass(node_data):
+        return asdict(node_data)
+    return dict(node_data)  # type: ignore[call-overload]
+
+
+def _normalize_operations(operations: list) -> list[dict] | dict:
+    """Normalize a list of SchemaPatchOp/dict operations to plain dicts.
+
+    Returns list[dict] on success, or an error dict on validation failure.
+    """
+    ops_dicts: list[dict] = []
+    for op in operations:
+        if isinstance(op, dict):
+            op_dict = dict(op)
+        elif is_dataclass(op):
+            # Shallow conversion — asdict() recursively flattens nested dataclasses
+            # (e.g. node_data), losing to_dict()'s None-filtering and injecting id: None.
+            op_dict = dict(vars(op))
+        else:
+            op_dict = dict(op)  # type: ignore[call-overload]
+
+        operation = op_dict.get("operation")
+        if operation not in ("add", "update", "remove"):
+            return {"error": f"Invalid operation '{operation}'. Must be 'add', 'update', or 'remove'."}
+
+        node_data = op_dict.get("node_data")
+        if node_data is not None:
+            op_dict["node_data"] = _normalize_node_data(node_data)
+
+        ops_dicts.append(op_dict)
+    return ops_dicts
+
+
 async def patch_schema(
     client: AsyncRossumAPIClient,
     schema_id: int,
-    operation: PatchOperation,
-    node_id: str,
-    node_data: SchemaNode | SchemaNodeUpdate | None = None,
-    parent_id: str | None = None,
-    position: int | None = None,
+    operations: list,
 ) -> dict:
-    if operation not in ("add", "update", "remove"):
-        return {"error": f"Invalid operation '{operation}'. Must be 'add', 'update', or 'remove'."}
+    normalized = _normalize_operations(operations)
+    if isinstance(normalized, dict):
+        return normalized
 
-    logger.debug(f"Patching schema: schema_id={schema_id}, operation={operation}, node_id={node_id}")
-
-    node_data_dict: dict | None = None
-    if node_data is not None:
-        if isinstance(node_data, dict):
-            node_data_dict = node_data
-        elif hasattr(node_data, "to_dict"):
-            node_data_dict = node_data.to_dict()
-        else:
-            node_data_dict = asdict(node_data)
+    logger.debug(f"Patching schema: schema_id={schema_id}, {len(normalized)} operations")
 
     def prepare(content: list) -> list:
-        return apply_schema_patch(
-            content=content,
-            operation=operation,
-            node_id=node_id,
-            node_data=node_data_dict,
-            parent_id=parent_id,
-            position=position,
-        )
+        return apply_schema_patches(content, normalized)
 
     try:
         _, result_content = await _update_schema_with_retry(client, schema_id, prepare)
     except ValueError as e:
         return {"error": str(e)}
 
-    # Return concise confirmation with the affected node instead of the full schema
     assert result_content is not None
-    node, _, _, _ = _find_node_anywhere(result_content, node_id)
+    results = []
+    for op_dict in normalized:
+        node_id = op_dict["node_id"]
+        if op_dict["operation"] == "remove":
+            results.append({"operation": "remove", "node_id": node_id, "node": None})
+        else:
+            node, _, _, _ = _find_node_anywhere(result_content, node_id)
+            results.append({"operation": op_dict["operation"], "node_id": node_id, "node": node})
+
     return {
         "status": "success",
         "schema_id": schema_id,
-        "operation": operation,
-        "node_id": node_id,
-        "node": node,
+        "operations_count": len(normalized),
+        "results": results,
     }
 
 
