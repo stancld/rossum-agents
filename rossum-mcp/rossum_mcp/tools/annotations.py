@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import tempfile
@@ -124,23 +125,26 @@ async def _copy_annotations(
     target_queue_url = build_resource_url("queues", target_queue_id)
     params = {"reimport": "true"} if reimport else {}
 
+    async def _copy_one(annotation_id: int) -> dict:
+        payload: dict = {"target_queue": target_queue_url}
+        if target_status is not None:
+            payload["target_status"] = target_status
+        return await client._http_client.request_json(
+            method="POST",
+            url=f"annotations/{annotation_id}/copy",
+            json=payload,
+            params=params,
+        )
+
+    responses = await asyncio.gather(*[_copy_one(aid) for aid in annotation_ids], return_exceptions=True)
+
     results: list[dict] = []
     errors: list[dict] = []
-    for annotation_id in annotation_ids:
-        try:
-            payload: dict = {"target_queue": target_queue_url}
-            if target_status is not None:
-                payload["target_status"] = target_status
-
-            response = await client._http_client.request_json(
-                method="POST",
-                url=f"annotations/{annotation_id}/copy",
-                json=payload,
-                params=params,
-            )
+    for annotation_id, response in zip(annotation_ids, responses, strict=True):
+        if isinstance(response, Exception):
+            errors.append({"annotation_id": annotation_id, "error": f"{type(response).__name__}: {response!s}"})
+        else:
             results.append({"annotation_id": annotation_id, "copied_annotation": response})
-        except Exception as e:
-            errors.append({"annotation_id": annotation_id, "error": f"{type(e).__name__}: {e!s}"})
 
     return {"copied": len(results), "failed": len(errors), "results": results, "errors": errors}
 
