@@ -299,7 +299,7 @@ See the [full documentation](https://stancld.github.io/rossum-agents/skills_and_
 
 ## MCP Tools
 
-The MCP server provides **41 tools** organized into categories:
+The MCP server provides **36 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|

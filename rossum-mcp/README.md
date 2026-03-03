@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 41 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. 36 tools for queues, schemas, hooks, engines, and more.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
