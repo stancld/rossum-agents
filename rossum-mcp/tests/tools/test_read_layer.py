@@ -536,7 +536,7 @@ class TestSearchErrors:
 class TestSearchRelations:
     @pytest.mark.asyncio
     async def test_search_relations(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
-        with patch("rossum_mcp.tools.read_layer.registry.graceful_list") as mock_gl:
+        with patch("rossum_mcp.tools.relations.graceful_list") as mock_gl:
             mock_gl.return_value = Mock(items=[Mock(id=1, type="edit")])
             register_read_tools(mock_mcp, mock_client)
             result = await mock_mcp._tools["search"](query=RelationSearch(type="edit"))
@@ -544,7 +544,7 @@ class TestSearchRelations:
 
     @pytest.mark.asyncio
     async def test_search_document_relations(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
-        with patch("rossum_mcp.tools.read_layer.registry.graceful_list") as mock_gl:
+        with patch("rossum_mcp.tools.document_relations.graceful_list") as mock_gl:
             mock_gl.return_value = Mock(items=[Mock(id=10, type="line_items")])
             register_read_tools(mock_mcp, mock_client)
             result = await mock_mcp._tools["search"](query=DocumentRelationSearch(type="line_items"))
