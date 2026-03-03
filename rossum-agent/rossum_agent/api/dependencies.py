@@ -87,6 +87,9 @@ class RossumCredentials:
     token: str
     api_url: str
     user_id: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
 
 
 async def get_rossum_credentials(
@@ -147,7 +150,14 @@ async def get_validated_credentials(
                     status_code=status.HTTP_502_BAD_GATEWAY, detail="Rossum API did not return user ID"
                 )
 
-            return RossumCredentials(token=credentials.token, api_url=credentials.api_url, user_id=user_id)
+            return RossumCredentials(
+                token=credentials.token,
+                api_url=credentials.api_url,
+                user_id=user_id,
+                first_name=user_data.get("first_name"),
+                last_name=user_data.get("last_name"),
+                email=user_data.get("email"),
+            )
 
     except httpx.RequestError as e:
         logger.error(f"Failed to connect to Rossum API: {e}")

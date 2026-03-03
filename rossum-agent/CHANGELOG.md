@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Fixed `packages.find` in `pyproject.toml` — removed `rossum_mcp*` and `rossum_deploy*` from the `include` list; only `rossum_agent*` belongs in this package's build
+- Fixed Slack reporter name blank when using support access — `/v1/users/{id}` returns 404 for cross-org support tokens; now falls back to `first_name last_name (email)` from `/v1/auth/user` response [#223](https://github.com/rossumai/rossum-agents/pull/223)
 - Schema patching sub-agent now auto-recovers from engine restriction errors — when `update_schema` fails with "extracted field '...' is not present among names of engine fields", invalid `rir_field_names` are auto-stripped and the update retried [#221](https://github.com/stancld/rossum-agents/pull/221)
 
 ## [1.3.6] - 2026-03-02
