@@ -701,7 +701,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "create_queue_from_template",
                 "suggest_formula_field",
                 ("patch_schema", "patch_schema_with_subagent"),
-                "are_reasoning_fields_enabled",
                 "load_skill",
                 "restore_entity_version",
             ],

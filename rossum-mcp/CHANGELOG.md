@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
 - Added `get` tool: fetch any entity by ID with a single unified tool — supports `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`; `include_related=True` enriches with linked data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events) [#221](https://github.com/stancld/rossum-agents/pull/221)
 - Added `search` tool: list/filter any entity with typed, entity-specific query objects — covers all `get`-supported types plus search-only entities `hook_log`, `hook_template`, `user_role` [#221](https://github.com/stancld/rossum-agents/pull/221)
 
+### Removed
+- Removed `are_lookup_fields_enabled` and `are_reasoning_fields_enabled` tools — feature availability is inferred by the agent from organization group data via the `get` / `search` tools
+
 ### Changed
 - `update_queue` parameter `queue_data` is now a typed `QueueUpdateData` schema instead of an untyped dict — LLMs see valid field names and types directly in the JSON schema [#221](https://github.com/stancld/rossum-agents/pull/221)
 - `update_engine` parameter `engine_data` is now a typed `EngineUpdateData` schema instead of an untyped dict [#221](https://github.com/stancld/rossum-agents/pull/221)

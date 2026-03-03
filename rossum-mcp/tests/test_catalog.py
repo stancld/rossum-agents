@@ -21,7 +21,6 @@ class TestCategoryMeta:
             "hooks",
             "email_templates",
             "rules",
-            "organization_groups",
             "users",
             "workspaces",
         }
