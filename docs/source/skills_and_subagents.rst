@@ -42,8 +42,6 @@ Available Skills
      - Deploy configuration changes safely via sandbox with before/after diff
    * - ``schema-patching``
      - Add, update, or remove individual schema fields
-   * - ``schema-pruning``
-     - Remove unwanted fields from schema in one call
    * - ``organization-setup``
      - Set up Rossum for new customers with correct document types and regional configurations
    * - ``schema-creation``

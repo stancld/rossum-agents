@@ -30,7 +30,7 @@ Regional variants: `AP&R {Region} Demo Template`, `Tax Invoice {Region} Demo Tem
 
 ## Schema Customization
 
-**Load `schema-pruning` skill** for bulk field removal, **`schema-patching` skill** for adding fields.
+Use `prune_schema_fields` tool for bulk field removal, **`schema-patching` skill** for adding fields.
 
 ### Schema Pruning
 

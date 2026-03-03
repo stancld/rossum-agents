@@ -33,7 +33,6 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 - `load_skill("organization-setup")` → new customer onboarding, queue templates
 - `load_skill("schema-creation")` → create new schemas from scratch
 - `load_skill("schema-patching")` → modify schemas, add/remove fields, formulas
-- `load_skill("schema-pruning")` → bulk remove unwanted fields from schema
 - `load_skill("ui-settings")` → update queue UI settings, annotation list columns
 - `load_skill("hooks")` → hook templates, token_owner, testing, debugging
 - `load_skill("txscript")` → TxScript language reference (field access, helpers, TableColumn, messaging, constraints); use only when Rossum Store hook templates are insufficient

@@ -275,7 +275,6 @@ The Rossum Agent includes specialized capabilities for complex workflows:
 |-------|---------|
 | `rossum-deployment` | Deploy configuration changes safely via sandbox with before/after diff |
 | `schema-patching` | Add, update, or remove individual schema fields |
-| `schema-pruning` | Remove unwanted fields from schema in one call |
 | `organization-setup` | Set up Rossum for new customers with regional templates |
 | `ui-settings` | Update queue UI settings without corrupting structure |
 | `hooks` | Hook templates, token_owner, testing, debugging |
