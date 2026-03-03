@@ -5,8 +5,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 from rossum_agent.api.main import app
-from rossum_agent.api.routes.slack import SlackConfig, SlackContext, _fetch_slack_context, get_slack_config
+from rossum_agent.api.routes.slack import (
+    SlackConfig,
+    SlackContext,
+    _fetch_slack_context,
+    _reporter_name_from_credentials,
+    get_slack_config,
+)
 from rossum_agent.api.services.slack_service import SlackServiceError
+from rossum_api import APIClientError
 
 from .conftest import create_mock_httpx_client
 
@@ -204,10 +211,39 @@ class TestGetSlackConfig:
         assert exc_info.value.status_code == 503
 
 
+class TestReporterNameFromCredentials:
+    def test_full_name_and_email(self):
+        creds = MagicMock(first_name="Dan", last_name="Stancl", email="dan@rossum.ai")
+        assert _reporter_name_from_credentials(creds) == "Dan Stancl (dan@rossum.ai)"
+
+    def test_first_name_only_with_email(self):
+        creds = MagicMock(first_name="Dan", last_name=None, email="dan@rossum.ai")
+        assert _reporter_name_from_credentials(creds) == "Dan (dan@rossum.ai)"
+
+    def test_email_only(self):
+        creds = MagicMock(first_name=None, last_name=None, email="dan@rossum.ai")
+        assert _reporter_name_from_credentials(creds) == "dan@rossum.ai"
+
+    def test_name_only_no_email(self):
+        creds = MagicMock(first_name="Dan", last_name="Stancl", email=None)
+        assert _reporter_name_from_credentials(creds) == "Dan Stancl"
+
+    def test_nothing(self):
+        creds = MagicMock(first_name=None, last_name=None, email=None)
+        assert _reporter_name_from_credentials(creds) is None
+
+
 class TestFetchSlackContext:
     @pytest.fixture
     def mock_credentials(self):
-        return MagicMock(api_url="https://api.rossum.ai/v1", token="test-token", user_id="123")
+        return MagicMock(
+            api_url="https://api.rossum.ai/v1",
+            token="test-token",
+            user_id="123",
+            first_name="Test",
+            last_name="User",
+            email="test@rossum.ai",
+        )
 
     @patch("rossum_agent.api.routes.slack.AsyncRossumAPIClient")
     @pytest.mark.asyncio
@@ -257,14 +293,46 @@ class TestFetchSlackContext:
 
     @patch("rossum_agent.api.routes.slack.AsyncRossumAPIClient")
     @pytest.mark.asyncio
-    async def test_api_failure_returns_empty_context(self, mock_client_cls, mock_credentials):
+    async def test_user_not_found_falls_back_to_credentials(self, mock_client_cls, mock_credentials):
         mock_client = AsyncMock()
         mock_client_cls.return_value = mock_client
-        mock_client.retrieve_user.side_effect = Exception("API down")
+        mock_client.retrieve_user.side_effect = APIClientError("GET", "/v1/users/123", 404, Exception("Not Found"))
+
+        mock_org = MagicMock()
+        mock_org.name = "Acme Corp"
+        mock_org.id = 42
+        mock_client.retrieve_own_organization.return_value = mock_org
 
         ctx = await _fetch_slack_context(mock_credentials)
 
-        assert ctx == SlackContext(user_id="123")
+        assert ctx.reporter_name == "Test User (test@rossum.ai)"
+        assert ctx.organization_name == "Acme Corp"
+        assert ctx.organization_id == 42
+
+    @patch("rossum_agent.api.routes.slack.AsyncRossumAPIClient")
+    @pytest.mark.asyncio
+    async def test_user_non_404_error_propagates_to_outer_catch(self, mock_client_cls, mock_credentials):
+        mock_client = AsyncMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.retrieve_user.side_effect = APIClientError("GET", "/v1/users/123", 500, Exception("Server Error"))
+
+        ctx = await _fetch_slack_context(mock_credentials)
+
+        assert ctx.reporter_name is None
+        assert ctx.organization_name is None
+
+    @patch("rossum_agent.api.routes.slack.AsyncRossumAPIClient")
+    @pytest.mark.asyncio
+    async def test_full_api_failure_returns_empty_context(self, mock_client_cls, mock_credentials):
+        mock_client = AsyncMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.retrieve_user.side_effect = Exception("API down")
+        mock_client.retrieve_own_organization.side_effect = Exception("API down")
+
+        ctx = await _fetch_slack_context(mock_credentials)
+
+        assert ctx.reporter_name is None
+        assert ctx.organization_name is None
 
     @patch("rossum_agent.api.routes.slack.AsyncRossumAPIClient")
     @pytest.mark.asyncio
