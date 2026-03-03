@@ -156,7 +156,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url=None,
         prompt="Hey, what can you do?",
         tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=8000, max_total_tokens=9000),
+        token_budget=TokenBudget(min_total_tokens=8500, max_total_tokens=9500),
         success_criteria=SuccessCriteria(
             required_keywords=["hook", "queue"],
             max_steps=1,
@@ -732,14 +732,15 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ),
         ],
         tool_expectation=ToolExpectation(
-            expected_tools=["create_queue_from_template"],
+            expected_tools=["create_queue_from_template", "ask_user_question"],
             mode=ToolMatchMode.SUBSET,
             forbidden_tools=["patch_schema", "patch_schema_with_subagent", "suggest_formula_field"],
         ),
-        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=65000),
+        token_budget=TokenBudget(min_total_tokens=50000, max_total_tokens=85000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
             max_steps=4,
+            require_final_answer=False,
             file_expectation=FileExpectation(),
             custom_checks=[CAUTIOUS_PERSONA_CLARIFICATION_CHECK],
         ),

@@ -27,8 +27,11 @@ from rossum_agent.agent.models import (
     ToolStartStep,
 )
 from rossum_agent.api.models.schemas import (
+    AgentQuestionEvent,
+    AgentQuestionItemSchema,
     DocumentContent,
     ImageContent,
+    QuestionOptionSchema,
     StepEvent,
     StreamDoneEvent,
     SubAgentProgressEvent,
@@ -42,6 +45,7 @@ from rossum_agent.redis_storage import RedisStorage
 from rossum_agent.rossum_mcp_integration import MCPConnection, connect_mcp_server
 from rossum_agent.tools.core import (
     AgentContext,
+    AgentQuestion,
     SubAgentProgress,
     SubAgentText,
     reset_context,
@@ -77,7 +81,9 @@ async def _log_commit_hook(commit: ConfigCommit) -> str | None:
 class _RequestContext:
     """Per-request context for agent execution."""
 
-    event_queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent] | None = None
+    event_queue: (
+        asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent] | None
+    ) = None
     event_loop: asyncio.AbstractEventLoop | None = None
 
 
@@ -310,7 +316,7 @@ class AgentService:
 
     def _enqueue_event_threadsafe(
         self,
-        event: SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent,
+        event: SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent,
         event_name: str,
     ) -> None:
         """Thread-safe event enqueueing via call_soon_threadsafe.
@@ -344,12 +350,28 @@ class AgentService:
         event = TaskSnapshotEvent(tasks=snapshot)
         self._enqueue_event_threadsafe(event, "Task snapshot")
 
+    def _on_agent_question(self, question: AgentQuestion) -> None:
+        event = AgentQuestionEvent(
+            questions=[
+                AgentQuestionItemSchema(
+                    question=item.question,
+                    options=[
+                        QuestionOptionSchema(value=o.value, label=o.label, description=o.description)
+                        for o in item.options
+                    ],
+                    multi_select=item.multi_select,
+                )
+                for item in question.questions
+            ],
+        )
+        self._enqueue_event_threadsafe(event, "Agent question")
+
     @staticmethod
     def _drain_queue(
-        queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent],
-    ) -> list[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent]:
+        queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent],
+    ) -> list[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent]:
         """Drain all pending events from the queue."""
-        events: list[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent] = []
+        events: list[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent] = []
         while not queue.empty():
             try:
                 events.append(queue.get_nowait())
@@ -369,7 +391,14 @@ class AgentService:
         rossum_url: str | None = None,
         images: list[ImageContent] | None = None,
         documents: list[DocumentContent] | None = None,
-    ) -> AsyncIterator[StepEvent | StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent]:
+    ) -> AsyncIterator[
+        StepEvent
+        | StreamDoneEvent
+        | SubAgentProgressEvent
+        | SubAgentTextEvent
+        | TaskSnapshotEvent
+        | AgentQuestionEvent
+    ]:
         """Run the agent with a new prompt.
 
         Creates a fresh MCP connection, initializes the agent with conversation
@@ -407,6 +436,7 @@ class AgentService:
             text_callback=self._on_sub_agent_text,
             task_tracker=TaskTracker(),
             task_snapshot_callback=self._on_task_snapshot,
+            question_callback=self._on_agent_question,
         )
         ctx_token = set_context(agent_ctx)
 

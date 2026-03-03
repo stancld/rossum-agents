@@ -128,6 +128,7 @@ Backend (`messages.py`) emits these SSE event names with corresponding payloads:
 | `sub_agent_progress` | `SubAgentProgressEvent` | `SubAgentProgressEvent` | Sub-agent iteration updates |
 | `sub_agent_text` | `SubAgentTextEvent` | `SubAgentTextEvent` | Sub-agent text streaming |
 | `task_snapshot` | `TaskSnapshotEvent` | `TaskSnapshotEvent` | Task tracker state |
+| `agent_question` | `AgentQuestionEvent` | `AgentQuestionEvent` | Structured question from agent to user |
 | `file_created` | `FileCreatedEvent` | `FileCreatedEvent` | Output file notification |
 | `done` | `StreamDoneEvent` | `StreamDoneEvent` | Final event with token usage |
 

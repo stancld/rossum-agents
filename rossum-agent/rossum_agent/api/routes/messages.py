@@ -26,6 +26,7 @@ from rossum_agent.api.dependencies import (
     get_validated_credentials,
 )
 from rossum_agent.api.models.schemas import (
+    AgentQuestionEvent,
     CancelResponse,
     DocumentContent,
     FileCreatedEvent,
@@ -86,7 +87,9 @@ async def _generate_chat_summary(user_prompt: str, previous_summary: str | None 
         return None
 
 
-type AgentEvent = StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | StepEvent
+type AgentEvent = (
+    StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent | StepEvent
+)
 
 
 @dataclass
@@ -108,6 +111,8 @@ def _process_agent_event(event: AgentEvent) -> ProcessedEvent:
         return ProcessedEvent(sse_event=_format_sse_event("sub_agent_text", event.model_dump_json()))
     if isinstance(event, TaskSnapshotEvent):
         return ProcessedEvent(sse_event=_format_sse_event("task_snapshot", event.model_dump_json()))
+    if isinstance(event, AgentQuestionEvent):
+        return ProcessedEvent(sse_event=_format_sse_event("agent_question", event.model_dump_json()))
     sse = _format_sse_event("step", event.model_dump_json())
     if event.type == "final_answer" and event.is_streaming:
         return ProcessedEvent(sse_event=sse, final_response_update=event.content)

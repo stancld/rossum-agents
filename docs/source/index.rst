@@ -152,6 +152,7 @@ The ``rossum_agent`` package provides additional capabilities:
 * Multi-environment support with spawnable MCP connections
 * Skills system for domain-specific workflows (deployment, TxScript, formula fields, reasoning fields)
 * Mock PDF generation for end-to-end document extraction testing (``generate_mock_pdf``)
+* Interactive user questions (free-text or multiple-choice) via ``ask_user_question`` tool
 * File output for saving reports, documentation, and analysis results
 * Integration with AI agent frameworks (Anthropic Claude via AWS Bedrock)
 * REST API interface with slash commands for quick introspection (``/list-skills``, ``/list-mcp-tools``, etc.)

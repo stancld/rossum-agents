@@ -58,6 +58,26 @@ class TestInternalToolsRegistration:
         assert "write_file" in names
         assert "search_knowledge_base" in names
         assert "load_skill" in names
+        assert "ask_user_question" in names
+
+    def test_ask_user_question_in_internal_tools(self) -> None:
+        """Test that ask_user_question appears in get_internal_tools."""
+        tools = get_internal_tools()
+        tool_names = {t["name"] for t in tools}
+        assert "ask_user_question" in tool_names
+
+    def test_ask_user_question_definition_structure(self) -> None:
+        """Test that ask_user_question has correct tool definition structure."""
+        tools = get_internal_tools()
+        ask_tool = next(t for t in tools if t["name"] == "ask_user_question")
+        assert "description" in ask_tool
+        assert "input_schema" in ask_tool
+        schema = ask_tool["input_schema"]
+        assert schema["type"] == "object"
+        assert "question" in schema["properties"]
+        assert "options" in schema["properties"]
+        assert "multi_select" in schema["properties"]
+        assert "questions" in schema["properties"]
 
     def test_copilot_tools_hidden_until_skill_loaded(self) -> None:
         """Copilot tools only appear in get_internal_tools() after their skill is loaded."""

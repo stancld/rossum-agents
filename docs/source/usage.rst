@@ -1637,6 +1637,37 @@ Close a spawned MCP connection.
 
 Success or error message.
 
+User Interaction Tools
+^^^^^^^^^^^^^^^^^^^^^^
+
+ask_user_question
+"""""""""""""""""
+
+Ask the user one or more structured questions mid-execution. Supports free-text input and multiple-choice selectors. Streamed to the frontend via SSE ``agent_question`` event.
+
+Use when you need required information that you cannot determine on your own (e.g. queue name, template choice, workspace ID), or when the user explicitly asks for confirmation before proceeding.
+
+**Parameters (single question):**
+
+- ``question`` (string): The question text.
+- ``options`` (list[object], optional): Choices with ``value``, ``label``, and optional ``description`` (max 90 chars). Omit for free-text.
+- ``multi_select`` (bool, optional): Allow multiple selections. Default: ``false``.
+
+**Parameters (multiple questions):**
+
+- ``questions`` (list[object]): Array of question objects, each with ``question``, optional ``options``, and optional ``multi_select``. Presented to the user one at a time.
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "status": "question_sent",
+     "question_count": 1,
+     "question": "Which queue template should I use?",
+     "option_count": 3
+   }
+
 Skills Tools
 ^^^^^^^^^^^^
 

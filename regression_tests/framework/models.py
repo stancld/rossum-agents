@@ -102,11 +102,10 @@ class CustomCheck:
 class SuccessCriteria:
     """High-level success conditions for a task.
 
-    All tests require: final answer present, no agent errors.
-
     Attributes:
         required_keywords: Keywords that must appear in the final answer.
         max_steps: Maximum number of steps allowed.
+        require_final_answer: If False, skip the "Final answer present" check (e.g. when agent asks a question).
         require_subagent: True = must use sub-agent, False = must not, None = either is fine.
         mermaid_expectation: Expected mermaid diagram content.
         file_expectation: Expected file outputs.
@@ -115,6 +114,7 @@ class SuccessCriteria:
 
     required_keywords: Sequence[str] = field(default_factory=list)
     max_steps: int | None = None
+    require_final_answer: bool = True
     require_subagent: bool | None = False
     mermaid_expectation: MermaidExpectation = field(default_factory=MermaidExpectation)
     file_expectation: FileExpectation = field(default_factory=FileExpectation)

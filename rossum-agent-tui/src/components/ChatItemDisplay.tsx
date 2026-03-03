@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { AgentQuestion } from "./AgentQuestion.js";
 import { ThinkingBlock } from "./ThinkingBlock.js";
 import { ToolCall } from "./ToolCall.js";
 import { StreamingIndicator } from "./StreamingIndicator.js";
@@ -128,6 +129,7 @@ function FinalAnswerBlock({
   );
 }
 
+// eslint-disable-next-line complexity -- discriminated union switch on ChatItem.kind
 export const ChatItemDisplay = React.memo(function ChatItemDisplay({
   item,
   expanded,
@@ -208,6 +210,17 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
 
     case "config_commit":
       return <ConfigCommitItem commit={item.commit} />;
+
+    case "agent_question":
+      return (
+        <AgentQuestion
+          question={item.question}
+          options={item.options}
+          multiSelect={item.multiSelect}
+          questionIndex={item.questionIndex}
+          totalQuestions={item.totalQuestions}
+        />
+      );
 
     case "streaming":
       return (

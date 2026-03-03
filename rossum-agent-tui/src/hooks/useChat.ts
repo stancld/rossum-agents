@@ -6,6 +6,7 @@ import {
   savePersistedState,
 } from "../utils/persistence.js";
 import type {
+  AgentQuestionEvent,
   AttachmentInfo,
   ChatState,
   CompletedStep,
@@ -40,6 +41,7 @@ const INITIAL_STATE: ChatState = {
   error: null,
   userMessages: [],
   feedback: {},
+  pendingQuestion: null,
 };
 
 function stepToCompleted(step: StepEvent): CompletedStep {
@@ -183,6 +185,12 @@ function reduceEvent(prev: ChatState, event: SSEEvent): ChatState {
     case "sub_agent_text":
       return handleSubAgentTextEvent(prev, event.data as SubAgentTextEvent);
 
+    case "agent_question":
+      return {
+        ...prev,
+        pendingQuestion: event.data as AgentQuestionEvent,
+      };
+
     case "done":
       return handleDoneEvent(prev, event.data);
 
@@ -242,6 +250,7 @@ export function useChat(config: Config) {
         currentStreaming: null,
         subAgentProgress: null,
         subAgentText: null,
+        pendingQuestion: null,
         finalAnswer: null,
         tokenUsage: null,
         configCommit: null,
