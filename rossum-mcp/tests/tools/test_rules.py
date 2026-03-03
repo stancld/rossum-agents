@@ -609,30 +609,6 @@ class TestPatchRule:
 
 
 @pytest.mark.unit
-class TestDeleteRule:
-    """Tests for delete_rule tool."""
-
-    @pytest.mark.asyncio
-    async def test_delete_rule_success(self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
-        """Test successful rule deletion."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        from rossum_mcp.tools.rules import register_rule_tools
-
-        register_rule_tools(mock_mcp, mock_client)
-
-        mock_client.delete_rule.return_value = None
-
-        delete_rule = mock_mcp._tools["delete_rule"]
-        result = await delete_rule(rule_id=123)
-
-        assert "deleted successfully" in result["message"]
-        assert "123" in result["message"]
-        mock_client.delete_rule.assert_called_once_with(123)
-
-
-@pytest.mark.unit
 class TestActionsToDict:
     """Tests for _actions_to_dicts helper."""
 

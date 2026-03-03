@@ -12,12 +12,13 @@ if TYPE_CHECKING:
 
 
 def _synthesize_tool_name(tc: ToolCall) -> str:
-    """Enrich generic read-layer tool names with their entity argument.
+    """Enrich unified-layer tool names with their entity argument.
 
-    The MCP read layer replaced individual get_X/list_X tools with generic
-    `get(entity, id)` and `search(query)` tools. This helper produces
-    descriptive names like `get:queue` or `search:hook` so regression test
-    expectations remain meaningful.
+    The MCP read/delete layers replaced individual get_X/list_X/delete_X tools
+    with generic `get(entity, id)`, `search(query)`, and `delete(entity, id)`
+    tools. This helper produces descriptive names like `get:queue`,
+    `search:hook`, or `delete:queue` so regression test expectations remain
+    meaningful.
     """
     if tc.name == "get":
         entity = tc.arguments.get("entity", "")
@@ -26,6 +27,9 @@ def _synthesize_tool_name(tc: ToolCall) -> str:
         query = tc.arguments.get("query", {})
         entity = query.get("entity", "") if isinstance(query, dict) else ""
         return f"search:{entity}" if entity else "search"
+    if tc.name == "delete":
+        entity = tc.arguments.get("entity", "")
+        return f"delete:{entity}" if entity else "delete"
     return tc.name
 
 

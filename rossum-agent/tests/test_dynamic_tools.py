@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from rossum_agent.tools.core import AgentContext, DynamicToolsState, get_context, set_context
 from rossum_agent.tools.dynamic_tools import (
+    DELETE_TOOL_NAME,
     DISCOVERY_TOOL_NAME,
     HIDDEN_TOOLS,
     CatalogData,
@@ -16,6 +18,7 @@ from rossum_agent.tools.dynamic_tools import (
     get_load_tool_category_definition,
     get_load_tool_definition,
     get_write_tools,
+    get_write_tools_async,
     load_tool,
     load_tool_category,
     preload_categories_for_request,
@@ -676,10 +679,10 @@ class TestGetWriteTools:
 
         result = get_write_tools()
 
-        assert result == {"create_schema"}
+        assert result == {"create_schema", "delete"}
 
     @patch("rossum_agent.tools.dynamic_tools._fetch_catalog_from_mcp")
-    def test_returns_empty_set_when_no_write_tools(self, mock_fetch: MagicMock) -> None:
+    def test_always_includes_unified_delete_tool(self, mock_fetch: MagicMock) -> None:
         mock_fetch.return_value = CatalogData(
             catalog={"schemas": {"get_schema", "list_schemas"}},
             keywords={"schemas": ["schema"]},
@@ -688,7 +691,47 @@ class TestGetWriteTools:
 
         result = get_write_tools()
 
-        assert result == set()
+        assert result == {"delete"}
+
+
+class TestGetWriteToolsAsync:
+    """Tests for get_write_tools_async function."""
+
+    def setup_method(self) -> None:
+        import rossum_agent.tools.dynamic_tools as dt
+
+        dt._catalog_cache = None
+
+    def teardown_method(self) -> None:
+        import rossum_agent.tools.dynamic_tools as dt
+
+        dt._catalog_cache = None
+
+    @pytest.mark.asyncio
+    async def test_always_includes_unified_delete_tool(self) -> None:
+        mock_connection = AsyncMock()
+        with patch(
+            "rossum_agent.tools.dynamic_tools._fetch_catalog_async",
+            AsyncMock(return_value=CatalogData(catalog={}, keywords={}, write_tools=set())),
+        ):
+            result = await get_write_tools_async(mock_connection)
+        assert DELETE_TOOL_NAME in result
+
+    @pytest.mark.asyncio
+    async def test_includes_catalog_write_tools_plus_delete(self) -> None:
+        mock_connection = AsyncMock()
+        with patch(
+            "rossum_agent.tools.dynamic_tools._fetch_catalog_async",
+            AsyncMock(
+                return_value=CatalogData(
+                    catalog={"schemas": {"create_schema", "get_schema"}},
+                    keywords={},
+                    write_tools={"create_schema"},
+                )
+            ),
+        ):
+            result = await get_write_tools_async(mock_connection)
+        assert result == {"create_schema", DELETE_TOOL_NAME}
 
 
 class TestFetchCatalogParsesWriteTools:

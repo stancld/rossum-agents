@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 - **Breaking**: Replaced 25+ individual read tools with the unified `get` and `search` tools. Removed standalone tools: `get_annotation`, `list_annotations`, `get_queue`, `list_queues`, `get_queue_schema`, `get_queue_engine`, `get_schema`, `list_schemas`, `get_hook`, `list_hooks`, `list_hook_logs`, `list_hook_templates`, `get_engine`, `list_engines`, `get_email_template`, `list_email_templates`, `get_user`, `list_users`, `list_user_roles`, `get_organization_group`, `list_organization_groups`, `get_rule`, `list_rules`, `get_workspace`, `list_workspaces`, `get_relation`, `list_relations`, `get_document_relation`, `list_document_relations`, `get_organization_limit` [#221](https://github.com/stancld/rossum-agents/pull/221)
+- **Breaking**: Replaced 6 individual delete tools with the unified `delete` tool. Removed standalone tools: `delete_queue`, `delete_schema`, `delete_hook`, `delete_rule`, `delete_workspace`, `delete_annotation` [#229](https://github.com/stancld/rossum-agents/pull/229)
 - Removed dead validation code (`_validate_node`, `_validate_id`, `_validate_datapoint`, `_validate_tuple`, `_validate_multivalue`, `_validate_section`, `SchemaValidationError`) superseded by the sanitization approach in `sanitize_schema_content`
 
 ## [1.4.1] - 2026-02-26

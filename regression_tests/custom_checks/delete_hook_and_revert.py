@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 
 def check_hook_deleted_and_reverted(steps: list[AgentStep], api_base_url: str, api_token: str) -> tuple[bool, str]:
     """Verify the agent deleted a hook and reverted (recreation is now auto-executed)."""
-    if not agent_called_tool(steps, "delete_hook"):
-        return False, "Agent never called delete_hook"
+    if not agent_called_tool(steps, "delete"):
+        return False, "Agent never called delete"
 
     if not agent_called_tool(steps, "revert_commit"):
         return False, "Agent never called revert_commit"

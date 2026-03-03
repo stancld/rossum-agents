@@ -290,6 +290,53 @@ Unified tool to list/filter entities with typed, entity-specific query objects.
    # List enabled rules for a schema
    search(query={"entity": "rule", "schema_id": 200, "enabled": True})
 
+Delete Layer
+^^^^^^^^^^^^
+
+The delete layer provides a single unified ``delete`` tool that replaces all previous
+per-entity delete tools (``delete_queue``, ``delete_schema``, etc.).
+
+delete
+""""""
+
+Unified tool to delete any supported entity by ID.
+
+**Parameters:**
+
+- ``entity`` (string, required): Entity type. One of: ``queue``, ``schema``, ``hook``,
+  ``rule``, ``workspace``, ``annotation``
+- ``entity_id`` (integer, required): ID of the entity to delete
+
+**Entity-specific behavior:**
+
+- **queue**: Deletion begins after ~24h; cascades to annotations/documents
+- **annotation**: Soft-delete (moves to 'deleted' status)
+- **workspace**: Fails if it still contains queues
+- **schema**: Fails with 409 if linked to any queue/annotation
+
+**Returns:**
+
+.. code-block:: json
+
+   {
+     "message": "Queue 12345 scheduled for deletion (starts after 24 hours)"
+   }
+
+**Example usage:**
+
+.. code-block:: python
+
+   # Delete a queue
+   delete(entity="queue", entity_id=12345)
+
+   # Soft-delete an annotation
+   delete(entity="annotation", entity_id=67890)
+
+   # Delete a hook
+   delete(entity="hook", entity_id=111)
+
+**Note:** This operation is only available in read-write mode.
+
 upload_document
 ^^^^^^^^^^^^^^^
 
@@ -446,25 +493,6 @@ and defining the default confidence score threshold.
      "message": "Queue 'Updated Queue' (ID 12345) updated successfully"
    }
 
-delete_queue
-^^^^^^^^^^^^
-
-Schedules a queue for deletion. The queue will be deleted after a 24-hour delay,
-allowing time to recover if needed.
-
-**Parameters:**
-
-- ``queue_id`` (integer, required): Queue ID to delete
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "message": "Queue 12345 scheduled for deletion (starts after 24 hours)"
-   }
-
-**Note:** This operation is only available in read-write mode.
 
 update_schema
 ^^^^^^^^^^^^^
@@ -663,24 +691,6 @@ Creates a new schema with sections and datapoints.
      "message": "Schema 'My Schema' created successfully with ID 12345"
    }
 
-delete_schema
-^^^^^^^^^^^^^
-
-Deletes a schema. Schemas can only be deleted if they are not currently assigned to any queue.
-
-**Parameters:**
-
-- ``schema_id`` (integer, required): Schema ID to delete
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "message": "Schema 12345 deleted successfully"
-   }
-
-**Note:** This operation is only available in read-write mode.
 
 create_engine
 ^^^^^^^^^^^^^
@@ -903,25 +913,6 @@ data in the target queue (use when moving documents between queues).
 
 **Note:** This operation is only available in read-write mode.
 
-delete_annotation
-^^^^^^^^^^^^^^^^^
-
-Deletes an annotation by moving it to 'deleted' status. The annotation is not
-permanently removed but marked as deleted.
-
-**Parameters:**
-
-- ``annotation_id`` (integer, required): Rossum annotation ID to delete
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "message": "Annotation 12345 deleted successfully"
-   }
-
-**Note:** This operation is only available in read-write mode.
 
 create_hook
 ^^^^^^^^^^^
@@ -1055,24 +1046,6 @@ uses battle-tested configurations from the Rossum Store.
        token_owner="https://api.elis.rossum.ai/v1/users/12345"
    )
 
-delete_hook
-^^^^^^^^^^^
-
-Deletes a hook/extension.
-
-**Parameters:**
-
-- ``hook_id`` (integer, required): Hook ID to delete
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "message": "Hook 12345 deleted successfully"
-   }
-
-**Note:** This operation is only available in read-write mode.
 
 create_rule
 ^^^^^^^^^^^
@@ -1199,24 +1172,6 @@ Partial update (PATCH) of a business rule. Only provided fields are updated.
 
 **Note:** This operation is only available in read-write mode.
 
-delete_rule
-^^^^^^^^^^^
-
-Deletes a business rule.
-
-**Parameters:**
-
-- ``rule_id`` (integer, required): Rule ID to delete
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "message": "Rule 12345 deleted successfully"
-   }
-
-**Note:** This operation is only available in read-write mode.
 
 Workspace Management
 --------------------
@@ -1243,24 +1198,6 @@ Creates a new workspace in an organization.
      "message": "Workspace 'My New Workspace' created successfully with ID 12345"
    }
 
-delete_workspace
-^^^^^^^^^^^^^^^^
-
-Deletes a workspace. The workspace must be empty (no queues) before deletion.
-
-**Parameters:**
-
-- ``workspace_id`` (integer, required): Workspace ID to delete
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "message": "Workspace 12345 deleted successfully"
-   }
-
-**Note:** This operation is only available in read-write mode.
 
 User Management
 ---------------

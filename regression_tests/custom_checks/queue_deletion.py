@@ -19,10 +19,13 @@ if TYPE_CHECKING:
 
 def _extract_queue_id_from_tool_call(tool_call: ToolCall, tool_results: list[ToolResult]) -> int | None:
     """Extract queue_id from a single tool call."""
-    if tool_call.name == "delete_queue":
-        args = tool_call.arguments
-        if isinstance(args, dict) and "queue_id" in args:
-            return args["queue_id"]
+    if (
+        tool_call.name == "delete"
+        and isinstance(tool_call.arguments, dict)
+        and tool_call.arguments.get("entity") == "queue"
+        and "entity_id" in tool_call.arguments
+    ):
+        return tool_call.arguments["entity_id"]
 
     if tool_call.name == "create_queue_from_template":
         for result in tool_results:

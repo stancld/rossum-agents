@@ -252,32 +252,3 @@ class TestCreateWorkspace:
         assert result.id == 200
         call_args = mock_client.create_new_workspace.call_args[0][0]
         assert call_args["metadata"] == {"department": "finance"}
-
-
-@pytest.mark.unit
-class TestDeleteWorkspace:
-    """Tests for delete_workspace tool."""
-
-    @pytest.mark.asyncio
-    async def test_delete_workspace_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test successful workspace deletion."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-
-        from rossum_mcp.tools import base
-
-        importlib.reload(base)
-
-        from rossum_mcp.tools.workspaces import register_workspace_tools
-
-        register_workspace_tools(mock_mcp, mock_client)
-
-        mock_client.delete_workspace.return_value = None
-
-        delete_workspace = mock_mcp._tools["delete_workspace"]
-        result = await delete_workspace(workspace_id=100)
-
-        assert "deleted successfully" in result["message"]
-        assert "100" in result["message"]
-        mock_client.delete_workspace.assert_called_once_with(100)

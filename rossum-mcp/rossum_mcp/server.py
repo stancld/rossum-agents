@@ -12,6 +12,7 @@ from rossum_api.dtos import Token
 from rossum_mcp.logging_config import setup_logging
 from rossum_mcp.tools import (
     register_annotation_tools,
+    register_delete_tools,
     register_discovery_tools,
     register_email_template_tools,
     register_engine_tools,
@@ -53,6 +54,7 @@ def create_app() -> FastMCP:
 
     register_discovery_tools(mcp)
     register_read_tools(mcp, client)
+    register_delete_tools(mcp, client)
     register_annotation_tools(mcp, client)
     register_queue_tools(mcp, client)
     register_schema_tools(mcp, client)

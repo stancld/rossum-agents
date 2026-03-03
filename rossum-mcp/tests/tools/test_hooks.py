@@ -626,27 +626,6 @@ class TestListHookTemplates:
 
 
 @pytest.mark.unit
-class TestDeleteHook:
-    """Tests for delete_hook tool."""
-
-    @pytest.mark.asyncio
-    async def test_delete_hook_success(self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
-        """Test successful hook deletion."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_hook_tools(mock_mcp, mock_client)
-
-        mock_client.delete_hook.return_value = None
-
-        delete_hook = mock_mcp._tools["delete_hook"]
-        result = await delete_hook(hook_id=123)
-
-        assert "deleted successfully" in result["message"]
-        assert "123" in result["message"]
-        mock_client.delete_hook.assert_called_once_with(123)
-
-
-@pytest.mark.unit
 class TestValidateEvents:
     """Tests for _validate_events helper."""
 

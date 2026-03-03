@@ -199,9 +199,15 @@ class MCPConnection:
             self._read_cache[(entity_type, entity_id)] = data
 
     async def _handle_write(self, name: str, arguments: dict[str, Any]) -> Any:
-        entity_type = _extract_entity_type(name)
-        entity_id = _extract_entity_id(entity_type or "", arguments) if entity_type else None
-        operation = _classify_operation(name)
+        # Handle unified delete tool: delete(entity="queue", entity_id=123)
+        if name == "delete" and "entity" in arguments and "entity_id" in arguments:
+            entity_type = arguments["entity"]
+            entity_id = str(arguments["entity_id"])
+            operation: Literal["create", "update", "delete"] = "delete"
+        else:
+            entity_type = _extract_entity_type(name)
+            entity_id = _extract_entity_id(entity_type or "", arguments) if entity_type else None
+            operation = _classify_operation(name)
 
         self._auto_commit_if_needed(entity_type, entity_id, operation)
 

@@ -349,11 +349,3 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         config: dict | None = None,
     ) -> dict:
         return await _test_hook(client, hook_id, event, action, annotation, status, previous_status, config)
-
-    @mcp.tool(
-        description="Delete a hook.",
-        tags={"hooks", "write"},
-        annotations={"readOnlyHint": False, "destructiveHint": True},
-    )
-    async def delete_hook(hook_id: int) -> dict:
-        return await _delete_hook(client, hook_id)

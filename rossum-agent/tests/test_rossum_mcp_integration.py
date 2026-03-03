@@ -384,6 +384,35 @@ class TestHandleWriteDelete:
         assert change.before == before
         assert change.after is None
 
+    @pytest.mark.asyncio
+    async def test_unified_delete_routes_correctly(self):
+        conn = _make_connection(write_tools={"delete"})
+        before = {"id": 7, "name": "MyQueue"}
+        conn._read_cache[("queue", "7")] = before
+
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result({"message": "Queue scheduled for deletion"}))
+
+        await conn.call_tool("delete", {"entity": "queue", "entity_id": 7})
+
+        change = conn.get_changes()[0]
+        assert change.entity_type == "queue"
+        assert change.entity_id == "7"
+        assert change.operation == "delete"
+        assert change.before == before
+        assert change.after is None
+
+    @pytest.mark.asyncio
+    async def test_unified_delete_entity_id_cast_to_str(self):
+        conn = _make_connection(write_tools={"delete"})
+        conn._read_cache[("hook", "99")] = {"id": 99, "name": "H"}
+
+        conn.client.call_tool = AsyncMock(return_value=_make_mcp_result({"message": "deleted"}))
+
+        await conn.call_tool("delete", {"entity": "hook", "entity_id": 99})
+
+        change = conn.get_changes()[0]
+        assert change.entity_id == "99"
+
 
 class TestHandleWriteAutoCommit:
     @pytest.mark.asyncio
