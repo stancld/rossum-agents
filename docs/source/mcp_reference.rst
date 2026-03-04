@@ -125,6 +125,8 @@ search
      - *(no filters)*
    * - ``user_role``
      - *(no filters)*
+   * - ``queue_template_name``
+     - *(no filters)*
 
 **Returns:**
   ``list`` of entity objects
@@ -134,18 +136,6 @@ search
 
 **Implementation:**
   See ``rossum_mcp.tools.read_layer``
-
-get_queue_template_names
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_queue_template_names()``
-
-**API Endpoint:**
-  N/A (returns static list of available template names)
-
-**Implementation:**
-  Returns list of 20 available template names for use with ``create_queue_from_template``.
 
 create_queue_from_template
 ^^^^^^^^^^^^^^^^^^^^^^^^^^

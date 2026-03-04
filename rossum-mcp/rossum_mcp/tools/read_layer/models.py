@@ -134,6 +134,10 @@ class UserRoleSearch(BaseModel):
     entity: Literal["user_role"] = "user_role"
 
 
+class QueueTemplateNameSearch(BaseModel):
+    entity: Literal["queue_template_name"] = "queue_template_name"
+
+
 SearchQuery = Annotated[
     QueueSearch
     | SchemaSearch
@@ -149,6 +153,7 @@ SearchQuery = Annotated[
     | DocumentRelationSearch
     | HookLogSearch
     | HookTemplateSearch
-    | UserRoleSearch,
+    | UserRoleSearch
+    | QueueTemplateNameSearch,
     Field(discriminator="entity"),
 ]

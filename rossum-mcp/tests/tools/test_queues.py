@@ -664,25 +664,6 @@ class TestUpdateQueue:
 
 
 @pytest.mark.unit
-class TestGetQueueTemplateNames:
-    """Tests for get_queue_template_names tool."""
-
-    @pytest.mark.asyncio
-    async def test_get_queue_template_names_returns_list(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test that get_queue_template_names returns the template list."""
-        register_queue_tools(mock_mcp, mock_client)
-
-        get_queue_template_names = mock_mcp._tools["get_queue_template_names"]
-        result = await get_queue_template_names()
-
-        assert isinstance(result, list)
-        assert "EU Demo Template" in result
-        assert "US Demo Template" in result
-        assert "Empty Organization Template" in result
-        assert len(result) == 20
-
-
-@pytest.mark.unit
 class TestCreateQueueFromTemplate:
     """Tests for create_queue_from_template tool."""
 

@@ -15,7 +15,7 @@ from rossum_mcp.tools.engines import _get_engine, _list_engines
 from rossum_mcp.tools.hooks import _get_hook, _list_hook_logs, _list_hook_templates, _list_hooks
 from rossum_mcp.tools.organization_groups import _get_organization_group, _list_organization_groups
 from rossum_mcp.tools.organization_limits import _get_organization_limit
-from rossum_mcp.tools.queues import _get_queue, _list_queues
+from rossum_mcp.tools.queues import _get_queue, _list_queue_template_names, _list_queues
 from rossum_mcp.tools.relations import _get_relation, _list_relations
 from rossum_mcp.tools.rules import _get_rule, _list_rules
 from rossum_mcp.tools.schemas.operations import get_schema, list_schemas
@@ -101,6 +101,10 @@ def build_registry(client: AsyncRossumAPIClient) -> dict[str, EntityConfig]:
         "user_role": EntityConfig(
             retrieve_fn=None,
             search_fn=lambda **_kw: _list_user_roles(client),
+        ),
+        "queue_template_name": EntityConfig(
+            retrieve_fn=None,
+            search_fn=lambda **_kw: _list_queue_template_names(),
         ),
     }
 

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 36 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. 35 tools for queues, schemas, hooks, engines, and more.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
@@ -97,7 +97,7 @@ Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
 
 ## Available Tools
 
-The server provides **36 tools** organized into categories:
+The server provides **35 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
@@ -124,7 +124,7 @@ The server provides **36 tools** organized into categories:
 
 Supported entities for `get` (by ID): `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`
 
-Supported entities for `search` (with typed filters): all `get` entities plus `hook_log`, `hook_template`, `user_role`
+Supported entities for `search` (with typed filters): all `get` entities plus `hook_log`, `hook_template`, `user_role`, `queue_template_name`
 
 **Delete Layer** (unified delete replacing individual delete_X tools):
 `delete`
@@ -135,7 +135,7 @@ Supported entities: `queue`, `schema`, `hook`, `rule`, `workspace`, `annotation`
 `upload_document`, `get_annotation_content`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`
 
 **Queue Management:**
-`create_queue`, `create_queue_from_template`, `get_queue_template_names`, `update_queue`
+`create_queue`, `create_queue_from_template`, `update_queue`
 
 **Schema Management:**
 `create_schema`, `update_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`

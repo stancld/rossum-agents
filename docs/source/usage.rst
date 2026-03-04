@@ -359,40 +359,6 @@ to get the annotation ID.
      "message": "Document upload initiated. Use `search` with entity=\"annotation\" to find the annotation ID for this queue."
    }
 
-get_queue_template_names
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-Returns a list of available template names for use with ``create_queue_from_template``.
-
-**Parameters:** None
-
-**Returns:**
-
-.. code-block:: json
-
-   [
-     "EU Demo Template",
-     "AP&R EU Demo Template",
-     "Tax Invoice EU Demo Template",
-     "US Demo Template",
-     "AP&R US Demo Template",
-     "Tax Invoice US Demo Template",
-     "UK Demo Template",
-     "AP&R UK Demo Template",
-     "Tax Invoice UK Demo Template",
-     "CZ Demo Template",
-     "Empty Organization Template",
-     "Delivery Notes Demo Template",
-     "Delivery Note Demo Template",
-     "Chinese Invoices (Fapiao) Demo Template",
-     "Tax Invoice CN Demo Template",
-     "Certificates of Analysis Demo Template",
-     "Purchase Order Demo Template",
-     "Credit Note Demo Template",
-     "Debit Note Demo Template",
-     "Proforma Invoice Demo Template"
-   ]
-
 create_queue_from_template
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -402,7 +368,7 @@ Templates include pre-configured schema and AI engine optimized for specific doc
 **Parameters:**
 
 - ``name`` (string, required): Name of the queue to create
-- ``template_name`` (string, required): Template name (use ``get_queue_template_names`` to list)
+- ``template_name`` (string, required): Template name (use ``search`` with ``entity="queue_template_name"`` to list)
 - ``workspace_id`` (integer, required): Workspace ID where the queue should be created
 - ``include_documents`` (boolean, optional): Copy documents from template queue (default: false)
 - ``engine_id`` (integer, optional): Override engine assignment
