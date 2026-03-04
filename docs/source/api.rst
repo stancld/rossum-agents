@@ -38,109 +38,203 @@ Discovery
    :undoc-members:
    :show-inheritance:
 
-Document Processing
--------------------
+Resource Tracking
+~~~~~~~~~~~~~~~~~
 
-.. automodule:: rossum_mcp.tools.annotations
+.. automodule:: rossum_mcp.tools.resource_tracking
    :members:
    :undoc-members:
    :show-inheritance:
 
-Queue Management
-----------------
-
-.. automodule:: rossum_mcp.tools.queues
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Schema Management
+Create Operations
 -----------------
 
-.. automodule:: rossum_mcp.tools.schemas
+.. automodule:: rossum_mcp.tools.create.handler
    :members:
    :undoc-members:
    :show-inheritance:
 
-Engine Management
+.. automodule:: rossum_mcp.tools.create.annotations
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.create.queues
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.create.schemas
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.create.engines
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.create.hooks
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.create.rules
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.create.workspaces
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.create.users
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.create.email_templates
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Get Operations
+--------------
+
+.. automodule:: rossum_mcp.tools.get.handler
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.get.registry
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.get.models
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.get.annotations
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.get.engines
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.get.schemas
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.get.related
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Search Operations
 -----------------
 
-.. automodule:: rossum_mcp.tools.engines
+.. automodule:: rossum_mcp.tools.search.handler
    :members:
    :undoc-members:
    :show-inheritance:
 
-Extensions & Hooks
-------------------
-
-.. automodule:: rossum_mcp.tools.hooks
+.. automodule:: rossum_mcp.tools.search.registry
    :members:
    :undoc-members:
    :show-inheritance:
 
-Rules & Actions
----------------
-
-.. automodule:: rossum_mcp.tools.rules
+.. automodule:: rossum_mcp.tools.search.models
    :members:
    :undoc-members:
    :show-inheritance:
 
-Workspace Management
---------------------
+Update Operations
+-----------------
 
-.. automodule:: rossum_mcp.tools.workspaces
+.. automodule:: rossum_mcp.tools.update.handler
    :members:
    :undoc-members:
    :show-inheritance:
 
-User Management
----------------
-
-.. automodule:: rossum_mcp.tools.users
+.. automodule:: rossum_mcp.tools.update.models
    :members:
    :undoc-members:
    :show-inheritance:
 
-Relations
----------
-
-Relations
-~~~~~~~~~
-
-.. automodule:: rossum_mcp.tools.relations
+.. automodule:: rossum_mcp.tools.update.annotations
    :members:
    :undoc-members:
    :show-inheritance:
 
-Document Relations
-~~~~~~~~~~~~~~~~~~
-
-.. automodule:: rossum_mcp.tools.document_relations
+.. automodule:: rossum_mcp.tools.update.queues
    :members:
    :undoc-members:
    :show-inheritance:
 
-Email Templates
----------------
-
-.. automodule:: rossum_mcp.tools.email_templates
+.. automodule:: rossum_mcp.tools.update.engines
    :members:
    :undoc-members:
    :show-inheritance:
 
-Organization Groups
--------------------
-
-.. automodule:: rossum_mcp.tools.organization_groups
+.. automodule:: rossum_mcp.tools.update.hooks
    :members:
    :undoc-members:
    :show-inheritance:
 
-Organization Limits
--------------------
+.. automodule:: rossum_mcp.tools.update.rules
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-.. automodule:: rossum_mcp.tools.organization_limits
+.. automodule:: rossum_mcp.tools.update.users
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Schema Updates
+~~~~~~~~~~~~~~
+
+.. automodule:: rossum_mcp.tools.update.schemas.handler
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.update.schemas.patching
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.update.schemas.pruning
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.update.schemas.validation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Delete Operations
+-----------------
+
+.. automodule:: rossum_mcp.tools.delete.handler
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.delete.registry
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: rossum_mcp.tools.delete.models
    :members:
    :undoc-members:
    :show-inheritance:

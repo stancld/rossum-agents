@@ -11,18 +11,11 @@ from rossum_api.dtos import Token
 
 from rossum_mcp.logging_config import setup_logging
 from rossum_mcp.tools import (
-    register_annotation_tools,
+    register_create_tools,
     register_delete_tools,
     register_discovery_tools,
-    register_email_template_tools,
-    register_engine_tools,
-    register_hook_tools,
-    register_queue_tools,
-    register_read_tools,
-    register_rule_tools,
-    register_schema_tools,
-    register_user_tools,
-    register_workspace_tools,
+    register_get_tools,
+    register_update_tools,
 )
 from rossum_mcp.tools.base import configure, get_mcp_mode, set_mcp_mode
 
@@ -53,17 +46,10 @@ def create_app() -> FastMCP:
     client = AsyncRossumAPIClient(base_url=base_url, credentials=Token(token=api_token))
 
     register_discovery_tools(mcp)
-    register_read_tools(mcp, client)
+    register_get_tools(mcp, client)
     register_delete_tools(mcp, client)
-    register_annotation_tools(mcp, client)
-    register_queue_tools(mcp, client)
-    register_schema_tools(mcp, client)
-    register_engine_tools(mcp, client)
-    register_hook_tools(mcp, client)
-    register_email_template_tools(mcp, client)
-    register_rule_tools(mcp, client)
-    register_user_tools(mcp, client)
-    register_workspace_tools(mcp, client)
+    register_create_tools(mcp, client)
+    register_update_tools(mcp, client)
 
     @mcp.tool(description="Get the current MCP operation mode (read-only or read-write).")
     async def get_mcp_mode_tool() -> dict:

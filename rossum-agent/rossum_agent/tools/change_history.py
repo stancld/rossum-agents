@@ -15,7 +15,7 @@ from anthropic import beta_tool
 from rossum_api import APIClientError, AsyncRossumAPIClient
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.dtos import Token
-from rossum_mcp.tools.schemas.validation import sanitize_schema_content
+from rossum_mcp.tools.validation import sanitize_schema_content
 
 from rossum_agent.change_tracking.models import EntityChange
 from rossum_agent.rossum_mcp_integration import unwrap

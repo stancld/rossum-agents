@@ -1,0 +1,246 @@
+"""Handler for create tools - aggregates entity registrations."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence  # noqa: TC003 - needed at runtime for FastMCP
+from typing import TYPE_CHECKING, Any
+
+from rossum_api.models.email_template import EmailTemplate
+from rossum_api.models.engine import Engine, EngineField, EngineFieldType
+from rossum_api.models.hook import Hook, HookEventAndAction, HookType
+from rossum_api.models.queue import Queue
+from rossum_api.models.rule import Rule, RuleAction
+from rossum_api.models.schema import Schema
+from rossum_api.models.user import User
+from rossum_api.models.workspace import Workspace
+
+from rossum_mcp.tools.create.annotations import _copy_annotations, _upload_document
+from rossum_mcp.tools.create.email_templates import _create_email_template
+from rossum_mcp.tools.create.engines import _create_engine, _create_engine_field
+from rossum_mcp.tools.create.hooks import _create_hook, _create_hook_from_template
+from rossum_mcp.tools.create.queues import _create_queue, _create_queue_from_template
+from rossum_mcp.tools.create.rules import _create_rule
+from rossum_mcp.tools.create.schemas import _create_schema
+from rossum_mcp.tools.create.users import _create_user
+from rossum_mcp.tools.create.workspaces import _create_workspace
+from rossum_mcp.tools.models import (  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
+    EmailTemplateType,
+    EngineType,
+    QueueTemplateName,
+)
+
+if TYPE_CHECKING:
+    from fastmcp import FastMCP
+    from rossum_api import AsyncRossumAPIClient
+
+
+def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  # noqa: C901 - many tool registrations
+    # --- Annotations ---
+    @mcp.tool(
+        description="Upload a document; use search(entity='annotation', queue_id=...) to find the created annotation.",
+        tags={"annotations", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def upload_document(file_path: str, queue_id: int) -> dict:
+        return await _upload_document(client, file_path, queue_id)
+
+    @mcp.tool(
+        description="Copy annotations to another queue. reimport=True re-extracts data in the target queue (use when moving/uploading documents between queues). reimport=False preserves original extracted data as-is.",
+        tags={"annotations", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def copy_annotations(
+        annotation_ids: Sequence[int],
+        target_queue_id: int,
+        target_status: str | None = None,
+        reimport: bool = False,
+    ) -> dict:
+        return await _copy_annotations(client, annotation_ids, target_queue_id, target_status, reimport)
+
+    # --- Queues ---
+    @mcp.tool(
+        description="Create a queue.",
+        tags={"queues", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_queue(
+        name: str,
+        workspace_id: int,
+        schema_id: int,
+        engine_id: int | None = None,
+        inbox_id: int | None = None,
+        connector_id: int | None = None,
+        locale: str = "en_GB",
+        automation_enabled: bool = False,
+        automation_level: str = "never",
+        training_enabled: bool = True,
+        splitting_screen_feature_flag: bool = False,
+    ) -> Queue | dict:
+        return await _create_queue(
+            client,
+            name,
+            workspace_id,
+            schema_id,
+            engine_id,
+            inbox_id,
+            connector_id,
+            locale,
+            automation_enabled,
+            automation_level,
+            training_enabled,
+            splitting_screen_feature_flag,
+        )
+
+    @mcp.tool(
+        description="Create a queue from a template (includes schema + engine defaults).",
+        tags={"queues", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_queue_from_template(
+        name: str,
+        template_name: QueueTemplateName,
+        workspace_id: int,
+        include_documents: bool = False,
+        engine_id: int | None = None,
+    ) -> Queue | dict:
+        return await _create_queue_from_template(
+            client, name, template_name, workspace_id, include_documents, engine_id
+        )
+
+    # --- Schemas ---
+    @mcp.tool(
+        description="Create a schema; requires at least one section containing datapoints.",
+        tags={"schemas", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_schema(name: str, content: list[dict]) -> Schema | dict:
+        return await _create_schema(client, name, content)
+
+    # --- Engines ---
+    @mcp.tool(
+        description="Create an engine; create matching engine fields for the target schema immediately after.",
+        tags={"engines", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_engine(name: str, organization_id: int, engine_type: EngineType) -> Engine | dict:
+        return await _create_engine(client, name, organization_id, engine_type)
+
+    @mcp.tool(
+        description="Create an engine field corresponding to a schema field (used during engine+schema setup).",
+        tags={"engines", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_engine_field(
+        engine_id: int,
+        name: str,
+        label: str,
+        field_type: EngineFieldType,
+        schema_ids: list[int],
+        tabular: bool = False,
+        multiline: bool = False,
+        subtype: str | None = None,
+        pre_trained_field_id: str | None = None,
+    ) -> EngineField | dict:
+        return await _create_engine_field(
+            client, engine_id, name, label, field_type, schema_ids, tabular, multiline, subtype, pre_trained_field_id
+        )
+
+    # --- Hooks ---
+    @mcp.tool(
+        description="Create a hook. Function hooks: config.source auto-renamed to config.code, default runtime python3.12, timeout_s capped at 60. token_owner cannot be an organization_group_admin user.",
+        tags={"hooks", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_hook(
+        name: str,
+        type: HookType,
+        queues: list[str] | None = None,
+        events: list[HookEventAndAction] | None = None,
+        config: dict | None = None,
+        settings: dict | None = None,
+        secret: str | None = None,
+    ) -> Hook | dict:
+        return await _create_hook(client, name, type, queues, events, config, settings, secret)
+
+    @mcp.tool(
+        description="Create a hook from a template; events may override template defaults. If template requires use_token_owner, provide token_owner (not an organization_group_admin user).",
+        tags={"hooks", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_hook_from_template(
+        name: str,
+        hook_template_id: int,
+        queues: list[str],
+        events: list[HookEventAndAction] | None = None,
+        token_owner: str | None = None,
+    ) -> Hook | dict:
+        return await _create_hook_from_template(client, name, hook_template_id, queues, events, token_owner)
+
+    # --- Rules ---
+    @mcp.tool(
+        description="Create a rule: trigger is a TxScript condition; action includes id, type, event, payload. Scope with schema_id and/or queue_ids (at least one required).",
+        tags={"rules", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_rule(
+        name: str,
+        trigger_condition: str,
+        actions: list[RuleAction],
+        enabled: bool = True,
+        schema_id: int | None = None,
+        queue_ids: list[int] | None = None,
+    ) -> Rule | dict:
+        return await _create_rule(client, name, trigger_condition, actions, enabled, schema_id, queue_ids)
+
+    # --- Users ---
+    @mcp.tool(
+        description="Create a user (requires username + email). Use list_user_roles for role/group URLs; queue/group fields take full API URLs.",
+        tags={"users", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_user(
+        username: str,
+        email: str,
+        queues: list[str] | None = None,
+        groups: list[str] | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        is_active: bool = True,
+        metadata: dict | None = None,
+        oidc_id: str | None = None,
+        auth_type: str = "password",
+    ) -> User | dict:
+        return await _create_user(
+            client, username, email, queues, groups, first_name, last_name, is_active, metadata, oidc_id, auth_type
+        )
+
+    # --- Workspaces ---
+    @mcp.tool(
+        description="Create a new workspace.",
+        tags={"workspaces", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_workspace(name: str, organization_id: int, metadata: dict | None = None) -> Workspace | dict:
+        return await _create_workspace(client, name, organization_id, metadata)
+
+    # --- Email Templates ---
+    @mcp.tool(
+        description="Create an email template; set automate=true for automatic sending. to/cc/bcc are recipient objects {type: annotator|constant|datapoint, value: ...}.",
+        tags={"email_templates", "write"},
+        annotations={"readOnlyHint": False},
+    )
+    async def create_email_template(
+        name: str,
+        queue: int,
+        subject: str,
+        message: str,
+        type: EmailTemplateType = "custom",
+        automate: bool = False,
+        to: list[dict[str, Any]] | None = None,
+        cc: list[dict[str, Any]] | None = None,
+        bcc: list[dict[str, Any]] | None = None,
+        triggers: list[str] | None = None,
+    ) -> EmailTemplate | dict:
+        return await _create_email_template(
+            client, name, queue, subject, message, type, automate, to, cc, bcc, triggers
+        )
