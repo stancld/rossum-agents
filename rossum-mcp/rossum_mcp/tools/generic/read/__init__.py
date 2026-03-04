@@ -7,11 +7,11 @@ import dataclasses
 import logging
 from typing import TYPE_CHECKING, Literal, get_args
 
-from rossum_mcp.tools.read_layer.models import (
+from rossum_mcp.tools.generic.read.models import (
     SearchQuery,  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
 )
-from rossum_mcp.tools.read_layer.registry import EntityConfig, build_registry, extract_search_kwargs
-from rossum_mcp.tools.read_layer.related import fetch_related
+from rossum_mcp.tools.generic.read.registry import EntityConfig, build_registry, extract_search_kwargs
+from rossum_mcp.tools.generic.read.related import fetch_related
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP

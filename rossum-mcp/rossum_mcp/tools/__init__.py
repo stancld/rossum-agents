@@ -8,13 +8,13 @@ from rossum_mcp.tools.catalog import (
     CategoryMeta,
     get_catalog_summary,
 )
-from rossum_mcp.tools.delete_layer import register_delete_tools
 from rossum_mcp.tools.discovery import register_discovery_tools
 from rossum_mcp.tools.email_templates import register_email_template_tools
 from rossum_mcp.tools.engines import register_engine_tools
+from rossum_mcp.tools.generic.delete import register_delete_tools
+from rossum_mcp.tools.generic.read import register_read_tools
 from rossum_mcp.tools.hooks import register_hook_tools
 from rossum_mcp.tools.queues import register_queue_tools
-from rossum_mcp.tools.read_layer import register_read_tools
 from rossum_mcp.tools.rules import register_rule_tools
 from rossum_mcp.tools.schemas import register_schema_tools
 from rossum_mcp.tools.users import register_user_tools

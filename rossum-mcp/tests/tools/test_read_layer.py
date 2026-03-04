@@ -1,4 +1,4 @@
-"""Tests for rossum_mcp.tools.read_layer — unified get + search tools."""
+"""Tests for rossum_mcp.tools.generic.read — unified get + search tools."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from conftest import (
     create_mock_schema,
     create_mock_workspace,
 )
-from rossum_mcp.tools.read_layer import register_read_tools
-from rossum_mcp.tools.read_layer.models import (
+from rossum_mcp.tools.generic.read import register_read_tools
+from rossum_mcp.tools.generic.read.models import (
     AnnotationSearch,
     DocumentRelationSearch,
     EngineSearch,
@@ -27,7 +27,7 @@ from rossum_mcp.tools.read_layer.models import (
     SchemaSearch,
     WorkspaceSearch,
 )
-from rossum_mcp.tools.read_layer.registry import build_registry, extract_search_kwargs
+from rossum_mcp.tools.generic.read.registry import build_registry, extract_search_kwargs
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -257,9 +257,9 @@ class TestGetBatch:
         mock_client.retrieve_queue.side_effect = lambda qid: {1: q1, 2: q2}[qid]
 
         with (
-            patch("rossum_mcp.tools.read_layer.related.get_schema_tree_structure") as mock_tree,
-            patch("rossum_mcp.tools.read_layer.related._get_queue_engine") as mock_eng,
-            patch("rossum_mcp.tools.read_layer.related._list_hooks") as mock_hooks,
+            patch("rossum_mcp.tools.generic.read.related.get_schema_tree_structure") as mock_tree,
+            patch("rossum_mcp.tools.generic.read.related._get_queue_engine") as mock_eng,
+            patch("rossum_mcp.tools.generic.read.related._list_hooks") as mock_hooks,
         ):
             mock_tree.return_value = [{"id": "section1"}]
             mock_eng.return_value = create_mock_engine(id=10)
@@ -395,9 +395,9 @@ class TestIncludeRelated:
         mock_hook = create_mock_hook(id=1, name="Hook 1", active=True)
 
         with (
-            patch("rossum_mcp.tools.read_layer.related.get_schema_tree_structure") as mock_tree,
-            patch("rossum_mcp.tools.read_layer.related._get_queue_engine") as mock_eng,
-            patch("rossum_mcp.tools.read_layer.related._list_hooks") as mock_hooks,
+            patch("rossum_mcp.tools.generic.read.related.get_schema_tree_structure") as mock_tree,
+            patch("rossum_mcp.tools.generic.read.related._get_queue_engine") as mock_eng,
+            patch("rossum_mcp.tools.generic.read.related._list_hooks") as mock_hooks,
         ):
             mock_tree.return_value = [{"id": "section1"}]
             mock_eng.return_value = mock_engine
@@ -419,7 +419,7 @@ class TestIncludeRelated:
         mock_queue = create_mock_queue(id=42)
         mock_client.retrieve_queue.return_value = mock_queue
 
-        with patch("rossum_mcp.tools.read_layer.related.fetch_related") as mock_fetch:
+        with patch("rossum_mcp.tools.generic.read.related.fetch_related") as mock_fetch:
             register_read_tools(mock_mcp, mock_client)
             result = await mock_mcp._tools["get"](entity="queue", entity_id=42, include_related=False)
 
@@ -525,7 +525,7 @@ class TestSearchErrors:
     ) -> None:
         register_read_tools(mock_mcp, mock_client)
         # organization_limit has no search_fn
-        from rossum_mcp.tools.read_layer.models import BaseModel
+        from rossum_mcp.tools.generic.read.models import BaseModel
 
         class FakeSearch(BaseModel):
             entity: str = "organization_limit"
@@ -575,7 +575,7 @@ class TestIncludeRelatedSchema:
         mock_rule.enabled = True
 
         with (
-            patch("rossum_mcp.tools.read_layer.related.graceful_list") as mock_gl,
+            patch("rossum_mcp.tools.generic.read.related.graceful_list") as mock_gl,
         ):
             # First call returns queues, second returns rules
             mock_gl.side_effect = [
@@ -642,9 +642,9 @@ class TestIncludeRelatedQueueErrors:
         mock_hook = create_mock_hook(id=1, name="Hook 1", active=True)
 
         with (
-            patch("rossum_mcp.tools.read_layer.related.get_schema_tree_structure") as mock_tree,
-            patch("rossum_mcp.tools.read_layer.related._get_queue_engine") as mock_eng,
-            patch("rossum_mcp.tools.read_layer.related._list_hooks") as mock_hooks,
+            patch("rossum_mcp.tools.generic.read.related.get_schema_tree_structure") as mock_tree,
+            patch("rossum_mcp.tools.generic.read.related._get_queue_engine") as mock_eng,
+            patch("rossum_mcp.tools.generic.read.related._list_hooks") as mock_hooks,
         ):
             mock_tree.side_effect = RuntimeError("Schema tree failed")
             mock_eng.return_value = create_mock_engine(id=10)
@@ -667,9 +667,9 @@ class TestIncludeRelatedQueueErrors:
         mock_client.retrieve_queue.return_value = mock_queue
 
         with (
-            patch("rossum_mcp.tools.read_layer.related.get_schema_tree_structure") as mock_tree,
-            patch("rossum_mcp.tools.read_layer.related._get_queue_engine") as mock_eng,
-            patch("rossum_mcp.tools.read_layer.related._list_hooks") as mock_hooks,
+            patch("rossum_mcp.tools.generic.read.related.get_schema_tree_structure") as mock_tree,
+            patch("rossum_mcp.tools.generic.read.related._get_queue_engine") as mock_eng,
+            patch("rossum_mcp.tools.generic.read.related._list_hooks") as mock_hooks,
         ):
             mock_tree.side_effect = RuntimeError("fail")
             mock_eng.side_effect = RuntimeError("fail")

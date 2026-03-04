@@ -77,7 +77,7 @@ get
   Varies by entity — ``GET /v1/{entity_plural}/{id}``
 
 **Implementation:**
-  See ``rossum_mcp.tools.read_layer``
+  See ``rossum_mcp.tools.generic.read``
 
 search
 ^^^^^^
@@ -135,7 +135,7 @@ search
   Varies by entity — ``GET /v1/{entity_plural}``
 
 **Implementation:**
-  See ``rossum_mcp.tools.read_layer``
+  See ``rossum_mcp.tools.generic.read``
 
 create_queue_from_template
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -715,7 +715,7 @@ delete
      - Soft delete — moves to 'deleted' status
 
 **Implementation:**
-  Defined in ``rossum_mcp/tools/delete_layer/__init__.py``. A registry maps entity
+  Defined in ``rossum_mcp/tools/generic/delete.py``. A registry maps entity
   names to existing private delete functions from individual tool modules.
 
 Rossum API Resources

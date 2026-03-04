@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from rossum_api.models.relation import Relation
-from rossum_mcp.tools.read_layer.registry import _get_relation, _list_relations
+from rossum_mcp.tools.generic.read.registry import _get_relation, _list_relations
 
 
 def create_mock_relation(**kwargs) -> Relation:

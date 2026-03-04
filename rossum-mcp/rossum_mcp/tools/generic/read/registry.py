@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     from rossum_api import AsyncRossumAPIClient
 
-    from rossum_mcp.tools.read_layer.models import SearchQuery
+    from rossum_mcp.tools.generic.read.models import SearchQuery
 
 
 @dataclass
