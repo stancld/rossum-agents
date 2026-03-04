@@ -1,0 +1,85 @@
+"""Create operations for hooks."""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Any
+
+from rossum_api.models.hook import Hook, HookEventAndAction, HookType
+
+if TYPE_CHECKING:
+    from rossum_api import AsyncRossumAPIClient
+
+logger = logging.getLogger(__name__)
+
+VALID_HOOK_EVENTS = {e.value for e in HookEventAndAction}
+
+
+def _validate_events(events: list[HookEventAndAction]) -> list[HookEventAndAction]:
+    invalid = [e for e in events if e not in VALID_HOOK_EVENTS]
+    if invalid:
+        valid_list = ", ".join(sorted(VALID_HOOK_EVENTS))
+        raise ValueError(
+            f"Invalid event(s): {invalid}. Events must use 'event.action' format. Valid values: {valid_list}"
+        )
+    return events
+
+
+async def _create_hook(
+    client: AsyncRossumAPIClient,
+    name: str,
+    type: HookType,
+    queues: list[str] | None = None,
+    events: list[HookEventAndAction] | None = None,
+    config: dict | None = None,
+    settings: dict | None = None,
+    secret: str | None = None,
+) -> Hook | dict:
+    hook_data: dict[str, Any] = {"name": name, "type": type, "sideload": ["schemas"]}
+
+    if queues is not None:
+        hook_data["queues"] = queues
+    if events is not None:
+        hook_data["events"] = _validate_events(events)
+    if config is None:
+        config = {}
+    if type == "function" and "source" in config:
+        config["code"] = config.pop("source")
+    if type == "function" and "runtime" not in config:
+        config["runtime"] = "python3.12"
+    if "timeout_s" in config and config["timeout_s"] > 60:
+        config["timeout_s"] = 60
+    hook_data["config"] = config
+    if settings is not None:
+        hook_data["settings"] = settings
+    if secret is not None:
+        hook_data["secret"] = secret
+
+    hook: Hook = await client.create_new_hook(hook_data)
+    return hook
+
+
+async def _create_hook_from_template(
+    client: AsyncRossumAPIClient,
+    name: str,
+    hook_template_id: int,
+    queues: list[str],
+    events: list[HookEventAndAction] | None = None,
+    token_owner: str | None = None,
+) -> Hook | dict:
+    logger.debug(f"Creating hook from template: name={name}, template_id={hook_template_id}")
+
+    hook_template_url = f"{client._http_client.base_url.rstrip('/')}/hook_templates/{hook_template_id}"
+
+    hook_data: dict[str, Any] = {"name": name, "hook_template": hook_template_url, "queues": queues}
+    if events is not None:
+        hook_data["events"] = _validate_events(events)
+    if token_owner is not None:
+        hook_data["token_owner"] = token_owner
+
+    result = await client._http_client.request_json("POST", "hooks/create", json=hook_data)
+
+    if hook_id := result.get("id"):
+        hook: Hook = await client.retrieve_hook(hook_id)
+        return hook
+    return {"error": "Hook wasn't likely created. Hook ID not available."}

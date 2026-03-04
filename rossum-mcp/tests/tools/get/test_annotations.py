@@ -1,0 +1,142 @@
+"""Tests for rossum_mcp.tools.get.annotations and related modules."""
+
+from __future__ import annotations
+
+import json
+from unittest.mock import AsyncMock, Mock
+
+import anyio
+import pytest
+from conftest import create_mock_annotation
+from rossum_mcp.tools.get.handler import register_get_tools
+from rossum_mcp.tools.get.registry import _get_annotation
+from rossum_mcp.tools.search.registry import _list_annotations
+
+
+@pytest.fixture
+def mock_client() -> AsyncMock:
+    """Create a mock AsyncRossumAPIClient."""
+    client = AsyncMock()
+    client._http_client = AsyncMock()
+    client._deserializer = Mock(side_effect=lambda resource, raw: raw)
+    return client
+
+
+@pytest.fixture
+def mock_mcp() -> Mock:
+    """Create a mock FastMCP instance that captures registered tools."""
+    tools: dict = {}
+
+    def tool_decorator(**kwargs):
+        def wrapper(fn):
+            tools[fn.__name__] = fn
+            return fn
+
+        return wrapper
+
+    mcp = Mock()
+    mcp.tool = tool_decorator
+    mcp._tools = tools
+    return mcp
+
+
+@pytest.mark.unit
+class TestGetAnnotation:
+    """Tests for get_annotation tool."""
+
+    @pytest.mark.asyncio
+    async def test_get_annotation_success(self, mock_client: AsyncMock) -> None:
+        """Test successful annotation retrieval."""
+        mock_annotation = create_mock_annotation(id=67890, status="confirmed")
+        mock_client.retrieve_annotation.return_value = mock_annotation
+
+        result = await _get_annotation(mock_client, annotation_id=67890)
+
+        assert result.id == 67890
+        assert result.status == "confirmed"
+        mock_client.retrieve_annotation.assert_called_once_with(67890)
+
+
+@pytest.mark.unit
+class TestGetAnnotationContent:
+    """Tests for get_annotation_content tool."""
+
+    @pytest.mark.asyncio
+    async def test_get_annotation_content_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test annotation content is written to a local file and path is returned."""
+        register_get_tools(mock_mcp, mock_client)
+
+        content_data = [{"id": "abc123", "value": "test_value"}]
+        mock_annotation = create_mock_annotation(id=67890, content=content_data)
+        mock_client.retrieve_annotation.return_value = mock_annotation
+
+        get_annotation_content = mock_mcp._tools["get_annotation_content"]
+        result = await get_annotation_content(annotation_id=67890)
+
+        assert "path" in result
+        path = anyio.Path(result["path"])
+        assert await path.exists()
+        assert json.loads(await path.read_text()) == content_data
+        mock_client.retrieve_annotation.assert_called_once_with(67890, sideloads=("content",))
+        await path.unlink()
+
+
+@pytest.mark.unit
+class TestListAnnotations:
+    """Tests for list_annotations tool."""
+
+    @pytest.mark.asyncio
+    async def test_list_annotations_success(self, mock_client: AsyncMock) -> None:
+        """Test successful annotations listing."""
+        mock_ann1 = create_mock_annotation(id=1, status="confirmed")
+        mock_ann2 = create_mock_annotation(id=2, status="to_review")
+
+        async def mock_fetch_all(resource, **filters):
+            for item in [mock_ann1, mock_ann2]:
+                yield item
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        result = await _list_annotations(mock_client, queue_id=100, status="confirmed,to_review")
+
+        assert len(result) == 2
+        assert result[0].id == 1
+        assert result[1].id == 2
+
+    @pytest.mark.asyncio
+    async def test_list_annotations_no_status_filter(self, mock_client: AsyncMock) -> None:
+        """Test annotations listing without status filter."""
+
+        async def mock_fetch_all(resource, **filters):
+            return
+            yield
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        result = await _list_annotations(mock_client, queue_id=100, status=None)
+
+        assert len(result) == 0
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_annotations_skips_broken_items(self, mock_client: AsyncMock) -> None:
+        """Test list_annotations gracefully skips items that fail deserialization."""
+        mock_ann = create_mock_annotation(id=1, status="confirmed")
+
+        def mock_deserializer(resource, raw):
+            if raw.get("id") == 2:
+                raise ValueError("broken annotation")
+            return mock_ann
+
+        mock_client._deserializer = mock_deserializer
+
+        async def mock_fetch_all(resource, **filters):
+            yield {"id": 1, "status": "confirmed"}
+            yield {"id": 2, "status": "broken"}
+            yield {"id": 3, "status": "to_review"}
+
+        mock_client._http_client.fetch_all = mock_fetch_all
+
+        result = await _list_annotations(mock_client, queue_id=100, status="confirmed,to_review")
+
+        assert len(result) == 2
