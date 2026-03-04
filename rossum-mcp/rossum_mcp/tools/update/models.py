@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Literal, TypedDict
 
+from rossum_mcp.tools.models import (  # noqa: TC001 - needed at runtime for FastMCP TypedDict resolution
+    AutomationLevel,
+    QueueLocale,
+)
+
 DatapointType = Literal["string", "number", "date", "enum", "button"]
 
 
@@ -39,8 +44,8 @@ class SchemaNodeUpdate:
 class QueueUpdateData(TypedDict, total=False):
     name: str
     automation_enabled: bool
-    automation_level: str
-    locale: str
+    automation_level: AutomationLevel
+    locale: QueueLocale
     metadata: dict[str, Any]
     settings: dict[str, Any]
     engine: str

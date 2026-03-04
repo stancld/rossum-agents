@@ -15,6 +15,8 @@ from rossum_mcp.tools.resource_tracking import embed_tracked_resources, track_re
 if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
 
+    from rossum_mcp.tools.models import AutomationLevel, QueueLocale
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,9 +28,9 @@ async def _create_queue(
     engine_id: int | None = None,
     inbox_id: int | None = None,
     connector_id: int | None = None,
-    locale: str = "en_GB",
+    locale: QueueLocale = "en_GB",
     automation_enabled: bool = False,
-    automation_level: str = "never",
+    automation_level: AutomationLevel = "never",
     training_enabled: bool = True,
     splitting_screen_feature_flag: bool = False,
 ) -> Queue:

@@ -3,7 +3,45 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Literal, get_args
+from typing import Literal, TypedDict, get_args
+
+AutomationLevel = Literal["never", "always", "confident"]
+
+QueueLocale = Literal[
+    "auto",
+    "en_US",
+    "en_GB",
+    "de_DE",
+    "de_AT",
+    "de_CH",
+    "fr_FR",
+    "fr_BE",
+    "fr_CH",
+    "cs_CZ",
+    "sk_SK",
+    "es_ES",
+    "it_IT",
+    "pt_PT",
+    "pt_BR",
+    "nl_NL",
+    "nl_BE",
+    "pl_PL",
+    "hu_HU",
+    "ro_RO",
+    "ja_JP",
+    "zh_CN",
+    "ko_KR",
+    "da_DK",
+    "fi_FI",
+    "sv_SE",
+    "nb_NO",
+]
+
+
+class EmailRecipient(TypedDict):
+    type: Literal["annotator", "constant", "datapoint"]
+    value: str
+
 
 DatapointType = Literal["string", "number", "date", "enum", "button"]
 NodeCategory = Literal["datapoint", "multivalue", "tuple"]

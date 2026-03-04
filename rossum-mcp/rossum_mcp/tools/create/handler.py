@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence  # noqa: TC003 - needed at runtime for FastMCP
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from rossum_api.models.email_template import EmailTemplate
 from rossum_api.models.engine import Engine, EngineField, EngineFieldType
@@ -22,8 +22,11 @@ from rossum_mcp.tools.create.schemas import _create_schema
 from rossum_mcp.tools.create.users import _create_user
 from rossum_mcp.tools.create.workspaces import _create_workspace
 from rossum_mcp.tools.models import (  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
+    AutomationLevel,
+    EmailRecipient,
     EmailTemplateType,
     EngineType,
+    QueueLocale,
     QueueTemplateName,
 )
 
@@ -68,9 +71,9 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         engine_id: int | None = None,
         inbox_id: int | None = None,
         connector_id: int | None = None,
-        locale: str = "en_GB",
+        locale: QueueLocale = "en_GB",
         automation_enabled: bool = False,
-        automation_level: str = "never",
+        automation_level: AutomationLevel = "never",
         training_enabled: bool = True,
         splitting_screen_feature_flag: bool = False,
     ) -> Queue | dict:
@@ -234,9 +237,9 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         message: str,
         type: EmailTemplateType = "custom",
         automate: bool = False,
-        to: list[dict[str, Any]] | None = None,
-        cc: list[dict[str, Any]] | None = None,
-        bcc: list[dict[str, Any]] | None = None,
+        to: list[EmailRecipient] | None = None,
+        cc: list[EmailRecipient] | None = None,
+        bcc: list[EmailRecipient] | None = None,
         triggers: list[str] | None = None,
     ) -> EmailTemplate | dict:
         return await _create_email_template(

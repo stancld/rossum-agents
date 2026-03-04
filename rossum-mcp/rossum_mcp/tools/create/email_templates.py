@@ -10,7 +10,7 @@ from rossum_mcp.tools.base import build_resource_url
 if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
 
-    from rossum_mcp.tools.models import EmailTemplateType
+    from rossum_mcp.tools.models import EmailRecipient, EmailTemplateType
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,9 @@ async def _create_email_template(
     message: str,
     type: EmailTemplateType = "custom",
     automate: bool = False,
-    to: list[dict[str, Any]] | None = None,
-    cc: list[dict[str, Any]] | None = None,
-    bcc: list[dict[str, Any]] | None = None,
+    to: list[EmailRecipient] | None = None,
+    cc: list[EmailRecipient] | None = None,
+    bcc: list[EmailRecipient] | None = None,
     triggers: list[str] | None = None,
 ) -> EmailTemplate | dict:
     logger.debug(f"Creating email template: name={name}, queue={queue}, type={type}")
