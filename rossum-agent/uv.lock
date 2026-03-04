@@ -1431,32 +1431,6 @@ wheels = [
 ]
 
 [[package]]
-name = "moto"
-version = "5.1.21"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "boto3" },
-    { name = "botocore" },
-    { name = "cryptography" },
-    { name = "jinja2" },
-    { name = "python-dateutil" },
-    { name = "requests" },
-    { name = "responses" },
-    { name = "werkzeug" },
-    { name = "xmltodict" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/55/f8/81e2ee90f47a6ae1e475a961bd6a1a1569b04999ba941897b87101b0d5af/moto-5.1.21.tar.gz", hash = "sha256:713dde46e71e2714fa9a29eec513ec618d35e1d84c256331b5aab3f30692feeb", size = 8441171, upload-time = "2026-02-08T21:52:39.157Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/53/c7/4b0bc06f0811caa67f7e8c3ca2e637bd8cb4317c2f8839b7d643d7ace68c/moto-5.1.21-py3-none-any.whl", hash = "sha256:311a30095b08b39dd2707f161f1440d361684fe0090b9fd0751dfd1c9b022445", size = 6514163, upload-time = "2026-02-08T21:52:36.91Z" },
-]
-
-[package.optional-dependencies]
-s3 = [
-    { name = "py-partiql-parser" },
-    { name = "pyyaml" },
-]
-
-[[package]]
 name = "multidict"
 version = "6.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1809,15 +1783,6 @@ keyring = [
 ]
 memory = [
     { name = "cachetools" },
-]
-
-[[package]]
-name = "py-partiql-parser"
-version = "0.6.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/56/7a/a0f6bda783eb4df8e3dfd55973a1ac6d368a89178c300e1b5b91cd181e5e/py_partiql_parser-0.6.3.tar.gz", hash = "sha256:09cecf916ce6e3da2c050f0cb6106166de42c33d34a078ec2eb19377ea70389a", size = 17456, upload-time = "2025-10-18T13:56:13.441Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c9/33/a7cbfccc39056a5cf8126b7aab4c8bafbedd4f0ca68ae40ecb627a2d2cd3/py_partiql_parser-0.6.3-py2.py3-none-any.whl", hash = "sha256:deb0769c3346179d2f590dcbde556f708cdb929059fb654bad75f4cf6e07f582", size = 23752, upload-time = "2025-10-18T13:56:12.256Z" },
 ]
 
 [[package]]
@@ -2208,20 +2173,6 @@ wheels = [
 ]
 
 [[package]]
-name = "responses"
-version = "0.26.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pyyaml" },
-    { name = "requests" },
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9f/b4/b7e040379838cc71bf5aabdb26998dfbe5ee73904c92c1c161faf5de8866/responses-0.26.0.tar.gz", hash = "sha256:c7f6923e6343ef3682816ba421c006626777893cb0d5e1434f674b649bac9eb4", size = 81303, upload-time = "2026-02-19T14:38:05.574Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/04/7f73d05b556da048923e31a0cc878f03be7c5425ed1f268082255c75d872/responses-0.26.0-py3-none-any.whl", hash = "sha256:03ec4409088cd5c66b71ecbbbd27fe2c58ddfad801c66203457b3e6a04868c37", size = 35099, upload-time = "2026-02-19T14:38:03.847Z" },
-]
-
-[[package]]
 name = "rich"
 version = "14.3.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2283,7 +2234,6 @@ all = [
     { name = "furo" },
     { name = "gunicorn" },
     { name = "httpx" },
-    { name = "moto", extra = ["s3"] },
     { name = "myst-parser" },
     { name = "pydantic" },
     { name = "pytest" },
@@ -2327,7 +2277,6 @@ slack = [
 tests = [
     { name = "coverage" },
     { name = "httpx" },
-    { name = "moto", extra = ["s3"] },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -2360,8 +2309,6 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'tests'", specifier = ">=0.27.0" },
     { name = "jinja2", specifier = ">=3.0" },
     { name = "jq", specifier = ">=1.7.0" },
-    { name = "moto", extras = ["s3"], marker = "extra == 'all'", specifier = ">=5.0.0" },
-    { name = "moto", extras = ["s3"], marker = "extra == 'tests'", specifier = ">=5.0.0" },
     { name = "myst-parser", marker = "extra == 'all'", specifier = ">=2.0.0" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
     { name = "pydantic", marker = "extra == 'all'", specifier = ">2.0.0" },
@@ -2987,18 +2934,6 @@ wheels = [
 ]
 
 [[package]]
-name = "werkzeug"
-version = "3.1.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "markupsafe" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/61/f1/ee81806690a87dab5f5653c1f146c92bc066d7f4cebc603ef88eb9e13957/werkzeug-3.1.6.tar.gz", hash = "sha256:210c6bede5a420a913956b4791a7f4d6843a43b6fcee4dfa08a65e93007d0d25", size = 864736, upload-time = "2026-02-19T15:17:18.884Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4d/ec/d58832f89ede95652fd01f4f24236af7d32b70cab2196dfcc2d2fd13c5c2/werkzeug-3.1.6-py3-none-any.whl", hash = "sha256:7ddf3357bb9564e407607f988f683d72038551200c704012bb9a4c523d42f131", size = 225166, upload-time = "2026-02-19T15:17:17.475Z" },
-]
-
-[[package]]
 name = "wrapt"
 version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3062,15 +2997,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c7/79/12135bdf8b9c9367b8701c2c19a14c913c120b882d50b014ca0d38083c2c/wsproto-1.3.2.tar.gz", hash = "sha256:b86885dcf294e15204919950f666e06ffc6c7c114ca900b060d6e16293528294", size = 50116, upload-time = "2025-11-20T18:18:01.871Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a4/f5/10b68b7b1544245097b2a1b8238f66f2fc6dcaeb24ba5d917f52bd2eed4f/wsproto-1.3.2-py3-none-any.whl", hash = "sha256:61eea322cdf56e8cc904bd3ad7573359a242ba65688716b0710a5eb12beab584", size = 24405, upload-time = "2025-11-20T18:18:00.454Z" },
-]
-
-[[package]]
-name = "xmltodict"
-version = "1.0.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/19/70/80f3b7c10d2630aa66414bf23d210386700aa390547278c789afa994fd7e/xmltodict-1.0.4.tar.gz", hash = "sha256:6d94c9f834dd9e44514162799d344d815a3a4faec913717a9ecbfa5be1bb8e61", size = 26124, upload-time = "2026-02-22T02:21:22.074Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/38/34/98a2f52245f4d47be93b580dae5f9861ef58977d73a79eb47c58f1ad1f3a/xmltodict-1.0.4-py3-none-any.whl", hash = "sha256:a4a00d300b0e1c59fc2bfccb53d7b2e88c32f200df138a0dd2229f842497026a", size = 13580, upload-time = "2026-02-22T02:21:21.039Z" },
 ]
 
 [[package]]
