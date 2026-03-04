@@ -1,5 +1,3 @@
-"""Delete registry mapping entity names to delete functions."""
-
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable

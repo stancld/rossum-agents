@@ -1,11 +1,7 @@
-"""Models for the update operation layer."""
-
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from typing import Any, Literal, TypedDict
-
-from rossum_mcp.tools.update.schemas.patching import PatchOperation
 
 DatapointType = Literal["string", "number", "date", "enum", "button"]
 
@@ -37,7 +33,6 @@ class SchemaNodeUpdate:
     max_occurrences: int | None = None
 
     def to_dict(self) -> dict:
-        """Convert to dict, excluding None values."""
         return {k: v for k, v in asdict(self).items() if v is not None}
 
 
@@ -68,11 +63,3 @@ class EngineUpdateData(TypedDict, total=False):
     description: str
     learning_enabled: bool
     training_queues: list[str]
-
-
-__all__ = [
-    "EngineUpdateData",
-    "PatchOperation",
-    "QueueUpdateData",
-    "SchemaNodeUpdate",
-]

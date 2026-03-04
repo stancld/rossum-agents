@@ -1,5 +1,3 @@
-"""Entity registry mapping entity names to search/list functions."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -273,7 +271,6 @@ async def _list_email_templates(
     first_n: int | None = None,
     use_regex: bool = False,
 ) -> list[EmailTemplate]:
-
     logger.info(f"Listing email templates: queue_id={queue_id}, type={type}, name={name}, first_n={first_n}")
     filters = build_filters(queue=queue_id, type=type, name=None if use_regex else name)
     result = await graceful_list(client, Resource.EmailTemplate, "email_template", max_items=first_n, **filters)
@@ -321,7 +318,6 @@ async def _list_relations(client: AsyncRossumAPIClient, **kwargs: object) -> lis
 
 
 async def _list_document_relations(client: AsyncRossumAPIClient, **kwargs: object) -> list[object]:
-
     filters = build_filters(**kwargs)
     result = await graceful_list(client, Resource.DocumentRelation, "document_relation", **filters)
     return result.items

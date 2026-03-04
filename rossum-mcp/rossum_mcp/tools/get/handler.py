@@ -1,5 +1,3 @@
-"""Handler for get tools: generic get + entity-specific read tools."""
-
 from __future__ import annotations
 
 import asyncio
@@ -42,7 +40,6 @@ EntityType = Literal[
 
 
 def _serialize(obj: object) -> object:
-    """Convert dataclass instances to dicts for JSON serialization."""
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
         return dataclasses.asdict(obj)
     return obj

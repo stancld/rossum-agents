@@ -10,9 +10,7 @@ import pytest
 from conftest import create_mock_hook
 from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
-from rossum_mcp.tools.create.hooks import (
-    _validate_events,
-)
+from rossum_mcp.tools.validation import validate_hook_events
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -275,16 +273,16 @@ class TestCreateHookFromTemplate:
 
 @pytest.mark.unit
 class TestValidateEvents:
-    """Tests for _validate_events helper."""
+    """Tests for validate_hook_events helper."""
 
     def test_valid_events(self) -> None:
-        result = _validate_events(["annotation_content.initialize", "upload.created"])
+        result = validate_hook_events(["annotation_content.initialize", "upload.created"])
         assert result == ["annotation_content.initialize", "upload.created"]
 
     def test_invalid_event_raises(self) -> None:
         with pytest.raises(ValueError, match=r"Invalid event.*annotation_content.*event\.action"):
-            _validate_events(["annotation_content"])
+            validate_hook_events(["annotation_content"])
 
     def test_mixed_valid_invalid_raises(self) -> None:
         with pytest.raises(ValueError, match=r"Invalid event.*bad_event"):
-            _validate_events(["annotation_content.initialize", "bad_event"])
+            validate_hook_events(["annotation_content.initialize", "bad_event"])

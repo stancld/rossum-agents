@@ -1,21 +1,13 @@
-"""Update operations for rules."""
-
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict
 from typing import TYPE_CHECKING
 
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.rule import Rule, RuleAction
 
 from rossum_mcp.tools.base import build_resource_url
-
-
-def _actions_to_dicts(actions: list[RuleAction]) -> list[dict]:
-    """Serialize actions for API payloads, handling both dataclass instances and raw dicts."""
-    return [asdict(a) if isinstance(a, RuleAction) else a for a in actions]
-
+from rossum_mcp.tools.validation import actions_to_dicts
 
 if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
@@ -39,7 +31,7 @@ async def _update_rule(
     rule_data: dict = {
         "name": name,
         "trigger_condition": trigger_condition,
-        "actions": _actions_to_dicts(actions),
+        "actions": actions_to_dicts(actions),
         "enabled": enabled,
         "queues": [build_resource_url("queues", qid) for qid in queue_ids],
     }
@@ -71,7 +63,7 @@ async def _patch_rule(
     if trigger_condition is not None:
         patch_data["trigger_condition"] = trigger_condition
     if actions is not None:
-        patch_data["actions"] = _actions_to_dicts(actions)
+        patch_data["actions"] = actions_to_dicts(actions)
     if enabled is not None:
         patch_data["enabled"] = enabled
     if queue_ids is not None:

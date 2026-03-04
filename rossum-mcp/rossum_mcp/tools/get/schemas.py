@@ -1,12 +1,9 @@
-"""Get operations for schemas (tree structure)."""
-
 from __future__ import annotations
 
 from rossum_mcp.tools.get.models import SchemaTreeNode
 
 
 def _build_tree_node(node: dict) -> SchemaTreeNode:
-    """Build a lightweight tree node from a schema node."""
     category = node.get("category", "")
     node_id = node.get("id", "")
     label = node.get("label", "")
@@ -25,5 +22,4 @@ def _build_tree_node(node: dict) -> SchemaTreeNode:
 
 
 def _extract_schema_tree(content: list[dict]) -> list[dict]:
-    """Extract lightweight tree structure from schema content."""
     return [_build_tree_node(section).to_dict() for section in content]

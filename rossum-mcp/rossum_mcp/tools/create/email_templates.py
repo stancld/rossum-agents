@@ -1,5 +1,3 @@
-"""Create operations for email templates."""
-
 from __future__ import annotations
 
 import logging

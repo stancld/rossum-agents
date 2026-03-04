@@ -1,5 +1,3 @@
-"""Entity registry mapping entity names to retrieve functions for the get layer."""
-
 from __future__ import annotations
 
 import logging
@@ -96,7 +94,6 @@ async def _get_organization_limit(client: AsyncRossumAPIClient, organization_id:
 
 
 async def _get_relation(client: AsyncRossumAPIClient, relation_id: int) -> Relation:
-
     logger.debug(f"Retrieving relation: relation_id={relation_id}")
     relation_data = await client._http_client.fetch_one(Resource.Relation, relation_id)
     return cast("Relation", client._deserializer(Resource.Relation, relation_data))

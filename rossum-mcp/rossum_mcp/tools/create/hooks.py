@@ -1,5 +1,3 @@
-"""Create operations for hooks."""
-
 from __future__ import annotations
 
 import logging
@@ -7,22 +5,12 @@ from typing import TYPE_CHECKING, Any
 
 from rossum_api.models.hook import Hook, HookEventAndAction, HookType
 
+from rossum_mcp.tools.validation import validate_hook_events
+
 if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
 
 logger = logging.getLogger(__name__)
-
-VALID_HOOK_EVENTS = {e.value for e in HookEventAndAction}
-
-
-def _validate_events(events: list[HookEventAndAction]) -> list[HookEventAndAction]:
-    invalid = [e for e in events if e not in VALID_HOOK_EVENTS]
-    if invalid:
-        valid_list = ", ".join(sorted(VALID_HOOK_EVENTS))
-        raise ValueError(
-            f"Invalid event(s): {invalid}. Events must use 'event.action' format. Valid values: {valid_list}"
-        )
-    return events
 
 
 async def _create_hook(
@@ -40,7 +28,7 @@ async def _create_hook(
     if queues is not None:
         hook_data["queues"] = queues
     if events is not None:
-        hook_data["events"] = _validate_events(events)
+        hook_data["events"] = validate_hook_events(events)
     if config is None:
         config = {}
     if type == "function" and "source" in config:
@@ -73,7 +61,7 @@ async def _create_hook_from_template(
 
     hook_data: dict[str, Any] = {"name": name, "hook_template": hook_template_url, "queues": queues}
     if events is not None:
-        hook_data["events"] = _validate_events(events)
+        hook_data["events"] = validate_hook_events(events)
     if token_owner is not None:
         hook_data["token_owner"] = token_owner
 

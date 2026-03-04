@@ -1,5 +1,3 @@
-"""Handler for create tools - aggregates entity registrations."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence  # noqa: TC003 - needed at runtime for FastMCP

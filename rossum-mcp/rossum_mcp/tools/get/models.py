@@ -1,5 +1,3 @@
-"""Models for the get operation layer."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,7 +14,6 @@ class SchemaTreeNode:
     children: list[SchemaTreeNode] | None = None
 
     def to_dict(self) -> dict:
-        """Convert to dict, excluding None values."""
         result: dict = {"id": self.id, "label": self.label, "category": self.category}
         if self.type:
             result["type"] = self.type

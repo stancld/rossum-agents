@@ -1,5 +1,3 @@
-"""Create operations for schemas."""
-
 from __future__ import annotations
 
 import logging

@@ -1,5 +1,3 @@
-"""Handler for update tools - aggregates entity registrations."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -19,13 +17,15 @@ from rossum_mcp.tools.update.engines import _update_engine
 from rossum_mcp.tools.update.hooks import _test_hook, _update_hook
 from rossum_mcp.tools.update.models import (  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
     EngineUpdateData,
-    PatchOperation,
     QueueUpdateData,
     SchemaNodeUpdate,
 )
 from rossum_mcp.tools.update.queues import _update_queue
 from rossum_mcp.tools.update.rules import _patch_rule, _update_rule
 from rossum_mcp.tools.update.schemas.handler import _patch_schema, _prune_schema_fields, _update_schema
+from rossum_mcp.tools.update.schemas.patching import (
+    PatchOperation,  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
+)
 from rossum_mcp.tools.update.users import _update_user
 
 if TYPE_CHECKING:

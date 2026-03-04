@@ -1,5 +1,3 @@
-"""Create operations for queues."""
-
 from __future__ import annotations
 
 import logging
@@ -68,7 +66,6 @@ async def _create_queue(
 
 
 def _get_engine_url(queue: Queue) -> str | None:
-    """Extract the engine URL from a queue, checking all engine fields."""
     for attr in ("dedicated_engine", "generic_engine", "engine"):
         value = getattr(queue, attr, None)
         if value and isinstance(value, str):

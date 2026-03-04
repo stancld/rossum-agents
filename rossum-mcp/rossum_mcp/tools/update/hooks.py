@@ -1,26 +1,12 @@
-"""Update operations for hooks."""
-
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from rossum_api.models.hook import Hook, HookAction, HookEvent, HookEventAndAction
 
 from rossum_mcp.tools.base import extract_id_from_url
-
-VALID_HOOK_EVENTS = {e.value for e in HookEventAndAction}
-
-
-def _validate_events(events: list[HookEventAndAction]) -> list[HookEventAndAction]:
-    invalid = [e for e in events if e not in VALID_HOOK_EVENTS]
-    if invalid:
-        valid_list = ", ".join(sorted(VALID_HOOK_EVENTS))
-        raise ValueError(
-            f"Invalid event(s): {invalid}. Events must use 'event.action' format. Valid values: {valid_list}"
-        )
-    return events
-
+from rossum_mcp.tools.validation import validate_hook_events
 
 if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
@@ -41,7 +27,7 @@ async def _update_hook(
     logger.debug(f"Updating hook: hook_id={hook_id}")
 
     existing_hook: Hook = await client.retrieve_hook(hook_id)
-    hook_data: dict[str, Any] = {
+    hook_data: dict = {
         "name": existing_hook.name,
         "queues": existing_hook.queues,
         "events": list(existing_hook.events),
@@ -53,7 +39,7 @@ async def _update_hook(
     if queues is not None:
         hook_data["queues"] = queues
     if events is not None:
-        hook_data["events"] = _validate_events(events)
+        hook_data["events"] = validate_hook_events(events)
     if config is not None:
         hook_data["config"] = config
     if settings is not None:
@@ -90,7 +76,6 @@ _DEFAULT_PREVIOUS_STATUS = "importing"
 
 
 async def _resolve_annotation_for_hook(client: AsyncRossumAPIClient, hook_id: int) -> str | None:
-    """Find an annotation URL from one of the hook's queues."""
     hook = await client.retrieve_hook(hook_id)
     for queue_url in hook.queues or []:
         queue_id = extract_id_from_url(str(queue_url))

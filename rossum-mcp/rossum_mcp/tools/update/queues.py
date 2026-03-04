@@ -1,5 +1,3 @@
-"""Update operations for queues."""
-
 from __future__ import annotations
 
 import logging
@@ -39,7 +37,6 @@ _VALID_META_NAMES = {
 
 
 def _validate_queue_column_settings(queue_data: QueueUpdateData) -> str | None:
-    """Validate meta_name values in annotation_list_table columns. Returns error message or None."""
     columns = queue_data.get("settings", {}).get("annotation_list_table", {}).get("columns", [])
     if not isinstance(columns, list):
         return None

@@ -1,6 +1,27 @@
-"""Schema validation utilities for Rossum MCP Server."""
-
 from __future__ import annotations
+
+from dataclasses import asdict
+
+from rossum_api.models.hook import HookEventAndAction
+from rossum_api.models.rule import RuleAction
+
+VALID_HOOK_EVENTS = {e.value for e in HookEventAndAction}
+
+
+def validate_hook_events(events: list[HookEventAndAction]) -> list[HookEventAndAction]:
+    invalid = [e for e in events if e not in VALID_HOOK_EVENTS]
+    if invalid:
+        valid_list = ", ".join(sorted(VALID_HOOK_EVENTS))
+        raise ValueError(
+            f"Invalid event(s): {invalid}. Events must use 'event.action' format. Valid values: {valid_list}"
+        )
+    return events
+
+
+def actions_to_dicts(actions: list[RuleAction]) -> list[dict]:
+    # FastMCP may pass raw dicts instead of RuleAction dataclass instances
+    return [asdict(a) if isinstance(a, RuleAction) else a for a in actions]
+
 
 VALID_UI_CONFIGURATION_TYPES = {"captured", "data", "manual", "formula", "reasoning", "lookup", None}
 VALID_UI_CONFIGURATION_EDIT = {"enabled", "enabled_without_warning", "disabled"}

@@ -10,7 +10,7 @@ import pytest
 from rossum_api.models.rule import Rule, RuleAction, ShowMessagePayload
 from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
-from rossum_mcp.tools.create.rules import _actions_to_dicts
+from rossum_mcp.tools.validation import actions_to_dicts
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -218,7 +218,7 @@ class TestCreateRule:
 
 @pytest.mark.unit
 class TestActionsToDict:
-    """Tests for _actions_to_dicts helper."""
+    """Tests for actions_to_dicts helper."""
 
     def test_converts_dataclass_instances(self) -> None:
         action = RuleAction(
@@ -227,7 +227,7 @@ class TestActionsToDict:
             event="validation",
             payload=ShowMessagePayload(type="error", content="Bad value", schema_id="amount"),
         )
-        result = _actions_to_dicts([action])
+        result = actions_to_dicts([action])
 
         assert result == [
             {
@@ -246,7 +246,7 @@ class TestActionsToDict:
             "event": "validation",
             "payload": {"type": "error", "content": "X"},
         }
-        result = _actions_to_dicts([raw])
+        result = actions_to_dicts([raw])
 
         assert result == [raw]
 
@@ -258,7 +258,7 @@ class TestActionsToDict:
             payload=ShowMessagePayload(type="info", content="OK"),
         )
         dict_action = {"id": "act2", "type": "custom", "event": "validation", "payload": {}}
-        result = _actions_to_dicts([dataclass_action, dict_action])
+        result = actions_to_dicts([dataclass_action, dict_action])
 
         assert len(result) == 2
         assert result[0] == {
