@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from fastmcp.exceptions import ToolError
 from rossum_api import APIClientError
 from rossum_mcp.tools import base
 from rossum_mcp.tools.update.handler import register_update_tools
@@ -222,10 +223,8 @@ class TestPruneSchemaFields:
         register_update_tools(mock_mcp, mock_client)
 
         prune_schema_fields = mock_mcp._tools["prune_schema_fields"]
-        result = await prune_schema_fields(schema_id=50, fields_to_keep=["a"], fields_to_remove=["b"])
-
-        assert "error" in result
-        assert "not both" in result["error"]
+        with pytest.raises(ToolError, match="not both"):
+            await prune_schema_fields(schema_id=50, fields_to_keep=["a"], fields_to_remove=["b"])
 
     @pytest.mark.asyncio
     async def test_prune_schema_fields_no_params_error(
@@ -238,10 +237,8 @@ class TestPruneSchemaFields:
         register_update_tools(mock_mcp, mock_client)
 
         prune_schema_fields = mock_mcp._tools["prune_schema_fields"]
-        result = await prune_schema_fields(schema_id=50)
-
-        assert "error" in result
-        assert "Must specify" in result["error"]
+        with pytest.raises(ToolError, match="Must specify"):
+            await prune_schema_fields(schema_id=50)
 
     @pytest.mark.asyncio
     async def test_prune_schema_fields_preserves_parent_containers_for_nested_fields(

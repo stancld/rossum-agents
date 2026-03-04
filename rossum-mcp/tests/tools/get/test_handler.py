@@ -14,6 +14,7 @@ from conftest import (
     create_mock_schema,
     create_mock_workspace,
 )
+from fastmcp.exceptions import ToolError
 from rossum_mcp.tools.get.handler import register_get_tools
 from rossum_mcp.tools.get.registry import build_get_registry
 from rossum_mcp.tools.search.models import (
@@ -291,9 +292,8 @@ class TestGetBatch:
         self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None
     ) -> None:
         register_get_tools(mock_mcp, mock_client)
-        result = await mock_mcp._tools["get"](entity="hook_log", entity_id=[1, 2])
-        assert isinstance(result, dict)
-        assert "error" in result
+        with pytest.raises(ToolError, match="does not support get"):
+            await mock_mcp._tools["get"](entity="hook_log", entity_id=[1, 2])
 
 
 # ───────────────────────── GET Error Cases ─────────────────────────
@@ -306,18 +306,16 @@ class TestGetErrors:
         self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None
     ) -> None:
         register_get_tools(mock_mcp, mock_client)
-        result = await mock_mcp._tools["get"](entity="hook_log", entity_id=1)
-        assert "error" in result
-        assert "does not support get" in result["error"]
+        with pytest.raises(ToolError, match="does not support get"):
+            await mock_mcp._tools["get"](entity="hook_log", entity_id=1)
 
     @pytest.mark.asyncio
     async def test_get_unknown_entity_returns_error(
         self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None
     ) -> None:
         register_get_tools(mock_mcp, mock_client)
-        result = await mock_mcp._tools["get"](entity="nonexistent", entity_id=1)
-        assert "error" in result
-        assert "Unknown entity" in result["error"]
+        with pytest.raises(ToolError, match="Unknown entity"):
+            await mock_mcp._tools["get"](entity="nonexistent", entity_id=1)
 
 
 # ───────────────────────── SEARCH Routing ─────────────────────────

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, get_args
 
+from fastmcp.exceptions import ToolError
+
 from rossum_mcp.tools.delete.models import DeleteEntityType
 from rossum_mcp.tools.delete.registry import build_delete_registry
 
@@ -36,6 +38,6 @@ def register_delete_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     async def delete(entity: DeleteEntityType, entity_id: int) -> dict:
         delete_fn = registry.get(entity)
         if delete_fn is None:
-            return {"error": f"Unknown entity type: {entity}"}
+            raise ToolError(f"Unknown entity type: {entity}")
 
         return await delete_fn(entity_id)

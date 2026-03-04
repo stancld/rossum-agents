@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, cast
 
+from fastmcp.exceptions import ToolError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.queue import Queue
 
@@ -53,10 +54,10 @@ def _validate_queue_column_settings(queue_data: QueueUpdateData) -> str | None:
     return None
 
 
-async def _update_queue(client: AsyncRossumAPIClient, queue_id: int, queue_data: QueueUpdateData) -> Queue | dict:
+async def _update_queue(client: AsyncRossumAPIClient, queue_id: int, queue_data: QueueUpdateData) -> Queue:
     validation_error = _validate_queue_column_settings(queue_data)
     if validation_error:
-        return {"error": validation_error}
+        raise ToolError(validation_error)
 
     logger.debug(f"Updating queue: queue_id={queue_id}, data={queue_data}")
     updated_queue_data = await client._http_client.update(Resource.Queue, queue_id, dict(queue_data))

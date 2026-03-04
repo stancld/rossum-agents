@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastmcp.exceptions import ToolError
 from rossum_api.models.engine import Engine
 from rossum_api.models.queue import Queue
 from rossum_api.models.schema import Schema
@@ -219,10 +220,9 @@ class TestCreateQueue:
         register_create_tools(mock_mcp, mock_client)
 
         create_queue = mock_mcp._tools["create_queue"]
-        result = await create_queue(name="New Queue", workspace_id=1, schema_id=10, splitting_screen_feature_flag=True)
+        with pytest.raises(ToolError, match="splitting_screen_feature_flag requested"):
+            await create_queue(name="New Queue", workspace_id=1, schema_id=10, splitting_screen_feature_flag=True)
 
-        assert "error" in result
-        assert "splitting_screen_feature_flag requested" in result["error"]
         mock_client.create_new_queue.assert_not_called()
 
 
@@ -297,15 +297,14 @@ class TestCreateQueueFromTemplate:
         register_create_tools(mock_mcp, mock_client)
 
         create_queue_from_template = mock_mcp._tools["create_queue_from_template"]
-        result = await create_queue_from_template(
-            name="New Queue",
-            template_name="Invalid Template",
-            workspace_id=1,
-        )
+        with pytest.raises(ToolError, match="Invalid template_name") as exc_info:
+            await create_queue_from_template(
+                name="New Queue",
+                template_name="Invalid Template",
+                workspace_id=1,
+            )
 
-        assert "error" in result
-        assert "Invalid template_name" in result["error"]
-        assert "available_templates" in result
+        assert "Available templates" in str(exc_info.value)
         mock_client._http_client.request_json.assert_not_called()
 
     @pytest.mark.asyncio

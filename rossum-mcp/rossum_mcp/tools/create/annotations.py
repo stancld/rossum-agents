@@ -6,6 +6,7 @@ from collections.abc import Sequence  # noqa: TC003 - needed at runtime for Fast
 from typing import TYPE_CHECKING
 
 import anyio
+from fastmcp.exceptions import ToolError
 
 from rossum_mcp.tools.base import build_resource_url
 
@@ -35,15 +36,15 @@ async def _upload_document(client: AsyncRossumAPIClient, file_path: str, queue_i
             f"- You have permission to upload documents to this queue\n"
             f"- Your API token has the necessary permissions"
         )
-        raise ValueError(error_msg) from e
+        raise ToolError(error_msg) from e
     except IndexError as e:
         logger.error(f"Upload failed - no tasks returned: {e}")
-        raise ValueError(
+        raise ToolError(
             f"Document upload failed - no tasks were created. This may indicate the queue_id ({queue_id}) is invalid."
         ) from e
     except Exception as e:
         logger.error(f"Upload failed: {type(e).__name__}: {e}")
-        raise ValueError(f"Document upload failed: {type(e).__name__}: {e!s}") from e
+        raise ToolError(f"Document upload failed: {type(e).__name__}: {e!s}") from e
 
     return {
         "task_id": task.id,

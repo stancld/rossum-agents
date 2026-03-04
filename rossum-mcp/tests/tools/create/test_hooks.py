@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_hook
+from fastmcp.exceptions import ToolError
 from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
 from rossum_mcp.tools.validation import validate_hook_events
@@ -215,15 +216,14 @@ class TestCreateHookFromTemplate:
         mock_client._http_client = mock_http_client
 
         create_hook_from_template = mock_mcp._tools["create_hook_from_template"]
-        result = await create_hook_from_template(
-            name="My Webhook Hook",
-            hook_template_id=5,
-            queues=["https://api.test.rossum.ai/v1/queues/1"],
-            events=["annotation_content.initialize"],
-        )
+        with pytest.raises(ToolError, match="Hook wasn't likely created"):
+            await create_hook_from_template(
+                name="My Webhook Hook",
+                hook_template_id=5,
+                queues=["https://api.test.rossum.ai/v1/queues/1"],
+                events=["annotation_content.initialize"],
+            )
 
-        assert "error" in result
-        assert "Hook wasn't likely created" in result["error"]
         mock_client.retrieve_hook.assert_not_called()
 
     @pytest.mark.asyncio

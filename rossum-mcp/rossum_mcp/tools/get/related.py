@@ -10,6 +10,7 @@ import logging
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Any
 
+from fastmcp.exceptions import ToolError
 from rossum_api import APIClientError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models import deserialize_default
@@ -71,21 +72,19 @@ async def _get_queue_engine(client: AsyncRossumAPIClient, queue_id: int) -> Engi
 
 async def _get_schema_tree_structure(
     client: AsyncRossumAPIClient, schema_id: int | None = None, queue_id: int | None = None
-) -> list[dict] | dict:
+) -> list[dict]:
     """Get lightweight schema tree structure. Used by related fetchers."""
     # Import here to avoid circular import: get.related → get.registry → search.registry → ... → get.related
     from rossum_mcp.tools.get.registry import _get_schema  # noqa: PLC0415 - circular import avoidance
 
     if schema_id is None and queue_id is None:
-        return {"error": "Provide schema_id or queue_id"}
+        raise ToolError("Provide schema_id or queue_id")
     if schema_id is not None and queue_id is not None:
-        return {"error": "Provide schema_id or queue_id, not both"}
+        raise ToolError("Provide schema_id or queue_id, not both")
     if queue_id:
         queue = await client.retrieve_queue(queue_id)
         schema_id = extract_id_from_url(queue.schema)
     schema = await _get_schema(client, schema_id)  # type: ignore[arg-type]
-    if isinstance(schema, dict):
-        return schema
     content_dicts: list[dict[str, Any]] = [
         asdict(section) if is_dataclass(section) else dict(section)  # type: ignore[arg-type]
         for section in schema.content
