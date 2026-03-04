@@ -56,12 +56,13 @@ async def _upload_document(client: AsyncRossumAPIClient, file_path: str, queue_i
 
 async def _copy_annotations(
     client: AsyncRossumAPIClient,
+    base_url: str,
     annotation_ids: Sequence[int],
     target_queue_id: int,
     target_status: str | None = None,
     reimport: bool = False,
 ) -> dict:
-    target_queue_url = build_resource_url("queues", target_queue_id)
+    target_queue_url = build_resource_url(base_url, "queues", target_queue_id)
     params = {"reimport": "true"} if reimport else {}
 
     async def _copy_one(annotation_id: int) -> dict:

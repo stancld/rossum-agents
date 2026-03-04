@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from rossum_api.models.workspace import Workspace
-from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 def create_mock_workspace(**kwargs) -> Workspace:
@@ -62,16 +56,9 @@ class TestCreateWorkspace:
     """Tests for create_workspace tool."""
 
     @pytest.mark.asyncio
-    async def test_create_workspace_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_workspace_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful workspace creation."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_workspace = create_mock_workspace(id=200, name="New Workspace")
         mock_client.create_new_workspace.return_value = mock_workspace
@@ -83,16 +70,9 @@ class TestCreateWorkspace:
         assert result.name == "New Workspace"
 
     @pytest.mark.asyncio
-    async def test_create_workspace_with_metadata(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_workspace_with_metadata(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test workspace creation with metadata."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_workspace = create_mock_workspace(id=200, name="New Workspace")
         mock_client.create_new_workspace.return_value = mock_workspace

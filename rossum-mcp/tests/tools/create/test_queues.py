@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
@@ -11,7 +10,6 @@ from fastmcp.exceptions import ToolError
 from rossum_api.models.engine import Engine
 from rossum_api.models.queue import Queue
 from rossum_api.models.schema import Schema
-from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
 from rossum_mcp.tools.create.queues import (
     _create_queue_from_template,
@@ -120,14 +118,9 @@ class TestCreateQueue:
     """Tests for create_queue tool."""
 
     @pytest.mark.asyncio
-    async def test_create_queue_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_queue_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful queue creation."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_queue = create_mock_queue(
             id=200,
@@ -149,14 +142,9 @@ class TestCreateQueue:
         mock_client.create_new_queue.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_queue_with_inbox_id(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_queue_with_inbox_id(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test create_queue with inbox_id parameter."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_queue = create_mock_queue(id=200, name="New Queue")
         mock_client.create_new_queue.return_value = mock_queue
@@ -168,14 +156,9 @@ class TestCreateQueue:
         assert call_args["inbox"] == "https://api.test.rossum.ai/v1/inboxes/5"
 
     @pytest.mark.asyncio
-    async def test_create_queue_with_connector_id(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_queue_with_connector_id(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test create_queue with connector_id parameter."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_queue = create_mock_queue(id=200, name="New Queue")
         mock_client.create_new_queue.return_value = mock_queue
@@ -191,12 +174,9 @@ class TestCreateQueue:
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         """Test create_queue with splitting_screen_feature_flag when env vars are set."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
         monkeypatch.setenv("SPLITTING_SCREEN_FLAG_NAME", "enable_splitting")
         monkeypatch.setenv("SPLITTING_SCREEN_FLAG_VALUE", "true")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_queue = create_mock_queue(id=200, name="New Queue")
         mock_client.create_new_queue.return_value = mock_queue
@@ -212,12 +192,9 @@ class TestCreateQueue:
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         """Test create_queue with splitting_screen_feature_flag when env vars are missing."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
         monkeypatch.delenv("SPLITTING_SCREEN_FLAG_NAME", raising=False)
         monkeypatch.delenv("SPLITTING_SCREEN_FLAG_VALUE", raising=False)
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         create_queue = mock_mcp._tools["create_queue"]
         with pytest.raises(ToolError, match="splitting_screen_feature_flag requested"):
@@ -231,14 +208,9 @@ class TestCreateQueueFromTemplate:
     """Tests for create_queue_from_template tool."""
 
     @pytest.mark.asyncio
-    async def test_create_queue_from_template_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_queue_from_template_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful queue creation from template."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_queue = create_mock_queue(id=300, name="New Template Queue")
         mock_client._http_client.request_json.return_value = {"id": 300, "name": "New Template Queue"}
@@ -263,14 +235,9 @@ class TestCreateQueueFromTemplate:
         assert call_kwargs["json"]["include_documents"] is False
 
     @pytest.mark.asyncio
-    async def test_create_queue_from_template_with_engine(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_queue_from_template_with_engine(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test queue creation from template with custom engine."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_queue = create_mock_queue(id=300, name="New Template Queue")
         mock_client._http_client.request_json.return_value = {"id": 300}
@@ -288,13 +255,9 @@ class TestCreateQueueFromTemplate:
         assert call_kwargs["json"]["engine"] == "https://api.test.rossum.ai/v1/engines/42"
 
     @pytest.mark.asyncio
-    async def test_create_queue_from_template_invalid_template(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_queue_from_template_invalid_template(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test queue creation from template with invalid template name."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         create_queue_from_template = mock_mcp._tools["create_queue_from_template"]
         with pytest.raises(ToolError, match="Invalid template_name") as exc_info:
@@ -308,12 +271,8 @@ class TestCreateQueueFromTemplate:
         mock_client._http_client.request_json.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_tracks_schema_and_engine(self, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
+    async def test_tracks_schema_and_engine(self, mock_client: AsyncMock) -> None:
         """Test that _create_queue_from_template tracks side-effect schema and engine."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
         mock_queue = create_mock_queue(
             id=300,
             name="Template Queue",
@@ -325,7 +284,9 @@ class TestCreateQueueFromTemplate:
         mock_client.retrieve_schema.return_value = create_mock_schema(id=50, name="Template Schema")
         mock_client.retrieve_engine.return_value = create_mock_engine(id=60, name="Template Engine")
 
-        result = await _create_queue_from_template(mock_client, "Template Queue", "EU Demo Template", workspace_id=1)
+        result = await _create_queue_from_template(
+            mock_client, "https://api.test.rossum.ai/v1", "Template Queue", "EU Demo Template", workspace_id=1
+        )
 
         assert isinstance(result, dict)
         assert result["id"] == 300
@@ -339,14 +300,8 @@ class TestCreateQueueFromTemplate:
         assert tracked[1]["data"]["name"] == "Template Engine"
 
     @pytest.mark.asyncio
-    async def test_tracks_engine_even_when_engine_id_provided(
-        self, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_tracks_engine_even_when_engine_id_provided(self, mock_client: AsyncMock) -> None:
         """Test that engine is tracked even when engine_id is explicitly provided (pre-existing engine)."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
         mock_queue = create_mock_queue(
             id=300,
             schema="https://api.test.rossum.ai/v1/schemas/50",
@@ -358,7 +313,12 @@ class TestCreateQueueFromTemplate:
         mock_client.retrieve_engine.return_value = create_mock_engine(id=42, name="Existing Engine")
 
         result = await _create_queue_from_template(
-            mock_client, "Template Queue", "EU Demo Template", workspace_id=1, engine_id=42
+            mock_client,
+            "https://api.test.rossum.ai/v1",
+            "Template Queue",
+            "EU Demo Template",
+            workspace_id=1,
+            engine_id=42,
         )
 
         assert isinstance(result, dict)
@@ -368,14 +328,8 @@ class TestCreateQueueFromTemplate:
         assert engine_tracked[0]["entity_id"] == "42"
 
     @pytest.mark.asyncio
-    async def test_schema_fetch_failure_is_logged_and_skipped(
-        self, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_schema_fetch_failure_is_logged_and_skipped(self, mock_client: AsyncMock) -> None:
         """Test that schema fetch failure doesn't break queue creation."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
         mock_queue = create_mock_queue(
             id=300,
             schema="https://api.test.rossum.ai/v1/schemas/50",
@@ -386,7 +340,9 @@ class TestCreateQueueFromTemplate:
         mock_client.retrieve_schema.side_effect = Exception("Schema not found")
         mock_client.retrieve_engine.return_value = create_mock_engine(id=60, name="Template Engine")
 
-        result = await _create_queue_from_template(mock_client, "Queue", "EU Demo Template", workspace_id=1)
+        result = await _create_queue_from_template(
+            mock_client, "https://api.test.rossum.ai/v1", "Queue", "EU Demo Template", workspace_id=1
+        )
 
         assert isinstance(result, dict)
         tracked = result[TRACKED_RESOURCES_KEY]
@@ -394,14 +350,8 @@ class TestCreateQueueFromTemplate:
         assert tracked[0]["entity_type"] == "engine"
 
     @pytest.mark.asyncio
-    async def test_engine_fetch_failure_is_logged_and_skipped(
-        self, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_engine_fetch_failure_is_logged_and_skipped(self, mock_client: AsyncMock) -> None:
         """Test that engine fetch failure doesn't break queue creation."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
         mock_queue = create_mock_queue(
             id=300,
             schema="https://api.test.rossum.ai/v1/schemas/50",
@@ -412,7 +362,9 @@ class TestCreateQueueFromTemplate:
         mock_client.retrieve_schema.return_value = create_mock_schema(id=50, name="Template Schema")
         mock_client.retrieve_engine.side_effect = Exception("Engine not found")
 
-        result = await _create_queue_from_template(mock_client, "Queue", "EU Demo Template", workspace_id=1)
+        result = await _create_queue_from_template(
+            mock_client, "https://api.test.rossum.ai/v1", "Queue", "EU Demo Template", workspace_id=1
+        )
 
         assert isinstance(result, dict)
         tracked = result[TRACKED_RESOURCES_KEY]
@@ -420,14 +372,8 @@ class TestCreateQueueFromTemplate:
         assert tracked[0]["entity_type"] == "schema"
 
     @pytest.mark.asyncio
-    async def test_both_fetches_fail_returns_queue_without_tracked(
-        self, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_both_fetches_fail_returns_queue_without_tracked(self, mock_client: AsyncMock) -> None:
         """When both schema and engine fetch fail, result has empty tracked list."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
         mock_queue = create_mock_queue(
             id=300,
             schema="https://api.test.rossum.ai/v1/schemas/50",
@@ -438,21 +384,17 @@ class TestCreateQueueFromTemplate:
         mock_client.retrieve_schema.side_effect = Exception("Schema fetch failed")
         mock_client.retrieve_engine.side_effect = Exception("Engine fetch failed")
 
-        result = await _create_queue_from_template(mock_client, "Queue", "EU Demo Template", workspace_id=1)
+        result = await _create_queue_from_template(
+            mock_client, "https://api.test.rossum.ai/v1", "Queue", "EU Demo Template", workspace_id=1
+        )
 
         # No tracked resources → embed_tracked_resources returns the original Queue dataclass
         assert isinstance(result, Queue)
         assert result.id == 300
 
     @pytest.mark.asyncio
-    async def test_queue_with_no_engine_only_tracks_schema(
-        self, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_queue_with_no_engine_only_tracks_schema(self, mock_client: AsyncMock) -> None:
         """Test that queue with no engine URL only tracks schema."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
         mock_queue = create_mock_queue(
             id=300,
             schema="https://api.test.rossum.ai/v1/schemas/50",
@@ -464,7 +406,9 @@ class TestCreateQueueFromTemplate:
         mock_client._deserializer = Mock(return_value=mock_queue)
         mock_client.retrieve_schema.return_value = create_mock_schema(id=50, name="Template Schema")
 
-        result = await _create_queue_from_template(mock_client, "Queue", "EU Demo Template", workspace_id=1)
+        result = await _create_queue_from_template(
+            mock_client, "https://api.test.rossum.ai/v1", "Queue", "EU Demo Template", workspace_id=1
+        )
 
         assert isinstance(result, dict)
         tracked = result[TRACKED_RESOURCES_KEY]

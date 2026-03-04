@@ -2,19 +2,13 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastmcp.exceptions import ToolError
 from rossum_api.models.rule import Rule, RuleAction, ShowMessagePayload
-from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
 from rossum_mcp.tools.validation import actions_to_dicts
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 def create_mock_rule(**kwargs) -> Rule:
@@ -71,12 +65,9 @@ class TestCreateRule:
     """Tests for create_rule tool."""
 
     @pytest.mark.asyncio
-    async def test_create_rule_success(self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
+    async def test_create_rule_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful rule creation."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         test_action = {
             "id": "action1",
@@ -115,14 +106,9 @@ class TestCreateRule:
         assert call_args["enabled"] is True
 
     @pytest.mark.asyncio
-    async def test_create_rule_without_schema_id(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_rule_without_schema_id(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test creating a rule with only queue_ids (no schema_id)."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_rule = create_mock_rule(id=457, name="Queue-only Rule", enabled=True)
         mock_client.create_new_rule.return_value = mock_rule
@@ -141,13 +127,9 @@ class TestCreateRule:
         assert call_args["queues"] == ["https://api.test.rossum.ai/v1/queues/101"]
 
     @pytest.mark.asyncio
-    async def test_create_rule_requires_scope(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_rule_requires_scope(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test create_rule fails when neither schema_id nor queue_ids provided."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         create_rule = mock_mcp._tools["create_rule"]
         with pytest.raises(ToolError, match="Provide at least one of schema_id or queue_ids"):
@@ -160,14 +142,9 @@ class TestCreateRule:
         mock_client.create_new_rule.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_create_rule_with_disabled(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_rule_with_disabled(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test creating a disabled rule."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_rule = create_mock_rule(id=789, name="Disabled Rule", enabled=False)
         mock_client.create_new_rule.return_value = mock_rule
@@ -188,14 +165,9 @@ class TestCreateRule:
         assert call_args["enabled"] is False
 
     @pytest.mark.asyncio
-    async def test_create_rule_with_queue_ids(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_rule_with_queue_ids(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test creating a rule with queue_ids."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_rule = create_mock_rule(id=999, name="Queue Rule")
         mock_client.create_new_rule.return_value = mock_rule

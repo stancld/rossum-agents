@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import importlib
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_hook
 from fastmcp.exceptions import ToolError
-from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
 from rossum_mcp.tools.validation import validate_hook_events
 
@@ -51,12 +49,9 @@ class TestCreateHook:
     @pytest.mark.asyncio
     async def test_create_hook_success(self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
         """Test successful hook creation."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
         monkeypatch.setenv("API_TOKEN_OWNER", "https://api.test.rossum.ai/v1/users/1")
 
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_hook = create_mock_hook(id=200, name="New Hook", type="function")
         mock_client.create_new_hook.return_value = mock_hook
@@ -72,12 +67,9 @@ class TestCreateHook:
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         """Test hook creation with configuration."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
         monkeypatch.setenv("API_TOKEN_OWNER", "https://api.test.rossum.ai/v1/users/1")
 
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_hook = create_mock_hook(id=200, name="Configured Hook")
         mock_client.create_new_hook.return_value = mock_hook
@@ -102,12 +94,9 @@ class TestCreateHook:
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         """Test hook creation with settings, secret, and timeout_s capping."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
         monkeypatch.setenv("API_TOKEN_OWNER", "https://api.test.rossum.ai/v1/users/1")
 
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_hook = create_mock_hook(id=201, name="Full Config Hook")
         mock_client.create_new_hook.return_value = mock_hook
@@ -133,13 +122,9 @@ class TestCreateHookFromTemplate:
     """Tests for create_hook_from_template tool."""
 
     @pytest.mark.asyncio
-    async def test_create_hook_from_template_invalid_events(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_hook_from_template_invalid_events(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test that invalid event format raises ValueError."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_http_client = AsyncMock()
         mock_http_client.base_url = "https://api.test.rossum.ai/v1"
@@ -160,12 +145,9 @@ class TestCreateHookFromTemplate:
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         """Test creating a hook from template via hooks/create endpoint."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
         monkeypatch.setenv("API_TOKEN_OWNER", "https://api.test.rossum.ai/v1/users/1")
 
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         # Mock the HTTP client for hooks/create POST and the base_url property
         mock_http_client = AsyncMock()
@@ -202,12 +184,9 @@ class TestCreateHookFromTemplate:
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         """Test error handling when API response doesn't contain hook ID."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
         monkeypatch.setenv("API_TOKEN_OWNER", "https://api.test.rossum.ai/v1/users/1")
 
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         # Mock the HTTP client - API returns response without id
         mock_http_client = AsyncMock()
@@ -231,12 +210,9 @@ class TestCreateHookFromTemplate:
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
         """Test creating a hook from template with token_owner parameter."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
         monkeypatch.setenv("API_TOKEN_OWNER", "https://api.test.rossum.ai/v1/users/1")
 
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         # Mock the HTTP client for hooks/create POST
         mock_http_client = AsyncMock()

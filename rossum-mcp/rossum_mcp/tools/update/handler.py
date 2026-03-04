@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
 
 
-def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  # noqa: C901 - many tool registrations
+def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: str) -> None:  # noqa: C901 - many tool registrations
     # --- Annotations ---
     @mcp.tool(
         description="Set annotation status to 'reviewing' (from 'to_review').",
@@ -160,7 +160,7 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         enabled: bool,
         queue_ids: list[int],
     ) -> Rule | dict:
-        return await _update_rule(client, rule_id, name, trigger_condition, actions, enabled, queue_ids)
+        return await _update_rule(client, base_url, rule_id, name, trigger_condition, actions, enabled, queue_ids)
 
     @mcp.tool(
         description="Patch a rule (PATCH); only provided fields change. queue_ids=[] clears queue scoping.",
@@ -175,7 +175,7 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         enabled: bool | None = None,
         queue_ids: list[int] | None = None,
     ) -> Rule | dict:
-        return await _patch_rule(client, rule_id, name, trigger_condition, actions, enabled, queue_ids)
+        return await _patch_rule(client, base_url, rule_id, name, trigger_condition, actions, enabled, queue_ids)
 
     # --- Users ---
     @mcp.tool(

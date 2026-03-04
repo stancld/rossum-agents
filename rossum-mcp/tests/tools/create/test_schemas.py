@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_schema
 from fastmcp.exceptions import ToolError
-from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 @pytest.fixture
@@ -48,14 +42,9 @@ class TestCreateSchema:
     """Tests for create_schema tool."""
 
     @pytest.mark.asyncio
-    async def test_create_schema_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_schema_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful schema creation."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         content = [
             {
@@ -77,13 +66,8 @@ class TestCreateSchema:
         mock_client.create_new_schema.assert_called_once_with({"name": "New Schema", "content": content})
 
     @pytest.mark.asyncio
-    async def test_create_schema_rejects_empty_content(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+    async def test_create_schema_rejects_empty_content(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         create_schema = mock_mcp._tools["create_schema"]
         with pytest.raises(ToolError, match="empty content"):

@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from rossum_api.models.email_template import EmailTemplate
-from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 def create_mock_email_template(**kwargs) -> EmailTemplate:
@@ -69,16 +63,9 @@ class TestCreateEmailTemplate:
     """Tests for create_email_template tool."""
 
     @pytest.mark.asyncio
-    async def test_create_email_template_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_email_template_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful email template creation."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_template = create_mock_email_template(
             id=200, name="New Template", subject="Welcome", message="<p>Hello</p>"
@@ -99,16 +86,9 @@ class TestCreateEmailTemplate:
         assert call_args["queue"] == "https://api.test.rossum.ai/v1/queues/1"
 
     @pytest.mark.asyncio
-    async def test_create_email_template_with_all_fields(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_email_template_with_all_fields(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test email template creation with all optional fields."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-
-        importlib.reload(base)
-
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_template = create_mock_email_template(id=200, name="Full Template")
         mock_client.create_new_email_template.return_value = mock_template

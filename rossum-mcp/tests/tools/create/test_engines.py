@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_engine, create_mock_engine_field
 from fastmcp.exceptions import ToolError
-from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 @pytest.fixture
@@ -48,14 +42,9 @@ class TestCreateEngine:
     """Tests for create_engine tool."""
 
     @pytest.mark.asyncio
-    async def test_create_engine_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_engine_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful engine creation."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_engine = create_mock_engine(id=200, name="New Engine", type="extractor")
         mock_client._http_client.create.return_value = {"id": 200}
@@ -68,13 +57,9 @@ class TestCreateEngine:
         assert result.name == "New Engine"
 
     @pytest.mark.asyncio
-    async def test_create_engine_invalid_type(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_engine_invalid_type(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test create_engine with invalid engine type."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         create_engine = mock_mcp._tools["create_engine"]
 
@@ -87,14 +72,9 @@ class TestCreateEngineField:
     """Tests for create_engine_field tool."""
 
     @pytest.mark.asyncio
-    async def test_create_engine_field_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_engine_field_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful engine field creation."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_field = create_mock_engine_field(id=500, label="Invoice Number")
         mock_client._http_client.create.return_value = {"id": 500}
@@ -113,13 +93,9 @@ class TestCreateEngineField:
         assert result.label == "Invoice Number"
 
     @pytest.mark.asyncio
-    async def test_create_engine_field_empty_schemas(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_engine_field_empty_schemas(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test create_engine_field fails with empty schema_ids."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         create_engine_field = mock_mcp._tools["create_engine_field"]
 
@@ -133,13 +109,9 @@ class TestCreateEngineField:
             )
 
     @pytest.mark.asyncio
-    async def test_create_engine_field_invalid_type(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_engine_field_invalid_type(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test create_engine_field fails with invalid field type."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         create_engine_field = mock_mcp._tools["create_engine_field"]
 
@@ -153,14 +125,9 @@ class TestCreateEngineField:
             )
 
     @pytest.mark.asyncio
-    async def test_create_engine_field_with_optional_params(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_create_engine_field_with_optional_params(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test engine field creation with subtype and pre_trained_field_id."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_field = create_mock_engine_field(id=500, subtype="iban", pre_trained_field_id="iban_field")
         mock_client._http_client.create.return_value = {"id": 500}

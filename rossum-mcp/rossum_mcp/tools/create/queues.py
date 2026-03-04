@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 async def _create_queue(
     client: AsyncRossumAPIClient,
+    base_url: str,
     name: str,
     workspace_id: int,
     schema_id: int,
@@ -40,8 +41,8 @@ async def _create_queue(
 
     queue_data: dict = {
         "name": name,
-        "workspace": build_resource_url("workspaces", workspace_id),
-        "schema": build_resource_url("schemas", schema_id),
+        "workspace": build_resource_url(base_url, "workspaces", workspace_id),
+        "schema": build_resource_url(base_url, "schemas", schema_id),
         "locale": locale,
         "automation_enabled": automation_enabled,
         "automation_level": automation_level,
@@ -49,11 +50,11 @@ async def _create_queue(
     }
 
     if engine_id is not None:
-        queue_data["engine"] = build_resource_url("engines", engine_id)
+        queue_data["engine"] = build_resource_url(base_url, "engines", engine_id)
     if inbox_id is not None:
-        queue_data["inbox"] = build_resource_url("inboxes", inbox_id)
+        queue_data["inbox"] = build_resource_url(base_url, "inboxes", inbox_id)
     if connector_id is not None:
-        queue_data["connector"] = build_resource_url("connectors", connector_id)
+        queue_data["connector"] = build_resource_url(base_url, "connectors", connector_id)
     if splitting_screen_feature_flag:
         if os.environ.get("SPLITTING_SCREEN_FLAG_NAME") and os.environ.get("SPLITTING_SCREEN_FLAG_VALUE"):
             queue_data["settings"] = {
@@ -79,6 +80,7 @@ def _get_engine_url(queue: Queue) -> str | None:
 
 async def _create_queue_from_template(
     client: AsyncRossumAPIClient,
+    base_url: str,
     name: str,
     template_name: QueueTemplateName,
     workspace_id: int,
@@ -95,12 +97,12 @@ async def _create_queue_from_template(
     payload: dict = {
         "name": name,
         "template_name": template_name,
-        "workspace": build_resource_url("workspaces", workspace_id),
+        "workspace": build_resource_url(base_url, "workspaces", workspace_id),
         "include_documents": include_documents,
     }
 
     if engine_id is not None:
-        payload["engine"] = build_resource_url("engines", engine_id)
+        payload["engine"] = build_resource_url(base_url, "engines", engine_id)
 
     response = await client._http_client.request_json(
         method="POST",

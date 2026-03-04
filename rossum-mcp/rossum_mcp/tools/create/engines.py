@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 async def _create_engine(
-    client: AsyncRossumAPIClient, name: str, organization_id: int, engine_type: EngineType
+    client: AsyncRossumAPIClient, base_url: str, name: str, organization_id: int, engine_type: EngineType
 ) -> Engine:
     if engine_type not in ("extractor", "splitter"):
         raise ToolError(f"Invalid engine_type '{engine_type}'. Must be 'extractor' or 'splitter'")
@@ -26,7 +26,7 @@ async def _create_engine(
     logger.debug(f"Creating engine: name={name}, organization_id={organization_id}, type={engine_type}")
     engine_data = {
         "name": name,
-        "organization": build_resource_url("organizations", organization_id),
+        "organization": build_resource_url(base_url, "organizations", organization_id),
         "type": engine_type,
     }
     engine_response = await client._http_client.create(Resource.Engine, engine_data)
@@ -35,6 +35,7 @@ async def _create_engine(
 
 async def _create_engine_field(
     client: AsyncRossumAPIClient,
+    base_url: str,
     engine_id: int,
     name: str,
     label: str,
@@ -53,13 +54,13 @@ async def _create_engine_field(
 
     logger.debug(f"Creating engine field: engine_id={engine_id}, name={name}, type={field_type}, schemas={schema_ids}")
     engine_field_data = {
-        "engine": build_resource_url("engines", engine_id),
+        "engine": build_resource_url(base_url, "engines", engine_id),
         "name": name,
         "label": label,
         "type": field_type,
         "tabular": tabular,
         "multiline": multiline,
-        "schemas": [build_resource_url("schemas", schema_id) for schema_id in schema_ids],
+        "schemas": [build_resource_url(base_url, "schemas", schema_id) for schema_id in schema_ids],
     }
     if subtype is not None:
         engine_field_data["subtype"] = subtype

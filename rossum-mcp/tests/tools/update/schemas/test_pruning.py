@@ -2,22 +2,16 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastmcp.exceptions import ToolError
 from rossum_api import APIClientError
-from rossum_mcp.tools import base
 from rossum_mcp.tools.update.handler import register_update_tools
 from rossum_mcp.tools.update.schemas.pruning import (
     _collect_all_field_ids,
     _remove_fields_from_content,
 )
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 @pytest.mark.unit
@@ -144,14 +138,9 @@ class TestPruneSchemaFields:
     """Tests for prune_schema_fields tool."""
 
     @pytest.mark.asyncio
-    async def test_prune_schema_fields_with_fields_to_keep(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_prune_schema_fields_with_fields_to_keep(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test pruning with fields_to_keep."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,
@@ -180,14 +169,9 @@ class TestPruneSchemaFields:
         assert "header_section" in result["remaining_fields"]
 
     @pytest.mark.asyncio
-    async def test_prune_schema_fields_with_fields_to_remove(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_prune_schema_fields_with_fields_to_remove(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test pruning with fields_to_remove."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,
@@ -213,28 +197,18 @@ class TestPruneSchemaFields:
         assert "invoice_number" in result["remaining_fields"]
 
     @pytest.mark.asyncio
-    async def test_prune_schema_fields_both_params_error(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_prune_schema_fields_both_params_error(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test error when both fields_to_keep and fields_to_remove provided."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         prune_schema_fields = mock_mcp._tools["prune_schema_fields"]
         with pytest.raises(ToolError, match="not both"):
             await prune_schema_fields(schema_id=50, fields_to_keep=["a"], fields_to_remove=["b"])
 
     @pytest.mark.asyncio
-    async def test_prune_schema_fields_no_params_error(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_prune_schema_fields_no_params_error(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test error when neither parameter provided."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         prune_schema_fields = mock_mcp._tools["prune_schema_fields"]
         with pytest.raises(ToolError, match="Must specify"):
@@ -242,13 +216,10 @@ class TestPruneSchemaFields:
 
     @pytest.mark.asyncio
     async def test_prune_schema_fields_preserves_parent_containers_for_nested_fields(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+        self, mock_mcp: Mock, mock_client: AsyncMock
     ) -> None:
         """Test that keeping a nested field preserves its parent containers (multivalue, section)."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,
@@ -330,14 +301,9 @@ class TestPruneSchemaFields:
         assert "197469" in result["removed_fields"]
 
     @pytest.mark.asyncio
-    async def test_prune_schema_fields_all_fields_kept(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_prune_schema_fields_all_fields_kept(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test prune when fields_to_keep matches all fields so remove_set is empty."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,
@@ -365,13 +331,10 @@ class TestPruneSchemaFields:
         self,
         mock_mcp: Mock,
         mock_client: AsyncMock,
-        monkeypatch: MonkeyPatch,
         tuple_children: list[dict],
     ) -> None:
-        """Set up read-write mode and configure mock with a multivalue schema."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        """Configure mock with a multivalue schema."""
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,
@@ -402,13 +365,12 @@ class TestPruneSchemaFields:
 
     @pytest.mark.asyncio
     async def test_prune_schema_fields_removes_multivalue_when_tuple_removed(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+        self, mock_mcp: Mock, mock_client: AsyncMock
     ) -> None:
         """Test that removing tuple also removes parent multivalue (no stub left)."""
         self._setup_multivalue_schema(
             mock_mcp,
             mock_client,
-            monkeypatch,
             tuple_children=[{"id": "item_desc", "label": "Description", "category": "datapoint", "type": "string"}],
         )
 
@@ -421,13 +383,12 @@ class TestPruneSchemaFields:
 
     @pytest.mark.asyncio
     async def test_prune_schema_fields_removes_multivalue_when_all_tuple_children_removed(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+        self, mock_mcp: Mock, mock_client: AsyncMock
     ) -> None:
         """Test that removing all tuple children also removes multivalue."""
         self._setup_multivalue_schema(
             mock_mcp,
             mock_client,
-            monkeypatch,
             tuple_children=[
                 {"id": "item_desc", "label": "Description", "category": "datapoint", "type": "string"},
                 {"id": "item_qty", "label": "Quantity", "category": "datapoint", "type": "number"},
@@ -444,14 +405,9 @@ class TestPruneSchemaFields:
         assert "invoice_number" in result["remaining_fields"]
 
     @pytest.mark.asyncio
-    async def test_prune_schema_fields_removes_empty_sections(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_prune_schema_fields_removes_empty_sections(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test that sections with no remaining children are removed (API rejects empty sections)."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,
@@ -488,13 +444,10 @@ class TestPruneSchemaFields:
 
     @pytest.mark.asyncio
     async def test_prune_schema_fields_empty_fields_to_keep_removes_all(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+        self, mock_mcp: Mock, mock_client: AsyncMock
     ) -> None:
         """Test that fields_to_keep=[] removes all fields (empty schema)."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,
@@ -523,14 +476,9 @@ class TestPruneSchemaFields:
         mock_client._http_client.update.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_prune_schema_fields_allows_empty_result(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_prune_schema_fields_allows_empty_result(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test that pruning all fields empties the schema."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,
@@ -559,13 +507,10 @@ class TestPruneSchemaFields:
 
     @pytest.mark.asyncio
     async def test_prune_schema_fields_keep_section_as_empty_container(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+        self, mock_mcp: Mock, mock_client: AsyncMock
     ) -> None:
         """Test that section IDs in fields_to_keep are preserved as empty containers."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,
@@ -601,14 +546,9 @@ class TestPruneSchemaFields:
         mock_client._http_client.update.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_prune_schema_fields_retries_on_412(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_prune_schema_fields_retries_on_412(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test that prune_schema_fields retries on 412 Precondition Failed."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,
@@ -640,13 +580,10 @@ class TestPruneSchemaFields:
 
     @pytest.mark.asyncio
     async def test_prune_schema_fields_raises_after_max_retries_on_412(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+        self, mock_mcp: Mock, mock_client: AsyncMock
     ) -> None:
         """Test that prune_schema_fields raises after exhausting retries on 412."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_schema_dict = {
             "id": 50,

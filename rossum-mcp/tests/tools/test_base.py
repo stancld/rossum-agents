@@ -2,105 +2,48 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
-
-
-@pytest.fixture(autouse=True)
-def reset_mcp_mode():
-    """Reset MCP mode to read-write after each test."""
-    yield
-    from rossum_mcp.tools import base
-
-    base.configure(base_url=base._base_url, mcp_mode="read-write")
-
-
-@pytest.mark.unit
-class TestMCPMode:
-    """Tests for MCP mode functions."""
-
-    def test_default_mode_is_read_write(self, monkeypatch: MonkeyPatch) -> None:
-        """Test that default mode is read-write when env var not set."""
-        monkeypatch.delenv("ROSSUM_MCP_MODE", raising=False)
-        from rossum_mcp.tools import base
-
-        importlib.reload(base)
-        assert base.get_mcp_mode() == "read-write"
-
-    def test_initializes_from_env_var(self, monkeypatch: MonkeyPatch) -> None:
-        """Test mode initializes from env var."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
-        from rossum_mcp.tools import base
-
-        importlib.reload(base)
-        assert base.get_mcp_mode() == "read-only"
-
-    def test_set_and_get_mode(self) -> None:
-        """Test setting and getting mode."""
-        from rossum_mcp.tools.base import get_mcp_mode, set_mcp_mode
-
-        set_mcp_mode("read-only")
-        assert get_mcp_mode() == "read-only"
-
-        set_mcp_mode("read-write")
-        assert get_mcp_mode() == "read-write"
-
-    def test_set_mode_case_insensitive(self) -> None:
-        """Test set_mcp_mode is case-insensitive."""
-        from rossum_mcp.tools.base import get_mcp_mode, set_mcp_mode
-
-        set_mcp_mode("READ-ONLY")
-        assert get_mcp_mode() == "read-only"
-
-        set_mcp_mode("Read-Write")
-        assert get_mcp_mode() == "read-write"
-
-    def test_set_mode_invalid_raises_error(self) -> None:
-        """Test set_mcp_mode with invalid value raises ValueError."""
-        from rossum_mcp.tools.base import set_mcp_mode
-
-        with pytest.raises(ValueError, match="Invalid mode"):
-            set_mcp_mode("invalid-mode")
-
-    def test_invalid_env_var_raises_error(self, monkeypatch: MonkeyPatch) -> None:
-        """Test invalid ROSSUM_MCP_MODE env var raises ValueError."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "invalid-mode")
-        from rossum_mcp.tools import base
-
-        importlib.reload(base)
-        with pytest.raises(ValueError, match="Invalid ROSSUM_MCP_MODE"):
-            base.get_mcp_mode()
 
 
 @pytest.mark.unit
 class TestBuildResourceUrl:
     """Tests for build_resource_url function."""
 
-    def test_build_resource_url_with_base_url(self, monkeypatch: MonkeyPatch) -> None:
-        """Test building resource URL with configured base URL."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        from rossum_mcp.tools import base
+    def test_build_resource_url_with_base_url(self) -> None:
+        from rossum_mcp.tools.base import build_resource_url
 
-        importlib.reload(base)
-
-        result = base.build_resource_url("queues", 123)
+        result = build_resource_url("https://api.test.rossum.ai/v1", "queues", 123)
         assert result == "https://api.test.rossum.ai/v1/queues/123"
 
-    def test_build_resource_url_different_resources(self, monkeypatch: MonkeyPatch) -> None:
-        """Test building URLs for different resource types."""
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        from rossum_mcp.tools import base
+    def test_build_resource_url_different_resources(self) -> None:
+        from rossum_mcp.tools.base import build_resource_url
 
-        importlib.reload(base)
+        base = "https://api.test.rossum.ai/v1"
+        assert build_resource_url(base, "schemas", 456) == "https://api.test.rossum.ai/v1/schemas/456"
+        assert build_resource_url(base, "workspaces", 789) == "https://api.test.rossum.ai/v1/workspaces/789"
 
-        assert base.build_resource_url("schemas", 456) == "https://api.test.rossum.ai/v1/schemas/456"
-        assert base.build_resource_url("workspaces", 789) == "https://api.test.rossum.ai/v1/workspaces/789"
+
+@pytest.mark.unit
+class TestExtractIdFromUrl:
+    """Tests for extract_id_from_url function."""
+
+    def test_extract_id_from_url(self) -> None:
+        from rossum_mcp.tools.base import extract_id_from_url
+
+        assert extract_id_from_url("https://api.test.rossum.ai/v1/queues/123") == 123
+
+    def test_extract_id_from_url_trailing_slash(self) -> None:
+        from rossum_mcp.tools.base import extract_id_from_url
+
+        assert extract_id_from_url("https://api.test.rossum.ai/v1/queues/123/") == 123
+
+    def test_extract_id_from_url_invalid(self) -> None:
+        from rossum_mcp.tools.base import extract_id_from_url
+
+        with pytest.raises(ValueError, match="Cannot extract resource ID"):
+            extract_id_from_url("not-a-url")
 
 
 @pytest.mark.unit
@@ -109,10 +52,7 @@ class TestDeleteResource:
 
     @pytest.mark.asyncio
     async def test_delete_resource_success(self) -> None:
-        """Test successful resource deletion."""
-        from rossum_mcp.tools.base import delete_resource, set_mcp_mode
-
-        set_mcp_mode("read-write")
+        from rossum_mcp.tools.base import delete_resource
 
         mock_delete_fn = AsyncMock()
         result = await delete_resource("queue", 123, mock_delete_fn)
@@ -122,10 +62,7 @@ class TestDeleteResource:
 
     @pytest.mark.asyncio
     async def test_delete_resource_custom_message(self) -> None:
-        """Test deletion with custom success message."""
-        from rossum_mcp.tools.base import delete_resource, set_mcp_mode
-
-        set_mcp_mode("read-write")
+        from rossum_mcp.tools.base import delete_resource
 
         mock_delete_fn = AsyncMock()
         result = await delete_resource("queue", 123, mock_delete_fn, "Queue 123 scheduled for deletion")
@@ -134,10 +71,7 @@ class TestDeleteResource:
 
     @pytest.mark.asyncio
     async def test_delete_resource_propagates_exception(self) -> None:
-        """Test that API exceptions are propagated."""
-        from rossum_mcp.tools.base import delete_resource, set_mcp_mode
-
-        set_mcp_mode("read-write")
+        from rossum_mcp.tools.base import delete_resource
 
         mock_delete_fn = AsyncMock(side_effect=ValueError("Not Found"))
         with pytest.raises(ValueError, match="Not Found"):

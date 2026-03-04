@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 async def _create_workspace(
-    client: AsyncRossumAPIClient, name: str, organization_id: int, metadata: dict | None = None
+    client: AsyncRossumAPIClient, base_url: str, name: str, organization_id: int, metadata: dict | None = None
 ) -> Workspace | dict:
-    organization_url = build_resource_url("organizations", organization_id)
+    organization_url = build_resource_url(base_url, "organizations", organization_id)
     logger.debug(f"Creating workspace: name={name}, organization_id={organization_id}, metadata={metadata}")
     workspace_data: dict = {"name": name, "organization": organization_url}
     if metadata is not None:

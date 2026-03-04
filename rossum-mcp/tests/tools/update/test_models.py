@@ -2,19 +2,13 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_schema
-from rossum_mcp.tools import base
 from rossum_mcp.tools.models import SchemaDatapoint
 from rossum_mcp.tools.update.handler import register_update_tools
 from rossum_mcp.tools.update.models import SchemaNodeUpdate
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 @pytest.fixture
@@ -67,14 +61,9 @@ class TestSchemaNodeUpdate:
         assert result["stretch"] is True
 
     @pytest.mark.asyncio
-    async def test_patch_schema_with_dataclass(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_schema_with_dataclass(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test patch_schema accepts dataclass node_data."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_content = [
             {
@@ -110,14 +99,9 @@ class TestSchemaNodeUpdate:
         assert header_section["children"][0]["label"] == "Vendor Name"
 
     @pytest.mark.asyncio
-    async def test_patch_schema_update_with_dataclass(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_schema_update_with_dataclass(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test patch_schema update operation with SchemaNodeUpdate dataclass."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_content = [
             {

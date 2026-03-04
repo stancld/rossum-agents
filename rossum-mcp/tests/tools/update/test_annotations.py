@@ -2,16 +2,10 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from rossum_mcp.tools import base
 from rossum_mcp.tools.update.handler import register_update_tools
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 @pytest.fixture
@@ -46,13 +40,9 @@ class TestStartAnnotation:
     """Tests for start_annotation tool."""
 
     @pytest.mark.asyncio
-    async def test_start_annotation_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_start_annotation_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful annotation start."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         start_annotation = mock_mcp._tools["start_annotation"]
         result = await start_annotation(annotation_id=12345)
@@ -67,13 +57,9 @@ class TestBulkUpdateAnnotationFields:
     """Tests for bulk_update_annotation_fields tool."""
 
     @pytest.mark.asyncio
-    async def test_bulk_update_annotation_fields_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_bulk_update_annotation_fields_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful bulk update of annotation fields."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         operations = [
             {"op": "replace", "id": 1, "value": {"content": {"value": "new value"}}},
@@ -94,13 +80,9 @@ class TestConfirmAnnotation:
     """Tests for confirm_annotation tool."""
 
     @pytest.mark.asyncio
-    async def test_confirm_annotation_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_confirm_annotation_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful annotation confirmation."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         confirm_annotation = mock_mcp._tools["confirm_annotation"]
         result = await confirm_annotation(annotation_id=12345)
