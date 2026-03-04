@@ -2,14 +2,14 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 35 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. Fully typed tools with Pydantic models, Literal unions, and unified APIs — built for agents.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI - rossum-mcp](https://img.shields.io/pypi/v/rossum-mcp?label=rossum-mcp)](https://pypi.org/project/rossum-mcp/)
 [![Coverage](https://codecov.io/gh/stancld/rossum-agents/branch/master/graph/badge.svg?flag=rossum-mcp)](https://codecov.io/gh/stancld/rossum-agents)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-36-blue.svg)](#available-tools)
+[![Fully Typed](https://img.shields.io/badge/Fully_Typed-Pydantic_%2B_Literals-blue.svg)](#available-tools)
 
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
@@ -97,24 +97,23 @@ Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
 
 ## Available Tools
 
-The server provides **35 tools** organized into categories:
+A compact, fully-typed tool surface — Pydantic models, `Literal` unions, and consolidated APIs built for agents:
 
-| Category | Tools | Description |
-|----------|-------|-------------|
-| **Read Layer** | 2 | Get any entity by ID or search/list with typed filters |
-| **Delete Layer** | 1 | Unified delete for any supported entity by ID |
-| **Document Processing** | 6 | Upload documents, retrieve content, update/confirm/copy annotations |
-| **Queue Management** | 4 | Create and configure queues |
-| **Schema Management** | 5 | Define and modify field structures |
-| **Engine Management** | 4 | Configure extraction and splitting engines |
-| **Extensions (Hooks)** | 4 | Webhooks, serverless functions, testing |
-| **Rules & Actions** | 3 | Business rules with triggers and actions |
-| **Workspace Management** | 1 | Create workspaces |
-| **Organization Groups** | 2 | Check feature flags across organizations |
-| **User Management** | 2 | Create and update users |
-| **Email Templates** | 1 | Create automated email responses |
-| **MCP Mode** | 2 | Get/set read-only or read-write mode |
-| **Tool Discovery** | 1 | Dynamic tool loading |
+| Category | Description |
+|----------|-------------|
+| **Read Layer** | Get any entity by ID or search/list with typed filters |
+| **Delete Layer** | Unified delete for any supported entity by ID |
+| **Document Processing** | Upload documents, retrieve content, update/confirm/copy annotations |
+| **Queue Management** | Create and configure queues (including from templates) |
+| **Schema Management** | Define, modify, patch, and prune field structures |
+| **Engine Management** | Configure extraction and splitting engines |
+| **Extensions (Hooks)** | Webhooks, serverless functions, template-based creation, testing |
+| **Rules & Actions** | Business rules with TxScript triggers and actions |
+| **Workspace Management** | Create workspaces |
+| **Organization & Users** | Feature flags, user creation and updates |
+| **Email Templates** | Automated email responses |
+| **MCP Mode** | Get/set read-only or read-write mode at runtime |
+| **Tool Discovery** | Dynamic tool loading via `list_tool_categories` |
 
 <details>
 <summary><strong>Tool List by Category</strong></summary>

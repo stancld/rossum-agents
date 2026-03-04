@@ -19,7 +19,7 @@
 [![CodeFactor](https://www.codefactor.io/repository/github/stancld/rossum-agents/badge)](https://www.codefactor.io/repository/github/stancld/rossum-agents)
 
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-35-blue.svg)](#available-tools)
+[![Fully Typed](https://img.shields.io/badge/Fully_Typed-Pydantic_%2B_Literals-blue.svg)](#mcp-tools)
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![Claude Opus 4.6](https://img.shields.io/badge/Claude-Opus_4.6-blueviolet.svg)](https://www.anthropic.com/claude/opus)
 
@@ -299,25 +299,24 @@ See the [full documentation](https://stancld.github.io/rossum-agents/skills_and_
 
 ## MCP Tools
 
-The MCP server provides **35 tools** organized into categories:
+The MCP server exposes a compact, fully-typed tool surface — Pydantic models, `Literal` unions, and consolidated APIs built for agents:
 
-| Category | Tools | Description |
-|----------|-------|-------------|
-| Read Layer | 2 | Get any entity by ID or search/list with typed filters |
-| Document Processing | 7 | Upload documents, retrieve content, update/confirm/copy/delete annotations |
-| Queue Management | 5 | Create, configure, and delete queues |
-| Schema Management | 6 | Define, modify, and delete field structures |
-| Engine Management | 4 | Configure extraction and splitting engines |
-| Extensions (Hooks) | 5 | Webhooks, serverless functions, testing |
-| Rules & Actions | 4 | Business rules with triggers and actions |
-| Workspace Management | 2 | Create and delete workspaces |
-| Organization Groups | 2 | Check feature flags across organizations |
-| User Management | 2 | Create and update users |
-| Email Templates | 1 | Automated email responses |
-| MCP Mode | 2 | Get/set read-only or read-write mode |
-| Tool Discovery | 1 | Dynamic tool loading |
+| Category | Description |
+|----------|-------------|
+| Read Layer | Get any entity by ID or search/list with typed filters |
+| Delete Layer | Unified delete for any supported entity by ID |
+| Document Processing | Upload documents, retrieve content, update/confirm/copy annotations |
+| Queue Management | Create, configure queues (including from templates) |
+| Schema Management | Define, modify, patch, and prune field structures |
+| Engine Management | Configure extraction and splitting engines |
+| Extensions (Hooks) | Webhooks, serverless functions, template-based creation, testing |
+| Rules & Actions | Business rules with TxScript triggers and actions |
+| Workspace Management | Create workspaces |
+| Organization & Users | Feature flags, user creation and updates |
+| Email Templates | Automated email responses |
+| MCP Mode | Get/set read-only or read-write mode at runtime |
 
-See [rossum-mcp/README.md](rossum-mcp/README.md) for the tool list and [rossum-mcp/TOOLS.md](rossum-mcp/TOOLS.md) for detailed API documentation.
+See [rossum-mcp/README.md](rossum-mcp/README.md) for the full tool list and [rossum-mcp/TOOLS.md](rossum-mcp/TOOLS.md) for detailed API documentation.
 
 ## Documentation
 

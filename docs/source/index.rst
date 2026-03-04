@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **35 tools** organized into categories:
+A compact, fully-typed tool surface — Pydantic models, ``Literal`` unions, and consolidated APIs built for agents:
 
 **Unified Read Layer**
 
