@@ -65,9 +65,6 @@ all = [
 where = ["."]
 include = ["rossum_mcp*"]
 
-[tool.coverage.run]
-omit = ["rossum_mcp/server.py"]
-
 [tool.pytest.ini_options]
 markers = [
     "unit: marks tests as unit tests",
