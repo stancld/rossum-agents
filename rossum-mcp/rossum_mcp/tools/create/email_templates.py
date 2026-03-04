@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 async def _create_email_template(
     client: AsyncRossumAPIClient,
+    base_url: str,
     name: str,
     queue: int,
     subject: str,
@@ -32,7 +33,7 @@ async def _create_email_template(
 
     template_data: dict[str, Any] = {
         "name": name,
-        "queue": build_resource_url("queues", queue),
+        "queue": build_resource_url(base_url, "queues", queue),
         "subject": subject,
         "message": message,
         "type": type,

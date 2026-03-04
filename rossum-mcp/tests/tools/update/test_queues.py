@@ -2,19 +2,13 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastmcp.exceptions import ToolError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.queue import Queue
-from rossum_mcp.tools import base
 from rossum_mcp.tools.update.handler import register_update_tools
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 def create_mock_queue(**kwargs) -> Queue:
@@ -81,13 +75,9 @@ class TestUpdateQueue:
     """Tests for update_queue tool."""
 
     @pytest.mark.asyncio
-    async def test_update_queue_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_update_queue_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful queue update."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_queue = create_mock_queue(id=100, name="Updated Queue")
         mock_client._http_client.update.return_value = {"id": 100, "name": "Updated Queue"}
@@ -101,12 +91,8 @@ class TestUpdateQueue:
         mock_client._http_client.update.assert_called_once_with(Resource.Queue, 100, {"name": "Updated Queue"})
 
     @pytest.mark.asyncio
-    async def test_update_queue_rejects_invalid_meta_name(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+    async def test_update_queue_rejects_invalid_meta_name(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         update_queue = mock_mcp._tools["update_queue"]
         with pytest.raises(ToolError, match="Invalid meta_name") as exc_info:
@@ -127,12 +113,8 @@ class TestUpdateQueue:
         mock_client._http_client.update.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_update_queue_allows_valid_meta_names(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+    async def test_update_queue_allows_valid_meta_names(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_queue = create_mock_queue(id=100, name="Test Queue")
         mock_client._http_client.update.return_value = {"id": 100}

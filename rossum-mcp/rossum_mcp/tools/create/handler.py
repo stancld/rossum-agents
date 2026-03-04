@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
 
 
-def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  # noqa: C901 - many tool registrations
+def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: str) -> None:  # noqa: C901 - many tool registrations
     # --- Annotations ---
     @mcp.tool(
         description="Upload a document; use search(entity='annotation', queue_id=...) to find the created annotation.",
@@ -53,7 +53,7 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         target_status: str | None = None,
         reimport: bool = False,
     ) -> dict:
-        return await _copy_annotations(client, annotation_ids, target_queue_id, target_status, reimport)
+        return await _copy_annotations(client, base_url, annotation_ids, target_queue_id, target_status, reimport)
 
     # --- Queues ---
     @mcp.tool(
@@ -76,6 +76,7 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
     ) -> Queue | dict:
         return await _create_queue(
             client,
+            base_url,
             name,
             workspace_id,
             schema_id,
@@ -102,7 +103,7 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         engine_id: int | None = None,
     ) -> Queue | dict:
         return await _create_queue_from_template(
-            client, name, template_name, workspace_id, include_documents, engine_id
+            client, base_url, name, template_name, workspace_id, include_documents, engine_id
         )
 
     # --- Schemas ---
@@ -121,7 +122,7 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         annotations={"readOnlyHint": False},
     )
     async def create_engine(name: str, organization_id: int, engine_type: EngineType) -> Engine | dict:
-        return await _create_engine(client, name, organization_id, engine_type)
+        return await _create_engine(client, base_url, name, organization_id, engine_type)
 
     @mcp.tool(
         description="Create an engine field corresponding to a schema field (used during engine+schema setup).",
@@ -140,7 +141,17 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         pre_trained_field_id: str | None = None,
     ) -> EngineField | dict:
         return await _create_engine_field(
-            client, engine_id, name, label, field_type, schema_ids, tabular, multiline, subtype, pre_trained_field_id
+            client,
+            base_url,
+            engine_id,
+            name,
+            label,
+            field_type,
+            schema_ids,
+            tabular,
+            multiline,
+            subtype,
+            pre_trained_field_id,
         )
 
     # --- Hooks ---
@@ -188,7 +199,7 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         schema_id: int | None = None,
         queue_ids: list[int] | None = None,
     ) -> Rule | dict:
-        return await _create_rule(client, name, trigger_condition, actions, enabled, schema_id, queue_ids)
+        return await _create_rule(client, base_url, name, trigger_condition, actions, enabled, schema_id, queue_ids)
 
     # --- Users ---
     @mcp.tool(
@@ -219,7 +230,7 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         annotations={"readOnlyHint": False},
     )
     async def create_workspace(name: str, organization_id: int, metadata: dict | None = None) -> Workspace | dict:
-        return await _create_workspace(client, name, organization_id, metadata)
+        return await _create_workspace(client, base_url, name, organization_id, metadata)
 
     # --- Email Templates ---
     @mcp.tool(
@@ -240,5 +251,5 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  
         triggers: list[str] | None = None,
     ) -> EmailTemplate | dict:
         return await _create_email_template(
-            client, name, queue, subject, message, type, automate, to, cc, bcc, triggers
+            client, base_url, name, queue, subject, message, type, automate, to, cc, bcc, triggers
         )

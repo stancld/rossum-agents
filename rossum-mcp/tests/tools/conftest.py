@@ -2,30 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
-
-
-@pytest.fixture
-def mock_env_read_write(monkeypatch: MonkeyPatch) -> None:
-    """Set up environment variables for read-write mode testing."""
-    monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-    monkeypatch.setenv("ROSSUM_API_TOKEN", "test-token-123")
-    monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-    monkeypatch.setenv("API_TOKEN_OWNER", "https://api.test.rossum.ai/v1/users/1")
-
-
-@pytest.fixture
-def mock_env_read_only(monkeypatch: MonkeyPatch) -> None:
-    """Set up environment variables for read-only mode testing."""
-    monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-    monkeypatch.setenv("ROSSUM_API_TOKEN", "test-token-123")
-    monkeypatch.setenv("ROSSUM_MCP_MODE", "read-only")
 
 
 @pytest.fixture

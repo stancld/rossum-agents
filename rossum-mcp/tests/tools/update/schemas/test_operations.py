@@ -2,21 +2,15 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from conftest import create_mock_schema
 from fastmcp.exceptions import ToolError
 from rossum_api import APIClientError
-from rossum_mcp.tools import base
 from rossum_mcp.tools.search.models import SchemaListItem
 from rossum_mcp.tools.search.registry import _list_schemas
 from rossum_mcp.tools.update.handler import register_update_tools
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 @pytest.mark.unit
@@ -213,14 +207,9 @@ class TestUpdateSchema:
     """Tests for update_schema tool."""
 
     @pytest.mark.asyncio
-    async def test_update_schema_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_update_schema_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful schema update."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         updated_schema = create_mock_schema(id=50, name="Updated Schema")
         mock_client._http_client.update.return_value = {"id": 50}
@@ -233,13 +222,8 @@ class TestUpdateSchema:
         assert result.name == "Updated Schema"
 
     @pytest.mark.asyncio
-    async def test_update_schema_allows_empty_content(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+    async def test_update_schema_allows_empty_content(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         updated_schema = create_mock_schema(id=50, name="Empty Schema", content=[])
         mock_client._http_client.update.return_value = {"id": 50}
@@ -257,14 +241,9 @@ class TestPatchSchema:
     """Tests for patch_schema tool."""
 
     @pytest.mark.asyncio
-    async def test_patch_schema_add_datapoint(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_schema_add_datapoint(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test adding a datapoint to a section."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_content = [
             {
@@ -301,14 +280,9 @@ class TestPatchSchema:
         assert header_section["children"][1]["id"] == "vendor_name"
 
     @pytest.mark.asyncio
-    async def test_patch_schema_update_datapoint(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_schema_update_datapoint(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test updating properties of an existing datapoint."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_content = [
             {
@@ -349,14 +323,9 @@ class TestPatchSchema:
         assert datapoint["score_threshold"] == 0.9
 
     @pytest.mark.asyncio
-    async def test_patch_schema_remove_datapoint(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_schema_remove_datapoint(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test removing a datapoint from a section."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_content = [
             {
@@ -392,14 +361,9 @@ class TestPatchSchema:
         assert header_section["children"][0]["id"] == "invoice_number"
 
     @pytest.mark.asyncio
-    async def test_patch_schema_retries_on_412(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_schema_retries_on_412(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test that patch_schema retries on 412 Precondition Failed."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_content = [
             {
@@ -434,14 +398,9 @@ class TestPatchSchema:
         assert mock_client._http_client.request_json.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_patch_schema_raises_after_max_retries_on_412(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_schema_raises_after_max_retries_on_412(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test that patch_schema raises after exhausting retries on 412."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_content = [
             {
@@ -469,14 +428,9 @@ class TestPatchSchema:
             )
 
     @pytest.mark.asyncio
-    async def test_patch_schema_invalid_operation(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_schema_invalid_operation(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test that invalid operation returns error."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         patch_schema = mock_mcp._tools["patch_schema"]
         with pytest.raises(ToolError, match="Invalid operation 'invalid'"):
@@ -487,14 +441,9 @@ class TestPatchSchema:
             )
 
     @pytest.mark.asyncio
-    async def test_patch_schema_unexpected_content_format(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_schema_unexpected_content_format(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test patch_schema when schema content is not a list."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_client._http_client.request_json.return_value = {"content": "not_a_list"}
 
@@ -511,14 +460,9 @@ class TestPatchSchema:
         mock_client._http_client.update.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_patch_schema_node_not_found(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_schema_node_not_found(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test that updating a non-existent node returns error."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_content = [
             {

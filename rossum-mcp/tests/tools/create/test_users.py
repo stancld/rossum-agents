@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from rossum_api.models.user import User
-from rossum_mcp.tools.base import set_mcp_mode
 from rossum_mcp.tools.create.handler import register_create_tools
 
 
@@ -71,8 +70,7 @@ class TestCreateUser:
     @pytest.mark.asyncio
     async def test_create_user_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful user creation."""
-        set_mcp_mode("read-write")
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_user = create_mock_user(
             id=100,
@@ -98,8 +96,7 @@ class TestCreateUser:
     @pytest.mark.asyncio
     async def test_create_user_with_optional_fields(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test user creation with optional fields."""
-        set_mcp_mode("read-write")
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_user = create_mock_user(
             id=101,

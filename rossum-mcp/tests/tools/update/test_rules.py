@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastmcp.exceptions import ToolError
 from rossum_api.models.rule import Rule
-from rossum_mcp.tools import base
 from rossum_mcp.tools.update.handler import register_update_tools
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 def create_mock_rule(**kwargs) -> Rule:
@@ -70,12 +64,9 @@ class TestUpdateRule:
     """Tests for update_rule tool."""
 
     @pytest.mark.asyncio
-    async def test_update_rule_success(self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
+    async def test_update_rule_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful rule update (PUT)."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_rule = create_mock_rule(
             id=123,
@@ -118,14 +109,9 @@ class TestUpdateRule:
         mock_client._http_client.update.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_update_rule_with_empty_queue_ids(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_update_rule_with_empty_queue_ids(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test that update_rule with empty queue_ids sends an empty queues list."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_rule = create_mock_rule(
             id=123,
@@ -151,14 +137,9 @@ class TestUpdateRule:
         assert payload["queues"] == []
 
     @pytest.mark.asyncio
-    async def test_update_rule_overrides_queues_when_provided(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_update_rule_overrides_queues_when_provided(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test that update_rule uses provided queue_ids."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_rule = create_mock_rule(
             id=123,
@@ -192,11 +173,9 @@ class TestPatchRule:
     """Tests for patch_rule tool."""
 
     @pytest.mark.asyncio
-    async def test_patch_rule_success(self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
+    async def test_patch_rule_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful rule patch (PATCH)."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         updated_rule = create_mock_rule(id=123, name="Patched Name", enabled=True)
         mock_client.update_part_rule.return_value = updated_rule
@@ -209,13 +188,9 @@ class TestPatchRule:
         mock_client.update_part_rule.assert_called_once_with(123, {"name": "Patched Name"})
 
     @pytest.mark.asyncio
-    async def test_patch_rule_multiple_fields(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_rule_multiple_fields(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test patching multiple fields at once."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         updated_rule = create_mock_rule(id=123, enabled=False, trigger_condition="field.x > 0")
         mock_client.update_part_rule.return_value = updated_rule
@@ -229,13 +204,9 @@ class TestPatchRule:
         )
 
     @pytest.mark.asyncio
-    async def test_patch_rule_no_fields(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_rule_no_fields(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test patch_rule with no fields returns error."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         patch_rule = mock_mcp._tools["patch_rule"]
         with pytest.raises(ToolError, match="No fields provided to update"):
@@ -244,14 +215,9 @@ class TestPatchRule:
         mock_client.update_part_rule.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_patch_rule_with_queue_ids(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_rule_with_queue_ids(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test patching rule with queue_ids."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         updated_rule = create_mock_rule(id=123)
         mock_client.update_part_rule.return_value = updated_rule
@@ -270,14 +236,9 @@ class TestPatchRule:
         )
 
     @pytest.mark.asyncio
-    async def test_patch_rule_clear_queues(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_patch_rule_clear_queues(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test clearing rule queues with empty list."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.test.rossum.ai/v1")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         updated_rule = create_mock_rule(id=123)
         mock_client.update_part_rule.return_value = updated_rule

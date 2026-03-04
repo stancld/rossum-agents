@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 async def _create_rule(
     client: AsyncRossumAPIClient,
+    base_url: str,
     name: str,
     trigger_condition: str,
     actions: list[RuleAction],
@@ -37,10 +38,10 @@ async def _create_rule(
     }
 
     if schema_id is not None:
-        rule_data["schema"] = build_resource_url("schemas", schema_id)
+        rule_data["schema"] = build_resource_url(base_url, "schemas", schema_id)
 
     if queue_ids is not None:
-        rule_data["queues"] = [build_resource_url("queues", qid) for qid in queue_ids]
+        rule_data["queues"] = [build_resource_url(base_url, "queues", qid) for qid in queue_ids]
 
     rule: Rule = await client.create_new_rule(rule_data)
     logger.info(f"Rule {rule.id} '{rule.name}' created")

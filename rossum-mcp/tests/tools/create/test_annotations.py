@@ -2,19 +2,15 @@
 
 from __future__ import annotations
 
-import importlib
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastmcp.exceptions import ToolError
-from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 @pytest.fixture
@@ -54,12 +50,9 @@ class TestUploadDocument:
         mock_mcp: Mock,
         mock_client: AsyncMock,
         tmp_path: Path,
-        monkeypatch: MonkeyPatch,
     ) -> None:
         """Test successful document upload."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         test_file = tmp_path / "test.pdf"
         test_file.write_text("test content")
@@ -78,13 +71,9 @@ class TestUploadDocument:
         assert "search" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_upload_document_file_not_found(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_upload_document_file_not_found(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test upload fails when file doesn't exist."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         upload_document = mock_mcp._tools["upload_document"]
 
@@ -94,13 +83,9 @@ class TestUploadDocument:
         assert "File not found" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_upload_document_key_error(
-        self, mock_mcp: Mock, mock_client: AsyncMock, tmp_path: Path, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_upload_document_key_error(self, mock_mcp: Mock, mock_client: AsyncMock, tmp_path: Path) -> None:
         """Test upload fails when API response is missing expected key."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         test_file = tmp_path / "test.pdf"
         test_file.write_text("test content")
@@ -115,13 +100,9 @@ class TestUploadDocument:
         assert "queue_id (100)" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_upload_document_index_error(
-        self, mock_mcp: Mock, mock_client: AsyncMock, tmp_path: Path, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_upload_document_index_error(self, mock_mcp: Mock, mock_client: AsyncMock, tmp_path: Path) -> None:
         """Test upload fails when API returns empty list."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         test_file = tmp_path / "test.pdf"
         test_file.write_text("test content")
@@ -137,12 +118,10 @@ class TestUploadDocument:
 
     @pytest.mark.asyncio
     async def test_upload_document_generic_exception(
-        self, mock_mcp: Mock, mock_client: AsyncMock, tmp_path: Path, monkeypatch: MonkeyPatch
+        self, mock_mcp: Mock, mock_client: AsyncMock, tmp_path: Path
     ) -> None:
         """Test upload fails with generic exception."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         test_file = tmp_path / "test.pdf"
         test_file.write_text("test content")
@@ -160,14 +139,9 @@ class TestCopyAnnotations:
     """Tests for copy_annotations (bulk) tool."""
 
     @pytest.mark.asyncio
-    async def test_copy_annotations_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_copy_annotations_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful bulk copy of annotations."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://example.rossum.app/api/v1")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_client._http_client.request_json.side_effect = [
             {"id": 99991, "status": "to_review"},
@@ -184,14 +158,9 @@ class TestCopyAnnotations:
         assert result["results"][1]["annotation_id"] == 222
 
     @pytest.mark.asyncio
-    async def test_copy_annotations_partial_failure(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_copy_annotations_partial_failure(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test bulk copy where some annotations fail."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://example.rossum.app/api/v1")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_client._http_client.request_json.side_effect = [
             {"id": 99991, "status": "to_review"},
@@ -206,14 +175,9 @@ class TestCopyAnnotations:
         assert result["errors"][0]["annotation_id"] == 222
 
     @pytest.mark.asyncio
-    async def test_copy_annotations_with_reimport(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_copy_annotations_with_reimport(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test bulk copy with reimport=True passes query param."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://example.rossum.app/api/v1")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_client._http_client.request_json.return_value = {"id": 99991, "status": "importing"}
 
@@ -224,14 +188,9 @@ class TestCopyAnnotations:
         assert call_kwargs["params"] == {"reimport": "true"}
 
     @pytest.mark.asyncio
-    async def test_copy_annotations_with_target_status(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_copy_annotations_with_target_status(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test bulk copy with target_status."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://example.rossum.app/api/v1")
-        importlib.reload(base)
-        register_create_tools(mock_mcp, mock_client)
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_client._http_client.request_json.return_value = {"id": 99991, "status": "confirmed"}
 

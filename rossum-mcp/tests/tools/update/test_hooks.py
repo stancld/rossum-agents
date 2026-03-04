@@ -2,21 +2,15 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_hook
 from fastmcp.exceptions import ToolError
-from rossum_mcp.tools import base
 from rossum_mcp.tools.update.handler import register_update_tools
 from rossum_mcp.tools.update.hooks import (
     _generate_hook_payload,
 )
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 @pytest.fixture
@@ -51,13 +45,9 @@ class TestUpdateHook:
     """Tests for update_hook tool."""
 
     @pytest.mark.asyncio
-    async def test_update_hook_success(self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
+    async def test_update_hook_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful hook update."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_hook = create_mock_hook(
             id=100,
@@ -80,15 +70,9 @@ class TestUpdateHook:
         mock_client.update_part_hook.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_update_hook_with_all_fields(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_update_hook_with_all_fields(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test hook update with all optional fields."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-
-        importlib.reload(base)
-
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         existing_hook = create_mock_hook(id=100, name="Old Name", config=None)
         mock_client.retrieve_hook.return_value = existing_hook
@@ -122,11 +106,9 @@ class TestTestHook:
     """Tests for test_hook tool."""
 
     @pytest.mark.asyncio
-    async def test_test_hook_success(self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch) -> None:
+    async def test_test_hook_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test successful hook test execution with auto-resolved annotation."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         mock_hook = create_mock_hook(id=123, queues=["https://api.test.rossum.ai/v1/queues/100"])
         mock_client.retrieve_hook.return_value = mock_hook
@@ -166,13 +148,9 @@ class TestTestHook:
         )
 
     @pytest.mark.asyncio
-    async def test_test_hook_with_config(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_test_hook_with_config(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
         """Test hook test with optional config override."""
-        monkeypatch.setenv("ROSSUM_MCP_MODE", "read-write")
-        importlib.reload(base)
-        register_update_tools(mock_mcp, mock_client)
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
 
         generated_payload = {"payload": {"annotation": {"id": 456}}}
         test_response = {"response": {"status_code": 200}}

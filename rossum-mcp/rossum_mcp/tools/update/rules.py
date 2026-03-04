@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 async def _update_rule(
     client: AsyncRossumAPIClient,
+    base_url: str,
     rule_id: int,
     name: str,
     trigger_condition: str,
@@ -34,7 +35,7 @@ async def _update_rule(
         "trigger_condition": trigger_condition,
         "actions": actions_to_dicts(actions),
         "enabled": enabled,
-        "queues": [build_resource_url("queues", qid) for qid in queue_ids],
+        "queues": [build_resource_url(base_url, "queues", qid) for qid in queue_ids],
     }
 
     if existing_rule.schema is not None:
@@ -48,6 +49,7 @@ async def _update_rule(
 
 async def _patch_rule(
     client: AsyncRossumAPIClient,
+    base_url: str,
     rule_id: int,
     name: str | None = None,
     trigger_condition: str | None = None,
@@ -68,7 +70,7 @@ async def _patch_rule(
     if enabled is not None:
         patch_data["enabled"] = enabled
     if queue_ids is not None:
-        patch_data["queues"] = [build_resource_url("queues", qid) for qid in queue_ids]
+        patch_data["queues"] = [build_resource_url(base_url, "queues", qid) for qid in queue_ids]
 
     if not patch_data:
         raise ToolError("No fields provided to update")
