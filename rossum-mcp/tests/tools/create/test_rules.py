@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastmcp.exceptions import ToolError
 from rossum_api.models.rule import Rule, RuleAction, ShowMessagePayload
 from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
@@ -149,13 +150,13 @@ class TestCreateRule:
         register_create_tools(mock_mcp, mock_client)
 
         create_rule = mock_mcp._tools["create_rule"]
-        result = await create_rule(
-            name="Unscoped Rule",
-            trigger_condition="True",
-            actions=[],
-        )
+        with pytest.raises(ToolError, match="Provide at least one of schema_id or queue_ids"):
+            await create_rule(
+                name="Unscoped Rule",
+                trigger_condition="True",
+                actions=[],
+            )
 
-        assert result["error"] == "Provide at least one of schema_id or queue_ids to scope the rule."
         mock_client.create_new_rule.assert_not_called()
 
     @pytest.mark.asyncio

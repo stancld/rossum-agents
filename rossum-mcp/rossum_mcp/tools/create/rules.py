@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from fastmcp.exceptions import ToolError
 from rossum_api.models.rule import Rule, RuleAction
 
 from rossum_mcp.tools.base import build_resource_url
@@ -22,9 +23,9 @@ async def _create_rule(
     enabled: bool = True,
     schema_id: int | None = None,
     queue_ids: list[int] | None = None,
-) -> Rule | dict:
+) -> Rule:
     if schema_id is None and not queue_ids:
-        return {"error": "Provide at least one of schema_id or queue_ids to scope the rule."}
+        raise ToolError("Provide at least one of schema_id or queue_ids to scope the rule.")
 
     logger.debug(f"Creating rule: name={name}, schema_id={schema_id}, enabled={enabled}")
 

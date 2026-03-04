@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from fastmcp.exceptions import ToolError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.rule import Rule, RuleAction
 
@@ -23,7 +24,7 @@ async def _update_rule(
     actions: list[RuleAction],
     enabled: bool,
     queue_ids: list[int],
-) -> Rule | dict:
+) -> Rule:
     """Full update (PUT) - all fields required."""
     logger.debug(f"Updating rule: rule_id={rule_id}, name={name}")
     existing_rule: Rule = await client.retrieve_rule(rule_id)
@@ -53,7 +54,7 @@ async def _patch_rule(
     actions: list[RuleAction] | None = None,
     enabled: bool | None = None,
     queue_ids: list[int] | None = None,
-) -> Rule | dict:
+) -> Rule:
     """Partial update (PATCH) - only provided fields are updated."""
     logger.debug(f"Patching rule: rule_id={rule_id}")
 
@@ -70,7 +71,7 @@ async def _patch_rule(
         patch_data["queues"] = [build_resource_url("queues", qid) for qid in queue_ids]
 
     if not patch_data:
-        return {"error": "No fields provided to update"}
+        raise ToolError("No fields provided to update")
 
     updated_rule: Rule = await client.update_part_rule(rule_id, patch_data)
     logger.info(f"Rule {updated_rule.id} patched")

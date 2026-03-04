@@ -8,6 +8,7 @@ import random
 from dataclasses import asdict
 from typing import TYPE_CHECKING
 
+from fastmcp.exceptions import ToolError
 from rossum_api import APIClientError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.schema import Schema
@@ -72,7 +73,7 @@ async def _update_schema_with_retry(
     raise RuntimeError("Unreachable")
 
 
-async def _update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_data: dict) -> Schema | dict:
+async def _update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_data: dict) -> Schema:
     logger.debug(f"Updating schema: schema_id={schema_id}")
     if "content" in schema_data and isinstance(schema_data["content"], list):
         schema_data = {**schema_data, "content": sanitize_schema_content(schema_data["content"])}
@@ -91,7 +92,7 @@ async def _patch_schema(
     position: int | None = None,
 ) -> dict:
     if operation not in ("add", "update", "remove"):
-        return {"error": f"Invalid operation '{operation}'. Must be 'add', 'update', or 'remove'."}
+        raise ToolError(f"Invalid operation '{operation}'. Must be 'add', 'update', or 'remove'.")
 
     logger.debug(f"Patching schema: schema_id={schema_id}, operation={operation}, node_id={node_id}")
 
@@ -117,7 +118,7 @@ async def _patch_schema(
     try:
         _, result_content = await _update_schema_with_retry(client, schema_id, prepare)
     except ValueError as e:
-        return {"error": str(e)}
+        raise ToolError(str(e)) from e
 
     # Return concise confirmation with the affected node instead of the full schema
     assert result_content is not None
@@ -138,9 +139,9 @@ async def _prune_schema_fields(
     fields_to_remove: list[str] | None = None,
 ) -> dict:
     if fields_to_keep is not None and fields_to_remove is not None:
-        return {"error": "Specify fields_to_keep OR fields_to_remove, not both"}
+        raise ToolError("Specify fields_to_keep OR fields_to_remove, not both")
     if fields_to_keep is None and fields_to_remove is None:
-        return {"error": "Must specify fields_to_keep or fields_to_remove"}
+        raise ToolError("Must specify fields_to_keep or fields_to_remove")
 
     def prepare(content: list) -> list | None:
         all_ids = _collect_all_field_ids(content)
@@ -177,7 +178,7 @@ async def _prune_schema_fields(
     try:
         original_content, result_content = await _update_schema_with_retry(client, schema_id, prepare)
     except ValueError as e:
-        return {"error": str(e)}
+        raise ToolError(str(e)) from e
 
     if result_content is None:
         all_ids = _collect_all_field_ids(original_content)

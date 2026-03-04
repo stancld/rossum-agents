@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from conftest import create_mock_schema
+from fastmcp.exceptions import ToolError
 from rossum_api import APIClientError
 from rossum_mcp.tools import base
 from rossum_mcp.tools.search.models import SchemaListItem
@@ -478,13 +479,12 @@ class TestPatchSchema:
         register_update_tools(mock_mcp, mock_client)
 
         patch_schema = mock_mcp._tools["patch_schema"]
-        result = await patch_schema(
-            schema_id=50,
-            operation="invalid",
-            node_id="some_field",
-        )
-
-        assert result["error"] == "Invalid operation 'invalid'. Must be 'add', 'update', or 'remove'."
+        with pytest.raises(ToolError, match="Invalid operation 'invalid'"):
+            await patch_schema(
+                schema_id=50,
+                operation="invalid",
+                node_id="some_field",
+            )
 
     @pytest.mark.asyncio
     async def test_patch_schema_unexpected_content_format(
@@ -499,15 +499,15 @@ class TestPatchSchema:
         mock_client._http_client.request_json.return_value = {"content": "not_a_list"}
 
         patch_schema = mock_mcp._tools["patch_schema"]
-        result = await patch_schema(
-            schema_id=50,
-            operation="add",
-            node_id="new_field",
-            parent_id="section1",
-            node_data={"label": "New Field"},
-        )
+        with pytest.raises(ToolError, match="Unexpected schema content format"):
+            await patch_schema(
+                schema_id=50,
+                operation="add",
+                node_id="new_field",
+                parent_id="section1",
+                node_data={"label": "New Field"},
+            )
 
-        assert result["error"] == "Unexpected schema content format"
         mock_client._http_client.update.assert_not_called()
 
     @pytest.mark.asyncio
@@ -534,11 +534,10 @@ class TestPatchSchema:
         mock_client._http_client.request_json.return_value = {"content": existing_content}
 
         patch_schema = mock_mcp._tools["patch_schema"]
-        result = await patch_schema(
-            schema_id=50,
-            operation="update",
-            node_id="nonexistent_field",
-            node_data={"label": "Updated Label"},
-        )
-
-        assert "not found" in result["error"]
+        with pytest.raises(ToolError, match="not found"):
+            await patch_schema(
+                schema_id=50,
+                operation="update",
+                node_id="nonexistent_field",
+                node_data={"label": "Updated Label"},
+            )

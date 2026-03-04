@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastmcp.exceptions import ToolError
 from rossum_api.models.rule import Rule
 from rossum_mcp.tools import base
 from rossum_mcp.tools.update.handler import register_update_tools
@@ -237,9 +238,9 @@ class TestPatchRule:
         register_update_tools(mock_mcp, mock_client)
 
         patch_rule = mock_mcp._tools["patch_rule"]
-        result = await patch_rule(rule_id=123)
+        with pytest.raises(ToolError, match="No fields provided to update"):
+            await patch_rule(rule_id=123)
 
-        assert result["error"] == "No fields provided to update"
         mock_client.update_part_rule.assert_not_called()
 
     @pytest.mark.asyncio

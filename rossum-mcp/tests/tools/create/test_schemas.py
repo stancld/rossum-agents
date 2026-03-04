@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_schema
+from fastmcp.exceptions import ToolError
 from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
 
@@ -85,8 +86,7 @@ class TestCreateSchema:
         register_create_tools(mock_mcp, mock_client)
 
         create_schema = mock_mcp._tools["create_schema"]
-        result = await create_schema(name="New Schema", content=[])
+        with pytest.raises(ToolError, match="empty content"):
+            await create_schema(name="New Schema", content=[])
 
-        assert isinstance(result, dict)
-        assert "empty content" in result["error"]
         mock_client.create_new_schema.assert_not_called()

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastmcp.exceptions import ToolError
 from rossum_api import APIClientError
 from rossum_mcp.tools.delete.handler import register_delete_tools
 from rossum_mcp.tools.delete.registry import build_delete_registry
@@ -146,9 +147,8 @@ class TestDeleteErrors:
     @pytest.mark.asyncio
     async def test_unknown_entity_returns_error(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
         register_delete_tools(mock_mcp, mock_client)
-        result = await mock_mcp._tools["delete"](entity="nonexistent", entity_id=1)
-        assert "error" in result
-        assert "Unknown entity" in result["error"]
+        with pytest.raises(ToolError, match="Unknown entity"):
+            await mock_mcp._tools["delete"](entity="nonexistent", entity_id=1)
 
     @pytest.mark.asyncio
     async def test_not_found_propagates_exception(

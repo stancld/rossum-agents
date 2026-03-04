@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_hook
+from fastmcp.exceptions import ToolError
 from rossum_mcp.tools import base
 from rossum_mcp.tools.update.handler import register_update_tools
 from rossum_mcp.tools.update.hooks import (
@@ -275,11 +276,8 @@ class TestGenerateHookPayload:
 
         mock_client.list_annotations = mock_list_empty
 
-        result = await _generate_hook_payload(
-            mock_client, hook_id=123, event="annotation_content", action="initialize"
-        )
-
-        assert "error" in result
+        with pytest.raises(ToolError, match="requires an annotation"):
+            await _generate_hook_payload(mock_client, hook_id=123, event="annotation_content", action="initialize")
 
     @pytest.mark.asyncio
     async def test_generate_payload_non_annotation_event(self, mock_client: AsyncMock) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from fastmcp.exceptions import ToolError
 from rossum_api.models.hook import Hook, HookAction, HookEvent, HookEventAndAction
 
 from rossum_mcp.tools.base import extract_id_from_url
@@ -23,7 +24,7 @@ async def _update_hook(
     config: dict | None = None,
     settings: dict | None = None,
     active: bool | None = None,
-) -> Hook | dict:
+) -> Hook:
     logger.debug(f"Updating hook: hook_id={hook_id}")
 
     existing_hook: Hook = await client.retrieve_hook(hook_id)
@@ -62,8 +63,6 @@ async def _test_hook(
     config: dict | None = None,
 ) -> dict:
     payload = await _generate_hook_payload(client, hook_id, event, action, annotation, status, previous_status)
-    if "error" in payload:
-        return payload
     body: dict = {"payload": payload}
     if config is not None:
         body["config"] = config
@@ -98,13 +97,11 @@ async def _generate_hook_payload(
         if annotation is None:
             annotation = await _resolve_annotation_for_hook(client, hook_id)
             if annotation is None:
-                return {
-                    "error": (
-                        f"Event '{event}' requires an annotation but no annotations found on the hook's queues. "
-                        "Either upload a document to one of the hook's queues first, "
-                        "or pass an annotation URL from another queue explicitly via the 'annotation' parameter."
-                    )
-                }
+                raise ToolError(
+                    f"Event '{event}' requires an annotation but no annotations found on the hook's queues. "
+                    "Either upload a document to one of the hook's queues first, "
+                    "or pass an annotation URL from another queue explicitly via the 'annotation' parameter."
+                )
         if status is None:
             status = _DEFAULT_STATUS
         if previous_status is None:

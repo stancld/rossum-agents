@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from fastmcp.exceptions import ToolError
 from rossum_api.models.hook import Hook, HookEventAndAction, HookType
 
 from rossum_mcp.tools.validation import validate_hook_events
@@ -22,7 +23,7 @@ async def _create_hook(
     config: dict | None = None,
     settings: dict | None = None,
     secret: str | None = None,
-) -> Hook | dict:
+) -> Hook:
     hook_data: dict[str, Any] = {"name": name, "type": type, "sideload": ["schemas"]}
 
     if queues is not None:
@@ -54,7 +55,7 @@ async def _create_hook_from_template(
     queues: list[str],
     events: list[HookEventAndAction] | None = None,
     token_owner: str | None = None,
-) -> Hook | dict:
+) -> Hook:
     logger.debug(f"Creating hook from template: name={name}, template_id={hook_template_id}")
 
     hook_template_url = f"{client._http_client.base_url.rstrip('/')}/hook_templates/{hook_template_id}"
@@ -70,4 +71,4 @@ async def _create_hook_from_template(
     if hook_id := result.get("id"):
         hook: Hook = await client.retrieve_hook(hook_id)
         return hook
-    return {"error": "Hook wasn't likely created. Hook ID not available."}
+    raise ToolError("Hook wasn't likely created. Hook ID not available.")

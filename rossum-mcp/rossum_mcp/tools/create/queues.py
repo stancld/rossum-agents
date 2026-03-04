@@ -4,6 +4,7 @@ import logging
 import os
 from typing import TYPE_CHECKING, cast
 
+from fastmcp.exceptions import ToolError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.queue import Queue
 
@@ -30,7 +31,7 @@ async def _create_queue(
     automation_level: str = "never",
     training_enabled: bool = True,
     splitting_screen_feature_flag: bool = False,
-) -> Queue | dict:
+) -> Queue:
     logger.debug(
         f"Creating queue: name={name}, workspace_id={workspace_id}, schema_id={schema_id}, engine_id={engine_id}"
     )
@@ -57,9 +58,10 @@ async def _create_queue(
                 os.environ["SPLITTING_SCREEN_FLAG_NAME"]: os.environ["SPLITTING_SCREEN_FLAG_VALUE"]
             }
         else:
-            return {
-                "error": "splitting_screen_feature_flag requested but SPLITTING_SCREEN_FLAG_NAME and/or SPLITTING_SCREEN_FLAG_VALUE environment variables are not set"
-            }
+            raise ToolError(
+                "splitting_screen_feature_flag requested but SPLITTING_SCREEN_FLAG_NAME "
+                "and/or SPLITTING_SCREEN_FLAG_VALUE environment variables are not set"
+            )
 
     queue: Queue = await client.create_new_queue(queue_data)
     return queue
@@ -80,12 +82,9 @@ async def _create_queue_from_template(
     workspace_id: int,
     include_documents: bool = False,
     engine_id: int | None = None,
-) -> Queue | dict:
+) -> Queue:
     if template_name not in QUEUE_TEMPLATE_NAMES:
-        return {
-            "error": f"Invalid template_name: '{template_name}'",
-            "available_templates": QUEUE_TEMPLATE_NAMES,
-        }
+        raise ToolError(f"Invalid template_name: '{template_name}'. Available templates: {QUEUE_TEMPLATE_NAMES}")
 
     logger.debug(
         f"Creating queue from template: name={name}, template_name={template_name}, workspace_id={workspace_id}"

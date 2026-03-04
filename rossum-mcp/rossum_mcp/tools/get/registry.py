@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from fastmcp.exceptions import ToolError
 from rossum_api import APIClientError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.annotation import Annotation
@@ -47,12 +48,12 @@ async def _get_queue(client: AsyncRossumAPIClient, queue_id: int) -> Queue:
     return await client.retrieve_queue(queue_id)
 
 
-async def _get_schema(client: AsyncRossumAPIClient, schema_id: int) -> Schema | dict:
+async def _get_schema(client: AsyncRossumAPIClient, schema_id: int) -> Schema:
     try:
         return await client.retrieve_schema(schema_id)
     except APIClientError as e:
         if e.status_code == 404:
-            return {"error": f"Schema {schema_id} not found"}
+            raise ToolError(f"Schema {schema_id} not found") from e
         raise
 
 

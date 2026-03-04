@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, cast
 
+from fastmcp.exceptions import ToolError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.engine import Engine, EngineField, EngineFieldType
 
@@ -18,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 async def _create_engine(
     client: AsyncRossumAPIClient, name: str, organization_id: int, engine_type: EngineType
-) -> Engine | dict:
+) -> Engine:
     if engine_type not in ("extractor", "splitter"):
-        raise ValueError(f"Invalid engine_type '{engine_type}'. Must be 'extractor' or 'splitter'")
+        raise ToolError(f"Invalid engine_type '{engine_type}'. Must be 'extractor' or 'splitter'")
 
     logger.debug(f"Creating engine: name={name}, organization_id={organization_id}, type={engine_type}")
     engine_data = {
@@ -43,12 +44,12 @@ async def _create_engine_field(
     multiline: bool = False,
     subtype: str | None = None,
     pre_trained_field_id: str | None = None,
-) -> EngineField | dict:
+) -> EngineField:
     valid_types = ("string", "number", "date", "enum")
     if field_type not in valid_types:
-        raise ValueError(f"Invalid field_type '{field_type}'. Must be one of: {', '.join(valid_types)}")
+        raise ToolError(f"Invalid field_type '{field_type}'. Must be one of: {', '.join(valid_types)}")
     if not schema_ids:
-        raise ValueError("schema_ids cannot be empty - engine field must be linked to at least one schema")
+        raise ToolError("schema_ids cannot be empty - engine field must be linked to at least one schema")
 
     logger.debug(f"Creating engine field: engine_id={engine_id}, name={name}, type={field_type}, schemas={schema_ids}")
     engine_field_data = {

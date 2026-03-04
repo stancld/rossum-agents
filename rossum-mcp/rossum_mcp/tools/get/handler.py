@@ -5,6 +5,7 @@ import dataclasses
 import logging
 from typing import TYPE_CHECKING, Literal, get_args
 
+from fastmcp.exceptions import ToolError
 from rossum_api.models.engine import EngineField
 
 from rossum_mcp.tools.get.annotations import _get_annotation_content
@@ -102,9 +103,9 @@ def register_get_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  # n
     ) -> dict[str, object] | list[dict[str, object]]:
         config = registry.get(entity)
         if config is None:
-            return {"error": f"Unknown entity type: {entity}"}
+            raise ToolError(f"Unknown entity type: {entity}")
         if config.retrieve_fn is None:
-            return {"error": f"Entity '{entity}' does not support get by ID. Use search instead."}
+            raise ToolError(f"Entity '{entity}' does not support get by ID. Use search instead.")
 
         if isinstance(entity_id, list):
             return await _get_many(client, config, entity, entity_id, include_related)
@@ -120,9 +121,9 @@ def register_get_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  # n
         entity = query.entity
         config = registry.get(entity)
         if config is None:
-            return [{"error": f"Unknown entity type: {entity}"}]
+            raise ToolError(f"Unknown entity type: {entity}")
         if config.search_fn is None:
-            return [{"error": f"Entity '{entity}' does not support search/list."}]
+            raise ToolError(f"Entity '{entity}' does not support search/list.")
 
         kwargs = extract_search_kwargs(query)
         result = await config.search_fn(**kwargs)
@@ -141,9 +142,7 @@ def register_get_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  # n
         tags={"schemas"},
         annotations={"readOnlyHint": True},
     )
-    async def get_schema_tree_structure(
-        schema_id: int | None = None, queue_id: int | None = None
-    ) -> list[dict] | dict:
+    async def get_schema_tree_structure(schema_id: int | None = None, queue_id: int | None = None) -> list[dict]:
         return await _get_schema_tree_structure(client, schema_id=schema_id, queue_id=queue_id)
 
     @mcp.tool(

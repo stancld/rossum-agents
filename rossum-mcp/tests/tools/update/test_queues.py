@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastmcp.exceptions import ToolError
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.models.queue import Queue
 from rossum_mcp.tools import base
@@ -108,22 +109,21 @@ class TestUpdateQueue:
         register_update_tools(mock_mcp, mock_client)
 
         update_queue = mock_mcp._tools["update_queue"]
-        result = await update_queue(
-            queue_id=100,
-            queue_data={
-                "settings": {
-                    "annotation_list_table": {
-                        "columns": [
-                            {"column_type": "meta", "meta_name": "created_by", "visible": True},
-                        ]
+        with pytest.raises(ToolError, match="Invalid meta_name") as exc_info:
+            await update_queue(
+                queue_id=100,
+                queue_data={
+                    "settings": {
+                        "annotation_list_table": {
+                            "columns": [
+                                {"column_type": "meta", "meta_name": "created_by", "visible": True},
+                            ]
+                        }
                     }
-                }
-            },
-        )
+                },
+            )
 
-        assert "error" in result
-        assert "created_by" in result["error"]
-        assert "Invalid meta_name" in result["error"]
+        assert "created_by" in str(exc_info.value)
         mock_client._http_client.update.assert_not_called()
 
     @pytest.mark.asyncio

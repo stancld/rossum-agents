@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastmcp.exceptions import ToolError
 from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
 
@@ -108,10 +109,9 @@ class TestUploadDocument:
 
         upload_document = mock_mcp._tools["upload_document"]
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ToolError, match="API response missing expected key") as exc_info:
             await upload_document(file_path=str(test_file), queue_id=100)
 
-        assert "API response missing expected key" in str(exc_info.value)
         assert "queue_id (100)" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -130,10 +130,9 @@ class TestUploadDocument:
 
         upload_document = mock_mcp._tools["upload_document"]
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ToolError, match="no tasks were created") as exc_info:
             await upload_document(file_path=str(test_file), queue_id=100)
 
-        assert "no tasks were created" in str(exc_info.value)
         assert "queue_id (100)" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -152,10 +151,8 @@ class TestUploadDocument:
 
         upload_document = mock_mcp._tools["upload_document"]
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ToolError, match="Document upload failed: RuntimeError: Connection timeout"):
             await upload_document(file_path=str(test_file), queue_id=100)
-
-        assert "Document upload failed: RuntimeError: Connection timeout" in str(exc_info.value)
 
 
 @pytest.mark.unit

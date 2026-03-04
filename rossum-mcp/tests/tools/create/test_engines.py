@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_engine, create_mock_engine_field
+from fastmcp.exceptions import ToolError
 from rossum_mcp.tools import base
 from rossum_mcp.tools.create.handler import register_create_tools
 
@@ -77,10 +78,8 @@ class TestCreateEngine:
 
         create_engine = mock_mcp._tools["create_engine"]
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ToolError, match="Invalid engine_type"):
             await create_engine(name="New Engine", organization_id=1, engine_type="invalid")
-
-        assert "Invalid engine_type" in str(exc_info.value)
 
 
 @pytest.mark.unit
@@ -124,7 +123,7 @@ class TestCreateEngineField:
 
         create_engine_field = mock_mcp._tools["create_engine_field"]
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ToolError, match="schema_ids cannot be empty"):
             await create_engine_field(
                 engine_id=123,
                 name="field",
@@ -132,8 +131,6 @@ class TestCreateEngineField:
                 field_type="string",
                 schema_ids=[],
             )
-
-        assert "schema_ids cannot be empty" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_create_engine_field_invalid_type(
@@ -146,7 +143,7 @@ class TestCreateEngineField:
 
         create_engine_field = mock_mcp._tools["create_engine_field"]
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ToolError, match="Invalid field_type"):
             await create_engine_field(
                 engine_id=123,
                 name="field",
@@ -154,8 +151,6 @@ class TestCreateEngineField:
                 field_type="invalid",
                 schema_ids=[1],
             )
-
-        assert "Invalid field_type" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_create_engine_field_with_optional_params(

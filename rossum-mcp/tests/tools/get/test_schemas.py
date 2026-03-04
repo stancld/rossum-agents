@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from conftest import create_mock_schema
+from fastmcp.exceptions import ToolError
 from rossum_api import APIClientError
 from rossum_mcp.tools.get.handler import register_get_tools
 from rossum_mcp.tools.get.registry import _get_schema
@@ -75,12 +76,8 @@ class TestGetSchema:
             error=Exception("Not found"),
         )
 
-        result = await _get_schema(mock_client, 999)
-
-        assert isinstance(result, dict)
-        assert "error" in result
-        assert "999" in result["error"]
-        assert "not found" in result["error"]
+        with pytest.raises(ToolError, match="Schema 999 not found"):
+            await _get_schema(mock_client, 999)
 
 
 @pytest.mark.unit
@@ -148,7 +145,7 @@ class TestGetSchemaTreeStructure:
 
     @pytest.mark.asyncio
     async def test_get_schema_tree_structure_not_found(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test tree structure returns error dict when schema not found."""
+        """Test tree structure raises ToolError when schema not found."""
         register_get_tools(mock_mcp, mock_client)
 
         mock_client.retrieve_schema.side_effect = APIClientError(
@@ -159,12 +156,8 @@ class TestGetSchemaTreeStructure:
         )
 
         get_schema_tree_structure = mock_mcp._tools["get_schema_tree_structure"]
-        result = await get_schema_tree_structure(schema_id=999)
-
-        assert isinstance(result, dict)
-        assert "error" in result
-        assert "999" in result["error"]
-        assert "not found" in result["error"]
+        with pytest.raises(ToolError, match="Schema 999 not found"):
+            await get_schema_tree_structure(schema_id=999)
 
     @pytest.mark.asyncio
     async def test_get_schema_tree_structure_by_queue_id(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
@@ -198,22 +191,18 @@ class TestGetSchemaTreeStructure:
 
     @pytest.mark.asyncio
     async def test_get_schema_tree_structure_no_args(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test tree structure returns error when neither schema_id nor queue_id provided."""
+        """Test tree structure raises ToolError when neither schema_id nor queue_id provided."""
         register_get_tools(mock_mcp, mock_client)
 
         get_schema_tree_structure = mock_mcp._tools["get_schema_tree_structure"]
-        result = await get_schema_tree_structure()
-
-        assert isinstance(result, dict)
-        assert "error" in result
+        with pytest.raises(ToolError, match="Provide schema_id or queue_id"):
+            await get_schema_tree_structure()
 
     @pytest.mark.asyncio
     async def test_get_schema_tree_structure_both_args(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test tree structure returns error when both schema_id and queue_id provided."""
+        """Test tree structure raises ToolError when both schema_id and queue_id provided."""
         register_get_tools(mock_mcp, mock_client)
 
         get_schema_tree_structure = mock_mcp._tools["get_schema_tree_structure"]
-        result = await get_schema_tree_structure(schema_id=50, queue_id=100)
-
-        assert isinstance(result, dict)
-        assert "error" in result
+        with pytest.raises(ToolError, match="not both"):
+            await get_schema_tree_structure(schema_id=50, queue_id=100)
