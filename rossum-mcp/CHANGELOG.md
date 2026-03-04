@@ -14,7 +14,12 @@ All notable changes to this project will be documented in this file.
 - Removed `are_lookup_fields_enabled` and `are_reasoning_fields_enabled` tools — feature availability is inferred by the agent from organization group data via the `get` / `search` tools
 
 ### Changed
+<<<<<<< HEAD
 - Error handling in MCP tools now uses `raise ToolError(...)` instead of `return {"error": ...}` dicts — FastMCP surfaces these as proper MCP error responses, and return types are tightened by removing `| dict` unions [#236](https://github.com/stancld/rossum-agents/pull/236)
+=======
+- `create_queue` and `update_queue` parameters `locale` and `automation_level` are now `Literal` types instead of plain strings — LLMs see valid values directly in the JSON schema [#237](https://github.com/stancld/rossum-agents/pull/237)
+- `create_email_template` parameters `to`, `cc`, `bcc` are now typed `EmailRecipient` dicts instead of untyped `dict[str, Any]` [#237](https://github.com/stancld/rossum-agents/pull/237)
+>>>>>>> ce1c154 (rossum-mcp: Add Literal types for queue locale, automation level, and email recipients)
 - `update_queue` parameter `queue_data` is now a typed `QueueUpdateData` schema instead of an untyped dict — LLMs see valid field names and types directly in the JSON schema [#221](https://github.com/stancld/rossum-agents/pull/221)
 - `update_engine` parameter `engine_data` is now a typed `EngineUpdateData` schema instead of an untyped dict [#221](https://github.com/stancld/rossum-agents/pull/221)
 - `create_engine_field` parameter `multiline` changed from `str` to `bool` [#221](https://github.com/stancld/rossum-agents/pull/221)
