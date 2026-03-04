@@ -501,6 +501,40 @@ Invoked via the ``patch_schema_with_subagent`` tool. Handles bulk schema modific
      - For enum
      - Array of enum options
 
+Task Execution Sub-Agent
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Invoked via the ``execute_task`` tool. Delegates a single task from the TaskTracker to a fresh sub-agent with clean context and all currently loaded tools (internal + MCP).
+
+**Capabilities:**
+
+- Spawns a dedicated sub-agent scoped to one task
+- Passes currently loaded MCP and internal tools (excluding orchestration tools like ``create_task``, ``load_skill``)
+- Automatically manages task status (``in_progress`` → ``completed``)
+- Accepts optional context from prior tasks (IDs, URLs, summaries)
+
+**Usage:**
+
+.. code-block:: python
+
+   execute_task(
+       task_id="1",
+       context="Schema ID: 12345, Queue ID: 67890"
+   )
+
+Returns JSON with:
+
+- ``task_id``, ``subject`` — task identification
+- ``analysis`` — sub-agent's result summary
+- ``iterations_used``, ``input_tokens``, ``output_tokens`` — execution stats
+- ``elapsed_ms`` — wall-clock time
+
+**When to use:**
+
+- Multi-step operations where each task can run independently
+- Delegating work to keep the orchestrator's context clean
+- Tasks that need access to multiple tool categories
+
 Sub-Agent Architecture
 ^^^^^^^^^^^^^^^^^^^^^^
 

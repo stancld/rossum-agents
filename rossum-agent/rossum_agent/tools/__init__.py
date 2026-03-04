@@ -41,7 +41,12 @@ from rossum_agent.tools.file_tools import write_file
 from rossum_agent.tools.mock_pdf import generate_mock_pdf
 from rossum_agent.tools.skills import load_skill
 from rossum_agent.tools.spawn_mcp import call_on_connection, close_connection, spawn_mcp_connection
-from rossum_agent.tools.subagents import patch_schema_with_subagent, search_elis_docs, search_knowledge_base
+from rossum_agent.tools.subagents import (
+    execute_task,
+    patch_schema_with_subagent,
+    search_elis_docs,
+    search_knowledge_base,
+)
 from rossum_agent.tools.task_tracker import create_task, list_tasks, update_task
 
 if TYPE_CHECKING:
@@ -58,6 +63,7 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     create_task,
     update_task,
     list_tasks,
+    execute_task,
     run_jq,
     run_grep,
     generate_mock_pdf,

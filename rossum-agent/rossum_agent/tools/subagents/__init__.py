@@ -4,6 +4,7 @@ Opus-powered sub-agents for complex iterative tasks:
 - Knowledge base search with AI analysis
 - Elis documentation search with AI analysis
 - Schema patching with programmatic bulk updates
+- Task execution with dedicated sub-agents
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from rossum_agent.tools.subagents.knowledge_base import search_knowledge_base
 from rossum_agent.tools.subagents.mcp_helpers import call_mcp_tool
 from rossum_agent.tools.subagents.schema_creation import SchemaCreationSubAgent, create_schema_with_subagent
 from rossum_agent.tools.subagents.schema_patching import SchemaPatchingSubAgent, patch_schema_with_subagent
+from rossum_agent.tools.subagents.task_subagent import TaskSubAgent, TaskSubAgentConfig, execute_task
 
 __all__ = [
     "OPUS_MODEL_ID",
@@ -23,8 +25,11 @@ __all__ = [
     "SubAgent",
     "SubAgentConfig",
     "SubAgentResult",
+    "TaskSubAgent",
+    "TaskSubAgentConfig",
     "call_mcp_tool",
     "create_schema_with_subagent",
+    "execute_task",
     "patch_schema_with_subagent",
     "search_elis_docs",
     "search_knowledge_base",

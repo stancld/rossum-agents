@@ -134,10 +134,10 @@ _CREATE_SCHEMA_TOOL: dict[str, Any] = {
     },
 }
 
-_OPUS_TOOLS: list[dict[str, Any]] = [_CREATE_SCHEMA_TOOL]
+_SUBAGENT_TOOLS: list[dict[str, Any]] = [_CREATE_SCHEMA_TOOL]
 
 
-def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
+def _execute_subagent_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
     if tool_name == "create_schema":
         mcp_result = call_mcp_tool("create_schema", tool_input)
         return json.dumps(mcp_result, indent=2, default=str) if mcp_result else "No data returned"
@@ -152,7 +152,7 @@ class SchemaCreationSubAgent(SubAgent):
         config = SubAgentConfig(
             tool_name="create_schema",
             system_prompt=_SCHEMA_CREATION_SYSTEM_PROMPT,
-            tools=_OPUS_TOOLS,
+            tools=_SUBAGENT_TOOLS,
             max_iterations=3,
             max_tokens=8192,
         )
@@ -160,15 +160,15 @@ class SchemaCreationSubAgent(SubAgent):
 
     def execute_tool(self, tool_name: str, tool_input: dict[str, Any]) -> str:
         """Execute a tool call from the LLM."""
-        return _execute_opus_tool(tool_name, tool_input)
+        return _execute_subagent_tool(tool_name, tool_input)
 
     def process_response_block(self, block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
         """No special block processing needed for schema creation."""
         return None
 
 
-def _call_opus_for_creation(name: str, requirements: str) -> SubAgentResult:
-    """Call Opus model for schema creation.
+def _call_subagent_for_creation(name: str, requirements: str) -> SubAgentResult:
+    """Call sub-agent for schema creation.
 
     Returns:
         SubAgentResult with analysis text and token counts.
@@ -215,7 +215,7 @@ def create_schema_with_subagent(name: str, requirements: str) -> str:
         )
 
     logger.info(f"create_schema: Calling Opus for name={name}")
-    result = _call_opus_for_creation(name, requirements)
+    result = _call_subagent_for_creation(name, requirements)
     elapsed_ms = round((time.perf_counter() - start_time) * 1000, 3)
 
     logger.info(

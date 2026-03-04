@@ -176,6 +176,7 @@ The agent provides internal tools and access to 43 MCP tools via dynamic loading
 - `create_task` - Create a task to track progress on multi-step operations
 - `update_task` - Update a task's status (`pending`, `in_progress`, `completed`) or subject
 - `list_tasks` - List all tracked tasks with current status
+- `execute_task` - Delegate a task to a dedicated sub-agent with clean context and currently loaded tools; auto-manages task status
 
 **User Interaction:**
 - `ask_user_question` - Ask the user structured questions (free-text or multiple-choice) mid-execution; streamed via SSE `agent_question` event

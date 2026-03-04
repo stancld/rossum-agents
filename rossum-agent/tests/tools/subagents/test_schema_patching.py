@@ -12,15 +12,15 @@ from rossum_agent.tools.subagents.schema_patching import (
     _APPLY_SCHEMA_CHANGES_TOOL,
     _GET_FULL_SCHEMA_TOOL,
     _GET_SCHEMA_TREE_STRUCTURE_TOOL,
-    _OPUS_TOOLS,
     _SCHEMA_PATCHING_SYSTEM_PROMPT,
+    _SUBAGENT_TOOLS,
     _add_fields_to_content,
     _apply_schema_changes,
     _build_field_node,
-    _call_opus_for_patching,
+    _call_subagent_for_patching,
     _coerce_type_to_string,
     _collect_field_ids,
-    _execute_opus_tool,
+    _execute_subagent_tool,
     _extract_schema_content,
     _filter_content,
     _find_or_create_section,
@@ -45,9 +45,9 @@ class TestConstants:
         assert "get_full_schema" in _SCHEMA_PATCHING_SYSTEM_PROMPT
         assert "apply_schema_changes" in _SCHEMA_PATCHING_SYSTEM_PROMPT
 
-    def test_opus_tools_contains_all_required_tools(self):
-        """Test that _OPUS_TOOLS contains all three tools."""
-        tool_names = [t["name"] for t in _OPUS_TOOLS]
+    def test_subagent_tools_contains_all_required_tools(self):
+        """Test that _SUBAGENT_TOOLS contains all three tools."""
+        tool_names = [t["name"] for t in _SUBAGENT_TOOLS]
         assert "get_schema_tree_structure" in tool_names
         assert "get_full_schema" in tool_names
         assert "apply_schema_changes" in tool_names
@@ -798,18 +798,18 @@ class TestUpdateFieldsInContent:
 
 
 class TestExecuteOpusTool:
-    """Test _execute_opus_tool function."""
+    """Test _execute_subagent_tool function."""
 
     def test_unknown_tool_returns_error(self):
         """Test that unknown tool returns error message."""
-        result = _execute_opus_tool("unknown_tool", {})
+        result = _execute_subagent_tool("unknown_tool", {})
         assert "Unknown tool" in result
 
     def test_get_schema_tree_structure_calls_mcp(self):
         """Test get_schema_tree_structure tool calls MCP."""
         with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
             mock_mcp.return_value = [{"id": "section1", "category": "section"}]
-            result = _execute_opus_tool("get_schema_tree_structure", {"schema_id": 123})
+            result = _execute_subagent_tool("get_schema_tree_structure", {"schema_id": 123})
 
             mock_mcp.assert_called_once_with("get_schema_tree_structure", {"schema_id": 123})
             parsed = json.loads(result)
@@ -826,7 +826,7 @@ class TestExecuteOpusTool:
                     "content": [{"id": "section1", "category": "section", "children": []}],
                 }
             }
-            _execute_opus_tool("get_full_schema", {"schema_id": 123})
+            _execute_subagent_tool("get_full_schema", {"schema_id": 123})
 
             assert 123 in _schema_content_cache
             assert _schema_content_cache[123][0]["id"] == "section1"
@@ -837,7 +837,7 @@ class TestExecuteOpusTool:
         """Test apply_schema_changes requires get_full_schema to be called first."""
         _schema_content_cache.clear()
 
-        result = _execute_opus_tool("apply_schema_changes", {"schema_id": 999})
+        result = _execute_subagent_tool("apply_schema_changes", {"schema_id": 999})
         parsed = json.loads(result)
 
         assert "error" in parsed
@@ -855,7 +855,7 @@ class TestExecuteOpusTool:
 
         with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
             mock_mcp.return_value = {"id": 123}
-            result = _execute_opus_tool(
+            result = _execute_subagent_tool(
                 "apply_schema_changes",
                 {
                     "schema_id": 123,
@@ -885,7 +885,7 @@ class TestExecuteOpusTool:
 
         with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
             mock_mcp.return_value = {"id": 123}
-            result = _execute_opus_tool(
+            result = _execute_subagent_tool(
                 "apply_schema_changes",
                 {
                     "schema_id": 123,
@@ -940,7 +940,7 @@ class TestPatchSchemaWithSubagent:
             iterations_used=2,
         )
         with patch(
-            "rossum_agent.tools.subagents.schema_patching._call_opus_for_patching",
+            "rossum_agent.tools.subagents.schema_patching._call_subagent_for_patching",
             return_value=mock_result,
         ) as mock_opus:
             result = patch_schema_with_subagent(schema_id="123", changes=json.dumps(changes))
@@ -963,7 +963,7 @@ class TestPatchSchemaWithSubagent:
             iterations_used=1,
         )
         with patch(
-            "rossum_agent.tools.subagents.schema_patching._call_opus_for_patching",
+            "rossum_agent.tools.subagents.schema_patching._call_subagent_for_patching",
             return_value=mock_result,
         ):
             result = patch_schema_with_subagent(schema_id="123", changes=json.dumps(changes))
@@ -975,7 +975,7 @@ class TestPatchSchemaWithSubagent:
 
 
 class TestCallOpusForPatching:
-    """Test _call_opus_for_patching function."""
+    """Test _call_subagent_for_patching function."""
 
     def test_reports_progress(self):
         """Test that progress is reported during patching."""
@@ -1002,7 +1002,7 @@ class TestCallOpusForPatching:
                 mock_client.return_value.messages.create.return_value = mock_response
 
                 changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
-                _call_opus_for_patching("123", changes)
+                _call_subagent_for_patching("123", changes)
 
                 assert len(progress_calls) >= 1
                 assert progress_calls[0].tool_name == "patch_schema"
@@ -1038,7 +1038,7 @@ class TestCallOpusForPatching:
             with (
                 patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
                 patch(
-                    "rossum_agent.tools.subagents.schema_patching._execute_opus_tool",
+                    "rossum_agent.tools.subagents.schema_patching._execute_subagent_tool",
                     return_value='[{"id": "section1"}]',
                 ),
                 patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
@@ -1046,7 +1046,7 @@ class TestCallOpusForPatching:
                 mock_client.return_value.messages.create.side_effect = [first_response, second_response]
 
                 changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
-                result = _call_opus_for_patching("123", changes)
+                result = _call_subagent_for_patching("123", changes)
 
                 assert "Schema updated successfully" in result.analysis
                 assert result.input_tokens == 300
@@ -1074,7 +1074,7 @@ class TestCallOpusForPatching:
             with (
                 patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
                 patch(
-                    "rossum_agent.tools.subagents.schema_patching._execute_opus_tool",
+                    "rossum_agent.tools.subagents.schema_patching._execute_subagent_tool",
                     return_value='[{"id": "section1"}]',
                 ),
                 patch("rossum_agent.tools.subagents.base.logger"),
@@ -1083,7 +1083,7 @@ class TestCallOpusForPatching:
                 mock_client.return_value.messages.create.return_value = mock_response
 
                 changes = [{"id": "field1", "parent_section": "header", "type": "string"}]
-                result = _call_opus_for_patching("123", changes)
+                result = _call_subagent_for_patching("123", changes)
 
                 assert result.iterations_used == 3
                 assert mock_client.return_value.messages.create.call_count == 3
@@ -1099,7 +1099,7 @@ class TestCallOpusForPatching:
             ),
             patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", return_value=None),
         ):
-            result = _call_opus_for_patching("123", [{"id": "f1"}])
+            result = _call_subagent_for_patching("123", [{"id": "f1"}])
 
             assert "Error calling Opus sub-agent" in result.analysis
             assert "AWS error" in result.analysis
@@ -1124,7 +1124,7 @@ class TestCallOpusForPatching:
                 mock_client.return_value.messages.create.return_value = mock_response
 
                 changes = [{"action": "update", "id": "field1", "formula": "new_code"}]
-                _call_opus_for_patching("123", changes)
+                _call_subagent_for_patching("123", changes)
 
                 call_args = mock_client.return_value.messages.create.call_args
                 user_content = call_args[1]["messages"][0]["content"]
@@ -1155,7 +1155,7 @@ class TestCallOpusForPatching:
                     {"action": "add", "id": "new_f", "parent_section": "s1", "type": "string"},
                     {"action": "update", "id": "old_f", "formula": "code"},
                 ]
-                _call_opus_for_patching("123", changes)
+                _call_subagent_for_patching("123", changes)
 
                 call_args = mock_client.return_value.messages.create.call_args
                 user_content = call_args[1]["messages"][0]["content"]
@@ -1195,7 +1195,7 @@ class TestCallOpusForPatching:
                         "matching": matching,
                     }
                 ]
-                _call_opus_for_patching("123", changes)
+                _call_subagent_for_patching("123", changes)
 
                 call_args = mock_client.return_value.messages.create.call_args
                 user_content = call_args[1]["messages"][0]["content"]
@@ -1225,7 +1225,7 @@ class TestCallOpusForPatching:
                 mock_client.return_value.messages.create.return_value = mock_response
 
                 changes = [{"action": "add", "id": "plain", "type": "string", "parent_section": "s1"}]
-                _call_opus_for_patching("123", changes)
+                _call_subagent_for_patching("123", changes)
 
                 call_args = mock_client.return_value.messages.create.call_args
                 user_content = call_args[1]["messages"][0]["content"]
@@ -1252,7 +1252,7 @@ class TestCallOpusForPatching:
                 mock_client.return_value.messages.create.return_value = mock_response
 
                 changes = [{"action": "update", "id": "calc", "formula": "field.a + field.b"}]
-                _call_opus_for_patching("123", changes)
+                _call_subagent_for_patching("123", changes)
 
                 call_args = mock_client.return_value.messages.create.call_args
                 user_content = call_args[1]["messages"][0]["content"]
@@ -1275,7 +1275,7 @@ class TestCallOpusForPatching:
                 ),
                 pytest.raises(RuntimeError, match="sub-agent crashed"),
             ):
-                _call_opus_for_patching("123", [{"id": "f1", "parent_section": "s1", "type": "string"}])
+                _call_subagent_for_patching("123", [{"id": "f1", "parent_section": "s1", "type": "string"}])
 
             assert 123 not in _schema_content_cache
         finally:

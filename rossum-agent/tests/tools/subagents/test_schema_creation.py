@@ -9,10 +9,10 @@ from rossum_agent.tools.core import AgentContext, set_context
 from rossum_agent.tools.subagents.base import SubAgentResult
 from rossum_agent.tools.subagents.schema_creation import (
     _CREATE_SCHEMA_TOOL,
-    _OPUS_TOOLS,
     _SCHEMA_CREATION_SYSTEM_PROMPT,
-    _call_opus_for_creation,
-    _execute_opus_tool,
+    _SUBAGENT_TOOLS,
+    _call_subagent_for_creation,
+    _execute_subagent_tool,
     create_schema_with_subagent,
 )
 
@@ -31,9 +31,9 @@ class TestConstants:
         assert "multivalue" in _SCHEMA_CREATION_SYSTEM_PROMPT
         assert "tuple" in _SCHEMA_CREATION_SYSTEM_PROMPT
 
-    def test_opus_tools_contains_create_schema(self):
-        """Test that _OPUS_TOOLS contains create_schema tool."""
-        tool_names = [t["name"] for t in _OPUS_TOOLS]
+    def test_subagent_tools_contains_create_schema(self):
+        """Test that _SUBAGENT_TOOLS contains create_schema tool."""
+        tool_names = [t["name"] for t in _SUBAGENT_TOOLS]
         assert "create_schema" in tool_names
 
     def test_create_schema_tool_schema(self):
@@ -44,18 +44,18 @@ class TestConstants:
 
 
 class TestExecuteOpusTool:
-    """Test _execute_opus_tool function."""
+    """Test _execute_subagent_tool function."""
 
     def test_unknown_tool_returns_error(self):
         """Test that unknown tool returns error message."""
-        result = _execute_opus_tool("unknown_tool", {})
+        result = _execute_subagent_tool("unknown_tool", {})
         assert "Unknown tool" in result
 
     def test_create_schema_calls_mcp(self):
         """Test create_schema tool calls MCP."""
         with patch("rossum_agent.tools.subagents.schema_creation.call_mcp_tool") as mock_mcp:
             mock_mcp.return_value = {"id": 123, "name": "Test Schema"}
-            result = _execute_opus_tool(
+            result = _execute_subagent_tool(
                 "create_schema",
                 {"name": "Test", "content": [{"id": "s1", "label": "Section", "category": "section", "children": []}]},
             )
@@ -68,7 +68,7 @@ class TestExecuteOpusTool:
         """Test create_schema handles empty MCP response."""
         with patch("rossum_agent.tools.subagents.schema_creation.call_mcp_tool") as mock_mcp:
             mock_mcp.return_value = None
-            result = _execute_opus_tool("create_schema", {"name": "Test", "content": []})
+            result = _execute_subagent_tool("create_schema", {"name": "Test", "content": []})
 
             assert result == "No data returned"
 
@@ -101,7 +101,7 @@ class TestCreateSchemaWithSubagent:
             iterations_used=1,
         )
         with patch(
-            "rossum_agent.tools.subagents.schema_creation._call_opus_for_creation",
+            "rossum_agent.tools.subagents.schema_creation._call_subagent_for_creation",
             return_value=mock_result,
         ) as mock_opus:
             result = create_schema_with_subagent(
@@ -124,7 +124,7 @@ class TestCreateSchemaWithSubagent:
             iterations_used=1,
         )
         with patch(
-            "rossum_agent.tools.subagents.schema_creation._call_opus_for_creation",
+            "rossum_agent.tools.subagents.schema_creation._call_subagent_for_creation",
             return_value=mock_result,
         ):
             result = create_schema_with_subagent(name="Test", requirements="Simple schema")
@@ -136,7 +136,7 @@ class TestCreateSchemaWithSubagent:
 
 
 class TestCallOpusForCreation:
-    """Test _call_opus_for_creation function."""
+    """Test _call_subagent_for_creation function."""
 
     def test_reports_progress(self):
         """Test that progress is reported during creation."""
@@ -159,7 +159,7 @@ class TestCallOpusForCreation:
             with patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client:
                 mock_client.return_value.messages.create.return_value = mock_response
 
-                _call_opus_for_creation("Test Schema", "Simple schema with one section")
+                _call_subagent_for_creation("Test Schema", "Simple schema with one section")
 
                 assert len(progress_calls) >= 1
                 assert progress_calls[0].tool_name == "create_schema"
@@ -195,13 +195,13 @@ class TestCallOpusForCreation:
             with (
                 patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
                 patch(
-                    "rossum_agent.tools.subagents.schema_creation._execute_opus_tool",
+                    "rossum_agent.tools.subagents.schema_creation._execute_subagent_tool",
                     return_value='{"id": 123, "name": "Test"}',
                 ),
             ):
                 mock_client.return_value.messages.create.side_effect = [first_response, second_response]
 
-                result = _call_opus_for_creation("Test", "Simple schema")
+                result = _call_subagent_for_creation("Test", "Simple schema")
 
                 assert "Schema created successfully" in result.analysis
                 assert result.input_tokens == 300
@@ -229,14 +229,14 @@ class TestCallOpusForCreation:
             with (
                 patch("rossum_agent.tools.subagents.base.create_bedrock_client") as mock_client,
                 patch(
-                    "rossum_agent.tools.subagents.schema_creation._execute_opus_tool",
+                    "rossum_agent.tools.subagents.schema_creation._execute_subagent_tool",
                     return_value='{"id": 123}',
                 ),
                 patch("rossum_agent.tools.subagents.base.logger"),
             ):
                 mock_client.return_value.messages.create.return_value = mock_response
 
-                result = _call_opus_for_creation("Test", "Simple schema")
+                result = _call_subagent_for_creation("Test", "Simple schema")
 
                 assert result.iterations_used == 3
                 assert mock_client.return_value.messages.create.call_count == 3
@@ -249,7 +249,7 @@ class TestCallOpusForCreation:
             "rossum_agent.tools.subagents.base.create_bedrock_client",
             side_effect=Exception("AWS error"),
         ):
-            result = _call_opus_for_creation("Test", "Simple schema")
+            result = _call_subagent_for_creation("Test", "Simple schema")
 
             assert "Error calling Opus sub-agent" in result.analysis
             assert "AWS error" in result.analysis

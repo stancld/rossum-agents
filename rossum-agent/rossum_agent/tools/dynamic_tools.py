@@ -79,6 +79,13 @@ def mark_skill_loaded(name: str) -> None:
     state.version += 1
 
 
+def unmark_skill_loaded(name: str) -> None:
+    """Unmark a skill as loaded and increment version to invalidate tool cache."""
+    state = get_context().dynamic_tools
+    state.loaded_skills.discard(name)
+    state.version += 1
+
+
 def is_skill_loaded(name: str) -> bool:
     """Check if a skill has been loaded."""
     return name in get_context().dynamic_tools.loaded_skills
@@ -337,6 +344,50 @@ def get_load_tool_definition() -> ToolParam:
             "required": ["tool_names"],
         },
     }
+
+
+def fetch_category_tools(categories: list[str]) -> list[ToolParam]:
+    """Fetch MCP tools for categories without mutating context state.
+
+    Returns Anthropic-format tool definitions for the given categories.
+    Tools already loaded in the dynamic tools context are excluded
+    (they'll be included via get_dynamic_tools during snapshot).
+    """
+    ctx = get_context()
+    if ctx.mcp_connection is None or ctx.mcp_event_loop is None:
+        logger.warning("MCP connection not available, cannot fetch category tools")
+        return []
+
+    catalog = get_category_tool_names()
+    if not catalog:
+        return []
+
+    tool_names_to_fetch: set[str] = set()
+    for category in categories:
+        if category not in catalog:
+            logger.warning(f"Unknown tool category '{category}' — skipping")
+            continue
+        tool_names_to_fetch.update(catalog[category])
+
+    if not tool_names_to_fetch:
+        return []
+
+    if ctx.is_read_only:
+        tool_names_to_fetch -= get_write_tools()
+    tool_names_to_fetch -= set(HIDDEN_TOOLS)
+
+    # Skip tools already loaded in context (will be included via get_dynamic_tools)
+    already_loaded = {t["name"] for t in ctx.dynamic_tools.tools}
+    tool_names_to_fetch -= already_loaded
+
+    if not tool_names_to_fetch:
+        return []
+
+    mcp_tools = asyncio.run_coroutine_threadsafe(ctx.mcp_connection.get_tools(), ctx.mcp_event_loop).result()
+    tools = _filter_mcp_tools_by_names(mcp_tools, tool_names_to_fetch)
+
+    logger.info(f"Transiently fetched {len(tools)} tools for categories {categories}")
+    return mcp_tools_to_anthropic_format(tools)
 
 
 def load_tool(tool_names: list[str]) -> str:

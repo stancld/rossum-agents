@@ -251,7 +251,7 @@ _APPLY_SCHEMA_CHANGES_TOOL: dict[str, Any] = {
     },
 }
 
-_OPUS_TOOLS: list[dict[str, Any]] = [
+_SUBAGENT_TOOLS: list[dict[str, Any]] = [
     _GET_SCHEMA_TREE_STRUCTURE_TOOL,
     _GET_FULL_SCHEMA_TOOL,
     _APPLY_SCHEMA_CHANGES_TOOL,
@@ -564,7 +564,7 @@ def _apply_schema_changes(
 _schema_content_cache: dict[int, list[dict[str, Any]]] = {}
 
 
-def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
+def _execute_subagent_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
     schema_id = tool_input.get("schema_id")
 
     if tool_name == "get_schema_tree_structure":
@@ -606,7 +606,7 @@ class SchemaPatchingSubAgent(SubAgent):
         config = SubAgentConfig(
             tool_name="patch_schema",
             system_prompt=_SCHEMA_PATCHING_SYSTEM_PROMPT,
-            tools=_OPUS_TOOLS,
+            tools=_SUBAGENT_TOOLS,
             max_iterations=3,
             max_tokens=4096,
         )
@@ -614,15 +614,15 @@ class SchemaPatchingSubAgent(SubAgent):
 
     def execute_tool(self, tool_name: str, tool_input: dict[str, Any]) -> str:
         """Execute a tool call from the LLM."""
-        return _execute_opus_tool(tool_name, tool_input)
+        return _execute_subagent_tool(tool_name, tool_input)
 
     def process_response_block(self, block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
         """No special block processing needed for schema patching."""
         return None
 
 
-def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> SubAgentResult:
-    """Call Opus model for schema patching with deterministic tool workflow.
+def _call_subagent_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> SubAgentResult:
+    """Call sub-agent for schema patching with deterministic tool workflow.
 
     Pre-fetches schema data and injects it into context to skip redundant tool calls.
 
@@ -636,7 +636,7 @@ def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> Su
     if schema_result:
         content = _extract_schema_content(schema_result)
         if not content:
-            logger.info("_call_opus_for_patching: schema %s has empty content", schema_id)
+            logger.info("_call_subagent_for_patching: schema %s has empty content", schema_id)
         _schema_content_cache[schema_id_int] = content
 
     tree_str = json.dumps(_to_plain(tree_result), indent=2, default=str) if tree_result else "No data"
@@ -738,7 +738,7 @@ def patch_schema_with_subagent(schema_id: str, changes: str) -> str:
         )
 
     logger.info(f"patch_schema: Calling Opus for schema_id={schema_id}, {len(changes_list)} changes")
-    result = _call_opus_for_patching(schema_id, changes_list)
+    result = _call_subagent_for_patching(schema_id, changes_list)
     elapsed_ms = round((time.perf_counter() - start_time) * 1000, 3)
 
     logger.info(

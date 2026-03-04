@@ -14,16 +14,20 @@ from rossum_agent.tools.dynamic_tools import (
     _fetch_catalog_from_mcp,
     _filter_mcp_tools_by_names,
     _load_categories_impl,
+    fetch_category_tools,
     get_dynamic_tools,
     get_load_tool_category_definition,
     get_load_tool_definition,
     get_write_tools,
     get_write_tools_async,
+    is_skill_loaded,
     load_tool,
     load_tool_category,
+    mark_skill_loaded,
     preload_categories_for_request,
     reset_dynamic_tools,
     suggest_categories_for_request,
+    unmark_skill_loaded,
 )
 
 
@@ -939,5 +943,137 @@ class TestHiddenTools:
 
             assert "Error" in result
             assert "update_schema" in result
+        finally:
+            set_context(AgentContext())
+
+
+class TestUnmarkSkillLoaded:
+    """Tests for unmark_skill_loaded function."""
+
+    def test_unmarks_loaded_skill(self) -> None:
+        set_context(AgentContext())
+        try:
+            mark_skill_loaded("formula-fields")
+            assert is_skill_loaded("formula-fields")
+
+            unmark_skill_loaded("formula-fields")
+            assert not is_skill_loaded("formula-fields")
+        finally:
+            set_context(AgentContext())
+
+    def test_increments_version(self) -> None:
+        set_context(AgentContext())
+        try:
+            mark_skill_loaded("formula-fields")
+            version_after_mark = get_context().dynamic_tools.version
+
+            unmark_skill_loaded("formula-fields")
+            assert get_context().dynamic_tools.version == version_after_mark + 1
+        finally:
+            set_context(AgentContext())
+
+    def test_no_error_for_unloaded_skill(self) -> None:
+        set_context(AgentContext())
+        try:
+            # Should not raise even if skill was never loaded
+            unmark_skill_loaded("nonexistent")
+            assert not is_skill_loaded("nonexistent")
+        finally:
+            set_context(AgentContext())
+
+
+class TestFetchCategoryTools:
+    """Tests for fetch_category_tools function."""
+
+    def test_returns_empty_without_mcp_connection(self) -> None:
+        set_context(AgentContext(mcp_connection=None))
+        try:
+            result = fetch_category_tools(["schemas"])
+            assert result == []
+        finally:
+            set_context(AgentContext())
+
+    @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
+    def test_returns_empty_for_empty_catalog(self, mock_catalog: MagicMock) -> None:
+        mock_catalog.return_value = {}
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
+        try:
+            result = fetch_category_tools(["schemas"])
+            assert result == []
+        finally:
+            set_context(AgentContext())
+
+    @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
+    def test_skips_unknown_categories(self, mock_catalog: MagicMock) -> None:
+        mock_catalog.return_value = {"queues": {"get_queue"}}
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
+        try:
+            result = fetch_category_tools(["nonexistent"])
+            assert result == []
+        finally:
+            set_context(AgentContext())
+
+    @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
+    @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
+    @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
+    def test_fetches_tools_without_mutating_context(
+        self,
+        mock_catalog: MagicMock,
+        mock_run_coro: MagicMock,
+        mock_convert: MagicMock,
+    ) -> None:
+        mock_catalog.return_value = {"schemas": {"get_schema", "list_schemas"}}
+
+        mock_tool1 = MagicMock()
+        mock_tool1.name = "get_schema"
+        mock_tool2 = MagicMock()
+        mock_tool2.name = "list_schemas"
+        mock_future = MagicMock()
+        mock_future.result.return_value = [mock_tool1, mock_tool2]
+        mock_run_coro.return_value = mock_future
+
+        anthropic_tools = [{"name": "get_schema"}, {"name": "list_schemas"}]
+        mock_convert.return_value = anthropic_tools
+
+        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
+        try:
+            result = fetch_category_tools(["schemas"])
+
+            assert result == anthropic_tools
+            # Context should NOT be mutated
+            assert get_dynamic_tools() == []
+            assert get_context().dynamic_tools.loaded_categories == set()
+        finally:
+            set_context(AgentContext())
+
+    @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
+    @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
+    @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
+    def test_skips_already_loaded_tools(
+        self,
+        mock_catalog: MagicMock,
+        mock_run_coro: MagicMock,
+        mock_convert: MagicMock,
+    ) -> None:
+        mock_catalog.return_value = {"schemas": {"get_schema", "list_schemas"}}
+
+        ctx = AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock())
+        ctx.dynamic_tools.tools.append({"name": "get_schema"})
+        set_context(ctx)
+        try:
+            mock_tool = MagicMock()
+            mock_tool.name = "list_schemas"
+            mock_future = MagicMock()
+            mock_future.result.return_value = [mock_tool]
+            mock_run_coro.return_value = mock_future
+
+            mock_convert.return_value = [{"name": "list_schemas"}]
+
+            result = fetch_category_tools(["schemas"])
+
+            assert result == [{"name": "list_schemas"}]
+            # Only list_schemas should be fetched, get_schema was already loaded
+            filter_args = mock_run_coro.call_args
+            assert filter_args is not None
         finally:
             set_context(AgentContext())

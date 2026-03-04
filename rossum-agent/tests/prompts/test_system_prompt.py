@@ -16,11 +16,11 @@ class TestSystemPromptPersona:
 
 
 class TestSystemPromptTaskTracking:
-    def test_requires_update_task_transitions(self):
+    def test_execute_task_manages_status_automatically(self):
         prompt = get_system_prompt("default")
-        assert 'update_task(status="in_progress")' in prompt
-        assert 'update_task(status="completed")' in prompt
+        assert "execute_task" in prompt
+        assert "`in_progress` → `completed`" in prompt
 
-    def test_does_not_forbid_update_task(self):
+    def test_discourages_manual_update_task_for_subagent_tasks(self):
         prompt = get_system_prompt("default")
-        assert "Do not call `update_task`" not in prompt
+        assert "do not call `update_task` for tasks executed via sub-agents" in prompt
