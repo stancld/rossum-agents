@@ -273,7 +273,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "search_elis_docs",
             ],
         ),
-        token_budget=TokenBudget(min_total_tokens=90000, max_total_tokens=140000),
+        token_budget=TokenBudget(min_total_tokens=110000, max_total_tokens=180000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
