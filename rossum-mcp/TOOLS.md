@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 36 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 35 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ---
 
@@ -57,6 +57,7 @@ Lists/searches entities with typed, entity-specific filters. Pass a query object
 | `hook_log` | `hook_id`, `queue_id`, `annotation_id`, `email_id`, `log_level`, `status`, `status_code`, `request_id`, `timestamp_before`, `timestamp_after`, `start_before`, `start_after`, `end_before`, `end_after`, `search`, `page_size` |
 | `hook_template` | _(no filters)_ |
 | `user_role` | _(no filters)_ |
+| `queue_template_name` | _(no filters)_ |
 
 **Example:**
 ```json
@@ -249,43 +250,13 @@ Updates an existing queue's settings.
 - `queue_id` (integer, required): Queue ID to update
 - `queue_data` (object, required): Dictionary containing queue fields to update. Supported keys: `name`, `automation_enabled`, `automation_level`, `locale`, `metadata`, `settings`, `engine`, `dedicated_engine`, `training_enabled`, `webhooks`, `hooks`, `default_score_threshold`, `session_timeout`, `document_lifetime`, `delete_after`, `schema`, `workspace`, `connector`, `inbox`
 
-### get_queue_template_names
-
-Lists all available queue template names usable with `create_queue_from_template`.
-
-**Returns:** Array of template name strings:
-```json
-[
-  "EU Demo Template",
-  "AP&R EU Demo Template",
-  "Tax Invoice EU Demo Template",
-  "US Demo Template",
-  "AP&R US Demo Template",
-  "Tax Invoice US Demo Template",
-  "UK Demo Template",
-  "AP&R UK Demo Template",
-  "Tax Invoice UK Demo Template",
-  "CZ Demo Template",
-  "Empty Organization Template",
-  "Delivery Notes Demo Template",
-  "Delivery Note Demo Template",
-  "Chinese Invoices (Fapiao) Demo Template",
-  "Tax Invoice CN Demo Template",
-  "Certificates of Analysis Demo Template",
-  "Purchase Order Demo Template",
-  "Credit Note Demo Template",
-  "Debit Note Demo Template",
-  "Proforma Invoice Demo Template"
-]
-```
-
 ### create_queue_from_template
 
 Creates a queue from a predefined regional template. Automatically creates a matching schema and optionally assigns an engine.
 
 **Parameters:**
 - `name` (string, required): Name for the new queue
-- `template_name` (string, required): Template name from `get_queue_template_names`
+- `template_name` (string, required): Template name (use `search` with `entity: "queue_template_name"` to list)
 - `workspace_id` (integer, required): Workspace ID where the queue should be created
 - `include_documents` (boolean, optional, default: false): Include sample documents from the template
 - `engine_id` (integer, optional): Engine ID to assign; if not provided, the template's default engine is used

@@ -22,6 +22,7 @@ from rossum_mcp.tools.read_layer.models import (
     HookSearch,
     HookTemplateSearch,
     QueueSearch,
+    QueueTemplateNameSearch,
     RelationSearch,
     SchemaSearch,
     WorkspaceSearch,
@@ -467,6 +468,11 @@ class TestExtractSearchKwargs:
         kwargs = extract_search_kwargs(query)
         assert kwargs == {}
 
+    def test_queue_template_name_returns_empty(self) -> None:
+        query = QueueTemplateNameSearch()
+        kwargs = extract_search_kwargs(query)
+        assert kwargs == {}
+
 
 # ───────────────────────── Registry ─────────────────────────
 
@@ -492,12 +498,13 @@ class TestRegistry:
             "hook_log",
             "hook_template",
             "user_role",
+            "queue_template_name",
         }
         assert set(registry.keys()) == expected
 
     def test_search_only_entities_have_no_retrieve(self, mock_client: AsyncMock, setup_env: None) -> None:
         registry = build_registry(mock_client)
-        for entity_name in ("hook_log", "hook_template", "user_role"):
+        for entity_name in ("hook_log", "hook_template", "user_role", "queue_template_name"):
             assert registry[entity_name].retrieve_fn is None
             assert registry[entity_name].search_fn is not None
 

@@ -264,6 +264,10 @@ QueueTemplateName = Literal[
 QUEUE_TEMPLATE_NAMES = get_args(QueueTemplateName)
 
 
+async def _list_queue_template_names() -> list[str]:
+    return list(QUEUE_TEMPLATE_NAMES)
+
+
 def _get_engine_url(queue: Queue) -> str | None:
     """Extract the engine URL from a queue, checking all engine fields."""
     for attr in ("dedicated_engine", "generic_engine", "engine"):
@@ -372,14 +376,6 @@ def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     )
     async def update_queue(queue_id: int, queue_data: QueueUpdateData) -> Queue | dict:
         return await _update_queue(client, queue_id, queue_data)
-
-    @mcp.tool(
-        description="List template names usable by create_queue_from_template.",
-        tags={"queues"},
-        annotations={"readOnlyHint": True},
-    )
-    async def get_queue_template_names() -> list[str]:
-        return list(QUEUE_TEMPLATE_NAMES)
 
     @mcp.tool(
         description="Create a queue from a template (includes schema + engine defaults).",

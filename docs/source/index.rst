@@ -44,12 +44,12 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **36 tools** organized into categories:
+The MCP server provides **35 tools** organized into categories:
 
 **Unified Read Layer**
 
 * **get** - Get entities by ID (single or batch). Supports ``include_related`` for enriched responses (queue→schema+engine+hooks, schema→queues+rules, hook→queues+events)
-* **search** - Search/list entities with typed, entity-specific filters. Supports: queue, schema, hook, engine, rule, user, workspace, email_template, organization_group, annotation, relation, document_relation, hook_log, hook_template, user_role
+* **search** - Search/list entities with typed, entity-specific filters. Supports: queue, schema, hook, engine, rule, user, workspace, email_template, organization_group, annotation, relation, document_relation, hook_log, hook_template, user_role, queue_template_name
 
 **Delete Layer**
 
@@ -68,7 +68,6 @@ The MCP server provides **36 tools** organized into categories:
 
 * **create_queue** - Create new queues
 * **create_queue_from_template** - Create queues from predefined templates (EU/US/UK/CZ/CN)
-* **get_queue_template_names** - List available queue template names
 * **update_queue** - Configure automation thresholds
 
 **Schema Management**
