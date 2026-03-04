@@ -662,7 +662,7 @@ class TestPopTrackedResources:
 class TestHandleWriteTrackedResources:
     @pytest.mark.asyncio
     async def test_records_tracked_resources_as_changes(self):
-        conn = _make_connection(write_tools={"create_queue_from_template"})
+        conn = _make_connection(write_tools={"create"})
         # _tracked_resources lives inside the result dict, then FastMCP wraps in {"result": ...}
         created = {
             "result": {
@@ -676,13 +676,13 @@ class TestHandleWriteTrackedResources:
         }
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
 
-        await conn.call_tool("create_queue_from_template", {"name": "Q"})
+        await conn.call_tool("create", {"entity": "queue_from_template", "data": {"name": "Q"}})
 
         changes = conn.get_changes()
         assert len(changes) == 3
 
         queue_change = changes[0]
-        assert queue_change.entity_type == "queue"
+        assert queue_change.entity_type == "queue_from_template"
         assert queue_change.entity_id == "99"
         assert queue_change.operation == "create"
 
@@ -701,7 +701,7 @@ class TestHandleWriteTrackedResources:
 
     @pytest.mark.asyncio
     async def test_tracked_resources_are_cached(self):
-        conn = _make_connection(write_tools={"create_queue_from_template"})
+        conn = _make_connection(write_tools={"create"})
         created = {
             "result": {
                 "id": 99,
@@ -713,13 +713,13 @@ class TestHandleWriteTrackedResources:
         }
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
 
-        await conn.call_tool("create_queue_from_template", {"name": "Q"})
+        await conn.call_tool("create", {"entity": "queue_from_template", "data": {"name": "Q"}})
 
         assert conn._cache_get("schema", "50") == {"id": 50, "name": "S"}
 
     @pytest.mark.asyncio
     async def test_tracked_resources_stripped_from_main_snapshot(self):
-        conn = _make_connection(write_tools={"create_queue_from_template"})
+        conn = _make_connection(write_tools={"create"})
         created = {
             "result": {
                 "id": 99,
@@ -731,7 +731,7 @@ class TestHandleWriteTrackedResources:
         }
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(created))
 
-        await conn.call_tool("create_queue_from_template", {"name": "Q"})
+        await conn.call_tool("create", {"entity": "queue_from_template", "data": {"name": "Q"}})
 
         queue_change = conn.get_changes()[0]
         # The after snapshot should not contain _tracked_resources

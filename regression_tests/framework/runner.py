@@ -30,6 +30,10 @@ def _synthesize_tool_name(tc: ToolCall) -> str:
     if tc.name == "delete":
         entity = tc.arguments.get("entity", "")
         return f"delete:{entity}" if entity else "delete"
+    if tc.name == "create":
+        data = tc.arguments.get("data", {})
+        entity = data.get("entity", "") if isinstance(data, dict) else ""
+        return f"create:{entity}" if entity else "create"
     return tc.name
 
 

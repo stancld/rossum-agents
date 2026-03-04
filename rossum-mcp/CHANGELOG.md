@@ -7,6 +7,12 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
+- Added `create` tool: create any entity with a single unified tool — supports `workspace`, `queue_from_template`, `schema`, `user`, `hook`, `hook_from_template`, `engine`, `engine_field`, `rule`, `email_template` [#233](https://github.com/stancld/rossum-agents/pull/233)
+
+### Removed
+- **Breaking**: Replaced 11 individual create tools with the unified `create` tool. Removed standalone tools: `create_workspace`, `create_queue`, `create_queue_from_template`, `create_schema`, `create_user`, `create_hook`, `create_hook_from_template`, `create_engine`, `create_engine_field`, `create_rule`, `create_email_template` [#233](https://github.com/stancld/rossum-agents/pull/233)
+
+### Added
 - Added `get` tool: fetch any entity by ID with a single unified tool — supports `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`; `include_related=True` enriches with linked data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events) [#221](https://github.com/stancld/rossum-agents/pull/221)
 - Added `search` tool: list/filter any entity with typed, entity-specific query objects — covers all `get`-supported types plus search-only entities `hook_log`, `hook_template`, `user_role`, `queue_template_name` [#221](https://github.com/stancld/rossum-agents/pull/221)
 

@@ -52,8 +52,6 @@ class TestExtractEntityType:
 
     def test_overrides(self):
         assert _extract_entity_type("prune_schema_fields") == "schema"
-        assert _extract_entity_type("create_queue_from_template") == "queue"
-        assert _extract_entity_type("create_hook_from_template") == "hook"
 
     def test_unknown_prefix(self):
         assert _extract_entity_type("run_export") is None
@@ -165,8 +163,6 @@ class TestClassifyOperation:
 
     def test_overrides(self):
         assert _classify_operation("prune_schema_fields") == "update"
-        assert _classify_operation("create_queue_from_template") == "create"
-        assert _classify_operation("create_hook_from_template") == "create"
 
     def test_unknown(self):
         assert _classify_operation("unknown_tool") == "update"
@@ -664,16 +660,18 @@ class TestOverrideToolTracking:
         assert conn._changes[1].after == patched
 
     @pytest.mark.anyio
-    async def test_create_queue_from_template_tracked_as_queue_create(self):
-        write_tools = {"create_queue_from_template"}
+    async def test_unified_create_tracked_as_entity_create(self):
+        write_tools = {"create"}
         conn = MCPConnection(client=AsyncMock(), write_tools=write_tools)
         conn._call_mcp = AsyncMock(return_value={"id": 42, "name": "Test Queue"})
 
-        await conn.call_tool("create_queue_from_template", {"template_name": "EU Invoice", "workspace_id": 1})
+        await conn.call_tool(
+            "create", {"entity": "queue_from_template", "data": {"template_name": "EU Invoice", "workspace_id": 1}}
+        )
 
         assert len(conn._changes) == 1
         change = conn._changes[0]
-        assert change.entity_type == "queue"
+        assert change.entity_type == "queue_from_template"
         assert change.entity_id == "42"
         assert change.operation == "create"
         assert change.before is None

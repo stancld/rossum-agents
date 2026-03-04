@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast, get_args
 
@@ -131,54 +130,6 @@ async def _get_queue_engine(client: AsyncRossumAPIClient, queue_id: int) -> Engi
         raise
 
     return engine
-
-
-async def _create_queue(
-    client: AsyncRossumAPIClient,
-    name: str,
-    workspace_id: int,
-    schema_id: int,
-    engine_id: int | None = None,
-    inbox_id: int | None = None,
-    connector_id: int | None = None,
-    locale: str = "en_GB",
-    automation_enabled: bool = False,
-    automation_level: str = "never",
-    training_enabled: bool = True,
-    splitting_screen_feature_flag: bool = False,
-) -> Queue | dict:
-    logger.debug(
-        f"Creating queue: name={name}, workspace_id={workspace_id}, schema_id={schema_id}, engine_id={engine_id}"
-    )
-
-    queue_data: dict = {
-        "name": name,
-        "workspace": build_resource_url("workspaces", workspace_id),
-        "schema": build_resource_url("schemas", schema_id),
-        "locale": locale,
-        "automation_enabled": automation_enabled,
-        "automation_level": automation_level,
-        "training_enabled": training_enabled,
-    }
-
-    if engine_id is not None:
-        queue_data["engine"] = build_resource_url("engines", engine_id)
-    if inbox_id is not None:
-        queue_data["inbox"] = build_resource_url("inboxes", inbox_id)
-    if connector_id is not None:
-        queue_data["connector"] = build_resource_url("connectors", connector_id)
-    if splitting_screen_feature_flag:
-        if os.environ.get("SPLITTING_SCREEN_FLAG_NAME") and os.environ.get("SPLITTING_SCREEN_FLAG_VALUE"):
-            queue_data["settings"] = {
-                os.environ["SPLITTING_SCREEN_FLAG_NAME"]: os.environ["SPLITTING_SCREEN_FLAG_VALUE"]
-            }
-        else:
-            return {
-                "error": "splitting_screen_feature_flag requested but SPLITTING_SCREEN_FLAG_NAME and/or SPLITTING_SCREEN_FLAG_VALUE environment variables are not set"
-            }
-
-    queue: Queue = await client.create_new_queue(queue_data)
-    return queue
 
 
 _VALID_META_NAMES = {
@@ -337,58 +288,9 @@ async def _create_queue_from_template(
 
 def register_queue_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Create a queue.",
-        tags={"queues", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_queue(
-        name: str,
-        workspace_id: int,
-        schema_id: int,
-        engine_id: int | None = None,
-        inbox_id: int | None = None,
-        connector_id: int | None = None,
-        locale: str = "en_GB",
-        automation_enabled: bool = False,
-        automation_level: str = "never",
-        training_enabled: bool = True,
-        splitting_screen_feature_flag: bool = False,
-    ) -> Queue | dict:
-        return await _create_queue(
-            client,
-            name,
-            workspace_id,
-            schema_id,
-            engine_id,
-            inbox_id,
-            connector_id,
-            locale,
-            automation_enabled,
-            automation_level,
-            training_enabled,
-            splitting_screen_feature_flag,
-        )
-
-    @mcp.tool(
         description="Update queue settings.",
         tags={"queues", "write"},
         annotations={"readOnlyHint": False},
     )
     async def update_queue(queue_id: int, queue_data: QueueUpdateData) -> Queue | dict:
         return await _update_queue(client, queue_id, queue_data)
-
-    @mcp.tool(
-        description="Create a queue from a template (includes schema + engine defaults).",
-        tags={"queues", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_queue_from_template(
-        name: str,
-        template_name: QueueTemplateName,
-        workspace_id: int,
-        include_documents: bool = False,
-        engine_id: int | None = None,
-    ) -> Queue | dict:
-        return await _create_queue_from_template(
-            client, name, template_name, workspace_id, include_documents, engine_id
-        )

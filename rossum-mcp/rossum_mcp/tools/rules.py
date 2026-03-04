@@ -138,21 +138,6 @@ async def _delete_rule(client: AsyncRossumAPIClient, rule_id: int) -> dict:
 
 def register_rule_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Create a rule: trigger is a TxScript condition; action includes id, type, event, payload. Scope with schema_id and/or queue_ids (at least one required).",
-        tags={"rules", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_rule(
-        name: str,
-        trigger_condition: str,
-        actions: list[RuleAction],
-        enabled: bool = True,
-        schema_id: int | None = None,
-        queue_ids: list[int] | None = None,
-    ) -> Rule | dict:
-        return await _create_rule(client, name, trigger_condition, actions, enabled, schema_id, queue_ids)
-
-    @mcp.tool(
         description="Replace a rule (PUT); all fields required. Use patch_rule for partial changes.",
         tags={"rules", "write"},
         annotations={"readOnlyHint": False},

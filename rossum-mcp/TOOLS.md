@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 35 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 25 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ---
 
@@ -70,6 +70,71 @@ Lists/searches entities with typed, entity-specific filters. Pass a query object
 ```
 
 **Returns:** Array of entity objects.
+
+---
+
+## Create Layer (2 tools)
+
+The create layer replaces all individual `create_X` tools with a unified `create` tool and a companion `get_create_schema` tool for on-demand schema introspection.
+
+### get_create_schema
+
+Returns the JSON Schema for a specific entity type, including entity-specific notes. Call this before `create` to see required/optional fields.
+
+**Parameters:**
+- `entity` (string, required): One of the supported entity types listed below.
+
+**Returns:** JSON Schema object with `properties`, `required`, and optional `note` field.
+
+### create
+
+Creates any supported entity. Call `get_create_schema(entity)` first to see required fields.
+
+**Parameters:**
+- `entity` (string, required): The entity type to create.
+- `data` (dict, required): Entity fields (without the `entity` key).
+
+**Supported entities:** `workspace`, `queue_from_template`, `schema`, `user`, `hook`, `hook_from_template`, `engine`, `engine_field`, `rule`, `email_template`
+
+**Entity-specific fields:**
+
+| Entity | Required fields | Optional fields |
+|--------|----------------|-----------------|
+| `workspace` | `name`, `organization_id` | `metadata` |
+| `queue_from_template` | `name`, `template_name`, `workspace_id` | `include_documents`, `engine_id` |
+| `schema` | `name`, `content` (array with at least one section) | |
+| `user` | `username`, `email` | `queues`, `groups`, `first_name`, `last_name`, `is_active` (default: true), `metadata`, `oidc_id`, `auth_type` (default: `password`) |
+| `hook` | `name`, `type` (`webhook`\|`function`) | `queues`, `events`, `config`, `settings`, `secret` |
+| `hook_from_template` | `name`, `hook_template_id`, `queues` | `events`, `token_owner` |
+| `engine` | `name`, `organization_id`, `engine_type` (`extractor`\|`splitter`) | |
+| `engine_field` | `engine_id`, `name`, `label`, `field_type`, `schema_ids` | `tabular`, `multiline`, `subtype`, `pre_trained_field_id` |
+| `rule` | `name`, `trigger_condition`, `actions` | `enabled` (default: true), `schema_id`, `queue_ids` (at least one scope required) |
+| `email_template` | `name`, `queue`, `subject`, `message` | `type` (default: `custom`), `automate`, `to`, `cc`, `bcc`, `triggers` |
+
+**Entity-specific notes:**
+- **queue_from_template** — Creates schema+engine as side effects; returns `_tracked_resources`
+- **schema** — Content must have at least one section with datapoints
+- **hook** (function) — `config.source` auto-renamed to `config.code`, default runtime `python3.12`, `timeout_s` capped at 60
+- **hook_from_template** — Events may override template defaults; `token_owner` required if template has `use_token_owner`
+- **engine** — Create matching `engine_field` entries immediately after
+- **engine_field** — `schema_ids` cannot be empty
+- **rule** — Scope with `schema_id` and/or `queue_ids` (at least one required)
+- **email_template** — Set `automate=true` for automatic sending; `to`/`cc`/`bcc` are recipient objects `{type: annotator|constant|datapoint, value: ...}`
+
+**Example:**
+```python
+# First, get the schema
+get_create_schema(entity="queue_from_template")
+
+# Then create
+create(entity="queue_from_template", data={
+  "name": "Invoice Processing",
+  "template_name": "EU Demo Template",
+  "workspace_id": 1
+})
+```
+
+**Returns:** The created entity object (serialized as dict). On validation error, returns `error`, `details`, and `expected_schema`.
 
 ---
 
@@ -223,24 +288,7 @@ Copies annotations to another queue. Use `reimport=True` to re-extract data in t
 
 ---
 
-## Queue Management (4 tools)
-
-### create_queue
-
-Creates a new queue.
-
-**Parameters:**
-- `name` (string, required): Name of the queue to create
-- `workspace_id` (integer, required): Workspace ID where the queue should be created
-- `schema_id` (integer, required): Schema ID to assign to the queue
-- `engine_id` (integer, optional): Engine ID to assign for document processing
-- `inbox_id` (integer, optional): Inbox ID to associate with the queue
-- `connector_id` (integer, optional): Connector ID to associate with the queue
-- `locale` (string, optional, default: `en_GB`): Queue locale
-- `automation_enabled` (boolean, optional, default: false): Enable automation
-- `automation_level` (string, optional, default: `never`): Automation level
-- `training_enabled` (boolean, optional, default: true): Enable training
-- `splitting_screen_feature_flag` (boolean, optional, default: false): Enable splitting screen feature
+## Queue Management (1 tool)
 
 ### update_queue
 
@@ -250,55 +298,9 @@ Updates an existing queue's settings.
 - `queue_id` (integer, required): Queue ID to update
 - `queue_data` (object, required): Dictionary containing queue fields to update. Supported keys: `name`, `automation_enabled`, `automation_level`, `locale`, `metadata`, `settings`, `engine`, `dedicated_engine`, `training_enabled`, `webhooks`, `hooks`, `default_score_threshold`, `session_timeout`, `document_lifetime`, `delete_after`, `schema`, `workspace`, `connector`, `inbox`
 
-### create_queue_from_template
-
-Creates a queue from a predefined regional template. Automatically creates a matching schema and optionally assigns an engine.
-
-**Parameters:**
-- `name` (string, required): Name for the new queue
-- `template_name` (string, required): Template name (use `search` with `entity: "queue_template_name"` to list)
-- `workspace_id` (integer, required): Workspace ID where the queue should be created
-- `include_documents` (boolean, optional, default: false): Include sample documents from the template
-- `engine_id` (integer, optional): Engine ID to assign; if not provided, the template's default engine is used
-
-**Returns:** Queue object with `_tracked_resources` listing the schema and engine created as side effects.
-
 ---
 
-## Schema Management (5 tools)
-
-### create_schema
-
-Creates a new schema with sections and datapoints.
-
-**Parameters:**
-- `name` (string, required): Schema name
-- `content` (array, required): Schema content array; must contain at least one section with datapoints
-
-**Example content structure:**
-```json
-[
-  {
-    "category": "section",
-    "id": "document_info",
-    "label": "Document Information",
-    "children": [
-      {
-        "category": "datapoint",
-        "id": "document_type",
-        "label": "Document Type",
-        "type": "enum",
-        "rir_field_names": [],
-        "constraints": {"required": false},
-        "options": [
-          {"value": "invoice", "label": "Invoice"},
-          {"value": "receipt", "label": "Receipt"}
-        ]
-      }
-    ]
-  }
-]
-```
+## Schema Management (4 tools)
 
 ### update_schema
 
@@ -372,16 +374,7 @@ Provide exactly one of `fields_to_keep` or `fields_to_remove`.
 
 ---
 
-## Engine Management (4 tools)
-
-### create_engine
-
-Creates a new engine for document processing. After creating an engine, immediately create matching engine fields for the target schema.
-
-**Parameters:**
-- `name` (string, required): Engine name
-- `organization_id` (integer, required): Organization ID
-- `engine_type` (string, required): `extractor` or `splitter`
+## Engine Management (2 tools)
 
 ### update_engine
 
@@ -390,21 +383,6 @@ Updates an existing engine's settings.
 **Parameters:**
 - `engine_id` (integer, required): Engine ID to update
 - `engine_data` (object, required): Dictionary with fields to update. Supported keys: `name`, `description`, `learning_enabled`, `training_queues`
-
-### create_engine_field
-
-Creates a new engine field and links it to schemas.
-
-**Parameters:**
-- `engine_id` (integer, required): Engine ID
-- `name` (string, required): Field name (slug format, max 50 chars)
-- `label` (string, required): Human-readable label (max 100 chars)
-- `field_type` (string, required): `string`, `number`, `date`, or `enum`
-- `schema_ids` (array of integers, required): List of schema IDs to link (at least one required)
-- `tabular` (boolean, optional, default: false): Whether the field is tabular (line item)
-- `multiline` (boolean, optional, default: false): Whether the field is multiline
-- `subtype` (string, optional): Field subtype
-- `pre_trained_field_id` (string, optional): Pre-trained field ID to link
 
 ### get_engine_fields
 
@@ -415,28 +393,7 @@ Retrieves engine fields for a specific engine or all engine fields.
 
 ---
 
-## Extensions — Hooks (4 tools)
-
-### create_hook
-
-Creates a new hook (webhook or serverless function).
-
-**Parameters:**
-- `name` (string, required): Hook name
-- `type` (string, required): `webhook` or `function`
-- `queues` (array of strings, optional): List of queue URLs
-- `events` (array of strings, optional): List of trigger events in `event.action` format
-- `config` (object, optional): Hook configuration. For function hooks: `config.source` is auto-renamed to `config.code`, default runtime is `python3.12`, `timeout_s` is capped at 60
-- `settings` (object, optional): Hook settings
-- `secret` (string, optional): Secret key for webhooks
-
-**Note:** `token_owner` cannot be an `organization_group_admin` user.
-
-**Common events:**
-- `annotation_content.initialize` — When annotation is first created
-- `annotation_content.confirm` — When annotation is confirmed
-- `annotation_content.export` — When annotation is exported
-- `annotation_status.changed` — When annotation status changes
+## Extensions — Hooks (2 tools)
 
 ### update_hook
 
@@ -450,17 +407,6 @@ Patches an existing hook; only provided fields change.
 - `config` (object, optional): New hook configuration
 - `settings` (object, optional): New hook settings
 - `active` (boolean, optional): Enable or disable the hook
-
-### create_hook_from_template
-
-Creates a hook from a Rossum Store template. Use `search(query={"entity": "hook_template"})` to browse available templates.
-
-**Parameters:**
-- `name` (string, required): Name for the new hook
-- `hook_template_id` (integer, required): Template ID from `search`
-- `queues` (array of strings, required): List of queue URLs
-- `events` (array of strings, optional): Override template default events
-- `token_owner` (string, optional): User URL for token ownership (required if template has `use_token_owner`; cannot be an `organization_group_admin` user)
 
 ### test_hook
 
@@ -479,40 +425,7 @@ Tests a hook by auto-generating a realistic payload and executing it. For `annot
 
 ---
 
-## Rules & Actions (3 tools)
-
-### create_rule
-
-Creates a new business rule. At least one of `schema_id` or `queue_ids` is required to scope the rule.
-
-**Parameters:**
-- `name` (string, required): Rule name
-- `trigger_condition` (string, required): TxScript formula (e.g., `"field.amount > 10000"`)
-- `actions` (array, required): List of actions. Each action requires: `id` (unique string), `type`, `event`, `payload`
-- `enabled` (boolean, optional, default: true): Whether the rule is enabled
-- `schema_id` (integer, optional): Schema ID to scope the rule
-- `queue_ids` (array of integers, optional): Queue IDs to scope the rule to specific queues
-
-**Action types:** `show_message`, `add_automation_blocker`, `add_validation_source`, `change_queue`, `send_email`, `hide_field`, `show_field`, `show_hide_field`, `change_status`, `add_label`, `remove_label`, `custom`
-
-**Example:**
-```json
-{
-  "name": "High Value Alert",
-  "trigger_condition": "field.amount > 10000",
-  "actions": [
-    {
-      "id": "show_high_value_message",
-      "type": "show_message",
-      "event": "validation",
-      "payload": {"type": "error", "content": "High value invoice detected", "schema_id": "amount"}
-    }
-  ],
-  "enabled": true,
-  "schema_id": 12345,
-  "queue_ids": [101, 102]
-}
-```
+## Rules & Actions (2 tools)
 
 ### update_rule
 
@@ -555,36 +468,7 @@ patch_rule(rule_id=67890, queue_ids=[])
 
 ---
 
-## Workspace Management (1 tool)
-
-### create_workspace
-
-Creates a new workspace.
-
-**Parameters:**
-- `name` (string, required): Workspace name
-- `organization_id` (integer, required): Organization ID
-- `metadata` (object, optional): Custom metadata
-
----
-
-## User Management (2 tools)
-
-### create_user
-
-Creates a new user. Use `search(query={"entity": "user_role"})` to get role/group URLs.
-
-**Parameters:**
-- `username` (string, required): Username for the new user
-- `email` (string, required): Email address for the new user
-- `queues` (array of strings, optional): List of queue URLs to assign
-- `groups` (array of strings, optional): List of group/role URLs to assign
-- `first_name` (string, optional): User's first name
-- `last_name` (string, optional): User's last name
-- `is_active` (boolean, optional, default: true): Whether the user is active
-- `metadata` (object, optional): Custom metadata
-- `oidc_id` (string, optional): OIDC identity for SSO
-- `auth_type` (string, optional, default: `password`): Authentication type
+## User Management (1 tool)
 
 ### update_user
 
@@ -603,31 +487,6 @@ Patches a user; only provided fields change. Use `search(query={"entity": "user_
 - `oidc_id` (string, optional): Updated OIDC identity
 - `auth_type` (string, optional): Updated authentication type
 - `ui_settings` (object, optional): Updated UI settings
-
----
-
-## Email Templates (1 tool)
-
-### create_email_template
-
-Creates a new email template.
-
-**Parameters:**
-- `name` (string, required): Template name
-- `queue` (integer, required): Queue ID
-- `subject` (string, required): Email subject
-- `message` (string, required): Email body (HTML supported)
-- `type` (string, optional, default: `custom`): Template type — `rejection`, `rejection_default`, `email_with_no_processable_attachments`, or `custom`
-- `automate` (boolean, optional, default: false): Auto-send on trigger
-- `to` (array, optional): Recipient objects
-- `cc` (array, optional): CC recipient objects
-- `bcc` (array, optional): BCC recipient objects
-- `triggers` (array of strings, optional): Trigger event names for automatic sending
-
-**Recipient object types:**
-- `{"type": "annotator", "value": ""}` — Document annotator
-- `{"type": "constant", "value": "email@example.com"}` — Fixed email address
-- `{"type": "datapoint", "value": "email_field_id"}` — Value from a document field
 
 ---
 
@@ -659,7 +518,7 @@ Set the MCP operation mode. Use `read-only` to disable write operations, `read-w
 
 Lists all available tool categories with descriptions, tool names, read/write status, and keywords for dynamic tool loading.
 
-**Available categories:** `read`, `annotations`, `queues`, `schemas`, `engines`, `hooks`, `email_templates`, `rules`, `users`, `workspaces`
+**Available categories:** `read`, `write`, `annotations`, `queues`, `schemas`, `engines`, `hooks`, `email_templates`, `rules`, `users`, `workspaces`
 
 ---
 
@@ -703,10 +562,10 @@ Other states: `created`, `failed_import`, `split`, `in_workflow`, `rejected`, `f
 
 ### Create Queue with Engine
 
-1. Create schema using `create_schema`
-2. Create engine using `create_engine`
-3. Create engine fields using `create_engine_field`
-4. Create queue using `create_queue`
+1. Create schema using `create(entity="schema", data={...})`
+2. Create engine using `create(entity="engine", data={...})`
+3. Create engine fields using `create(entity="engine_field", data={...})`
+4. Create queue using `create(entity="queue_from_template", data={...})` or via the API directly
 5. Optionally update engine training queues using `update_engine`
 
 ### Explore a Queue

@@ -289,22 +289,6 @@ async def _delete_hook(client: AsyncRossumAPIClient, hook_id: int) -> dict:
 
 def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
     @mcp.tool(
-        description="Create a hook. Function hooks: config.source auto-renamed to config.code, default runtime python3.12, timeout_s capped at 60. token_owner cannot be an organization_group_admin user.",
-        tags={"hooks", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_hook(
-        name: str,
-        type: HookType,
-        queues: list[str] | None = None,
-        events: list[HookEventAndAction] | None = None,
-        config: dict | None = None,
-        settings: dict | None = None,
-        secret: str | None = None,
-    ) -> Hook | dict:
-        return await _create_hook(client, name, type, queues, events, config, settings, secret)
-
-    @mcp.tool(
         description="Patch a hook; only provided fields change.",
         tags={"hooks", "write"},
         annotations={"readOnlyHint": False},
@@ -319,20 +303,6 @@ def register_hook_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         active: bool | None = None,
     ) -> Hook | dict:
         return await _update_hook(client, hook_id, name, queues, events, config, settings, active)
-
-    @mcp.tool(
-        description="Create a hook from a template; events may override template defaults. If template requires use_token_owner, provide token_owner (not an organization_group_admin user).",
-        tags={"hooks", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_hook_from_template(
-        name: str,
-        hook_template_id: int,
-        queues: list[str],
-        events: list[HookEventAndAction] | None = None,
-        token_owner: str | None = None,
-    ) -> Hook | dict:
-        return await _create_hook_from_template(client, name, hook_template_id, queues, events, token_owner)
 
     @mcp.tool(
         description="Test a hook by auto-generating a realistic payload and executing it. For annotation_content/annotation_status events, annotation and status are auto-resolved from the hook's queues if not provided. If no annotations exist on the hook's queues, ask the user to upload a document first — never upload documents yourself.",

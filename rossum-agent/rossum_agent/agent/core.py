@@ -94,8 +94,10 @@ from rossum_agent.tools.core import (
 )
 from rossum_agent.tools.deploy import DEPLOY_TOOLS, get_deploy_tool_names, get_deploy_tools
 from rossum_agent.tools.dynamic_tools import (
+    CREATE_TOOL_NAME,
     DELETE_TOOL_NAME,
     DISCOVERY_TOOL_NAME,
+    GET_CREATE_SCHEMA_TOOL_NAME,
     get_dynamic_tools,
     get_tools_version,
     is_skill_loaded,
@@ -402,7 +404,9 @@ class RossumAgent:
             mcp_tools = await self.mcp_connection.get_tools()
             always_loaded_names = {DISCOVERY_TOOL_NAME}
             if not get_context().is_read_only:
+                always_loaded_names.add(CREATE_TOOL_NAME)
                 always_loaded_names.add(DELETE_TOOL_NAME)
+                always_loaded_names.add(GET_CREATE_SCHEMA_TOOL_NAME)
             always_loaded = [t for t in mcp_tools if t.name in always_loaded_names]
             self._tools_cache = (
                 mcp_tools_to_anthropic_format(always_loaded)

@@ -48,8 +48,6 @@ _OPERATION_MAP: dict[str, Literal["create", "update", "delete"]] = {
 # Tools that don't follow the standard prefix convention
 _TOOL_OVERRIDES: dict[str, tuple[str, Literal["create", "update", "delete"]]] = {
     "prune_schema_fields": ("schema", "update"),
-    "create_queue_from_template": ("queue", "create"),
-    "create_hook_from_template": ("hook", "create"),
 }
 
 
@@ -204,6 +202,11 @@ class MCPConnection:
             entity_type = arguments["entity"]
             entity_id = str(arguments["entity_id"])
             operation: Literal["create", "update", "delete"] = "delete"
+        # Handle unified create tool: create(entity="queue_from_template", data={...})
+        elif name == "create" and "entity" in arguments:
+            entity_type = arguments["entity"]
+            entity_id = None
+            operation = "create"
         else:
             entity_type = _extract_entity_type(name)
             entity_id = _extract_entity_id(entity_type or "", arguments) if entity_type else None

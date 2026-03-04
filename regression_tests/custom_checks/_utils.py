@@ -6,7 +6,7 @@ import json
 import re
 from typing import TYPE_CHECKING
 
-from rossum_agent.agent.models import FinalAnswerStep, ToolResultStep
+from rossum_agent.agent.models import FinalAnswerStep, ToolCall, ToolResultStep
 from rossum_agent.bedrock_client import create_bedrock_client, get_small_model_id
 from rossum_api import SyncRossumAPIClient
 from rossum_api.dtos import Token
@@ -72,15 +72,34 @@ def extract_id_from_final_answer(steps: list[AgentStep]) -> str | None:
     return None
 
 
+def _matches_tool(tc: ToolCall, tool_name: str) -> bool:
+    """Match a tool call against a synthesized name like ``create:hook``."""
+    if ":" not in tool_name:
+        return tc.name == tool_name
+    prefix, entity = tool_name.split(":", 1)
+    if tc.name != prefix:
+        return False
+    if prefix == "search":
+        query = tc.arguments.get("query", {})
+        return (query.get("entity", "") if isinstance(query, dict) else "") == entity
+    return tc.arguments.get("entity", "") == entity
+
+
 def agent_called_tool(steps: list[AgentStep], tool_name: str) -> bool:
     """Check if a tool was called in any step."""
-    return any(tc.name == tool_name for step in steps if isinstance(step, ToolResultStep) for tc in step.tool_calls)
+    return any(
+        _matches_tool(tc, tool_name) for step in steps if isinstance(step, ToolResultStep) for tc in step.tool_calls
+    )
 
 
 def count_tool_calls(steps: list[AgentStep], tool_name: str) -> int:
     """Count how many times a tool was called."""
     return sum(
-        1 for step in steps if isinstance(step, ToolResultStep) for tc in step.tool_calls if tc.name == tool_name
+        1
+        for step in steps
+        if isinstance(step, ToolResultStep)
+        for tc in step.tool_calls
+        if _matches_tool(tc, tool_name)
     )
 
 

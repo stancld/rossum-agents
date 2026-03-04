@@ -49,7 +49,7 @@ def suggest_rule(user_query: str, queue_id: int) -> str:
         queue_id: The numeric queue ID (e.g., 2519495). Get this from search(query={"entity": "queue"}).
 
     Returns:
-        JSON with the suggested rule (name, trigger_condition, actions) ready for create_rule.
+        JSON with the suggested rule (name, trigger_condition, actions) ready for create(entity="rule", ...).
     """
     logger.info(f"suggest_rule: {queue_id=}, query={user_query[:100]}...")
 

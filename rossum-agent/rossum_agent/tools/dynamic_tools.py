@@ -32,9 +32,6 @@ HIDDEN_TOOLS: dict[str, str] = {
         "Hidden: agent tends to use update_schema incorrectly, unintentionally "
         "overwriting the whole schema. Use the schema_patching subagent instead."
     ),
-    "create_queue": (
-        "Hidden: use create_queue_from_template instead. Ask the user which template to use if not specified."
-    ),
 }
 
 
@@ -53,8 +50,14 @@ _catalog_cache: CatalogData | None = None
 # Discovery tool that's always loaded
 DISCOVERY_TOOL_NAME = "list_tool_categories"
 
-# Unified delete tool — always loaded in read-write mode (not part of any category)
+# Unified write tools — always loaded in read-write mode (not part of any domain category)
+CREATE_TOOL_NAME = "create"
 DELETE_TOOL_NAME = "delete"
+GET_CREATE_SCHEMA_TOOL_NAME = "get_create_schema"
+
+# Tools loaded unconditionally in _get_tools() — must be excluded from dynamic loading
+# to avoid "Tool names must be unique" API errors.
+ALWAYS_LOADED_TOOLS = {DISCOVERY_TOOL_NAME, CREATE_TOOL_NAME, DELETE_TOOL_NAME, GET_CREATE_SCHEMA_TOOL_NAME}
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +178,8 @@ def get_category_keywords() -> dict[str, list[str]]:
 
 def get_write_tools() -> set[str]:
     tools = _fetch_catalog_from_mcp().write_tools
-    # The unified delete tool lives outside any category but is always a write tool
+    # Unified write tools live outside any domain category but are always write tools
+    tools.add(CREATE_TOOL_NAME)
     tools.add(DELETE_TOOL_NAME)
     return tools
 
@@ -187,7 +191,8 @@ def get_cached_category_tool_names() -> dict[str, set[str]] | None:
 
 async def get_write_tools_async(mcp_connection: MCPConnection) -> set[str]:
     tools = (await _fetch_catalog_async(mcp_connection)).write_tools
-    # The unified delete tool lives outside any category but is always a write tool
+    # Unified write tools live outside any domain category but are always write tools
+    tools.add(CREATE_TOOL_NAME)
     tools.add(DELETE_TOOL_NAME)
     return tools
 
@@ -253,6 +258,7 @@ def _load_categories_impl(categories: list[str]) -> str:
         tool_names_to_load -= get_write_tools()
 
     tool_names_to_load -= set(HIDDEN_TOOLS)
+    tool_names_to_load -= ALWAYS_LOADED_TOOLS
 
     mcp_tools = asyncio.run_coroutine_threadsafe(ctx.mcp_connection.get_tools(), ctx.mcp_event_loop).result()
     tools_to_add = _filter_mcp_tools_by_names(mcp_tools, tool_names_to_load)
@@ -365,7 +371,7 @@ def load_tool(tool_names: list[str]) -> str:
         if blocked:
             return f"Error: Write tools not available in read-only mode: {blocked}"
 
-    already_loaded = {t["name"] for t in state.tools}
+    already_loaded = {t["name"] for t in state.tools} | ALWAYS_LOADED_TOOLS
     to_load = [name for name in tool_names if name not in already_loaded]
 
     if not to_load:

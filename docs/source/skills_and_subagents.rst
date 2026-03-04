@@ -49,7 +49,7 @@ Available Skills
    * - ``ui-settings``
      - Update queue UI settings (annotation list columns) without corrupting structure
    * - ``rules-and-actions``
-     - Create validation rules with TxScript trigger conditions and actions via ``create_rule``
+     - Create validation rules with TxScript trigger conditions and actions via ``create(entity="rule", data={...})``
    * - ``formula-fields``
      - Create/configure formula fields with TxScript reference, messaging functions, and common patterns
    * - ``reasoning-fields``
@@ -68,7 +68,7 @@ Hooks Skill
 
 **Goal**: Create, configure, and test hooks — prefer Rossum Store templates over custom code.
 
-Workflow: ``search(query={"entity": "hook_template"})`` → ``create_hook_from_template()`` or ``create_hook()`` → ``test_hook()`` → ``search(query={"entity": "hook_log", ...})``.
+Workflow: ``search(query={"entity": "hook_template"})`` → ``create(entity="hook_from_template", data={...})`` or ``create(entity="hook", data={...})`` → ``test_hook()`` → ``search(query={"entity": "hook_log", ...})``.
 
 Rossum Deployment Skill
 """""""""""""""""""""""
@@ -115,7 +115,7 @@ Organization Setup Skill
 
 **Goal**: Set up Rossum for new customers with correct document types and regional configurations.
 
-Use ``create_queue_from_template`` for new customer onboarding with regional templates (EU/US/UK/CZ/CN).
+Use ``create(entity="queue_from_template", data={...})`` for new customer onboarding with regional templates (EU/US/UK/CZ/CN).
 
 Schema Creation Skill
 """""""""""""""""""""
@@ -214,24 +214,24 @@ Available Categories
    * - Category
      - Description
      - Keywords (for auto-loading)
+   * - ``write``
+     - Create and delete entities (unified create/delete tools)
+     - create, delete, new, remove
    * - ``annotations``
      - Document processing: upload, retrieve, update, confirm
      - annotation, document, upload, extract, confirm, review
    * - ``queues``
-     - Queue management: create, configure, list
+     - Queue management: update, configure
      - queue, inbox, connector
    * - ``schemas``
      - Schema management: define, modify field structures
      - schema, field, datapoint, section, multivalue, tuple
    * - ``engines``
-     - AI engine management: extraction/splitting engines
+     - AI engine management: update engines, get engine fields
      - engine, ai, extractor, splitter, training
    * - ``hooks``
-     - Extensions/webhooks: automation hooks
+     - Extensions/webhooks: update and test hooks
      - hook, extension, webhook, automation, function, serverless
-   * - ``email_templates``
-     - Email templates: automated email responses
-     - email, template, notification, rejection
    * - ``document_relations``
      - Document relations: export/einvoice links
      - document relation, export, einvoice
@@ -239,14 +239,11 @@ Available Categories
      - Annotation relations: edit/attachment/duplicate links
      - relation, duplicate, attachment, edit
    * - ``rules``
-     - Validation rules: schema validation
+     - Validation rules: update and patch rules
      - rule, validation, constraint
    * - ``users``
-     - User management: list users and roles
+     - User management: update users
      - user, role, permission, token_owner
-   * - ``workspaces``
-     - Workspace management: organize queues
-     - workspace, organization
 
 Automatic Pre-loading
 ^^^^^^^^^^^^^^^^^^^^^

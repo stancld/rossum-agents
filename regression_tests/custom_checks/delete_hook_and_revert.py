@@ -19,8 +19,8 @@ def check_hook_deleted_and_reverted(steps: list[AgentStep], api_base_url: str, a
         return False, "Agent never called revert_commit"
 
     # Initial creation is still required; revert recreation is now auto-executed by revert_commit
-    create_count = count_tool_calls(steps, "create_hook") + count_tool_calls(steps, "create_hook_from_template")
+    create_count = count_tool_calls(steps, "create:hook") + count_tool_calls(steps, "create:hook_from_template")
     if create_count < 1:
-        return False, f"Expected at least one create_hook call (initial creation), got {create_count}"
+        return False, f"Expected at least one create:hook call (initial creation), got {create_count}"
 
     return True, "Hook was created, deleted, and reverted (recreation auto-executed)"

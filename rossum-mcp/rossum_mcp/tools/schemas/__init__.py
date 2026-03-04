@@ -77,14 +77,6 @@ def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await ops.update_schema(client, schema_id, schema_data)
 
     @mcp.tool(
-        description="Create a schema; requires at least one section containing datapoints.",
-        tags={"schemas", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_schema(name: str, content: list[dict]) -> Schema | dict:
-        return await ops.create_schema(client, name, content)
-
-    @mcp.tool(
         description="Patch schema nodes (add/update/remove). Prereq: load schema-patching skill. Ops: add (parent_id + node_data), update (node_id + node_data), remove (node_id only). Tuple datapoints require explicit id; section-level datapoints use the passed node_id.",
         tags={"schemas", "write"},
         annotations={"readOnlyHint": False},

@@ -26,38 +26,48 @@ Answer with a JSON object:
 {{"passed": true/false, "reasoning": "Brief explanation of which conventions were followed or violated"}}"""
 
 
+def _is_hook_tool(name: str, arguments: dict) -> bool:
+    if name == "update_hook":
+        return True
+    if name != "create":
+        return False
+    data = arguments.get("data", {})
+    return isinstance(data, dict) and data.get("entity") in ("hook", "hook_from_template")
+
+
+def _get_args_dict(tc_arguments: dict | str) -> dict:
+    return tc_arguments if isinstance(tc_arguments, dict) else {}
+
+
 def check_serverless_hook_uses_txscript(
     steps: list[AgentStep], _api_base_url: str, _api_token: str
 ) -> tuple[bool, str]:
     """Verify created hook code follows TxScript syntax conventions.
 
-    Searches tool results for create_hook or create_hook_from_template calls and
+    Searches tool results for create hook/hook_from_template calls and
     uses Haiku to semantically verify the hook code uses TxScript patterns.
     """
     for step in steps:
         if not isinstance(step, ToolResultStep):
             continue
         for tr in step.tool_results:
-            if tr.name not in ("create_hook", "create_hook_from_template", "update_hook"):
+            tc = next((tc for tc in step.tool_calls if tc.id == tr.tool_call_id), None)
+            if not tc or not _is_hook_tool(tc.name, _get_args_dict(tc.arguments)):
                 continue
 
             content = tr.content if isinstance(tr.content, str) else str(tr.content)
-            if not content:
-                continue
-
-            return call_haiku_check(_PROMPT.format(hook_code=content[:8000]))
+            if content:
+                return call_haiku_check(_PROMPT.format(hook_code=content[:8000]))
 
     for step in steps:
         if not isinstance(step, ToolResultStep):
             continue
         for tc in step.tool_calls:
-            if tc.name not in ("create_hook", "create_hook_from_template", "update_hook"):
+            if not _is_hook_tool(tc.name, _get_args_dict(tc.arguments)):
                 continue
 
             args = tc.arguments if isinstance(tc.arguments, str) else str(tc.arguments)
-            if not args:
-                continue
+            if args:
+                return call_haiku_check(_PROMPT.format(hook_code=args[:8000]))
 
-            return call_haiku_check(_PROMPT.format(hook_code=args[:8000]))
-
-    return False, "No create_hook/create_hook_from_template/update_hook tool call found"
+    return False, "No create hook or update_hook tool call found"

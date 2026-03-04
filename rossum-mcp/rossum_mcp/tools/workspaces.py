@@ -15,7 +15,6 @@ from rossum_mcp.tools.base import (
 )
 
 if TYPE_CHECKING:
-    from fastmcp import FastMCP
     from rossum_api import AsyncRossumAPIClient
 
 logger = logging.getLogger(__name__)
@@ -54,13 +53,3 @@ async def _create_workspace(
 
 async def _delete_workspace(client: AsyncRossumAPIClient, workspace_id: int) -> dict:
     return await delete_resource("workspace", workspace_id, client.delete_workspace)
-
-
-def register_workspace_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(
-        description="Create a new workspace.",
-        tags={"workspaces", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_workspace(name: str, organization_id: int, metadata: dict | None = None) -> Workspace | dict:
-        return await _create_workspace(client, name, organization_id, metadata)

@@ -13,10 +13,10 @@
 
 ```
 search(query={"entity": "hook_template"})
-create_hook_from_template(name="My Hook", hook_template_id=123, queues=["https://..."], token_owner="https://.../users/456")
+create(entity="hook_from_template", data={"name": "My Hook", "hook_template_id": 123, "queues": ["https://..."], "token_owner": "https://.../users/456"})
 ```
 
-Check template's `use_token_owner` and `events` fields before calling `create_hook_from_template`.
+Check template's `use_token_owner` and `events` fields before creating from template.
 
 ## token_owner
 
@@ -30,7 +30,7 @@ Check template's `use_token_owner` and `events` fields before calling `create_ho
 ## Creating Custom Hooks
 
 ```
-create_hook(name="My Hook", type="function", queues=["https://..."], events=["annotation_content.export"], config={"source": "<code>"})
+create(entity="hook", data={"name": "My Hook", "type": "function", "queues": ["https://..."], "events": ["annotation_content.export"], "config": {"source": "<code>"}})
 ```
 
 | Detail | Value |

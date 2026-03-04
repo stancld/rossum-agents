@@ -44,12 +44,16 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **35 tools** organized into categories:
+The MCP server provides **25 tools** organized into categories:
 
 **Unified Read Layer**
 
 * **get** - Get entities by ID (single or batch). Supports ``include_related`` for enriched responses (queue→schema+engine+hooks, schema→queues+rules, hook→queues+events)
 * **search** - Search/list entities with typed, entity-specific filters. Supports: queue, schema, hook, engine, rule, user, workspace, email_template, organization_group, annotation, relation, document_relation, hook_log, hook_template, user_role, queue_template_name
+
+**Create Layer**
+
+* **create** - Unified create for any supported entity. Pass ``data={"entity": "<type>", ...}`` with entity-specific fields. Supported entities: ``workspace``, ``queue_from_template``, ``schema``, ``user``, ``hook``, ``hook_from_template``, ``engine``, ``engine_field``, ``rule``, ``email_template``
 
 **Delete Layer**
 
@@ -66,50 +70,33 @@ The MCP server provides **35 tools** organized into categories:
 
 **Queue Management**
 
-* **create_queue** - Create new queues
-* **create_queue_from_template** - Create queues from predefined templates (EU/US/UK/CZ/CN)
 * **update_queue** - Configure automation thresholds
 
 **Schema Management**
 
-* **create_schema** - Create new schemas
 * **update_schema** - Configure field-level thresholds
 * **patch_schema** - Add, update, or remove individual schema nodes
 * **get_schema_tree_structure** - Get lightweight tree structure of schema
 * **prune_schema_fields** - Remove multiple fields from schema at once
 
-**Workspace Management**
-
-* **create_workspace** - Create a new workspace
-
 **User Management**
 
-* **create_user** - Create a new user
 * **update_user** - Update user properties
 
 **Engine Management**
 
-* **create_engine** - Create extraction or splitting engines
 * **update_engine** - Configure learning and training queues
-* **create_engine_field** - Define engine fields and link to schemas
 * **get_engine_fields** - Retrieve engine fields for a specific engine or all fields
 
 **Extensions (Hooks)**
 
-* **create_hook** - Create webhooks or serverless function hooks
 * **update_hook** - Update hook properties (name, queues, events, config, settings, active)
-* **create_hook_from_template** - Create hooks from pre-built templates
 * **test_hook** - Test a hook with sample payloads
 
 **Rules & Actions**
 
-* **create_rule** - Create business rules with trigger conditions and actions
 * **update_rule** - Full update of business rules (PUT)
 * **patch_rule** - Partial update of business rules (PATCH)
-
-**Email Templates**
-
-* **create_email_template** - Create new email templates
 
 **Tool Discovery**
 

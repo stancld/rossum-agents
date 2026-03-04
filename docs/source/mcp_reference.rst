@@ -137,57 +137,50 @@ search
 **Implementation:**
   See ``rossum_mcp.tools.generic.read``
 
-create_queue_from_template
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+get_create_schema
+^^^^^^^^^^^^^^^^^
 
 **MCP Tool:**
-  ``create_queue_from_template(name: str, template_name: str, workspace_id: int,
-  include_documents: bool, engine_id: int | None)``
+  ``get_create_schema(entity: CreateEntityType)``
 
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient._http_client.request_json("POST", "queues/from_template", ...)``
+Returns the JSON Schema for a specific entity type, including entity-specific notes.
+Call before ``create`` to discover required/optional fields.
 
-**API Endpoint:**
-  ``POST /v1/queues/from_template``
+**Returns:**
+  JSON Schema dict with ``properties``, ``required``, and optional ``note`` field.
 
-**Request Body:**
-  JSON object with queue name, template_name, workspace URL, include_documents flag,
-  and optional engine URL.
-
-**SDK Documentation:**
-  https://rossum.app/api/docs/#tag/Queue/operation/queues_from_template
-
-**Implementation:**
-  Creates a queue from predefined templates. Preferred method for new customer setup.
-  Templates include pre-configured schema and AI engine for specific document types
-  (EU/US/UK/CZ/CN invoices, purchase orders, credit notes, etc.).
-
-create_queue
-^^^^^^^^^^^^
+create
+^^^^^^
 
 **MCP Tool:**
-  ``create_queue(name: str, workspace_id: int, schema_id: int, engine_id: int | None,
-  inbox_id: int | None, connector_id: int | None, locale: str, automation_enabled: bool,
-  automation_level: str, training_enabled: bool)``
+  ``create(entity: CreateEntityType, data: dict)``
 
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.create_new_queue(queue_data: dict)``
+Creates an entity. Server-side Pydantic validation is preserved — on validation error,
+the response includes ``error``, ``details``, and ``expected_schema`` for self-correction.
 
-**API Endpoint:**
-  ``POST /v1/queues``
+**Supported entities:**
+  ``workspace``, ``queue_from_template``, ``schema``, ``user``, ``hook``, ``hook_from_template``,
+  ``engine``, ``engine_field``, ``rule``, ``email_template``
 
-**Request Body:**
-  JSON object with queue configuration including name, workspace URL, schema URL,
-  optional engine URL, inbox URL, connector URL, locale, automation settings, and
-  training settings.
+**Example:**
 
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
+  .. code-block:: python
+
+     # First, get the schema
+     get_create_schema(entity="queue_from_template")
+
+     # Then create
+     create(entity="queue_from_template", data={"name": "ACME Invoices", "template_name": "...", "workspace_id": 123})
+
+     create(entity="hook_from_template", data={"name": "Splitting", "hook_template_id": 5, "queues": [...]})
+
+     create(entity="workspace", data={"name": "Production", "organization_id": 100})
+
+**API Endpoints:**
+  Varies by entity — ``POST /v1/{entity_plural}`` or entity-specific endpoints.
 
 **Implementation:**
-  Creates a new queue with full configuration options. Constructs URLs for workspace,
-  schema, and optional resources (engine, inbox, connector) using the base URL.
-  See ``rossum_mcp.server:339-442``
+  See ``rossum_mcp.tools.generic.create``
 
 update_queue
 ^^^^^^^^^^^^
@@ -277,110 +270,6 @@ update_engine
 **Important:** When using the SDK directly with ``request_json``, always use the
 ``json=`` parameter, not ``data=``. The Rossum API expects JSON-encoded data
 (application/json), not form-encoded data (application/x-www-form-urlencoded).
-
-create_hook
-^^^^^^^^^^^
-
-**MCP Tool:**
-  ``create_hook(name: str, target: str, queues: list[str] | None,
-  events: list[str] | None, config: dict | None, enabled: bool,
-  insecure_ssl: bool, secret: str | None, response_event: dict | None)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.create_new_hook(hook_data: dict)``
-
-**API Endpoint:**
-  ``POST /v1/hooks``
-
-**Request Body:**
-  JSON object with hook configuration including name, target URL, optional
-  queue URLs, event triggers, configuration, and security settings.
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Creates a new webhook or serverless function hook. The hook will trigger on specified
-  events and send requests to the target URL. See ``rossum_mcp.server:972-1046``
-
-**Common Use Cases:**
-
-  .. code-block:: python
-
-     # Create a simple webhook for all queues
-     basic_hook = await server.create_hook(
-         name="Invoice Processing Hook",
-         target="https://example.com/webhook"
-     )
-
-     # Create a hook for specific queues and events
-     advanced_hook = await server.create_hook(
-         name="Status Tracker",
-         target="https://example.com/status",
-         queues=["https://api.elis.rossum.ai/v1/queues/12345"],
-         events=["annotation_status", "annotation_content"],
-         config={"custom_header": "value"},
-         secret="webhook_secret_123"
-     )
-
-**Parameters:**
-  - ``name`` (str): Hook name for identification
-  - ``target`` (str): URL endpoint where webhook requests are sent
-  - ``queues`` (list[str], optional): List of queue URLs to attach the hook to.
-    If not provided, hook applies to all queues
-  - ``events`` (list[str], optional): List of events that trigger the hook:
-
-    * ``annotation_status`` - Annotation status changes
-    * ``annotation_content`` - Content modifications
-    * ``annotation_export`` - Export operations
-    * ``datapoint_value`` - Individual field value changes
-
-  - ``config`` (dict, optional): Additional configuration (e.g., custom headers)
-  - ``enabled`` (bool): Whether the hook is active (default: True)
-  - ``insecure_ssl`` (bool): Skip SSL verification (default: False)
-  - ``secret`` (str, optional): Secret key for securing webhook requests
-  - ``response_event`` (dict, optional): Configuration for response event handling
-
-create_rule
-^^^^^^^^^^^
-
-**MCP Tool:**
-  ``create_rule(name: str, trigger_condition: str, actions: list[dict], enabled: bool = True, schema_id: int | None = None, queue_ids: list[int] | None = None)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.create_new_rule(rule_data)``
-
-**API Endpoint:**
-  ``POST /v1/rules``
-
-**Request Body:**
-  - ``name``: Rule name
-  - ``trigger_condition``: TxScript formula string (e.g., ``"field.amount > 10000"``)
-  - ``actions``: List of actions with required fields: ``id``, ``type``, ``event``, ``payload``
-  - ``enabled``: Whether the rule is active (default: True)
-  - ``schema``: Schema URL (optional, at least one of ``schema_id`` or ``queue_ids`` required)
-  - ``queues``: List of queue URLs to limit rule to specific queues (optional)
-
-**Action types:** ``show_message``, ``add_automation_blocker``, ``add_validation_source``, ``change_queue``, ``send_email``, ``hide_field``, ``show_field``, ``show_hide_field``, ``change_status``, ``add_label``, ``remove_label``, ``custom``
-
-**Event:** ``validation``
-
-**Implementation:**
-  Creates a new business rule. Rules automate field operations based on trigger conditions.
-  Actions define what happens when conditions are met (e.g., set field value, show message).
-  At least one of ``schema_id`` or ``queue_ids`` must be provided to scope the rule.
-
-**Common Use Cases:**
-
-  .. code-block:: python
-
-     # Create a validation rule
-     rule = await server.create_rule(
-         name="High Value Alert",
-         trigger_condition="field.amount > 10000",
-         actions=[{"id": "alert1", "type": "show_message", "event": "validation", "payload": {"type": "error", "content": "High value invoice", "schema_id": "amount"}}],
-         schema_id=12345
-     )
 
 update_rule
 ^^^^^^^^^^^
@@ -474,29 +363,6 @@ update_hook
 **Implementation:**
   Updates an existing hook's properties. Only provided fields are updated; others remain
   unchanged. Commonly used to modify hook name, attached queues, events, config, or active status.
-
-create_hook_from_template
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``create_hook_from_template(name: str, hook_template_id: int, queues: list[str], events: list[str] | None, token_owner: str | None)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient._http_client.request_json("POST", "hooks/create", json=hook_data)``
-
-**API Endpoint:**
-  ``POST /v1/hooks/create``
-
-**Request Body:**
-  JSON object with hook name, template URL, queues, optional events, and optional token_owner.
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Creates a hook from a Rossum Store template. If the template has ``use_token_owner=True``,
-  a valid token_owner user URL must be provided. Organization group admin users cannot be
-  used as token owners.
 
 test_hook
 ^^^^^^^^^
@@ -613,33 +479,30 @@ list_tool_categories
    * - ``read``
      - Unified read layer: get one entity by ID or search/list with typed filters
      - get, search, list, read, retrieve, find, lookup
+   * - ``write``
+     - Create and delete entities (unified create/delete tools)
+     - create, delete, new, remove
    * - ``annotations``
      - Document processing: upload, retrieve, update, confirm
      - annotation, document, upload, extract, confirm, review
    * - ``queues``
-     - Queue management: create, configure, list
+     - Queue management: update, configure
      - queue, inbox, connector
    * - ``schemas``
      - Schema management: define, modify field structures
      - schema, field, datapoint, section, multivalue, tuple
    * - ``engines``
-     - AI engine management: extraction/splitting engines
+     - AI engine management: update engines, get engine fields
      - engine, ai, extractor, splitter, training
    * - ``hooks``
-     - Extensions/webhooks: automation hooks
+     - Extensions/webhooks: update and test hooks
      - hook, extension, webhook, automation, function, serverless
-   * - ``email_templates``
-     - Email templates: automated email responses
-     - email, notification, rejection
    * - ``rules``
-     - Validation rules: schema validation
+     - Validation rules: update and patch rules
      - rule, validation, constraint
    * - ``users``
-     - User management: create and update users
+     - User management: update users
      - user, role, permission, token_owner
-   * - ``workspaces``
-     - Workspace management: organize queues
-     - workspace, organization
 **Example:**
 
 .. code-block:: python

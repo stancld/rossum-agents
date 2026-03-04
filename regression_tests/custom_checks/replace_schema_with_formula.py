@@ -14,12 +14,12 @@ if TYPE_CHECKING:
 
 
 def _extract_schema_id_from_steps(steps: list[AgentStep]) -> int | None:
-    """Extract schema_id from create_queue_from_template result or final answer."""
+    """Extract schema_id from create queue_from_template result or final answer."""
     for step in steps:
         if not isinstance(step, ToolResultStep):
             continue
         for tc in step.tool_calls:
-            if tc.name == "create_queue_from_template":
+            if tc.name == "create" and tc.arguments.get("entity") == "queue_from_template":
                 for tr in step.tool_results:
                     if tr.tool_call_id == tc.id and isinstance(tr.content, str):
                         match = re.search(r'"schema_id":\s*(\d+)', tr.content)

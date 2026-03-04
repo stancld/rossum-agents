@@ -116,34 +116,6 @@ def register_engine_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
         return await _update_engine(client, engine_id, engine_data)
 
     @mcp.tool(
-        description="Create an engine; create matching engine fields for the target schema immediately after.",
-        tags={"engines", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_engine(name: str, organization_id: int, engine_type: EngineType) -> Engine | dict:
-        return await _create_engine(client, name, organization_id, engine_type)
-
-    @mcp.tool(
-        description="Create an engine field corresponding to a schema field (used during engine+schema setup).",
-        tags={"engines", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_engine_field(
-        engine_id: int,
-        name: str,
-        label: str,
-        field_type: EngineFieldType,
-        schema_ids: list[int],
-        tabular: bool = False,
-        multiline: bool = False,
-        subtype: str | None = None,
-        pre_trained_field_id: str | None = None,
-    ) -> EngineField | dict:
-        return await _create_engine_field(
-            client, engine_id, name, label, field_type, schema_ids, tabular, multiline, subtype, pre_trained_field_id
-        )
-
-    @mcp.tool(
         description="Retrieve engine fields for a specific engine or all engine fields.",
         tags={"engines"},
         annotations={"readOnlyHint": True},

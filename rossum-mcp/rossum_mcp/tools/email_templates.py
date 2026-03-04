@@ -9,7 +9,6 @@ from rossum_api.models.email_template import EmailTemplate
 from rossum_mcp.tools.base import build_filters, build_resource_url, filter_by_name_regex, graceful_list
 
 if TYPE_CHECKING:
-    from fastmcp import FastMCP
     from rossum_api import AsyncRossumAPIClient
 
 logger = logging.getLogger(__name__)
@@ -70,26 +69,3 @@ async def _create_email_template(
 
     email_template: EmailTemplate = await client.create_new_email_template(template_data)
     return email_template
-
-
-def register_email_template_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(
-        description="Create an email template; set automate=true for automatic sending. to/cc/bcc are recipient objects {type: annotator|constant|datapoint, value: ...}.",
-        tags={"email_templates", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_email_template(
-        name: str,
-        queue: int,
-        subject: str,
-        message: str,
-        type: EmailTemplateType = "custom",
-        automate: bool = False,
-        to: list[dict[str, Any]] | None = None,
-        cc: list[dict[str, Any]] | None = None,
-        bcc: list[dict[str, Any]] | None = None,
-        triggers: list[str] | None = None,
-    ) -> EmailTemplate | dict:
-        return await _create_email_template(
-            client, name, queue, subject, message, type, automate, to, cc, bcc, triggers
-        )

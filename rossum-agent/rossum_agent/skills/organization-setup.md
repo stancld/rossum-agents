@@ -6,9 +6,9 @@
 
 | Scenario | Tool |
 |----------|------|
-| New customer onboarding | `create_queue_from_template` |
-| Copy existing config | `create_queue` with custom schema |
-| Empty queue | `create_queue` |
+| New customer onboarding | `create(entity="queue_from_template", data={...})` |
+| Copy existing config | `create(entity="queue_from_template", data={...})` with custom schema |
+| Empty queue | `create(entity="queue_from_template", data={...})` with Empty Organization template |
 
 ## Templates
 

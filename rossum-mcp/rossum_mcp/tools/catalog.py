@@ -24,6 +24,10 @@ CATEGORY_META: dict[str, CategoryMeta] = {
         description="Unified read layer: get one entity by ID or search/list with typed filters",
         keywords=["get", "search", "list", "read", "retrieve", "find", "lookup"],
     ),
+    "write": CategoryMeta(
+        description="Unified write layer: create or delete any supported entity",
+        keywords=["create", "delete", "new", "remove", "add"],
+    ),
     "annotations": CategoryMeta(
         description="Document processing: upload, retrieve, update, and confirm annotations",
         keywords=["annotation", "document", "upload", "extract", "confirm", "review"],

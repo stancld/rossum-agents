@@ -21,20 +21,26 @@ def register_discovery_tools(mcp: FastMCP) -> None:
     async def list_tool_categories() -> list[dict]:
         all_tools = await mcp.local_provider.list_tools()
 
-        # Group tools by category tag
+        # Group tools by category tag.
+        # Each tool is assigned to exactly one category: the most specific match.
+        # Generic categories ("read", "write") are used only when no domain category matches.
+        generic_categories = {"read", "write"}
         categories: dict[str, list[dict]] = {}
         for tool in all_tools:
             tool_tags = tool.tags or set()
-            for cat_name in CATEGORY_META:
-                if cat_name in tool_tags:
-                    categories.setdefault(cat_name, []).append(
-                        {
-                            "name": tool.name,
-                            "description": tool.description or "",
-                            "read_only": "write" not in tool_tags,
-                        }
-                    )
-                    break
+            matching = [c for c in CATEGORY_META if c in tool_tags]
+            if not matching:
+                continue
+            # Prefer domain-specific category over generic ones
+            domain = [c for c in matching if c not in generic_categories]
+            chosen = domain[0] if domain else matching[0]
+            categories.setdefault(chosen, []).append(
+                {
+                    "name": tool.name,
+                    "description": tool.description or "",
+                    "read_only": "write" not in tool_tags,
+                }
+            )
 
         return [
             {

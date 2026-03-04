@@ -359,70 +359,53 @@ to get the annotation ID.
      "message": "Document upload initiated. Use `search` with entity=\"annotation\" to find the annotation ID for this queue."
    }
 
-create_queue_from_template
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+create
+^^^^^^
 
-Creates a new queue from a predefined template. **Preferred method for new customer setup.**
-Templates include pre-configured schema and AI engine optimized for specific document types.
+Unified tool to create any supported entity. Uses a discriminated union on the ``entity`` field
+within the ``data`` parameter. Entity-specific fields are passed alongside ``entity``.
 
-**Parameters:**
+**Supported entities:** ``workspace``, ``queue_from_template``, ``schema``, ``user``, ``hook``,
+``hook_from_template``, ``engine``, ``engine_field``, ``rule``, ``email_template``
 
-- ``name`` (string, required): Name of the queue to create
-- ``template_name`` (string, required): Template name (use ``search`` with ``entity="queue_template_name"`` to list)
-- ``workspace_id`` (integer, required): Workspace ID where the queue should be created
-- ``include_documents`` (boolean, optional): Copy documents from template queue (default: false)
-- ``engine_id`` (integer, optional): Override engine assignment
+**Example usage:**
 
-**Returns:**
+.. code-block:: python
 
-.. code-block:: json
+   # Get schema for an entity type first
+   get_create_schema(entity="queue_from_template")
 
-   {
-     "id": 12345,
-     "name": "ACME Corp - Invoices",
-     "url": "https://elis.rossum.ai/api/v1/queues/12345",
-     "workspace": "https://elis.rossum.ai/api/v1/workspaces/11111",
-     "schema": "https://elis.rossum.ai/api/v1/schemas/67890"
-   }
+   # Create a queue from template (preferred for new customer setup)
+   create(entity="queue_from_template", data={"name": "ACME Invoices", "template_name": "...", "workspace_id": 123})
 
-create_queue
-^^^^^^^^^^^^
+   # Create a schema
+   create(entity="schema", data={"name": "Invoice Schema", "content": [...]})
 
-Creates a new queue with schema and optional engine assignment. Allows full configuration
-of queue settings including automation and training.
+   # Create a workspace
+   create(entity="workspace", data={"name": "Production", "organization_id": 100})
 
-**Parameters:**
+   # Create a hook from template
+   create(entity="hook_from_template", data={"name": "Splitting", "hook_template_id": 5, "queues": [...]})
 
-- ``name`` (string, required): Name of the queue to create
-- ``workspace_id`` (integer, required): Workspace ID where the queue should be created
-- ``schema_id`` (integer, required): Schema ID to assign to the queue
-- ``engine_id`` (integer, optional): Optional engine ID to assign for document processing
-- ``inbox_id`` (integer, optional): Optional inbox ID to assign
-- ``connector_id`` (integer, optional): Optional connector ID to assign
-- ``locale`` (string, optional): Queue locale (default: "en_GB")
-- ``automation_enabled`` (boolean, optional): Enable automation (default: false)
-- ``automation_level`` (string, optional): Automation level - "never", "always", etc. (default: "never")
-- ``training_enabled`` (boolean, optional): Enable training (default: true)
+   # Create a hook (webhook or function)
+   create(entity="hook", data={"name": "My Hook", "type": "webhook", "config": {"url": "https://..."}})
 
-**Returns:**
+   # Create an engine
+   create(entity="engine", data={"name": "My Engine", "organization_id": 100, "engine_type": "extractor"})
 
-.. code-block:: json
+   # Create an engine field
+   create(entity="engine_field", data={"engine_id": 123, "name": "invoice_number", "label": "Invoice Number", "field_type": "string", "schema_ids": [456]})
 
-   {
-     "id": "12345",
-     "name": "My New Queue",
-     "url": "https://elis.rossum.ai/api/v1/queues/12345",
-     "workspace": "https://elis.rossum.ai/api/v1/workspaces/11111",
-     "schema": "https://elis.rossum.ai/api/v1/schemas/67890",
-     "engine": "https://elis.rossum.ai/api/v1/engines/54321",
-     "inbox": null,
-     "connector": null,
-     "locale": "en_GB",
-     "automation_enabled": false,
-     "automation_level": "never",
-     "training_enabled": true,
-     "message": "Queue 'My New Queue' created successfully with ID 12345"
-   }
+   # Create a rule
+   create(entity="rule", data={"name": "High Value Alert", "trigger_condition": "field.amount > 10000", "actions": [...], "schema_id": 12345})
+
+   # Create a user
+   create(entity="user", data={"username": "john@example.com", ...})
+
+   # Create an email template
+   create(entity="email_template", data={"name": "Notification", "queue": "https://...", "subject": "...", "message": "..."})
+
+**Note:** This operation is only available in read-write mode. See ``TOOLS.md`` for full entity-specific parameter details.
 
 update_queue
 ^^^^^^^^^^^^
@@ -608,115 +591,6 @@ Updates an existing engine's settings including learning and training queues.
      "message": "Engine 'My Engine' (ID 12345) updated successfully"
    }
 
-create_schema
-^^^^^^^^^^^^^
-
-Creates a new schema with sections and datapoints.
-
-**Parameters:**
-
-- ``name`` (string, required): Schema name
-- ``content`` (array, required): Schema content array containing sections with datapoints.
-  Must follow Rossum schema structure with sections containing children.
-
-**Example content structure:**
-
-.. code-block:: json
-
-   [
-     {
-       "category": "section",
-       "id": "document_info",
-       "label": "Document Information",
-       "children": [
-         {
-           "category": "datapoint",
-           "id": "document_type",
-           "label": "Document Type",
-           "type": "enum",
-           "rir_field_names": [],
-           "constraints": {"required": false},
-           "options": [
-             {"value": "invoice", "label": "Invoice"},
-             {"value": "receipt", "label": "Receipt"}
-           ]
-         }
-       ]
-     }
-   ]
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "My Schema",
-     "url": "https://elis.rossum.ai/api/v1/schemas/12345",
-     "content": ["..."],
-     "message": "Schema 'My Schema' created successfully with ID 12345"
-   }
-
-
-create_engine
-^^^^^^^^^^^^^
-
-Creates a new engine for document processing.
-
-**Parameters:**
-
-- ``name`` (string, required): Engine name
-- ``organization_id`` (integer, required): Organization ID where the engine should be created
-- ``engine_type`` (string, required): Engine type - either 'extractor' or 'splitter'
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "My Engine",
-     "url": "https://elis.rossum.ai/api/v1/engines/12345",
-     "type": "extractor",
-     "organization": "https://elis.rossum.ai/api/v1/organizations/123",
-     "message": "Engine 'My Engine' created successfully with ID 12345"
-   }
-
-create_engine_field
-^^^^^^^^^^^^^^^^^^^
-
-Creates a new engine field and links it to schemas. Engine fields define what data the
-engine extracts and must be created for each field in the schema when setting up an engine.
-
-**Parameters:**
-
-- ``engine_id`` (integer, required): Engine ID to which this field belongs
-- ``name`` (string, required): Field name (slug format, max 50 chars)
-- ``label`` (string, required): Human-readable label (max 100 chars)
-- ``field_type`` (string, required): Field type - 'string', 'number', 'date', or 'enum'
-- ``schema_ids`` (array, required): List of schema IDs to link this engine field to (at least one required)
-- ``tabular`` (boolean, optional): Whether this field is in a table (default: false)
-- ``multiline`` (string, optional): Multiline setting - 'true', 'false', or '' (default: 'false')
-- ``subtype`` (string, optional): Optional field subtype (max 50 chars)
-- ``pre_trained_field_id`` (string, optional): Optional pre-trained field ID (max 50 chars)
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "invoice_number",
-     "label": "Invoice Number",
-     "url": "https://elis.rossum.ai/api/v1/engine_fields/12345",
-     "type": "string",
-     "engine": "https://elis.rossum.ai/api/v1/engines/123",
-     "tabular": false,
-     "multiline": "false",
-     "schema_ids": [456, 789],
-     "message": "Engine field 'Invoice Number' created successfully with ID 12345 and linked to 2 schema(s)"
-   }
-
 get_engine_fields
 ^^^^^^^^^^^^^^^^^
 
@@ -880,51 +754,6 @@ data in the target queue (use when moving documents between queues).
 **Note:** This operation is only available in read-write mode.
 
 
-create_hook
-^^^^^^^^^^^
-
-Creates a new hook (webhook or serverless function). Hooks respond to Rossum events and
-can be used for custom validation, data enrichment, or integration with external systems.
-
-**Parameters:**
-
-- ``name`` (string, required): Hook name
-- ``type`` (string, required): Hook type - either 'webhook' or 'function'
-- ``queues`` (array, optional): List of queue URLs to attach the hook to. If not provided,
-  hook applies to all queues. Format: ``["https://api.elis.rossum.ai/v1/queues/12345"]``
-- ``events`` (array, optional): List of events that trigger the hook. Common events:
-
-  - ``annotation_content.initialize`` - When annotation is first created
-  - ``annotation_content.confirm`` - When annotation is confirmed
-  - ``annotation_content.export`` - When annotation is exported
-  - ``annotation_status`` - When annotation status changes
-  - ``annotation_content`` - When annotation content changes
-  - ``datapoint_value`` - When individual field value changes
-
-- ``config`` (object, optional): Hook configuration
-
-  - For webhook: ``{"url": "https://example.com/webhook"}``
-  - For function: ``{"runtime": "python3.12", "function": "import json\ndef rossum_hook_request_handler(payload):\n    return {}"}``
-
-- ``settings`` (object, optional): Specific settings included in the payload when executing the hook
-- ``secret`` (string, optional): Secret key for securing webhook requests
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "My Hook",
-     "url": "https://elis.rossum.ai/api/v1/hooks/12345",
-     "enabled": true,
-     "queues": ["https://elis.rossum.ai/api/v1/queues/100"],
-     "events": ["annotation_content.initialize"],
-     "config": {"runtime": "python3.12", "function": "..."},
-     "settings": {"custom_key": "custom_value"},
-     "message": "Hook 'My Hook' created successfully with ID 12345"
-   }
-
 update_hook
 ^^^^^^^^^^^
 
@@ -968,96 +797,6 @@ settings, or active status. Only provide the fields you want to change - other f
 
    # Change hook events
    update_hook(hook_id=12345, events=["annotation_content.confirm"])
-
-create_hook_from_template
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Creates a hook from a Rossum Store template. Use ``search(query={"entity": "hook_template"})``
-first to find available templates and their IDs. This is the recommended way to create hooks as it
-uses battle-tested configurations from the Rossum Store.
-
-**Parameters:**
-
-- ``name`` (string, required): Name for the new hook
-- ``hook_template_id`` (integer, required): ID of the hook template to use (from ``search(query={"entity": "hook_template"})``)
-- ``queues`` (array, required): List of queue URLs to attach the hook to
-- ``events`` (array, optional): List of events to trigger the hook (overrides template defaults if provided)
-- ``token_owner`` (string, optional but required for some templates): User URL to use as token owner when the template has ``use_token_owner=True``. Obtain this via ``search(query={"entity": "user", ...})``.
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "My Document Splitting Hook",
-     "url": "https://elis.rossum.ai/api/v1/hooks/12345",
-     "hook_template": "https://elis.rossum.ai/api/v1/hook_templates/5",
-     "type": "function",
-     "queues": ["https://elis.rossum.ai/api/v1/queues/100"],
-     "events": ["annotation_content.initialize"],
-     "config": {},
-     "settings": {}
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # Create a hook from template
-   create_hook_from_template(
-       name="Invoice Splitting",
-       hook_template_id=5,
-       queues=["https://api.elis.rossum.ai/v1/queues/12345"],
-       token_owner="https://api.elis.rossum.ai/v1/users/12345"
-   )
-
-
-create_rule
-^^^^^^^^^^^
-
-Creates a new business rule. Rules automate field operations based on trigger conditions.
-
-**Parameters:**
-
-- ``name`` (string, required): Rule name
-- ``trigger_condition`` (string, required): TxScript formula (e.g., ``"field.amount > 10000"``)
-- ``actions`` (array, required): List of actions with required fields: ``id`` (unique string), ``type``, ``event``, ``payload``
-- ``enabled`` (boolean, optional): Whether the rule is enabled (default: true)
-- ``schema_id`` (integer, optional): Schema ID to associate the rule with (at least one of ``schema_id`` or ``queue_ids`` required)
-- ``queue_ids`` (array of integers, optional): List of queue IDs to limit the rule to specific queues
-
-**Action types:** ``show_message``, ``add_automation_blocker``, ``add_validation_source``, ``change_queue``, ``send_email``, ``hide_field``, ``show_field``, ``show_hide_field``, ``change_status``, ``add_label``, ``remove_label``, ``custom``
-
-**Event:** ``validation``
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 67890,
-     "name": "High Value Alert",
-     "url": "https://elis.rossum.ai/api/v1/rules/67890",
-     "schema": "https://elis.rossum.ai/api/v1/schemas/12345",
-     "trigger_condition": "field.amount > 10000",
-     "actions": [{"id": "alert1", "type": "show_message", "event": "validation", "payload": {"type": "error", "content": "High value invoice", "schema_id": "amount"}}],
-     "enabled": true
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # Create a simple validation rule
-   rule = create_rule(
-       name="High Value Alert",
-       trigger_condition="field.amount > 10000",
-       actions=[{"id": "alert1", "type": "show_message", "event": "validation", "payload": {"type": "error", "content": "High value invoice", "schema_id": "amount"}}],
-       schema_id=12345
-   )
-
-**Note:** This operation is only available in read-write mode.
 
 update_rule
 ^^^^^^^^^^^
@@ -1139,41 +878,8 @@ Partial update (PATCH) of a business rule. Only provided fields are updated.
 **Note:** This operation is only available in read-write mode.
 
 
-Workspace Management
---------------------
-
-create_workspace
-^^^^^^^^^^^^^^^^
-
-Creates a new workspace in an organization.
-
-**Parameters:**
-
-- ``name`` (string, required): Workspace name
-- ``organization_id`` (integer, required): Organization ID where the workspace should be created
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "My New Workspace",
-     "url": "https://elis.rossum.ai/api/v1/workspaces/12345",
-     "organization": "https://elis.rossum.ai/api/v1/organizations/100",
-     "message": "Workspace 'My New Workspace' created successfully with ID 12345"
-   }
-
-
 User Management
 ---------------
-
-create_user
-^^^^^^^^^^^
-
-Creates a new user in the organization.
-
-**Parameters:** See API documentation for full parameter list.
 
 update_user
 ^^^^^^^^^^^
@@ -1181,84 +887,6 @@ update_user
 Updates an existing user's properties.
 
 **Parameters:** See API documentation for full parameter list.
-
-Email Template Tools
-^^^^^^^^^^^^^^^^^^^^
-
-create_email_template
-"""""""""""""""""""""
-
-Creates a new email template. Templates can be automated to send emails automatically
-on specific triggers, or manual for user-initiated sending.
-
-**Parameters:**
-
-- ``name`` (string, required): Name of the email template
-- ``queue`` (string, required): URL of the queue to associate with
-- ``subject`` (string, required): Email subject line
-- ``message`` (string, required): Email body (HTML supported)
-- ``type`` (string, optional): Template type - 'rejection', 'rejection_default',
-  'email_with_no_processable_attachments', 'custom' (default: 'custom')
-- ``automate`` (boolean, optional): If true, email is sent automatically on trigger (default: false)
-- ``to`` (array, optional): List of recipient objects with 'type' and 'value' keys
-- ``cc`` (array, optional): List of CC recipient objects
-- ``bcc`` (array, optional): List of BCC recipient objects
-- ``triggers`` (array, optional): List of trigger URLs
-
-**Recipient object types:**
-
-- ``{"type": "annotator", "value": ""}`` - Send to the document annotator
-- ``{"type": "constant", "value": "email@example.com"}`` - Send to a fixed email address
-- ``{"type": "datapoint", "value": "email_field_id"}`` - Send to email from a datapoint field
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 1502,
-     "name": "Custom Notification",
-     "url": "https://elis.rossum.ai/api/v1/email_templates/1502",
-     "queue": "https://elis.rossum.ai/api/v1/queues/8199",
-     "subject": "Document Processed",
-     "message": "<p>Your document has been processed.</p>",
-     "type": "custom",
-     "automate": true,
-     "to": [{"type": "constant", "value": "notifications@example.com"}]
-   }
-
-**Example usage:**
-
-.. code-block:: python
-
-   # Create a simple custom email template
-   template = create_email_template(
-       name="Processing Complete",
-       queue="https://elis.rossum.ai/api/v1/queues/8199",
-       subject="Document Processing Complete",
-       message="<p>Your document has been successfully processed.</p>"
-   )
-
-   # Create an automated rejection template
-   template = create_email_template(
-       name="Auto Rejection",
-       queue="https://elis.rossum.ai/api/v1/queues/8199",
-       subject="Document Rejected",
-       message="<p>Your document could not be processed.</p>",
-       type="rejection",
-       automate=True,
-       to=[{"type": "annotator", "value": ""}]
-   )
-
-   # Create template with multiple recipients
-   template = create_email_template(
-       name="Team Notification",
-       queue="https://elis.rossum.ai/api/v1/queues/8199",
-       subject="New Document",
-       message="<p>A new document has arrived.</p>",
-       to=[{"type": "constant", "value": "team@example.com"}],
-       cc=[{"type": "datapoint", "value": "sender_email"}]
-   )
 
 Agent Tools
 -----------

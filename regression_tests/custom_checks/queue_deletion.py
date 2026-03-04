@@ -27,7 +27,7 @@ def _extract_queue_id_from_tool_call(tool_call: ToolCall, tool_results: list[Too
     ):
         return tool_call.arguments["entity_id"]
 
-    if tool_call.name == "create_queue_from_template":
+    if tool_call.name == "create" and tool_call.arguments.get("entity") == "queue_from_template":
         for result in tool_results:
             if result.tool_call_id == tool_call.id and isinstance(result.content, str):
                 match = re.search(r'"id":\s*(\d+)', result.content)

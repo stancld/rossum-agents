@@ -14,6 +14,7 @@ class TestCategoryMeta:
     def test_has_all_expected_categories(self) -> None:
         expected_categories = {
             "read",
+            "write",
             "annotations",
             "queues",
             "schemas",
@@ -64,7 +65,11 @@ class TestDiscoveryTools:
             return {}
 
         @mcp.tool(tags={"queues", "write"}, annotations={"readOnlyHint": False})
-        async def create_queue(name: str) -> dict:
+        async def update_queue(queue_id: int, name: str) -> dict:
+            return {}
+
+        @mcp.tool(tags={"write"}, annotations={"readOnlyHint": False})
+        async def create(name: str) -> dict:
             return {}
 
         @mcp.tool(tags={"hooks"}, annotations={"readOnlyHint": True})
@@ -90,7 +95,11 @@ class TestDiscoveryTools:
         queues_cat = next(cat for cat in result if cat["name"] == "queues")
         assert queues_cat["tool_count"] == 2
         tool_names = {t["name"] for t in queues_cat["tools"]}
-        assert tool_names == {"get_queue", "create_queue"}
+        assert tool_names == {"get_queue", "update_queue"}
+
+        write_cat = next(cat for cat in result if cat["name"] == "write")
+        assert write_cat["tool_count"] == 1
+        assert write_cat["tools"][0]["name"] == "create"
 
     async def test_list_tool_categories_marks_write_tools(self, mcp_with_tools: FastMCP) -> None:
         list_categories_tool = await mcp_with_tools.get_tool("list_tool_categories")
@@ -100,7 +109,7 @@ class TestDiscoveryTools:
         queues_cat = next(cat for cat in result if cat["name"] == "queues")
         tools_by_name = {t["name"]: t for t in queues_cat["tools"]}
         assert tools_by_name["get_queue"]["read_only"] is True
-        assert tools_by_name["create_queue"]["read_only"] is False
+        assert tools_by_name["update_queue"]["read_only"] is False
 
     async def test_list_tool_categories_includes_keywords(self, mcp_with_tools: FastMCP) -> None:
         list_categories_tool = await mcp_with_tools.get_tool("list_tool_categories")

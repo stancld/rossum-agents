@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from rossum_agent.tools.core import AgentContext, DynamicToolsState, get_context, set_context
 from rossum_agent.tools.dynamic_tools import (
+    CREATE_TOOL_NAME,
     DELETE_TOOL_NAME,
     DISCOVERY_TOOL_NAME,
     HIDDEN_TOOLS,
@@ -679,7 +680,7 @@ class TestGetWriteTools:
 
         result = get_write_tools()
 
-        assert result == {"create_schema", "delete"}
+        assert result == {"create_schema", "create", "delete"}
 
     @patch("rossum_agent.tools.dynamic_tools._fetch_catalog_from_mcp")
     def test_always_includes_unified_delete_tool(self, mock_fetch: MagicMock) -> None:
@@ -691,7 +692,7 @@ class TestGetWriteTools:
 
         result = get_write_tools()
 
-        assert result == {"delete"}
+        assert result == {"create", "delete"}
 
 
 class TestGetWriteToolsAsync:
@@ -731,7 +732,7 @@ class TestGetWriteToolsAsync:
             ),
         ):
             result = await get_write_tools_async(mock_connection)
-        assert result == {"create_schema", DELETE_TOOL_NAME}
+        assert result == {"create_schema", CREATE_TOOL_NAME, DELETE_TOOL_NAME}
 
 
 class TestFetchCatalogParsesWriteTools:
@@ -884,9 +885,6 @@ class TestHiddenTools:
 
     def test_update_schema_is_hidden(self) -> None:
         assert "update_schema" in HIDDEN_TOOLS
-
-    def test_create_queue_is_hidden(self) -> None:
-        assert "create_queue" in HIDDEN_TOOLS
 
     @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")

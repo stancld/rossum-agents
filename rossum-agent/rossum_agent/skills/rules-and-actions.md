@@ -1,10 +1,10 @@
 # Rules & Actions Skill
 
-**Goal**: Translate user-described validations into Rossum rules via `suggest_rule` → `create_rule`.
+**Goal**: Translate user-described validations into Rossum rules via `suggest_rule` → `create(entity="rule", ...)`.
 
 ## Workflow
 
-Call `suggest_rule(user_query, queue_id)`, then `create_rule(...)` immediately with the returned values — no confirmation needed.
+Call `suggest_rule(user_query, queue_id)`, then `create(entity="rule", data={...})` immediately with the returned values — no confirmation needed.
 
 If the user asks to test a rule, call `evaluate_rules(queue_id, annotation_id, schema_rules)` to preview which actions would trigger.
 `evaluate_rules` requires an existing annotation in the queue — upload documents first if none exist:
@@ -19,7 +19,7 @@ If the user asks to test a rule, call `evaluate_rules(queue_id, annotation_id, s
 
 | Constraint | Detail |
 |------------|--------|
-| `suggest_rule` before `create_rule` | Never hand-write trigger conditions or actions |
-| One call per check | One `suggest_rule` + one `create_rule` per independent validation |
+| `suggest_rule` before `create` | Never hand-write trigger conditions or actions |
+| One call per check | One `suggest_rule` + one `create(entity="rule", ...)` per independent validation |
 | Concise `user_query` | Field, condition, error message — one sentence, no elaboration |
 | `queue_ids` required | Scope every rule to at least one queue |

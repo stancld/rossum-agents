@@ -228,9 +228,9 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "Return the queue_id that was deleted."
         ),
         tool_expectation=ToolExpectation(
-            expected_tools=["create_queue_from_template", "delete:queue"], mode=ToolMatchMode.SUBSET
+            expected_tools=["create:queue_from_template", "delete:queue"], mode=ToolMatchMode.SUBSET
         ),
-        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=55000),
+        token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=60000),
         success_criteria=SuccessCriteria(
             required_keywords=["deleted"],
             max_steps=4,
@@ -261,7 +261,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "create_queue_from_template",
+                "create:queue_from_template",
                 "load_skill",
                 "create_task",  # model should plan
                 ("patch_schema", "patch_schema_with_subagent"),
@@ -273,7 +273,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "search_elis_docs",
             ],
         ),
-        token_budget=TokenBudget(min_total_tokens=90000, max_total_tokens=140000),
+        token_budget=TokenBudget(min_total_tokens=100000, max_total_tokens=180000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
@@ -326,7 +326,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "load_skill",
-                "create_queue_from_template",
+                "create:queue_from_template",
                 "suggest_formula_field",
                 ("patch_schema", "patch_schema_with_subagent"),
                 "prune_schema_fields",
@@ -361,10 +361,10 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "create_queue_from_template",
+                "create:queue_from_template",
                 "search_knowledge_base",
                 "search:hook_template",
-                "create_hook_from_template",
+                "create:hook_from_template",
                 "update_hook",
             ],
             mode=ToolMatchMode.SUBSET,
@@ -397,9 +397,9 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "create_queue_from_template",
+                "create:queue_from_template",
                 "load_skill",
-                "create_rule",
+                "create:rule",
                 "suggest_rule",
             ],
             mode=ToolMatchMode.SUBSET,
@@ -440,7 +440,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "Return only the queue_id as a one-word answer."
         ),
         tool_expectation=ToolExpectation(
-            expected_tools=["create_queue_from_template", "load_skill", "update_queue"],
+            expected_tools=["create:queue_from_template", "load_skill", "update_queue"],
             mode=ToolMatchMode.SUBSET,
         ),
         token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=70000),
@@ -469,9 +469,9 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "create_queue_from_template",
+                "create:queue_from_template",
                 "load_skill",
-                ("create_hook", "create_hook_from_template"),
+                ("create:hook", "create:hook_from_template"),
                 "test_hook",
             ],
             mode=ToolMatchMode.SUBSET,
@@ -507,7 +507,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "create_queue_from_template",
+                "create:queue_from_template",
                 "suggest_formula_field",
                 ("patch_schema", "patch_schema_with_subagent"),
                 "get:schema",
@@ -543,7 +543,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "create_queue_from_template",
+                "create:queue_from_template",
                 "prune_schema_fields",
                 ("patch_schema", "patch_schema_with_subagent"),
             ],
@@ -580,7 +580,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "create_queue_from_template",
+                "create:queue_from_template",
                 "prune_schema_fields",
                 ("patch_schema", "patch_schema_with_subagent"),
                 "show_change_history",
@@ -619,8 +619,8 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "create_queue_from_template",
-                "create_hook",
+                "create:queue_from_template",
+                "create:hook",
                 "delete:hook",
                 "show_change_history",
                 "revert_commit",
@@ -698,7 +698,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ],
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "create_queue_from_template",
+                "create:queue_from_template",
                 "suggest_formula_field",
                 ("patch_schema", "patch_schema_with_subagent"),
                 "load_skill",
@@ -731,7 +731,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ),
         ],
         tool_expectation=ToolExpectation(
-            expected_tools=["create_queue_from_template", "ask_user_question"],
+            expected_tools=["create:queue_from_template", "ask_user_question"],
             mode=ToolMatchMode.SUBSET,
             forbidden_tools=["patch_schema", "patch_schema_with_subagent", "suggest_formula_field"],
         ),
@@ -771,7 +771,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "create_queue_from_template",
+                "create:queue_from_template",
                 "search:annotation",
                 "copy_annotations",
                 "load_skill",

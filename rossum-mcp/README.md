@@ -2,14 +2,14 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 35 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. 25 tools for queues, schemas, hooks, engines, and more.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI - rossum-mcp](https://img.shields.io/pypi/v/rossum-mcp?label=rossum-mcp)](https://pypi.org/project/rossum-mcp/)
 [![Coverage](https://codecov.io/gh/stancld/rossum-agents/branch/master/graph/badge.svg?flag=rossum-mcp)](https://codecov.io/gh/stancld/rossum-agents)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-36-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-26-blue.svg)](#available-tools)
 
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
@@ -97,22 +97,20 @@ Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
 
 ## Available Tools
 
-The server provides **35 tools** organized into categories:
+The server provides **25 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
 | **Read Layer** | 2 | Get any entity by ID or search/list with typed filters |
+| **Create Layer** | 1 | Unified create for any supported entity |
 | **Delete Layer** | 1 | Unified delete for any supported entity by ID |
 | **Document Processing** | 6 | Upload documents, retrieve content, update/confirm/copy annotations |
-| **Queue Management** | 4 | Create and configure queues |
-| **Schema Management** | 5 | Define and modify field structures |
-| **Engine Management** | 4 | Configure extraction and splitting engines |
-| **Extensions (Hooks)** | 4 | Webhooks, serverless functions, testing |
-| **Rules & Actions** | 3 | Business rules with triggers and actions |
-| **Workspace Management** | 1 | Create workspaces |
-| **Organization Groups** | 2 | Check feature flags across organizations |
-| **User Management** | 2 | Create and update users |
-| **Email Templates** | 1 | Create automated email responses |
+| **Queue Management** | 1 | Update queue settings |
+| **Schema Management** | 4 | Update, patch, tree view, and prune field structures |
+| **Engine Management** | 2 | Update engines, get engine fields |
+| **Extensions (Hooks)** | 2 | Update and test hooks |
+| **Rules & Actions** | 2 | Update and patch business rules |
+| **User Management** | 1 | Update users |
 | **MCP Mode** | 2 | Get/set read-only or read-write mode |
 | **Tool Discovery** | 1 | Dynamic tool loading |
 
@@ -126,6 +124,11 @@ Supported entities for `get` (by ID): `queue`, `schema`, `hook`, `engine`, `rule
 
 Supported entities for `search` (with typed filters): all `get` entities plus `hook_log`, `hook_template`, `user_role`, `queue_template_name`
 
+**Create Layer** (unified create replacing 11 individual create_X tools):
+`create`, `get_create_schema`
+
+Supported entities: `workspace`, `queue_from_template`, `schema`, `user`, `hook`, `hook_from_template`, `engine`, `engine_field`, `rule`, `email_template`
+
 **Delete Layer** (unified delete replacing individual delete_X tools):
 `delete`
 
@@ -135,28 +138,22 @@ Supported entities: `queue`, `schema`, `hook`, `rule`, `workspace`, `annotation`
 `upload_document`, `get_annotation_content`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`
 
 **Queue Management:**
-`create_queue`, `create_queue_from_template`, `update_queue`
+`update_queue`
 
 **Schema Management:**
-`create_schema`, `update_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`
+`update_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`
 
 **Engine Management:**
-`create_engine`, `update_engine`, `create_engine_field`, `get_engine_fields`
+`update_engine`, `get_engine_fields`
 
 **Extensions (Hooks):**
-`create_hook`, `update_hook`, `create_hook_from_template`, `test_hook`
+`update_hook`, `test_hook`
 
 **Rules & Actions:**
-`create_rule`, `update_rule`, `patch_rule`
-
-**Workspace Management:**
-`create_workspace`
+`update_rule`, `patch_rule`
 
 **User Management:**
-`create_user`, `update_user`
-
-**Email Templates:**
-`create_email_template`
+`update_user`
 
 **MCP Mode:**
 `get_mcp_mode`, `set_mcp_mode`
