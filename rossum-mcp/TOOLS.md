@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 35 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 33 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ---
 
@@ -223,24 +223,7 @@ Copies annotations to another queue. Use `reimport=True` to re-extract data in t
 
 ---
 
-## Queue Management (4 tools)
-
-### create_queue
-
-Creates a new queue.
-
-**Parameters:**
-- `name` (string, required): Name of the queue to create
-- `workspace_id` (integer, required): Workspace ID where the queue should be created
-- `schema_id` (integer, required): Schema ID to assign to the queue
-- `engine_id` (integer, optional): Engine ID to assign for document processing
-- `inbox_id` (integer, optional): Inbox ID to associate with the queue
-- `connector_id` (integer, optional): Connector ID to associate with the queue
-- `locale` (string, optional, default: `en_GB`): Queue locale
-- `automation_enabled` (boolean, optional, default: false): Enable automation
-- `automation_level` (string, optional, default: `never`): Automation level
-- `training_enabled` (boolean, optional, default: true): Enable training
-- `splitting_screen_feature_flag` (boolean, optional, default: false): Enable splitting screen feature
+## Queue Management (2 tools)
 
 ### update_queue
 
@@ -265,7 +248,7 @@ Creates a queue from a predefined regional template. Automatically creates a mat
 
 ---
 
-## Schema Management (5 tools)
+## Schema Management (4 tools)
 
 ### create_schema
 
@@ -299,14 +282,6 @@ Creates a new schema with sections and datapoints.
   }
 ]
 ```
-
-### update_schema
-
-Full update of an existing schema. Typically used to set field-level automation thresholds.
-
-**Parameters:**
-- `schema_id` (integer, required): Schema ID to update
-- `schema_data` (object, required): Dictionary containing schema fields to update (full schema required)
 
 ### patch_schema
 
@@ -706,7 +681,7 @@ Other states: `created`, `failed_import`, `split`, `in_workflow`, `rejected`, `f
 1. Create schema using `create_schema`
 2. Create engine using `create_engine`
 3. Create engine fields using `create_engine_field`
-4. Create queue using `create_queue`
+4. Create queue using `create_queue_from_template`
 5. Optionally update engine training queues using `update_engine`
 
 ### Explore a Queue

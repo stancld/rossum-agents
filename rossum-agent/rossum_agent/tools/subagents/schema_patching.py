@@ -13,10 +13,14 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import os
 import re
 import time
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING
+
+import httpx
+from rossum_mcp.tools.schemas.validation import sanitize_schema_content
 
 if TYPE_CHECKING:
     from typing import Any
@@ -507,6 +511,26 @@ def _strip_invalid_rir_fields(content: list[dict[str, Any]], bad_names: set[str]
     return fixed
 
 
+def _put_schema_content(schema_id: int, content: list[dict[str, Any]]) -> dict[str, Any]:
+    """PUT schema content directly via Rossum API, bypassing MCP.
+
+    Used by the schema patching sub-agent for atomic bulk schema updates.
+    The update_schema MCP tool was removed (not suitable for agent use);
+    this function provides the same functionality for programmatic callers.
+    """
+    base_url = os.environ["ROSSUM_API_BASE_URL"]
+    token = os.environ["ROSSUM_API_TOKEN"]
+
+    sanitized = sanitize_schema_content(content)
+    response = httpx.patch(
+        f"{base_url}/schemas/{schema_id}",
+        json={"content": sanitized},
+        headers={"Authorization": f"token {token}"},
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 def _apply_schema_changes(
     schema_id: int,
     current_content: list[dict[str, Any]],
@@ -542,21 +566,17 @@ def _apply_schema_changes(
         result["fields_updated"] = updated
 
     try:
-        mcp_result = call_mcp_tool(
-            "update_schema", {"schema_id": schema_id, "schema_data": {"content": modified_content}}
-        )
+        api_result = _put_schema_content(schema_id, modified_content)
     except Exception as e:
         bad_names = set(_ENGINE_RESTRICTION_RE.findall(str(e)))
         if not bad_names:
             raise
         fixed = _strip_invalid_rir_fields(modified_content, bad_names)
         logger.info(f"Auto-fixed engine restriction: stripped rir_field_names from fields {fixed}")
-        mcp_result = call_mcp_tool(
-            "update_schema", {"schema_id": schema_id, "schema_data": {"content": modified_content}}
-        )
+        api_result = _put_schema_content(schema_id, modified_content)
 
     result["fields_kept"] = sorted(_collect_field_ids(modified_content))
-    result["update_result"] = "success" if mcp_result else "failed"
+    result["update_result"] = "success" if api_result else "failed"
 
     return result
 

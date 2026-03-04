@@ -44,7 +44,7 @@ This project enables three progressive levels of AI-powered Rossum orchestration
 Features
 --------
 
-The MCP server provides **35 tools** organized into categories:
+The MCP server provides **33 tools** organized into categories:
 
 **Unified Read Layer**
 
@@ -66,14 +66,12 @@ The MCP server provides **35 tools** organized into categories:
 
 **Queue Management**
 
-* **create_queue** - Create new queues
 * **create_queue_from_template** - Create queues from predefined templates (EU/US/UK/CZ/CN)
 * **update_queue** - Configure automation thresholds
 
 **Schema Management**
 
 * **create_schema** - Create new schemas
-* **update_schema** - Configure field-level thresholds
 * **patch_schema** - Add, update, or remove individual schema nodes
 * **get_schema_tree_structure** - Get lightweight tree structure of schema
 * **prune_schema_fields** - Remove multiple fields from schema at once

@@ -2,14 +2,14 @@
 
 <div align="center">
 
-**MCP server for AI-powered Rossum document processing. 35 tools for queues, schemas, hooks, engines, and more.**
+**MCP server for AI-powered Rossum document processing. 33 tools for queues, schemas, hooks, engines, and more.**
 
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://stancld.github.io/rossum-agents/)
 [![Python](https://img.shields.io/pypi/pyversions/rossum-mcp.svg)](https://pypi.org/project/rossum-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI - rossum-mcp](https://img.shields.io/pypi/v/rossum-mcp?label=rossum-mcp)](https://pypi.org/project/rossum-mcp/)
 [![Coverage](https://codecov.io/gh/stancld/rossum-agents/branch/master/graph/badge.svg?flag=rossum-mcp)](https://codecov.io/gh/stancld/rossum-agents)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-36-blue.svg)](#available-tools)
+[![MCP Tools](https://img.shields.io/badge/MCP_Tools-33-blue.svg)](#available-tools)
 
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
@@ -90,27 +90,26 @@ Two tools allow dynamic mode control:
 User: What mode are we in?
 Assistant: [calls get_mcp_mode] → "read-only"
 
-User: I'm ready to update the schema now.
+User: I'm ready to patch the schema now.
 Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
-           [calls update_schema(...)]
+           [calls patch_schema(...)]
 ```
 
 ## Available Tools
 
-The server provides **35 tools** organized into categories:
+The server provides **33 tools** organized into categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
 | **Read Layer** | 2 | Get any entity by ID or search/list with typed filters |
 | **Delete Layer** | 1 | Unified delete for any supported entity by ID |
 | **Document Processing** | 6 | Upload documents, retrieve content, update/confirm/copy annotations |
-| **Queue Management** | 4 | Create and configure queues |
-| **Schema Management** | 5 | Define and modify field structures |
+| **Queue Management** | 2 | Create and configure queues |
+| **Schema Management** | 4 | Define and modify field structures |
 | **Engine Management** | 4 | Configure extraction and splitting engines |
 | **Extensions (Hooks)** | 4 | Webhooks, serverless functions, testing |
 | **Rules & Actions** | 3 | Business rules with triggers and actions |
 | **Workspace Management** | 1 | Create workspaces |
-| **Organization Groups** | 2 | Check feature flags across organizations |
 | **User Management** | 2 | Create and update users |
 | **Email Templates** | 1 | Create automated email responses |
 | **MCP Mode** | 2 | Get/set read-only or read-write mode |
@@ -135,10 +134,10 @@ Supported entities: `queue`, `schema`, `hook`, `rule`, `workspace`, `annotation`
 `upload_document`, `get_annotation_content`, `start_annotation`, `bulk_update_annotation_fields`, `confirm_annotation`, `copy_annotations`
 
 **Queue Management:**
-`create_queue`, `create_queue_from_template`, `update_queue`
+`create_queue_from_template`, `update_queue`
 
 **Schema Management:**
-`create_schema`, `update_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`
+`create_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`
 
 **Engine Management:**
 `create_engine`, `update_engine`, `create_engine_field`, `get_engine_fields`

@@ -111,15 +111,6 @@ async def list_schemas(
     return filter_by_name_regex(items, name, use_regex)
 
 
-async def update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_data: dict) -> Schema | dict:
-    logger.debug(f"Updating schema: schema_id={schema_id}")
-    if "content" in schema_data and isinstance(schema_data["content"], list):
-        schema_data = {**schema_data, "content": sanitize_schema_content(schema_data["content"])}
-    await client._http_client.update(Resource.Schema, schema_id, schema_data)
-    updated_schema: Schema = await client.retrieve_schema(schema_id)
-    return updated_schema
-
-
 async def create_schema(client: AsyncRossumAPIClient, name: str, content: list[dict]) -> Schema | dict:
     if not content:
         return {"error": "Cannot create schema with empty content"}

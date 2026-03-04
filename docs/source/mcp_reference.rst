@@ -162,33 +162,6 @@ create_queue_from_template
   Templates include pre-configured schema and AI engine for specific document types
   (EU/US/UK/CZ/CN invoices, purchase orders, credit notes, etc.).
 
-create_queue
-^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``create_queue(name: str, workspace_id: int, schema_id: int, engine_id: int | None,
-  inbox_id: int | None, connector_id: int | None, locale: str, automation_enabled: bool,
-  automation_level: str, training_enabled: bool)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.create_new_queue(queue_data: dict)``
-
-**API Endpoint:**
-  ``POST /v1/queues``
-
-**Request Body:**
-  JSON object with queue configuration including name, workspace URL, schema URL,
-  optional engine URL, inbox URL, connector URL, locale, automation settings, and
-  training settings.
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Creates a new queue with full configuration options. Constructs URLs for workspace,
-  schema, and optional resources (engine, inbox, connector) using the base URL.
-  See ``rossum_mcp.server:339-442``
-
 update_queue
 ^^^^^^^^^^^^
 
@@ -211,29 +184,6 @@ update_queue
 **Implementation:**
   Updates specific queue fields using PATCH semantics. Commonly used to configure
   automation thresholds and settings. See ``rossum_mcp.server:444-486``
-
-update_schema
-^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``update_schema(schema_id: int, schema_data: dict)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.internal_client.update(Resource.Schema, schema_id, schema_data)``
-
-**API Endpoint:**
-  ``PATCH /v1/schemas/{schema_id}``
-
-**Request Body:**
-  Partial JSON object typically containing the 'content' array with field-level
-  configuration including score_threshold properties.
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Updates schema configuration, typically used to set field-level automation
-  thresholds that override the queue's default threshold. See ``rossum_mcp.server:488-526``
 
 update_engine
 ^^^^^^^^^^^^^

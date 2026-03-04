@@ -24,6 +24,7 @@ from rossum_agent.tools.subagents.schema_patching import (
     _extract_schema_content,
     _filter_content,
     _find_or_create_section,
+    _put_schema_content,
     _schema_content_cache,
     _section_label_from_id,
     _strip_invalid_rir_fields,
@@ -853,8 +854,8 @@ class TestExecuteOpusTool:
             }
         ]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._put_schema_content") as mock_put:
+            mock_put.return_value = {"id": 123}
             result = _execute_opus_tool(
                 "apply_schema_changes",
                 {
@@ -866,7 +867,7 @@ class TestExecuteOpusTool:
                 },
             )
 
-            mock_mcp.assert_called_once()
+            mock_put.assert_called_once()
             parsed = json.loads(result)
             assert "field2" in parsed["fields_added"]
             assert 123 not in _schema_content_cache
@@ -883,8 +884,8 @@ class TestExecuteOpusTool:
             }
         ]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._put_schema_content") as mock_put:
+            mock_put.return_value = {"id": 123}
             result = _execute_opus_tool(
                 "apply_schema_changes",
                 {
@@ -895,8 +896,8 @@ class TestExecuteOpusTool:
 
             parsed = json.loads(result)
             assert "field1" in parsed["fields_updated"]
-            call_args = mock_mcp.call_args[0]
-            updated_content = call_args[1]["schema_data"]["content"]
+            call_args = mock_put.call_args[0]
+            updated_content = call_args[1]
             assert updated_content[0]["children"][0]["formula"] == "new"
             assert 123 not in _schema_content_cache
 
@@ -1299,20 +1300,20 @@ class TestApplySchemaChanges:
             }
         ]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._put_schema_content") as mock_put:
+            mock_put.return_value = {"id": 123}
             result = _apply_schema_changes(123, content, ["field1"], None)
 
             assert "field2" in result["fields_removed"]
             assert "field1" in result["fields_kept"]
-            mock_mcp.assert_called_once()
+            mock_put.assert_called_once()
 
     def test_adds_new_fields(self):
         """Test that new fields are added."""
         content = [{"id": "section1", "category": "section", "children": []}]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._put_schema_content") as mock_put:
+            mock_put.return_value = {"id": 123}
             result = _apply_schema_changes(
                 123,
                 content,
@@ -1332,8 +1333,8 @@ class TestApplySchemaChanges:
             }
         ]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._put_schema_content") as mock_put:
+            mock_put.return_value = {"id": 123}
             result = _apply_schema_changes(
                 123,
                 content,
@@ -1357,8 +1358,8 @@ class TestApplySchemaChanges:
             }
         ]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._put_schema_content") as mock_put:
+            mock_put.return_value = {"id": 123}
             result = _apply_schema_changes(
                 123,
                 content,
@@ -1368,8 +1369,8 @@ class TestApplySchemaChanges:
             )
 
             assert "field1" in result["fields_updated"]
-            call_args = mock_mcp.call_args[0]
-            updated_content = call_args[1]["schema_data"]["content"]
+            call_args = mock_put.call_args[0]
+            updated_content = call_args[1]
             assert updated_content[0]["children"][0]["formula"] == "new_code"
 
 
@@ -1446,7 +1447,7 @@ class TestApplySchemaChangesEngineRestrictionRecovery:
     """Test auto-recovery when API rejects schema due to engine field restrictions."""
 
     def test_retries_after_stripping_bad_rir_fields(self):
-        """When update_schema fails with engine restriction, strip rir_field_names and retry."""
+        """When _put_schema_content fails with engine restriction, strip rir_field_names and retry."""
         content = [
             {
                 "id": "section1",
@@ -1457,20 +1458,20 @@ class TestApplySchemaChangesEngineRestrictionRecovery:
             }
         ]
         engine_error = Exception(
-            "Error calling tool 'update_schema': [PATCH] https://example.com/api/v1/schemas/123 "
+            "[PATCH] https://example.com/api/v1/schemas/123 "
             '- HTTP 400 - {"content":[{"children":{"1":{"id":["Engine (id: 44371) restriction: '
             "extracted field 'month_in_spanish' is not present among names of engine fields\"]}}}]}"
         )
         call_count = 0
 
-        def mock_call_mcp(name, args):
+        def mock_put(schema_id, content):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
                 raise engine_error
             return {"id": 123}
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", side_effect=mock_call_mcp):
+        with patch("rossum_agent.tools.subagents.schema_patching._put_schema_content", side_effect=mock_put):
             result = _apply_schema_changes(
                 123,
                 content,
@@ -1493,8 +1494,8 @@ class TestApplySchemaChangesEngineRestrictionRecovery:
         """Non-engine-restriction errors propagate normally."""
         content = [{"id": "s1", "category": "section", "children": []}]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.side_effect = Exception("Some other API error")
+        with patch("rossum_agent.tools.subagents.schema_patching._put_schema_content") as mock_put:
+            mock_put.side_effect = Exception("Some other API error")
             raised = False
             try:
                 _apply_schema_changes(123, content, None, None)
@@ -1502,3 +1503,73 @@ class TestApplySchemaChangesEngineRestrictionRecovery:
                 raised = True
                 assert "Some other API error" in str(e)
             assert raised
+
+
+class TestPutSchemaContent:
+    """Tests for _put_schema_content HTTP helper."""
+
+    def test_sends_patch_with_sanitized_content(self, monkeypatch):
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.example.com/v1")
+        monkeypatch.setenv("ROSSUM_API_TOKEN", "test-token")
+
+        content = [{"id": "section1", "category": "section", "children": []}]
+
+        with patch("rossum_agent.tools.subagents.schema_patching.httpx.patch") as mock_patch:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"id": 42}
+            mock_response.raise_for_status = MagicMock()
+            mock_patch.return_value = mock_response
+
+            result = _put_schema_content(42, content)
+
+        mock_patch.assert_called_once_with(
+            "https://api.example.com/v1/schemas/42",
+            json={"content": content},
+            headers={"Authorization": "token test-token"},
+        )
+        mock_response.raise_for_status.assert_called_once()
+        assert result == {"id": 42}
+
+    def test_raises_on_http_error(self, monkeypatch):
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.example.com/v1")
+        monkeypatch.setenv("ROSSUM_API_TOKEN", "test-token")
+
+        import httpx
+
+        with patch("rossum_agent.tools.subagents.schema_patching.httpx.patch") as mock_patch:
+            mock_response = MagicMock()
+            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "Bad Request", request=MagicMock(), response=MagicMock()
+            )
+            mock_patch.return_value = mock_response
+
+            with pytest.raises(httpx.HTTPStatusError):
+                _put_schema_content(1, [])
+
+    def test_sanitizes_content_before_sending(self, monkeypatch):
+        monkeypatch.setenv("ROSSUM_API_BASE_URL", "https://api.example.com/v1")
+        monkeypatch.setenv("ROSSUM_API_TOKEN", "t")
+
+        content = [
+            {
+                "id": "section1",
+                "category": "section",
+                "children": [{"id": "f1", "category": "datapoint", "bogus_key": "dropped"}],
+            }
+        ]
+
+        with (
+            patch("rossum_agent.tools.subagents.schema_patching.httpx.patch") as mock_patch,
+            patch(
+                "rossum_agent.tools.subagents.schema_patching.sanitize_schema_content",
+                wraps=lambda c: c,
+            ) as mock_sanitize,
+        ):
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"id": 1}
+            mock_response.raise_for_status = MagicMock()
+            mock_patch.return_value = mock_response
+
+            _put_schema_content(1, content)
+
+        mock_sanitize.assert_called_once_with(content)

@@ -182,6 +182,6 @@ Example workflow:
    User: What mode are we in?
    Assistant: [calls get_mcp_mode] → "read-only"
 
-   User: I'm ready to update the schema now.
+   User: I'm ready to patch the schema now.
    Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
-              [calls update_schema(...)]
+              [calls patch_schema(...)]

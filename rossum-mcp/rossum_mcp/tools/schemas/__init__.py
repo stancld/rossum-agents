@@ -24,7 +24,6 @@ from rossum_mcp.tools.schemas.operations import (
     list_schemas,
     patch_schema,
     prune_schema_fields,
-    update_schema,
 )
 from rossum_mcp.tools.schemas.patching import (
     PatchOperation,
@@ -63,19 +62,10 @@ __all__ = [
     "prune_schema_fields",
     "register_schema_tools",
     "sanitize_schema_content",
-    "update_schema",
 ]
 
 
 def register_schema_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:
-    @mcp.tool(
-        description="Update schema settings; requires full schema.",
-        tags={"schemas", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def update_schema(schema_id: int, schema_data: dict) -> Schema | dict:
-        return await ops.update_schema(client, schema_id, schema_data)
-
     @mcp.tool(
         description="Create a schema; requires at least one section containing datapoints.",
         tags={"schemas", "write"},
