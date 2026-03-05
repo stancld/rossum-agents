@@ -119,6 +119,7 @@ class ToolStartStep:
     tool_calls: list[ToolCall]
     tool_progress: tuple[int, int]
     current_tool: str | None = None
+    current_tool_call_id: str | None = None
     sub_agent_progress: SubAgentProgress | None = None
     is_streaming: bool = True
 

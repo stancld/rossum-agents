@@ -336,10 +336,23 @@ Returns JSON with:
 
 For extension setup guides and workflow tutorials, use ``search_knowledge_base`` instead.
 
+Working Memory & File Tools
+"""""""""""""""""""""""""""
+
+Large tool results (>30k chars) are automatically saved to workspace files under ``{output_dir}/workspace/``. The agent receives a compact summary with item count, preview, and file path — then queries the full content on demand.
+
+``write_file(filename, content)``
+   Save content to the agent's output directory. Accepts string, dict, or list content.
+
+   .. code-block:: python
+
+      write_file(filename="report.md", content="# Analysis\n...")
+      write_file(filename="data.json", content={"key": "value"})
+
 General-Purpose Data Tools
 """"""""""""""""""""""""""
 
-Available for any JSON/text content — annotation data, logs, schema dumps, API responses.
+Available for any JSON/text content — annotation data, logs, schema dumps, API responses. Both tools accept file paths, making them ideal for querying spilled workspace files.
 
 ``run_jq(jq_query, data)``
    Run a jq expression on a JSON string or file path. Returns the jq output as a string (truncated at 50 000 chars).

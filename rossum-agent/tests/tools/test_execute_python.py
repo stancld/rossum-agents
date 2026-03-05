@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import patch
 
+from rossum_agent.tools.core import AgentContext, set_context
 from rossum_agent.tools.python_exec import execute_python, get_execute_python_definition
 
 
@@ -92,6 +94,49 @@ class TestExecPython:
         assert parsed["result"] == {"content": [{"id": "header"}]}
         mock_call_mcp_tool.assert_called_once_with("get", {"entity": "schema", "entity_id": 123})
 
+    def test_open_reads_relative_file_inside_workspace(self, tmp_path: Path) -> None:
+        file_path = tmp_path / "example.txt"
+        file_path.write_text("hello", encoding="utf-8")
+
+        set_context(AgentContext(output_dir=tmp_path))
+        try:
+            result = execute_python(code='f = open("example.txt")\ndata = f.read()\nf.close()\ndata')
+            parsed = json.loads(result)
+        finally:
+            set_context(AgentContext())
+
+        assert parsed["status"] == "success"
+        assert parsed["result"] == "hello"
+
+    def test_open_rejects_path_outside_workspace(self, tmp_path: Path) -> None:
+        outside_file = tmp_path.parent / "outside.txt"
+        outside_file.write_text("secret", encoding="utf-8")
+
+        set_context(AgentContext(output_dir=tmp_path))
+        try:
+            result = execute_python(code=f'result = open("{outside_file}").read()')
+            parsed = json.loads(result)
+        finally:
+            set_context(AgentContext())
+
+        assert parsed["status"] == "error"
+        assert "inside workspace or /var" in parsed["error"]
+
+    def test_open_allows_read_only_var_paths(self, tmp_path: Path) -> None:
+        actual_path = tmp_path.resolve() / "var-allowed.txt"
+        actual_path.write_text("from-var", encoding="utf-8")
+        var_path = Path(str(actual_path).replace("/private/var/", "/var/", 1))
+
+        set_context(AgentContext(output_dir=tmp_path))
+        try:
+            result = execute_python(code=f'result = open("{var_path}").read()')
+            parsed = json.loads(result)
+        finally:
+            set_context(AgentContext())
+
+        assert parsed["status"] == "success"
+        assert parsed["result"] == "from-var"
+
     def test_rejects_try_star(self) -> None:
         result = execute_python(code="try:\n  pass\nexcept* ValueError:\n  pass")
         parsed = json.loads(result)
@@ -105,6 +150,48 @@ class TestExecPython:
 
         assert parsed["status"] == "error"
         assert "Import" in parsed["error"]
+
+    def test_allows_import_json(self) -> None:
+        result = execute_python(code="import json\nresult = json.loads('{\"ok\": true}')")
+        parsed = json.loads(result)
+
+        assert parsed["status"] == "success"
+        assert parsed["result"] == {"ok": True}
+
+    def test_allows_from_json_import(self) -> None:
+        result = execute_python(code='from json import dumps\nresult = dumps({"value": 1})')
+        parsed = json.loads(result)
+
+        assert parsed["status"] == "success"
+        assert parsed["result"] == '{"value": 1}'
+
+    def test_allows_stdlib_imports(self) -> None:
+        result = execute_python(code="from collections import Counter\nresult = dict(Counter(['a', 'b', 'a']))")
+        parsed = json.loads(result)
+
+        assert parsed["status"] == "success"
+        assert parsed["result"] == {"a": 2, "b": 1}
+
+    def test_allows_import_re(self) -> None:
+        result = execute_python(code='import re\nresult = bool(re.match(r"\\d+", "123"))')
+        parsed = json.loads(result)
+
+        assert parsed["status"] == "success"
+        assert parsed["result"] is True
+
+    def test_allows_import_pathlib(self) -> None:
+        result = execute_python(code='from pathlib import Path\nresult = str(Path("/home") / "test.txt")')
+        parsed = json.loads(result)
+
+        assert parsed["status"] == "success"
+        assert parsed["result"] == "/home/test.txt"
+
+    def test_rejects_non_allowed_from_import(self) -> None:
+        result = execute_python(code="from os import path\nresult = 1")
+        parsed = json.loads(result)
+
+        assert parsed["status"] == "error"
+        assert "ImportFrom" in parsed["error"]
 
     def test_rejects_dunder_attribute_access(self) -> None:
         result = execute_python(code="result = copilot.__class__")

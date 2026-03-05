@@ -94,7 +94,7 @@ def assert_files_created(expectation: FileExpectation, output_dir: Path | None =
             f"Expected file patterns not matched: {unmatched_patterns}. Actual files: {actual_filenames}"
         )
 
-    if len(actual_files) != len(expectation.expected_files):
+    if not expectation.allow_extra and len(actual_files) != len(expectation.expected_files):
         raise AssertionError(
             f"Expected exactly {len(expectation.expected_files)} files, "
             f"found {len(actual_files)}: {[str(f) for f in actual_files]}"

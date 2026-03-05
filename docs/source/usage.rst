@@ -55,7 +55,8 @@ The ``rossum_agent`` package provides a REST API interface:
    # Or run with Docker Compose
    docker-compose up rossum-agent
 
-The agent includes file output, knowledge base search, hook testing, deployment tools,
+The agent includes working memory (auto-spillover for large tool results to workspace files),
+file I/O, knowledge base search, hook testing, deployment tools,
 and multi-environment MCP connections. See the :doc:`examples` section for complete workflows.
 
 Using Rossum Deploy
@@ -1330,11 +1331,13 @@ Run constrained Python snippets in a sandboxed environment. Load the relevant sk
 
 **Parameters:**
 
-- ``code`` (string, required): Python code to execute. Imports are not allowed. Assign the final value to ``result`` or leave it as the last expression.
+- ``code`` (string, required): Python code to execute. Stdlib imports allowed: collections, csv, datetime, functools, io, itertools, json, math, operator, pathlib, re, statistics, string, textwrap. Assign the final value to ``result`` or leave it as the last expression.
 - For large dict/list/string outputs, prefer calling ``write_file(...)`` inside the snippet and return the write result or a short summary instead of inlining the payload.
 - ``operation_name`` (string, optional): Short label for the intent of the execution.
 
 Task-specific helper functions are documented in the corresponding skills, especially ``python-execution``, ``formula-fields``, ``lookup-fields``, and ``rules-and-actions``.
+
+Inside ``execute_python``, the built-in helper surface includes ``mcp(...)``, ``api_get(...)``, ``schema_content(...)``, ``write_file(...)``, ``json``, and the ``copilot`` namespace.
 
 **Returns:**
 

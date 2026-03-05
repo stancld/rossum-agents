@@ -22,6 +22,7 @@ from rossum_agent.agent.models import (
     StepType,
     TextDeltaStep,
     ThinkingStep,
+    ToolCall,
     ToolResult,
     ToolResultStep,
     ToolStartStep,
@@ -112,15 +113,34 @@ def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentP
     )
 
 
-def _create_tool_start_event(step: ToolStartStep, current_tool: str) -> StepEvent:
+def _create_tool_start_event(
+    step: ToolStartStep, tool_call: ToolCall | None = None, current_tool: str | None = None
+) -> StepEvent:
     current_tool_args = None
     current_tool_call_id = None
-    for tc in step.tool_calls:
-        if tc.name == current_tool:
-            current_tool_args = tc.arguments
-            current_tool_call_id = tc.id
-            break
-    display_name = get_display_tool_name(current_tool, current_tool_args)
+    resolved_tool_name = current_tool
+
+    if tool_call is not None:
+        resolved_tool_name = tool_call.name
+        current_tool_args = tool_call.arguments
+        current_tool_call_id = tool_call.id
+    else:
+        if step.current_tool_call_id is not None:
+            for tc in step.tool_calls:
+                if tc.id == step.current_tool_call_id:
+                    resolved_tool_name = tc.name
+                    current_tool_args = tc.arguments
+                    current_tool_call_id = tc.id
+                    break
+        if current_tool_args is None:
+            for tc in step.tool_calls:
+                if current_tool is not None and tc.name == current_tool:
+                    resolved_tool_name = tc.name
+                    current_tool_args = tc.arguments
+                    current_tool_call_id = tc.id
+                    break
+
+    display_name = get_display_tool_name(resolved_tool_name or "", current_tool_args)
     return StepEvent(
         type="tool_start",
         step_number=step.step_number,
@@ -190,13 +210,13 @@ def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
             total = len(step.tool_calls)
             events = []
             for idx, tc in enumerate(step.tool_calls, 1):
-                ev = _create_tool_start_event(step, tc.name)
+                ev = _create_tool_start_event(step, tool_call=tc)
                 ev.tool_progress = (idx, total)
                 events.append(ev)
 
         case ToolStartStep():
             # Single tool progress update
-            events = [_create_tool_start_event(step, step.current_tool)]
+            events = [_create_tool_start_event(step, current_tool=step.current_tool)]
 
         case ToolResultStep():
             events = [_create_tool_result_event(step.step_number, r) for r in step.tool_results]

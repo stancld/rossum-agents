@@ -8,6 +8,7 @@ import io
 import json
 import logging
 from contextlib import redirect_stdout
+from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
@@ -28,6 +29,7 @@ from rossum_agent.python_tools.copilot.lookup import (
 )
 from rossum_agent.python_tools.copilot.rule import evaluate_rules as _evaluate_rules
 from rossum_agent.python_tools.copilot.rule import suggest_rule as _suggest_rule
+from rossum_agent.tools.core import get_context
 from rossum_agent.tools.file_tools import write_file as _write_file_tool
 from rossum_agent.tools.subagents.mcp_helpers import call_mcp_tool as _call_mcp_tool
 
@@ -37,8 +39,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _MAX_CODE_LENGTH = 12000
+_ALLOWED_OPEN_MODES = {"r", "rt", "w", "wt", "a", "at"}
+_READ_ONLY_OPEN_MODES = {"r", "rt"}
 
 _SAFE_BUILTINS: dict[str, object] = {
+    "__import__": __import__,
     "abs": abs,
     "all": all,
     "any": any,
@@ -89,11 +94,66 @@ _DISALLOWED_AST_NODES = (
 )
 
 
+_ALLOWED_MODULES = frozenset(
+    {
+        "collections",
+        "csv",
+        "datetime",
+        "functools",
+        "io",
+        "itertools",
+        "json",
+        "math",
+        "operator",
+        "pathlib",
+        "re",
+        "statistics",
+        "string",
+        "textwrap",
+    }
+)
+
+
+def _is_allowed_import(node: ast.Import | ast.ImportFrom) -> bool:
+    if isinstance(node, ast.Import):
+        return all(alias.name in _ALLOWED_MODULES for alias in node.names)
+    return node.level == 0 and node.module is not None and node.module in _ALLOWED_MODULES
+
+
 def _parse_json_result(raw: str) -> object:
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         return raw
+
+
+def _sandboxed_open(
+    file: str,
+    mode: str = "r",
+    encoding: str = "utf-8",
+) -> object:
+    """Open files within the workspace, plus read-only access under /var."""
+    if mode not in _ALLOWED_OPEN_MODES:
+        raise ValueError(f"open mode not allowed: {mode}")
+
+    workspace_dir = get_context().get_output_dir().resolve()
+    var_dir = Path("/var").resolve()
+    path = Path(file)
+    if not path.is_absolute():
+        path = workspace_dir / path
+    resolved = path.resolve()
+
+    try:
+        resolved.relative_to(workspace_dir)
+    except ValueError:
+        try:
+            resolved.relative_to(var_dir)
+        except ValueError as e:
+            raise ValueError("open() path must stay inside workspace or /var") from e
+        if mode not in _READ_ONLY_OPEN_MODES:
+            raise ValueError("open() only supports read-only access for /var paths") from None
+
+    return resolved.open(mode, encoding=encoding)
 
 
 def _unwrap_mcp_result(obj: object) -> object:
@@ -127,6 +187,8 @@ def _extract_schema_content(obj: object) -> list[dict[str, object]] | None:
 
 def _validate_ast(tree: ast.AST) -> None:
     for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)) and _is_allowed_import(node):
+            continue
         if isinstance(node, _DISALLOWED_AST_NODES):
             raise ValueError(f"{type(node).__name__} is not allowed in execute_python")
         if isinstance(node, ast.Name) and node.id.startswith("__"):
@@ -188,6 +250,7 @@ def _build_helpers() -> dict[str, object]:
         "suggest_lookup_field": copilot.suggest_lookup_field,
         "suggest_rule": copilot.suggest_rule,
         "mcp": mcp,
+        "open": _sandboxed_open,
         "write_file": write_file,
     }
 
@@ -198,7 +261,8 @@ def get_execute_python_definition() -> ToolParam:
         "name": "execute_python",
         "description": (
             "Run short Python snippets in a constrained environment. "
-            "Do not use imports. Assign the final structured value to `result` or leave it as the last expression. "
+            "Stdlib imports allowed: collections, csv, datetime, functools, io, itertools, json, math, operator, pathlib, re, statistics, string, textwrap. "
+            "Assign the final structured value to `result` or leave it as the last expression. "
             "When the useful output is a large string, dict, or list, prefer `write_file(...)` inside the snippet instead of returning it inline. "
             "Load the relevant skill first for task-specific helper guidance."
         ),
@@ -207,7 +271,7 @@ def get_execute_python_definition() -> ToolParam:
             "properties": {
                 "code": {
                     "type": "string",
-                    "description": "Python code to execute. No imports. Max 12000 characters.",
+                    "description": "Python code to execute. Stdlib imports allowed (collections, csv, datetime, etc.). Max 12000 characters.",
                 },
                 "operation_name": {
                     "type": "string",

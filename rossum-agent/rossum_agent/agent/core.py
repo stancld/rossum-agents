@@ -81,6 +81,7 @@ from rossum_agent.agent.models import (
     ToolStartStep,
     truncate_content,
 )
+from rossum_agent.agent.spillover import maybe_spill
 from rossum_agent.api.models.schemas import TokenUsageBreakdown
 from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
 from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
@@ -156,6 +157,47 @@ def _parse_json_encoded_strings(arguments: dict) -> dict:
         else:
             result[key] = value
     return result
+
+
+def _tool_call_fingerprint(tool_call: ToolCall) -> str:
+    """Create a stable fingerprint for deduplicating identical tool calls in one step."""
+    return json.dumps(
+        {"name": tool_call.name, "arguments": tool_call.arguments},
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+
+
+def _deduplicate_tool_calls(
+    tool_calls: list[ToolCall], step_num: int
+) -> tuple[list[ToolCall], dict[str, list[ToolCall]]]:
+    """Deduplicate identical tool calls, returning unique calls and a map of duplicates by primary ID."""
+    deduped: list[ToolCall] = []
+    duplicate_calls_by_id: dict[str, list[ToolCall]] = {}
+    seen_fingerprints: dict[str, ToolCall] = {}
+
+    for tool_call in tool_calls:
+        fingerprint = _tool_call_fingerprint(tool_call)
+        primary_call = seen_fingerprints.get(fingerprint)
+        if primary_call is None:
+            seen_fingerprints[fingerprint] = tool_call
+            deduped.append(tool_call)
+            duplicate_calls_by_id[tool_call.id] = []
+        else:
+            duplicate_calls_by_id[primary_call.id].append(tool_call)
+
+    duplicate_count = len(tool_calls) - len(deduped)
+    if duplicate_count > 0:
+        logger.info(
+            "Step %s: deduplicated %s duplicate tool call(s) (%s requested, %s executed)",
+            step_num,
+            duplicate_count,
+            len(tool_calls),
+            len(deduped),
+        )
+
+    return deduped, duplicate_calls_by_id
 
 
 class _SchemaStagger:
@@ -726,11 +768,12 @@ class RossumAgent:
             output_tokens=output_tokens,
         )
 
-        total_tools = len(tool_calls)
+        deduped_tool_calls, duplicate_calls_by_id = _deduplicate_tool_calls(tool_calls, step_num)
+        total_tools = len(deduped_tool_calls)
 
         yield ToolStartStep(
             step_number=step_num,
-            tool_calls=tool_calls,
+            tool_calls=deduped_tool_calls,
             tool_progress=(0, total_tools),
         )
 
@@ -740,20 +783,28 @@ class RossumAgent:
         # Stagger schema patch calls to avoid 412 conflicts from concurrent writes
         stagger = _SchemaStagger()
 
-        async def execute_single_tool(tool_call: ToolCall, idx: int) -> None:
+        async def execute_single_tool(tool_call: ToolCall, duplicate_calls: list[ToolCall], idx: int) -> None:
             await stagger.maybe_delay(tool_call.name)
 
             tool_progress = (idx, total_tools)
             async for progress_or_result in self._execute_tool_with_progress(
-                tool_call, step_num, tool_calls, tool_progress
+                tool_call, step_num, deduped_tool_calls, tool_progress
             ):
                 if isinstance(progress_or_result, ToolStartStep):
                     await progress_queue.put(progress_or_result)
                 elif isinstance(progress_or_result, ToolResult):
                     results_by_id[tool_call.id] = progress_or_result
+                    for duplicate_call in duplicate_calls:
+                        results_by_id[duplicate_call.id] = ToolResult(
+                            tool_call_id=duplicate_call.id,
+                            name=duplicate_call.name,
+                            content=progress_or_result.content,
+                            is_error=progress_or_result.is_error,
+                        )
 
         tasks = [
-            asyncio.create_task(execute_single_tool(tool_call, idx)) for idx, tool_call in enumerate(tool_calls, 1)
+            asyncio.create_task(execute_single_tool(tool_call, duplicate_calls_by_id[tool_call.id], idx))
+            for idx, tool_call in enumerate(deduped_tool_calls, 1)
         ]
 
         try:
@@ -773,14 +824,15 @@ class RossumAgent:
             await asyncio.gather(*tasks, return_exceptions=True)
             raise
 
-        tool_results = [results_by_id[tc.id] for tc in tool_calls if tc.id in results_by_id]
-        memory_step.tool_results = tool_results
+        memory_results = [results_by_id[tc.id] for tc in tool_calls if tc.id in results_by_id]
+        streamed_results = [results_by_id[tc.id] for tc in deduped_tool_calls if tc.id in results_by_id]
+        memory_step.tool_results = memory_results
         self.memory.add_step(memory_step)
 
         yield ToolResultStep(
             step_number=step_num,
-            tool_calls=tool_calls,
-            tool_results=tool_results,
+            tool_calls=deduped_tool_calls,
+            tool_results=streamed_results,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
         )
@@ -848,6 +900,7 @@ class RossumAgent:
                             tool_calls=tool_calls,
                             tool_progress=tool_progress,
                             current_tool=tool_call.name,
+                            current_tool_call_id=tool_call.id,
                             sub_agent_progress=progress,
                         )
                     except queue.Empty:
@@ -865,6 +918,7 @@ class RossumAgent:
                 result = await self.mcp_connection.call_tool(tool_call.name, tool_call.arguments)
                 content = self._serialize_tool_result(result)
 
+            content = maybe_spill(content, tool_call.name, step_num, get_context().get_output_dir(), tool_call.id)
             content = truncate_content(content)
             yield ToolResult(tool_call_id=tool_call.id, name=tool_call.name, content=content)
 

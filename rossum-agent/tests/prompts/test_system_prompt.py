@@ -35,3 +35,8 @@ class TestSystemPromptSchemaInstructions:
         prompt = get_system_prompt("default")
         assert '`load_skill("python-execution")`' in prompt
         assert "schema_content(...)" not in prompt
+
+    def test_run_jq_requires_jq_syntax(self):
+        prompt = get_system_prompt("default")
+        assert "`run_jq` expects real jq syntax" in prompt
+        assert "`?`, `//`, and `tonumber?`" in prompt

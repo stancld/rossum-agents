@@ -122,7 +122,7 @@ The agent provides internal tools and access to 43 MCP tools via dynamic loading
 <details>
 <summary><strong>Internal Tools</strong></summary>
 
-**File & Knowledge:**
+**File & Working Memory:**
 - `write_file` - Save reports, documentation, analysis results
 - `search_knowledge_base` - Search Rossum docs with AI analysis (sub-agent)
 - `search_elis_docs` - AI-powered search of API documentation (sub-agent)
