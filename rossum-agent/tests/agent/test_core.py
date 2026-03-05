@@ -1376,27 +1376,6 @@ class TestExecuteTool:
         assert len(result.content) < 50000
         assert "truncated" in result.content.lower()
 
-    @pytest.mark.asyncio
-    async def test_executes_deploy_tool(self):
-        """Test that deploy tools are executed locally."""
-        agent = self._create_agent()
-
-        tool_call = ToolCall(
-            id="tc_1",
-            name="deploy_hook",
-            arguments={"hook_id": "123"},
-        )
-
-        with (
-            patch("rossum_agent.agent.core.execute_tool", return_value="Deploy Success") as mock_execute,
-            patch("rossum_agent.agent.core.get_deploy_tool_names", return_value=["deploy_hook"]),
-        ):
-            result = await self._get_final_result(agent, tool_call)
-
-        mock_execute.assert_called_once()
-        assert result.content == "Deploy Success"
-        assert result.is_error is False
-
 
 class TestExecuteToolsInParallel:
     """Test RossumAgent._execute_tools_with_progress parallel execution."""
@@ -2451,7 +2430,6 @@ class TestRossumAgentProperties:
         with (
             patch("rossum_agent.agent.core.mcp_tools_to_anthropic_format", return_value=[]),
             patch("rossum_agent.agent.core.get_internal_tools", return_value=[]),
-            patch("rossum_agent.agent.core.get_deploy_tools", return_value=[]),
         ):
             mock_client = MagicMock()
             mock_mcp = MagicMock()
@@ -2501,7 +2479,6 @@ class TestRossumAgentTokenTracking:
         with (
             patch("rossum_agent.agent.core.mcp_tools_to_anthropic_format", return_value=[]),
             patch("rossum_agent.agent.core.get_internal_tools", return_value=[]),
-            patch("rossum_agent.agent.core.get_deploy_tools", return_value=[]),
         ):
             mock_client = MagicMock()
             mock_mcp = MagicMock()

@@ -12,8 +12,11 @@ All notable changes to this project will be documented in this file.
 - Added `ask_user_question` tool — agent can ask the user structured questions (free-text or multiple-choice) mid-execution when it needs information it cannot determine on its own; streamed via SSE `agent_question` event [#224](https://github.com/rossumai/rossum-agents/pull/224)
 
 ### Changed
-- Removed `schema-pruning` skill — use `prune_schema_fields` MCP tool directly [#225](https://github.com/stancld/rossum-agents/pull/225)
 - Removed `elis_openapi_grep` and `elis_openapi_jq` as direct agent tools — Elis API reference lookups now route exclusively through the `search_elis_docs` sub-agent ([#220](https://github.com/rossumai/rossum-agents/pull/220))
+
+### Removed
+- Removed `rossum-deployment` skill and all deploy/spawn tools — unused and unsolved [#241](https://github.com/stancld/rossum-agents/pull/241)
+- Removed `schema-pruning` skill — use `prune_schema_fields` MCP tool directly [#225](https://github.com/stancld/rossum-agents/pull/225)
 - Updated skills and MCP integration for rossum-mcp's unified `get`/`search` read layer — base prompt, 5 skill files (document-testing, hooks, rossum-deployment, rules-and-actions, ui-settings), and copilot tools now reference new tool names instead of removed `get_*/list_*` tools [#221](https://github.com/stancld/rossum-agents/pull/221)
 - Removed `kb_grep` and `kb_get_article` from main agent tools — knowledge base lookups now route through `search_knowledge_base` sub-agent only [#221](https://github.com/stancld/rossum-agents/pull/221)
 - Formula tools (`suggest_formula_field`) and lookup tools (`suggest_lookup_field`, `evaluate_lookup_field`, `get_lookup_dataset_raw_values`, `query_lookup_dataset`) are now skill-gated — only available after loading `formula-fields` or `lookup-fields` skill respectively [#221](https://github.com/stancld/rossum-agents/pull/221)

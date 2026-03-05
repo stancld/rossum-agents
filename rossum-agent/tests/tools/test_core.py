@@ -17,7 +17,6 @@ from rossum_agent.tools.core import (
     reset_context,
     set_context,
 )
-from rossum_agent.tools.spawn_mcp import SpawnedConnection
 from rossum_agent.tools.task_tracker import TaskTracker
 
 if TYPE_CHECKING:
@@ -332,24 +331,6 @@ class TestMCPConnection:
             assert get_context().is_read_only is True
         finally:
             loop.close()
-
-
-class TestSpawnedConnection:
-    """Tests for SpawnedConnection dataclass."""
-
-    def test_spawned_connection_fields(self) -> None:
-        mock_connection = MagicMock()
-        mock_client = MagicMock()
-
-        spawned = SpawnedConnection(
-            connection=mock_connection,
-            client=mock_client,
-            api_base_url="https://api.example.com",
-        )
-
-        assert spawned.connection is mock_connection
-        assert spawned.client is mock_client
-        assert spawned.api_base_url == "https://api.example.com"
 
 
 class TestTaskTrackerContextVar:

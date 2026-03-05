@@ -44,8 +44,8 @@ class TestInternalToolsRegistration:
         """Test that executable tool names are a superset of visible tools.
 
         get_internal_tool_names() returns all executable tools (for dispatch routing),
-        while get_internal_tools() returns only currently visible tools (deployment
-        tools are hidden until rossum-deployment skill is loaded).
+        while get_internal_tools() returns only currently visible tools (some tools
+        are hidden until their skill is loaded).
         """
         tools = get_internal_tools()
         names = get_internal_tool_names()

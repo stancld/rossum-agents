@@ -1488,58 +1488,6 @@ Returns hook response and logs.
 
 **Returns:** Dict with hook response and execution logs.
 
-Multi-Environment Tools
-^^^^^^^^^^^^^^^^^^^^^^^
-
-spawn_mcp_connection
-""""""""""""""""""""
-
-Spawn a new MCP connection to a different Rossum environment.
-
-Use this when you need to make changes to a different Rossum environment than the one
-the agent was initialized with. For example, when deploying changes from source to target.
-
-**Parameters:**
-
-- ``connection_id`` (string, required): A unique identifier for this connection (e.g., 'target', 'sandbox')
-- ``api_token`` (string, required): API token for the target environment
-- ``api_base_url`` (string, required): API base URL for the target environment
-- ``mcp_mode`` (string, optional): "read-only" or "read-write" (default: "read-write")
-
-**Returns:**
-
-Success message with list of available tools on the spawned connection.
-
-call_on_connection
-""""""""""""""""""
-
-Call a tool on a spawned MCP connection.
-
-Use this to execute MCP tools on a connection that was previously spawned with ``spawn_mcp_connection``.
-
-**Parameters:**
-
-- ``connection_id`` (string, required): The identifier of the spawned connection
-- ``tool_name`` (string, required): The name of the MCP tool to call
-- ``arguments`` (string, required): JSON string of arguments to pass to the tool
-
-**Returns:**
-
-The result of the tool call as a JSON string.
-
-close_connection
-""""""""""""""""
-
-Close a spawned MCP connection.
-
-**Parameters:**
-
-- ``connection_id`` (string, required): The connection to close
-
-**Returns:**
-
-Success or error message.
-
 User Interaction Tools
 ^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1584,7 +1532,7 @@ The skill will provide detailed instructions, workflows, and context for the tas
 
 **Parameters:**
 
-- ``name`` (string, required): The name of the skill to load (e.g., "rossum-deployment", "txscript")
+- ``name`` (string, required): The name of the skill to load (e.g., "schema-patching", "txscript")
 
 **Returns:**
 
@@ -1592,96 +1540,9 @@ The skill will provide detailed instructions, workflows, and context for the tas
 
    {
      "status": "success",
-     "skill_name": "rossum-deployment",
-     "instructions": "## Rossum Deployment Workflow\n\n..."
+     "skill_name": "Schema Patching",
+     "instructions": "## Schema Patching\n\n..."
    }
-
-Agent Deployment Tools
-^^^^^^^^^^^^^^^^^^^^^^
-
-The agent includes deployment tools that wrap the ``rossum_deploy`` package for use within agent conversations.
-
-deploy_pull
-"""""""""""
-
-Pull Rossum configuration objects from an organization to local files.
-
-**Parameters:**
-
-- ``org_id`` (int, required): Organization ID to pull from
-- ``workspace_path`` (string, optional): Path to workspace directory
-- ``api_base_url`` (string, optional): API base URL for target environment
-- ``token`` (string, optional): API token for target environment
-
-deploy_diff
-"""""""""""
-
-Compare local workspace files with remote Rossum configuration.
-
-**Parameters:**
-
-- ``workspace_path`` (string, optional): Path to workspace directory
-
-deploy_push
-"""""""""""
-
-Push local changes to Rossum.
-
-**Parameters:**
-
-- ``dry_run`` (bool, optional): Only show what would be pushed
-- ``force`` (bool, optional): Push even if there are conflicts
-- ``workspace_path`` (string, optional): Path to workspace directory
-
-deploy_copy_org
-"""""""""""""""
-
-Copy all objects from source organization to target organization.
-
-**Parameters:**
-
-- ``source_org_id`` (int, required): Source organization ID
-- ``target_org_id`` (int, required): Target organization ID
-- ``target_api_base`` (string, optional): Target API base URL
-- ``target_token`` (string, optional): Target API token
-- ``workspace_path`` (string, optional): Path to workspace directory
-
-deploy_copy_workspace
-"""""""""""""""""""""
-
-Copy a single workspace and all its objects to target organization.
-
-**Parameters:**
-
-- ``source_workspace_id`` (int, required): Source workspace ID
-- ``target_org_id`` (int, required): Target organization ID
-- ``target_api_base`` (string, optional): Target API base URL
-- ``target_token`` (string, optional): Target API token
-- ``workspace_path`` (string, optional): Path to workspace directory
-
-deploy_compare_workspaces
-"""""""""""""""""""""""""
-
-Compare two local workspaces to see differences between source and target.
-
-**Parameters:**
-
-- ``source_workspace_path`` (string, required): Path to source workspace
-- ``target_workspace_path`` (string, required): Path to target workspace
-- ``id_mapping_path`` (string, optional): Path to ID mapping JSON from copy operations
-
-deploy_to_org
-"""""""""""""
-
-Deploy local configuration changes to a target organization.
-
-**Parameters:**
-
-- ``target_org_id`` (int, required): Target organization ID
-- ``target_api_base`` (string, optional): Target API base URL
-- ``target_token`` (string, optional): Target API token
-- ``dry_run`` (bool, optional): Only show what would be deployed
-- ``workspace_path`` (string, optional): Path to workspace directory
 
 Deployment Tools
 ----------------

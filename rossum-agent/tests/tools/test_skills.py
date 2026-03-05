@@ -32,15 +32,15 @@ class TestLoadSkill:
     def test_load_skill_found_returns_success(self):
         """Test that load_skill returns success JSON when skill is found."""
         mock_skill = Skill(
-            name="Rossum Deployment",
-            content="# Deployment Instructions\n\nFollow these steps...",
-            file_path=Path("/fake/path/rossum-deployment.md"),
+            name="Schema Patching",
+            content="# Schema Patching Instructions\n\nFollow these steps...",
+            file_path=Path("/fake/path/schema-patching.md"),
         )
 
         with patch("rossum_agent.tools.skills.get_skill", return_value=mock_skill):
-            result = load_skill("rossum-deployment")
+            result = load_skill("schema-patching")
 
         parsed = json.loads(result)
         assert parsed["status"] == "success"
-        assert parsed["skill_name"] == "Rossum Deployment"
-        assert parsed["instructions"] == "# Deployment Instructions\n\nFollow these steps..."
+        assert parsed["skill_name"] == "Schema Patching"
+        assert parsed["instructions"] == "# Schema Patching Instructions\n\nFollow these steps..."

@@ -152,22 +152,8 @@ The agent provides internal tools and access to 43 MCP tools via dynamic loading
 - `create_schema_with_subagent` - Create new schemas via Opus sub-agent
 - `patch_schema_with_subagent` - Safe schema modifications via Opus
 
-**Deployment:**
-- `deploy_pull` - Pull configs from organization
-- `deploy_diff` - Compare local vs remote
-- `deploy_push` - Push local changes
-- `deploy_copy_org` - Copy entire organization
-- `deploy_copy_workspace` - Copy single workspace
-- `deploy_compare_workspaces` - Compare two workspaces
-- `deploy_to_org` - Deploy to target organization
-
-**Multi-Environment:**
-- `spawn_mcp_connection` - Connect to different Rossum environment
-- `call_on_connection` - Call tools on spawned connection
-- `close_connection` - Close spawned connection
-
 **Skills:**
-- `load_skill` - Load domain-specific workflows (`rossum-deployment`, `schema-patching`, `organization-setup`, `schema-creation`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
+- `load_skill` - Load domain-specific workflows (`schema-patching`, `organization-setup`, `schema-creation`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
 
 **Document Testing:**
 - `generate_mock_pdf` - Generate schema-aware mock PDFs with realistic field values for end-to-end extraction testing

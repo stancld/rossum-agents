@@ -71,7 +71,7 @@ class SkillRegistry:
         """Get a skill by its slug (filename without extension).
 
         Args:
-            slug: The skill slug (e.g., "rossum-deployment").
+            slug: The skill slug (e.g., "schema-patching").
 
         Returns:
             The Skill object if found, None otherwise.

@@ -16,7 +16,7 @@ Use the ``load_skill`` tool when a task matches one of the available skills:
 .. code-block:: json
 
    {
-     "name": "rossum-deployment"
+     "name": "schema-patching"
    }
 
 Returns skill instructions as JSON:
@@ -25,8 +25,8 @@ Returns skill instructions as JSON:
 
    {
      "status": "success",
-     "skill_name": "Rossum Deployment",
-     "instructions": "# Rossum Deployment Skill\n\n**Goal**: Deploy configuration changes safely..."
+     "skill_name": "Schema Patching",
+     "instructions": "# Schema Patching Skill\n\n**Goal**: Add, update, or remove individual schema fields..."
    }
 
 Available Skills
@@ -38,8 +38,6 @@ Available Skills
 
    * - Skill
      - Purpose
-   * - ``rossum-deployment``
-     - Deploy configuration changes safely via sandbox with before/after diff
    * - ``schema-patching``
      - Add, update, or remove individual schema fields
    * - ``organization-setup``
@@ -69,22 +67,6 @@ Hooks Skill
 **Goal**: Create, configure, and test hooks — prefer Rossum Store templates over custom code.
 
 Workflow: ``search(query={"entity": "hook_template"})`` → ``create_hook_from_template()`` or ``create_hook()`` → ``test_hook()`` → ``search(query={"entity": "hook_log", ...})``.
-
-Rossum Deployment Skill
-"""""""""""""""""""""""
-
-**Goal**: Deploy configuration changes safely via sandbox with before/after diff.
-
-Key workflow:
-
-1. Copy workspace to sandbox (``deploy_copy_workspace``)
-2. Pull BEFORE state (``deploy_pull``)
-3. Modify sandbox via spawned connection (``call_on_connection``)
-4. Pull AFTER state (``deploy_pull``)
-5. Compare and show diff (``deploy_compare_workspaces``) - **wait for user approval**
-6. Deploy to production (``deploy_to_org``)
-
-**Critical rule**: Direct MCP calls modify production. Use ``call_on_connection("sandbox", ...)`` for sandbox modifications.
 
 Schema Patching Skill
 """""""""""""""""""""
