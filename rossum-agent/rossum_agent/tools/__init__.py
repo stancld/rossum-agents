@@ -40,7 +40,6 @@ from rossum_agent.tools.dynamic_tools import (
 from rossum_agent.tools.file_tools import write_file
 from rossum_agent.tools.mock_pdf import generate_mock_pdf
 from rossum_agent.tools.skills import load_skill
-from rossum_agent.tools.spawn_mcp import call_on_connection, close_connection, spawn_mcp_connection
 from rossum_agent.tools.subagents import patch_schema_with_subagent, search_elis_docs, search_knowledge_base
 from rossum_agent.tools.task_tracker import create_task, list_tasks, update_task
 
@@ -87,22 +86,8 @@ _RULES_TOOLS: list[BetaTool[..., str]] = [
     evaluate_rules,
 ]
 
-_DEPLOYMENT_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
-    spawn_mcp_connection,
-    call_on_connection,
-    close_connection,
-]
-
 _INTERNAL_TOOL_REGISTRY: dict[str, BetaTool[..., str]] = {
-    t.name: t
-    for t in (
-        _ALWAYS_INTERNAL_TOOLS
-        + _FORMULA_TOOLS
-        + _LOOKUP_TOOLS
-        + _CHANGE_HISTORY_TOOLS
-        + _RULES_TOOLS
-        + _DEPLOYMENT_INTERNAL_TOOLS
-    )
+    t.name: t for t in (_ALWAYS_INTERNAL_TOOLS + _FORMULA_TOOLS + _LOOKUP_TOOLS + _CHANGE_HISTORY_TOOLS + _RULES_TOOLS)
 }
 
 
@@ -117,8 +102,6 @@ def _get_active_internal_tools() -> list[BetaTool[..., str]]:
         tools = tools + _CHANGE_HISTORY_TOOLS
     if is_skill_loaded("rules-and-actions"):
         tools = tools + _RULES_TOOLS
-    if is_skill_loaded("rossum-deployment"):
-        tools = tools + _DEPLOYMENT_INTERNAL_TOOLS
     return tools
 
 
@@ -182,14 +165,7 @@ def execute_tool(name: str, arguments: dict[str, object], tools: list[BetaTool[.
     raise ValueError(f"Unknown tool: {name}")
 
 
-INTERNAL_TOOLS = (
-    _ALWAYS_INTERNAL_TOOLS
-    + _FORMULA_TOOLS
-    + _LOOKUP_TOOLS
-    + _CHANGE_HISTORY_TOOLS
-    + _RULES_TOOLS
-    + _DEPLOYMENT_INTERNAL_TOOLS
-)
+INTERNAL_TOOLS = _ALWAYS_INTERNAL_TOOLS + _FORMULA_TOOLS + _LOOKUP_TOOLS + _CHANGE_HISTORY_TOOLS + _RULES_TOOLS
 
 __all__ = [
     "INTERNAL_TOOLS",

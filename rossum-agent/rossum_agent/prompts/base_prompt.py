@@ -29,7 +29,6 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 **Hooks**: Prefer `search(query={"entity": "hook_template"})` + `create_hook_from_template` over custom code.
 
 **Skills** (load FIRST when relevant):
-- `load_skill("rossum-deployment")` → sandbox, deploy, cross-org, migrate
 - `load_skill("organization-setup")` → new customer onboarding, queue templates
 - `load_skill("schema-creation")` → create new schemas from scratch
 - `load_skill("schema-patching")` → modify schemas, add/remove fields, formulas
@@ -84,9 +83,7 @@ Event nodes: light blue (`#E8F4F8`). Hook nodes: darker blue (`#4A90E2`, white t
 CONFIGURATION_WORKFLOWS = """
 # Configuration
 
-**Sandbox deployments**: Load `rossum-deployment` skill first. Execute autonomously through diff, then wait for user approval before deploying.
-
-**Direct operations**: For single-org changes without sandbox, use MCP tools directly.
+**Direct operations**: For single-org changes, use MCP tools directly.
 
 **Testing hooks**: Call `test_hook` with the hook ID, event, and action. It auto-generates a realistic payload internally. If it fails because no annotations exist on the hook's queues, find an annotation from another queue in the same workspace and pass its URL via the `annotation` parameter."""
 

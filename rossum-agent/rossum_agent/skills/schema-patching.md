@@ -88,4 +88,3 @@ Load the `schemas` tool category first: `load_tool_category(["schemas"])`
 
 - Create new schemas from scratch: load `schema-creation` skill
 - Schema customization during queue creation: load `organization-setup` skill
-- Sandbox testing before production: load `rossum-deployment` skill

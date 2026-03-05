@@ -36,7 +36,6 @@ dependencies = [
     "python-dotenv",
     "fpdf2>=2.8.0",
     "rossum-api>=3.9.1",
-    "rossum-deploy>=0.1.0",
     "rossum-mcp>=1.4.0",
 ]
 
@@ -101,7 +100,6 @@ all = [
 ]
 
 [tool.uv.sources]
-rossum-deploy = { git = "https://github.com/stancld/rossum-agents.git", subdirectory = "rossum-deploy" }
 rossum-mcp = { git = "https://github.com/stancld/rossum-agents.git", subdirectory = "rossum-mcp" }
 
 [tool.pytest.ini_options]

@@ -273,7 +273,6 @@ The Rossum Agent includes specialized capabilities for complex workflows:
 
 | Skill | Purpose |
 |-------|---------|
-| `rossum-deployment` | Deploy configuration changes safely via sandbox with before/after diff |
 | `schema-patching` | Add, update, or remove individual schema fields |
 | `organization-setup` | Set up Rossum for new customers with regional templates |
 | `ui-settings` | Update queue UI settings without corrupting structure |
