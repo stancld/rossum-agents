@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from rossum_agent.api.services.chat_service import ChatService
 from rossum_agent.redis_storage import ChatData, ChatMetadata
 
@@ -419,3 +421,101 @@ class TestChatServiceFeedback:
 
         assert result is True
         mock_storage.delete_feedback.assert_called_once_with("user_123", "chat_123", 2)
+
+
+class TestChatServicePostgres:
+    """Tests for ChatService PostgreSQL dual-write integration."""
+
+    @pytest.mark.asyncio
+    async def test_save_messages_schedules_pg_write(self):
+        mock_storage = MagicMock()
+        mock_storage.save_chat.return_value = True
+        mock_dao = AsyncMock()
+
+        service = ChatService(redis_storage=mock_storage, pg_dao=mock_dao)
+        msgs = [{"role": "user", "content": "hello"}]
+        meta = ChatMetadata(mcp_mode="read-only")
+        service.save_messages("user_1", "chat_1", msgs, metadata=meta)
+
+        # Allow the background task to run
+        await asyncio.sleep(0)
+
+        mock_dao.save_chat.assert_awaited_once_with("chat_1", "user_1", msgs, output_dir=None, metadata=meta.to_dict())
+
+    @pytest.mark.asyncio
+    async def test_save_feedback_schedules_pg_write(self):
+        mock_storage = MagicMock()
+        mock_storage.save_feedback.return_value = True
+        mock_dao = AsyncMock()
+
+        service = ChatService(redis_storage=mock_storage, pg_dao=mock_dao)
+        service.save_feedback("user_1", "chat_1", 0, True)
+
+        await asyncio.sleep(0)
+
+        mock_dao.save_feedback.assert_awaited_once_with("chat_1", 0, True)
+
+    @pytest.mark.asyncio
+    async def test_delete_feedback_schedules_pg_write(self):
+        mock_storage = MagicMock()
+        mock_storage.delete_feedback.return_value = True
+        mock_dao = AsyncMock()
+
+        service = ChatService(redis_storage=mock_storage, pg_dao=mock_dao)
+        service.delete_feedback("user_1", "chat_1", 2)
+
+        await asyncio.sleep(0)
+
+        mock_dao.delete_feedback.assert_awaited_once_with("chat_1", 2)
+
+    @pytest.mark.asyncio
+    async def test_delete_chat_schedules_pg_write(self):
+        mock_storage = MagicMock()
+        mock_storage.delete_chat.return_value = True
+        mock_dao = AsyncMock()
+
+        service = ChatService(redis_storage=mock_storage, pg_dao=mock_dao)
+        service.delete_chat("user_1", "chat_1")
+
+        await asyncio.sleep(0)
+
+        mock_dao.delete_chat.assert_awaited_once_with("chat_1")
+
+    @pytest.mark.asyncio
+    async def test_create_chat_schedules_pg_write(self):
+        mock_storage = MagicMock()
+        mock_dao = AsyncMock()
+
+        service = ChatService(redis_storage=mock_storage, pg_dao=mock_dao)
+        service.create_chat("user_1", mcp_mode="read-only")
+
+        await asyncio.sleep(0)
+
+        mock_dao.save_chat.assert_awaited_once()
+        call_args = mock_dao.save_chat.call_args
+        assert call_args.kwargs.get("metadata", call_args.args[3] if len(call_args.args) > 3 else None) is not None
+
+    @pytest.mark.asyncio
+    async def test_pg_error_does_not_affect_redis(self):
+        mock_storage = MagicMock()
+        mock_storage.save_feedback.return_value = True
+        mock_dao = AsyncMock()
+        mock_dao.save_feedback.side_effect = RuntimeError("PG down")
+
+        service = ChatService(redis_storage=mock_storage, pg_dao=mock_dao)
+        result = service.save_feedback("user_1", "chat_1", 0, True)
+
+        await asyncio.sleep(0)
+
+        assert result is True
+        mock_storage.save_feedback.assert_called_once()
+
+    def test_no_pg_dao_skips_scheduling(self):
+        mock_storage = MagicMock()
+        mock_storage.save_feedback.return_value = True
+
+        service = ChatService(redis_storage=mock_storage, pg_dao=None)
+        result = service.save_feedback("user_1", "chat_1", 0, True)
+
+        assert result is True
+        assert len(service._pg_tasks) == 0

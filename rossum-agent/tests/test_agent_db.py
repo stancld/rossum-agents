@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 import sqlalchemy as sa
 from rossum_agent.db import ChatHistoryDAO, chat_files_table, chats_table, metadata
 from sqlalchemy.dialects.postgresql import BYTEA, JSONB
@@ -101,3 +102,98 @@ class TestChatHistoryDAO:
     def test_init_exposes_chat_files_table(self):
         dao = ChatHistoryDAO(MagicMock())
         assert dao.chat_files is chat_files_table
+
+    @staticmethod
+    def _make_engine(mock_conn):
+        """Create a mock async engine whose .begin() returns mock_conn as async ctx manager."""
+        mock_engine = MagicMock()
+        ctx = AsyncMock()
+        ctx.__aenter__.return_value = mock_conn
+        ctx.__aexit__.return_value = False
+        mock_engine.begin.return_value = ctx
+        return mock_engine
+
+    @pytest.mark.asyncio
+    async def test_save_chat_executes_upsert(self):
+        mock_conn = AsyncMock()
+        engine = self._make_engine(mock_conn)
+
+        dao = ChatHistoryDAO(engine)
+        await dao.save_chat(
+            "chat_1", "user_1", [{"role": "user", "content": "hi"}], metadata={"mcp_mode": "read-only"}
+        )
+
+        mock_conn.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_save_file_executes_delete_and_insert(self):
+        mock_conn = AsyncMock()
+        engine = self._make_engine(mock_conn)
+
+        dao = ChatHistoryDAO(engine)
+        await dao.save_file("chat_1", "report.pdf", b"pdf-content")
+
+        assert mock_conn.execute.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_save_feedback_executes_update(self):
+        mock_conn = AsyncMock()
+        mock_conn.execute.return_value = MagicMock(rowcount=1)
+        engine = self._make_engine(mock_conn)
+
+        dao = ChatHistoryDAO(engine)
+        result = await dao.save_feedback("chat_1", 0, True)
+
+        assert result is True
+        mock_conn.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_feedback_executes_update(self):
+        mock_conn = AsyncMock()
+        mock_conn.execute.return_value = MagicMock(rowcount=1)
+        engine = self._make_engine(mock_conn)
+
+        dao = ChatHistoryDAO(engine)
+        result = await dao.delete_feedback("chat_1", 0)
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_delete_chat_returns_true_when_deleted(self):
+        mock_conn = AsyncMock()
+        mock_conn.execute.return_value = MagicMock(rowcount=1)
+        engine = self._make_engine(mock_conn)
+
+        dao = ChatHistoryDAO(engine)
+        result = await dao.delete_chat("chat_1")
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_delete_chat_returns_false_when_not_found(self):
+        mock_conn = AsyncMock()
+        mock_conn.execute.return_value = MagicMock(rowcount=0)
+        engine = self._make_engine(mock_conn)
+
+        dao = ChatHistoryDAO(engine)
+        result = await dao.delete_chat("nonexistent")
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_save_all_files_nonexistent_dir(self, tmp_path):
+        dao = ChatHistoryDAO(AsyncMock())
+        result = await dao.save_all_files("chat_1", tmp_path / "nonexistent")
+        assert result == 0
+
+    @pytest.mark.asyncio
+    async def test_save_all_files_saves_files(self, tmp_path):
+        (tmp_path / "a.txt").write_bytes(b"aaa")
+        (tmp_path / "b.txt").write_bytes(b"bbb")
+
+        dao = ChatHistoryDAO(AsyncMock())
+        with patch.object(dao, "save_file", new_callable=AsyncMock) as mock_save:
+            result = await dao.save_all_files("chat_1", tmp_path)
+
+        assert result == 2
+        assert mock_save.call_count == 2

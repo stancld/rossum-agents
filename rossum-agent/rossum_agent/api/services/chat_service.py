@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import logging
 import secrets
+from collections.abc import Coroutine
 from typing import TYPE_CHECKING
 
 from rossum_agent.api.models.schemas import (
@@ -21,6 +23,8 @@ if TYPE_CHECKING:
     from pathlib import Path
     from typing import Any, Literal
 
+    from rossum_agent.db import ChatHistoryDAO
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,16 +32,47 @@ class ChatService:
     """Service for managing chat sessions.
 
     Wraps RedisStorage to provide chat CRUD operations with proper
-    data transformation to/from API schemas.
+    data transformation to/from API schemas. Optionally writes to
+    PostgreSQL (via ChatHistoryDAO) as a durable audit store.
     """
 
-    def __init__(self, redis_storage: RedisStorage | None = None) -> None:
+    def __init__(
+        self,
+        redis_storage: RedisStorage | None = None,
+        pg_dao: ChatHistoryDAO | None = None,
+    ) -> None:
         self._storage = redis_storage or RedisStorage()
+        self._pg_dao = pg_dao
+        self._pg_tasks: set[asyncio.Task] = set()
 
     @property
     def storage(self) -> RedisStorage:
         """Get the underlying RedisStorage instance."""
         return self._storage
+
+    def _schedule_pg(self, coro: Coroutine[None, None, None]) -> None:
+        """Fire-and-forget an async PG write. Errors are logged, never raised."""
+        if self._pg_dao is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+
+        async def _safe():
+            try:
+                await coro
+            except Exception as e:
+                logger.error(f"PostgreSQL write failed: {e}", exc_info=True)
+
+        task = loop.create_task(_safe())
+        self._pg_tasks.add(task)
+        task.add_done_callback(self._pg_tasks.discard)
+
+    async def drain_pg_tasks(self) -> None:
+        """Await all pending PostgreSQL background tasks. Call during shutdown."""
+        if self._pg_tasks:
+            await asyncio.gather(*self._pg_tasks, return_exceptions=True)
 
     def is_connected(self) -> bool:
         """Check if Redis is connected."""
@@ -57,6 +92,8 @@ class ChatService:
         initial_messages: list[dict[str, Any]] = []
         metadata = ChatMetadata(mcp_mode=mcp_mode, persona=persona)
         self._storage.save_chat(user_id, chat_id, initial_messages, metadata=metadata)
+        if self._pg_dao:
+            self._schedule_pg(self._pg_dao.save_chat(chat_id, user_id, initial_messages, metadata=metadata.to_dict()))
 
         logger.info(
             f"Created chat {chat_id} for user {user_id or 'shared'} with mcp_mode={mcp_mode}, persona={persona}"
@@ -111,6 +148,8 @@ class ChatService:
     def delete_chat(self, user_id: str | None, chat_id: str) -> bool:
         self._storage.delete_all_files(chat_id)
         deleted = self._storage.delete_chat(user_id, chat_id)
+        if self._pg_dao:
+            self._schedule_pg(self._pg_dao.delete_chat(chat_id))
         logger.info(f"Deleted chat {chat_id} for user {user_id or 'shared'}: {deleted}")
         return deleted
 
@@ -133,13 +172,41 @@ class ChatService:
         output_dir: Path | None = None,
         metadata: ChatMetadata | None = None,
     ) -> bool:
-        return self._storage.save_chat(user_id, chat_id, messages, output_dir, metadata)
+        result = self._storage.save_chat(user_id, chat_id, messages, output_dir, metadata)
+        if self._pg_dao:
+            self._schedule_pg(self._pg_save_messages(chat_id, user_id, messages, output_dir, metadata))
+        return result
+
+    async def _pg_save_messages(
+        self,
+        chat_id: str,
+        user_id: str | None,
+        messages: list[dict[str, Any]],
+        output_dir: Path | None,
+        metadata: ChatMetadata | None,
+    ) -> None:
+        assert self._pg_dao is not None
+        await self._pg_dao.save_chat(
+            chat_id,
+            user_id,
+            messages,
+            output_dir=str(output_dir) if output_dir else None,
+            metadata=metadata.to_dict() if metadata else {},
+        )
+        if output_dir:
+            await self._pg_dao.save_all_files(chat_id, output_dir)
 
     def save_feedback(self, user_id: str | None, chat_id: str, turn_index: int, is_positive: bool) -> bool:
-        return self._storage.save_feedback(user_id, chat_id, turn_index, is_positive)
+        result = self._storage.save_feedback(user_id, chat_id, turn_index, is_positive)
+        if self._pg_dao:
+            self._schedule_pg(self._pg_dao.save_feedback(chat_id, turn_index, is_positive))
+        return result
 
     def get_feedback(self, user_id: str | None, chat_id: str) -> dict[int, bool]:
         return self._storage.get_feedback(user_id, chat_id)
 
     def delete_feedback(self, user_id: str | None, chat_id: str, turn_index: int) -> bool:
-        return self._storage.delete_feedback(user_id, chat_id, turn_index)
+        result = self._storage.delete_feedback(user_id, chat_id, turn_index)
+        if self._pg_dao:
+            self._schedule_pg(self._pg_dao.delete_feedback(chat_id, turn_index))
+        return result

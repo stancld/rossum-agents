@@ -12,6 +12,9 @@ from typing import TYPE_CHECKING
 import uvicorn
 from fastapi import FastAPI, Request, status
 from gunicorn.app.base import BaseApplication
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from rossum_agent.db import ChatHistoryDAO
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -59,13 +62,24 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
     )
 
 
+def _create_pg_dao() -> ChatHistoryDAO | None:
+    """Create a ChatHistoryDAO if POSTGRES_DSN is configured."""
+    dsn = os.environ.get("POSTGRES_DSN")
+    if not dsn:
+        return None
+    engine = create_async_engine(dsn, pool_size=5, max_overflow=5)
+    return ChatHistoryDAO(engine)
+
+
 def _init_services(app: FastAPI) -> None:
     """Initialize services and store them in app.state.
 
     Skips initialization if services are already set (e.g., during testing).
     """
+    if not hasattr(app.state, "pg_dao"):
+        app.state.pg_dao = _create_pg_dao()
     if not hasattr(app.state, "chat_service"):
-        app.state.chat_service = ChatService()
+        app.state.chat_service = ChatService(pg_dao=app.state.pg_dao)
     if not hasattr(app.state, "agent_service"):
         app.state.agent_service = AgentService()
     if not hasattr(app.state, "file_service"):
@@ -85,10 +99,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     else:
         logger.warning("Redis connection failed - some features may not work")
 
+    if app.state.pg_dao:
+        logger.info("PostgreSQL chat history DAO initialized")
+    else:
+        logger.info("PostgreSQL not configured — chat history stored in Redis only")
+
     yield
 
     logger.info("Rossum Agent API shutting down...")
     app.state.chat_service.storage.close()
+    if app.state.pg_dao:
+        await app.state.chat_service.drain_pg_tasks()
+        await app.state.pg_dao.engine.dispose()
 
 
 app = FastAPI(
