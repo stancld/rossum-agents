@@ -189,6 +189,7 @@ function reduceEvent(prev: ChatState, event: SSEEvent): ChatState {
       return {
         ...prev,
         pendingQuestion: event.data as AgentQuestionEvent,
+        connectionStatus: "idle",
       };
 
     case "done":
