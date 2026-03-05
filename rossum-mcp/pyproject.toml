@@ -34,6 +34,11 @@ dependencies = [
 rossum-mcp = "rossum_mcp.server:main"
 
 [project.optional-dependencies]
+postgres = [
+    "alembic>=1.13.0",
+    "asyncpg>=0.29.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+]
 docs = [
     "myst-parser>=2.0.0",
     "sphinx>=7.0.0",
@@ -46,8 +51,11 @@ tests = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
+    "sqlalchemy>=2.0.0",
 ]
 all = [
+    "alembic>=1.13.0",
+    "asyncpg>=0.29.0",
     "coverage>=7.0.0",
     "fastmcp>=3.0.0",
     "myst-parser>=2.0.0",
@@ -58,6 +66,7 @@ all = [
     "sphinx>=7.0.0",
     "sphinx-autodoc-typehints>=1.25.0",
     "sphinx-copybutton>=0.5.2",
+    "sqlalchemy[asyncio]>=2.0.0",
     "furo",
 ]
 

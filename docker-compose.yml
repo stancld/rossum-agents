@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: rossum-postgres
+    environment:
+      - POSTGRES_USER=rossum
+      - POSTGRES_PASSWORD=rossum
+      - POSTGRES_DB=rossum
+    ports:
+      - 127.0.0.1:5432:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rossum -d rossum"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:8-alpine
     container_name: rossum-redis
@@ -25,6 +42,7 @@ services:
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - POSTGRES_DSN=postgresql+asyncpg://rossum:rossum@postgres:5432/rossum
       - ROSSUM_KB_DATA_PATH=/app/rossum-agent/data/rossum-kb.json
     ports:
       - 127.0.0.1:8000:8000
@@ -33,7 +51,11 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
 
 volumes:
+  postgres-data:
+    driver: local
   redis-data:
     driver: local

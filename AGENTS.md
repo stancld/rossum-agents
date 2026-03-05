@@ -195,6 +195,7 @@ TUI types still declare `{ event: "error"; data: { message: string } }` in `SSEE
 | `ROSSUM_API_TOKEN` | Required - API authentication |
 | `ROSSUM_API_BASE_URL` | Required - API endpoint |
 | `REDIS_HOST`, `REDIS_PORT` | Optional - Redis connection (default port: 6379) |
+| `POSTGRES_DSN` | Optional - PostgreSQL connection string (e.g. `postgresql+asyncpg://user:pass@host:5432/db`) |
 | `ROSSUM_MCP_MODE` | Optional - read-only or read-write |
 
 ## Planning Files
