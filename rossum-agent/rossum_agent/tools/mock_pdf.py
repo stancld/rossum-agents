@@ -458,7 +458,10 @@ def _render_pdf(
             lbl = label_map.get(fid, fid)
             pdf.cell(0, 5, f"{lbl}: {val}", new_x="LMARGIN", new_y="NEXT")
 
-    return pdf.output()
+    output = pdf.output()
+    if output is None:
+        return b""
+    return bytes(output)
 
 
 @beta_tool

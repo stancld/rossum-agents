@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
-from rossum_agent.tools.copilot.formula import (
+from rossum_agent.python_tools.copilot.formula import (
     _build_suggest_formula_url,
     _clean_html,
     _create_formula_field_definition,
@@ -58,8 +58,8 @@ class TestSuggestFormulaField:
     """Tests for suggest_formula_field tool."""
 
     @patch.dict("os.environ", {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"})
-    @patch("rossum_agent.tools.copilot.formula._fetch_schema_content")
-    @patch("rossum_agent.tools.copilot.formula.httpx.Client")
+    @patch("rossum_agent.python_tools.copilot.formula._fetch_schema_content")
+    @patch("rossum_agent.python_tools.copilot.formula.httpx.Client")
     def test_successful_suggestion(self, mock_client_class: MagicMock, mock_fetch: MagicMock) -> None:
         mock_fetch.return_value = [{"id": "basic_info", "category": "section", "children": []}]
 
@@ -100,8 +100,8 @@ class TestSuggestFormulaField:
         mock_fetch.assert_called_once_with("https://api.rossum.ai/v1", "test_token", 123456)
 
     @patch.dict("os.environ", {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"})
-    @patch("rossum_agent.tools.copilot.formula._fetch_schema_content")
-    @patch("rossum_agent.tools.copilot.formula.httpx.Client")
+    @patch("rossum_agent.python_tools.copilot.formula._fetch_schema_content")
+    @patch("rossum_agent.python_tools.copilot.formula.httpx.Client")
     def test_no_suggestions(self, mock_client_class: MagicMock, mock_fetch: MagicMock) -> None:
         mock_fetch.return_value = [{"id": "basic_info", "category": "section", "children": []}]
 

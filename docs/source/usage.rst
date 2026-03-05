@@ -1320,42 +1320,21 @@ Use for end-to-end extraction testing: generate PDF → upload → verify extrac
      "line_items": [{"item_description": "Office supplies", "item_amount_total": "150.00"}]
    }
 
-Lookup Field Tools
-^^^^^^^^^^^^^^^^^^
+Copilot Execution Tool
+^^^^^^^^^^^^^^^^^^^^^^
 
-suggest_lookup_field
-""""""""""""""""""""
+execute_python
+"""""""""""
 
-Suggest matching configuration for a lookup field backed by Master Data Hub dataset.
-
-**Parameters:**
-
-- ``label`` (string, required): Field label.
-- ``hint`` (string, required): Matching intent and constraints.
-- ``schema_id`` (int, required): Target schema ID.
-- ``section_id`` (string, required): Section where the field belongs.
-- ``field_schema_id`` (string, optional): Field ID override.
-- ``dataset`` (string, optional): Dataset name or identifier.
-
-evaluate_lookup_field
-"""""""""""""""""""""
-
-Evaluate lookup field values on one or more annotations.
+Run constrained Python snippets in a sandboxed environment. Load the relevant skill first for task-specific helper guidance.
 
 **Parameters:**
 
-- ``schema_id`` (int, required): Schema containing lookup field.
-- ``annotation_urls`` (list[str], required): Annotation URLs or paths (e.g., ``['/api/v1/annotations/123456']``).
+- ``code`` (string, required): Python code to execute. Imports are not allowed. Assign the final value to ``result`` or leave it as the last expression.
+- For large dict/list/string outputs, prefer calling ``write_file(...)`` inside the snippet and return the write result or a short summary instead of inlining the payload.
+- ``operation_name`` (string, optional): Short label for the intent of the execution.
 
-get_lookup_dataset_raw_values
-"""""""""""""""""""""""""""""
-
-Fetch raw rows from a Master Data Hub dataset for unmatched/ambiguous lookup result verification.
-
-**Parameters:**
-
-- ``dataset`` (string, required): Dataset name or identifier.
-- ``limit`` (int, optional): Maximum rows to fetch (default ``10000``).
+Task-specific helper functions are documented in the corresponding skills, especially ``python-execution``, ``formula-fields``, ``lookup-fields``, and ``rules-and-actions``.
 
 **Returns:**
 
@@ -1363,21 +1342,36 @@ Fetch raw rows from a Master Data Hub dataset for unmatched/ambiguous lookup res
 
    {
      "status": "success",
-     "dataset": "imported-0d652b68-fd8b-4fc8-9cee-d39105b1304b",
-     "limit": 10000,
-     "row_count": 2,
-     "note": "Dataset cached. Use query_lookup_dataset to explore rows."
+     "operation_name": "suggest lookup field",
+     "result": {
+       "status": "success",
+       "field_schema_id": "vendor_match",
+       "matching": {"type": "master_data_hub", "configuration": {"dataset": "imported-..."}}
+     },
+     "stdout": null
    }
 
-query_lookup_dataset
-""""""""""""""""""""
+**Example usage:**
 
-Run a jq query on a previously downloaded MDH dataset. The dataset must be fetched first with ``get_lookup_dataset_raw_values``.
+.. code-block:: python
 
-**Parameters:**
+   execute_python(
+       code='''
+total = sum([1, 2, 3])
+result = {"total": total}
+''',
+       operation_name="quick calculation",
+   )
 
-- ``dataset`` (string, required): Dataset name or identifier (same as used in ``get_lookup_dataset_raw_values``).
-- ``jq_query`` (string, required): A jq query string. The cached data is always a flat array of row objects — query with ``.[0] | keys`` to discover columns, ``.[]``, ``.[0]``, etc.
+.. code-block:: python
+
+   execute_python(
+       code='''
+items = ["invoice_number", "invoice_date", "amount_total"]
+result = {"field_count": len(items), "first": items[0]}
+''',
+       operation_name="inspect values",
+   )
 
 Knowledge Base Tools
 ^^^^^^^^^^^^^^^^^^^^

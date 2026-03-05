@@ -1,6 +1,6 @@
-"""Lookup field suggestion and evaluation tools for the Rossum Agent.
+"""Lookup field suggestion and evaluation helpers for the Rossum Agent.
 
-This module provides tools to get lookup field suggestions from Rossum's internal API
+This module provides functions to get lookup field suggestions from Rossum's internal API
 and evaluate them against real annotations.
 """
 
@@ -14,9 +14,8 @@ import time
 
 import httpx
 import jq as jq_lib  # ty: ignore[unresolved-import] - no type stubs for jq
-from anthropic import beta_tool
 
-from rossum_agent.tools.copilot._shared import (
+from rossum_agent.python_tools.copilot._shared import (
     _fetch_schema_content,
     _inject_field_into_schema,
     _json_headers,
@@ -356,7 +355,6 @@ def _walk_for_lookup_results(
     return results
 
 
-@beta_tool
 def suggest_lookup_field(
     label: str,
     hint: str,
@@ -468,7 +466,6 @@ def suggest_lookup_field(
         return json.dumps({"status": "error", "error": str(e)})
 
 
-@beta_tool
 def evaluate_lookup_field(
     schema_id: int,
     annotation_urls: list[str],
@@ -557,7 +554,6 @@ def evaluate_lookup_field(
         return json.dumps({"status": "error", "error": str(e)})
 
 
-@beta_tool
 def get_lookup_dataset_raw_values(dataset: str, limit: int = 10000) -> str:
     """Fetch raw rows from a Master Data Hub dataset used by lookup matching.
 
@@ -628,7 +624,6 @@ def get_lookup_dataset_raw_values(dataset: str, limit: int = 10000) -> str:
         return json.dumps({"status": "error", "error": str(e)})
 
 
-@beta_tool
 def query_lookup_dataset(dataset: str, jq_query: str) -> str:
     """Run a jq query on a previously downloaded MDH dataset (stored as a flat rows array).
 

@@ -79,34 +79,14 @@ class TestInternalToolsRegistration:
         assert "multi_select" in schema["properties"]
         assert "questions" in schema["properties"]
 
-    def test_copilot_tools_hidden_until_skill_loaded(self) -> None:
-        """Copilot tools only appear in get_internal_tools() after their skill is loaded."""
-        from rossum_agent.tools.dynamic_tools import mark_skill_loaded
-
-        # Without skills: copilot tools absent from visible tools
+    def test_execute_python_always_visible(self) -> None:
+        """execute_python is always available as an internal tool."""
         set_context(AgentContext())
         try:
             tools = get_internal_tools()
             tool_names = {t["name"] for t in tools}
-            assert "suggest_formula_field" not in tool_names
-            assert "suggest_lookup_field" not in tool_names
-
-            # Load formula-fields skill
-            mark_skill_loaded("formula-fields")
-            tools = get_internal_tools()
-            tool_names = {t["name"] for t in tools}
-            assert "suggest_formula_field" in tool_names
-            assert "suggest_lookup_field" not in tool_names
-
-            # Load lookup-fields skill
-            mark_skill_loaded("lookup-fields")
-            tools = get_internal_tools()
-            tool_names = {t["name"] for t in tools}
-            assert "suggest_formula_field" in tool_names
-            assert "suggest_lookup_field" in tool_names
-            assert "evaluate_lookup_field" in tool_names
-            assert "get_lookup_dataset_raw_values" in tool_names
-            assert "query_lookup_dataset" in tool_names
+            assert "execute_python" in tool_names
+            assert "execute_python" in get_internal_tool_names()
         finally:
             set_context(AgentContext())
 
@@ -219,6 +199,13 @@ class TestExecuteInternalTool:
             assert (tmp_path / "test.txt").read_text() == "Hello"
         finally:
             set_context(AgentContext())
+
+    def test_execute_python_alias_dispatches(self) -> None:
+        from rossum_agent.tools import execute_internal_tool
+
+        result = json.loads(execute_internal_tool("execute_python", {"code": "1 + 2"}))
+        assert result["status"] == "success"
+        assert result["result"] == 3
 
     def test_load_tool_category_is_in_internal_tools(self) -> None:
         """Test that load_tool_category is listed as an internal tool."""

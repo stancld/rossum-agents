@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from regression_tests.custom_checks._utils import agent_called_tool, create_api_client, extract_datapoints
-from regression_tests.custom_checks.replace_schema_with_formula import _extract_schema_id_from_steps
+from regression_tests.custom_checks._utils import (
+    agent_called_tool,
+    create_api_client,
+    extract_datapoints,
+    extract_schema_id_from_steps,
+)
 
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
@@ -22,7 +26,7 @@ def check_multi_turn_schema_reverted(steps: list[AgentStep], api_base_url: str, 
     if not agent_called_tool(steps, "restore_entity_version"):
         return False, "Agent never called restore_entity_version"
 
-    schema_id = _extract_schema_id_from_steps(steps)
+    schema_id = extract_schema_id_from_steps(steps)
     if not schema_id:
         return False, "Could not find schema_id in agent steps"
 

@@ -156,7 +156,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url=None,
         prompt="Hey, what can you do?",
         tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=8500, max_total_tokens=9500),
+        token_budget=TokenBudget(min_total_tokens=8500, max_total_tokens=10000),
         success_criteria=SuccessCriteria(
             required_keywords=["hook", "queue"],
             max_steps=1,
@@ -265,7 +265,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "load_skill",
                 "create_task",  # model should plan
                 ("patch_schema", "patch_schema_with_subagent"),
-                "suggest_formula_field",
+                "execute_python",
             ],
             mode=ToolMatchMode.SUBSET,
             forbidden_tools=[
@@ -327,7 +327,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             expected_tools=[
                 "load_skill",
                 "create_queue_from_template",
-                "suggest_formula_field",
+                "execute_python",
                 ("patch_schema", "patch_schema_with_subagent"),
                 "prune_schema_fields",
             ],
@@ -400,7 +400,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "create_queue_from_template",
                 "load_skill",
                 "create_rule",
-                "suggest_rule",
+                "execute_python",
             ],
             mode=ToolMatchMode.SUBSET,
             forbidden_tools=[
@@ -503,15 +503,14 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "3. Update the formula field you just created:\n"
             "    - Field name: total_quantity\n"
             "    - New logic: Sum of all total amount values across line items\n"
-            "    - After updating, store the full schema JSON to `schema_v2.json`"
+            "    - After updating, store the full schema JSON to `schema_v2.json`\n"
+            "No task planning. Rush it."
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
-                "suggest_formula_field",
+                "execute_python",
                 ("patch_schema", "patch_schema_with_subagent"),
-                "get:schema",
-                "write_file",
             ],
             mode=ToolMatchMode.SUBSET,
         ),
@@ -646,7 +645,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         prompt=(
             "# Empty schema and revert\n\n"
             "Schema ID: {schema_id}\n\n"
-            "## Tasks:\n\n"
             "1. Remove ALL existing fields from schema {schema_id}\n"
             "2. Revert the last commit to restore the original schema\n\n"
             "Return only the schema_id as a one-word answer."
@@ -678,7 +676,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url=None,
         requires_redis=True,
         prompts=[
-            "Create a 'New revert queue' in workspace 785638. Use EU template.",
+            "Create a 'New revert queue' in workspace 785638. Use EU Invoice template.",
             (
                 "Add field to the queue.\n"
                 "    - Field name: The Net Terms\n"
@@ -699,7 +697,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
-                "suggest_formula_field",
+                "execute_python",
                 ("patch_schema", "patch_schema_with_subagent"),
                 "load_skill",
                 "restore_entity_version",
@@ -733,7 +731,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=["ask_user_question"],
             mode=ToolMatchMode.SUBSET,
-            forbidden_tools=["patch_schema", "patch_schema_with_subagent", "suggest_formula_field"],
+            forbidden_tools=["patch_schema", "patch_schema_with_subagent", "execute_python"],
         ),
         token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=85000),
         success_criteria=SuccessCriteria(
@@ -775,12 +773,8 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "search:annotation",
                 "copy_annotations",
                 "load_skill",
-                "suggest_lookup_field",
+                "execute_python",
                 ("patch_schema", "patch_schema_with_subagent"),
-                "evaluate_lookup_field",
-                "get_lookup_dataset_raw_values",
-                "query_lookup_dataset",
-                "write_file",
             ],
             mode=ToolMatchMode.SUBSET,
         ),

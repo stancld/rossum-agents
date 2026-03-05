@@ -6,7 +6,7 @@ import json
 from unittest.mock import MagicMock, Mock, patch
 
 import httpx
-from rossum_agent.tools.copilot.rule import (
+from rossum_agent.python_tools.copilot.rule import (
     _build_annotation_content_url,
     _build_annotation_url,
     _build_evaluate_rules_url,
@@ -60,7 +60,7 @@ class TestBuildAnnotationUrls:
 
 class TestSuggestRule:
     @patch.dict("os.environ", {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"})
-    @patch("rossum_agent.tools.copilot.rule.httpx.Client")
+    @patch("rossum_agent.python_tools.copilot.rule.httpx.Client")
     def test_successful_suggestion(self, mock_client_class: MagicMock) -> None:
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -115,7 +115,7 @@ class TestSuggestRule:
         assert "schema_content" not in sent_payload
 
     @patch.dict("os.environ", {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"})
-    @patch("rossum_agent.tools.copilot.rule.httpx.Client")
+    @patch("rossum_agent.python_tools.copilot.rule.httpx.Client")
     def test_no_suggestions(self, mock_client_class: MagicMock) -> None:
         mock_response = MagicMock()
         mock_response.json.return_value = {"results": []}
@@ -148,7 +148,7 @@ class TestSuggestRule:
         assert "credentials not available" in parsed["error"]
 
     @patch.dict("os.environ", {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"})
-    @patch("rossum_agent.tools.copilot.rule.httpx.Client")
+    @patch("rossum_agent.python_tools.copilot.rule.httpx.Client")
     def test_http_error(self, mock_client_class: MagicMock) -> None:
         mock_response = Mock()
         mock_response.status_code = 403
@@ -170,7 +170,7 @@ class TestSuggestRule:
 
 class TestEvaluateRules:
     @patch.dict("os.environ", {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"})
-    @patch("rossum_agent.tools.copilot.rule.httpx.Client")
+    @patch("rossum_agent.python_tools.copilot.rule.httpx.Client")
     def test_successful_evaluation(self, mock_client_class: MagicMock) -> None:
         annotation_content = [{"schema_id": "amount_total", "value": "498.0"}]
         eval_result = {
@@ -217,7 +217,7 @@ class TestEvaluateRules:
         assert payload["schema_rules"] == schema_rules
 
     @patch.dict("os.environ", {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"})
-    @patch("rossum_agent.tools.copilot.rule.httpx.Client")
+    @patch("rossum_agent.python_tools.copilot.rule.httpx.Client")
     def test_annotation_content_is_list(self, mock_client_class: MagicMock) -> None:
         annotation_content = [{"schema_id": "amount_total", "value": "498.0"}]
         eval_result = {"condition_values": [[False]], "actions": [], "messages": []}
@@ -257,7 +257,7 @@ class TestEvaluateRules:
         assert "credentials not available" in parsed["error"]
 
     @patch.dict("os.environ", {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"})
-    @patch("rossum_agent.tools.copilot.rule.httpx.Client")
+    @patch("rossum_agent.python_tools.copilot.rule.httpx.Client")
     def test_http_error_on_content_fetch(self, mock_client_class: MagicMock) -> None:
         mock_response = Mock()
         mock_response.status_code = 404
@@ -277,7 +277,7 @@ class TestEvaluateRules:
         assert "HTTP 404" in parsed["error"]
 
     @patch.dict("os.environ", {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"})
-    @patch("rossum_agent.tools.copilot.rule.httpx.Client")
+    @patch("rossum_agent.python_tools.copilot.rule.httpx.Client")
     def test_http_error_on_evaluate_post(self, mock_client_class: MagicMock) -> None:
         mock_content_response = MagicMock()
         mock_content_response.json.return_value = {"results": []}
@@ -302,7 +302,7 @@ class TestEvaluateRules:
         assert "HTTP 500" in parsed["error"]
 
     @patch.dict("os.environ", {"ROSSUM_API_BASE_URL": "https://api.rossum.ai/v1", "ROSSUM_API_TOKEN": "test_token"})
-    @patch("rossum_agent.tools.copilot.rule.httpx.Client")
+    @patch("rossum_agent.python_tools.copilot.rule.httpx.Client")
     def test_generic_error(self, mock_client_class: MagicMock) -> None:
         mock_client = MagicMock()
         mock_client.__enter__ = MagicMock(return_value=mock_client)
