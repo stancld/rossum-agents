@@ -82,9 +82,7 @@ async def _log_commit_hook(commit: ConfigCommit) -> str | None:
 class _RequestContext:
     """Per-request context for agent execution."""
 
-    event_queue: (
-        asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent] | None
-    ) = None
+    event_queue: asyncio.Queue[QueuedAgentEvent] | None = None
     event_loop: asyncio.AbstractEventLoop | None = None
 
 
@@ -101,6 +99,9 @@ class _ChatRunState:
 
 _request_context: contextvars.ContextVar[_RequestContext] = contextvars.ContextVar("request_context")
 
+type QueuedAgentEvent = SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent
+type StreamEvent = StepEvent | StreamDoneEvent | QueuedAgentEvent
+
 
 def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentProgressEvent:
     return SubAgentProgressEvent(
@@ -113,41 +114,40 @@ def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentP
     )
 
 
+def _resolve_tool_call(
+    step: ToolStartStep,
+    tool_call: ToolCall | None = None,
+    current_tool: str | None = None,
+) -> ToolCall | None:
+    if tool_call is not None:
+        return tool_call
+    if step.current_tool_call_id is not None:
+        for candidate in step.tool_calls:
+            if candidate.id == step.current_tool_call_id:
+                return candidate
+    if current_tool is None:
+        return None
+    for candidate in step.tool_calls:
+        if candidate.name == current_tool:
+            return candidate
+    return None
+
+
 def _create_tool_start_event(
     step: ToolStartStep, tool_call: ToolCall | None = None, current_tool: str | None = None
 ) -> StepEvent:
-    current_tool_args = None
-    current_tool_call_id = None
-    resolved_tool_name = current_tool
+    resolved_tool_call = _resolve_tool_call(step, tool_call, current_tool)
+    resolved_tool_name = resolved_tool_call.name if resolved_tool_call is not None else current_tool or ""
+    tool_arguments = resolved_tool_call.arguments if resolved_tool_call is not None else None
 
-    if tool_call is not None:
-        resolved_tool_name = tool_call.name
-        current_tool_args = tool_call.arguments
-        current_tool_call_id = tool_call.id
-    else:
-        if step.current_tool_call_id is not None:
-            for tc in step.tool_calls:
-                if tc.id == step.current_tool_call_id:
-                    resolved_tool_name = tc.name
-                    current_tool_args = tc.arguments
-                    current_tool_call_id = tc.id
-                    break
-        if current_tool_args is None:
-            for tc in step.tool_calls:
-                if current_tool is not None and tc.name == current_tool:
-                    resolved_tool_name = tc.name
-                    current_tool_args = tc.arguments
-                    current_tool_call_id = tc.id
-                    break
-
-    display_name = get_display_tool_name(resolved_tool_name or "", current_tool_args)
+    display_name = get_display_tool_name(resolved_tool_name, tool_arguments)
     return StepEvent(
         type="tool_start",
         step_number=step.step_number,
         tool_name=display_name,
-        tool_arguments=current_tool_args,
+        tool_arguments=tool_arguments,
         tool_progress=step.tool_progress,
-        tool_call_id=current_tool_call_id,
+        tool_call_id=resolved_tool_call.id if resolved_tool_call is not None else None,
     )
 
 
@@ -171,11 +171,7 @@ def _log_events(events: list[StepEvent]) -> None:
 
 
 def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
-    """Convert an AgentStep to StepEvents for SSE streaming.
-
-    Uses pattern matching on the discriminated union step types.
-    Returns a list because a single ToolResultStep may contain multiple tool results.
-    """
+    """Convert an agent step to SSE events."""
     match step:
         case ErrorStep():
             events = [StepEvent(type="error", step_number=step.step_number, content=step.error, is_final=True)]
@@ -334,11 +330,7 @@ class AgentService:
         state.last_memory = None
         return memory
 
-    def _enqueue_event_threadsafe(
-        self,
-        event: SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent,
-        event_name: str,
-    ) -> None:
+    def _enqueue_event_threadsafe(self, event: QueuedAgentEvent, event_name: str) -> None:
         """Thread-safe event enqueueing via call_soon_threadsafe.
 
         Callbacks may be invoked from thread pool executors, so we must marshal
@@ -387,11 +379,9 @@ class AgentService:
         self._enqueue_event_threadsafe(event, "Agent question")
 
     @staticmethod
-    def _drain_queue(
-        queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent],
-    ) -> list[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent]:
+    def _drain_queue(queue: asyncio.Queue[QueuedAgentEvent]) -> list[QueuedAgentEvent]:
         """Drain all pending events from the queue."""
-        events: list[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent] = []
+        events: list[QueuedAgentEvent] = []
         while not queue.empty():
             try:
                 events.append(queue.get_nowait())
@@ -411,14 +401,7 @@ class AgentService:
         rossum_url: str | None = None,
         images: list[ImageContent] | None = None,
         documents: list[DocumentContent] | None = None,
-    ) -> AsyncIterator[
-        StepEvent
-        | StreamDoneEvent
-        | SubAgentProgressEvent
-        | SubAgentTextEvent
-        | TaskSnapshotEvent
-        | AgentQuestionEvent
-    ]:
+    ) -> AsyncIterator[StreamEvent]:
         """Run the agent with a new prompt.
 
         Creates a fresh MCP connection, initializes the agent with conversation

@@ -9,7 +9,7 @@ import logging
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from anthropic.types import TextBlock
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -32,6 +32,7 @@ from rossum_agent.api.models.schemas import (
     FileCreatedEvent,
     ImageContent,
     MessageRequest,
+    Persona,
     StepEvent,
     StreamDoneEvent,
     SubAgentProgressEvent,
@@ -91,33 +92,37 @@ type AgentEvent = (
     StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent | StepEvent
 )
 
+_SSE_EVENT_NAMES = {
+    SubAgentProgressEvent: "sub_agent_progress",
+    SubAgentTextEvent: "sub_agent_text",
+    TaskSnapshotEvent: "task_snapshot",
+    AgentQuestionEvent: "agent_question",
+}
+
 
 @dataclass
 class ProcessedEvent:
-    """Result of processing an agent event."""
-
     sse_event: str | None = None
     done_event: StreamDoneEvent | None = None
     final_response_update: str | None = None
 
 
+@dataclass
+class StreamState:
+    final_response: str | None = None
+    done_event: StreamDoneEvent | None = None
+
+
 def _process_agent_event(event: AgentEvent) -> ProcessedEvent:
-    """Process a single agent event and return structured result."""
     if isinstance(event, StreamDoneEvent):
         return ProcessedEvent(done_event=event)
-    if isinstance(event, SubAgentProgressEvent):
-        return ProcessedEvent(sse_event=_format_sse_event("sub_agent_progress", event.model_dump_json()))
-    if isinstance(event, SubAgentTextEvent):
-        return ProcessedEvent(sse_event=_format_sse_event("sub_agent_text", event.model_dump_json()))
-    if isinstance(event, TaskSnapshotEvent):
-        return ProcessedEvent(sse_event=_format_sse_event("task_snapshot", event.model_dump_json()))
-    if isinstance(event, AgentQuestionEvent):
-        return ProcessedEvent(sse_event=_format_sse_event("agent_question", event.model_dump_json()))
-    sse = _format_sse_event("step", event.model_dump_json())
-    if event.type == "final_answer" and event.is_streaming:
-        return ProcessedEvent(sse_event=sse, final_response_update=event.content)
-    final_response = event.content if event.type == "final_answer" and event.content else None
-    return ProcessedEvent(sse_event=sse, final_response_update=final_response)
+
+    event_name = _SSE_EVENT_NAMES.get(type(event), "step")
+    final_response = event.content if isinstance(event, StepEvent) and event.type == "final_answer" else None
+    return ProcessedEvent(
+        sse_event=_format_sse_event(event_name, event.model_dump_json()),
+        final_response_update=final_response,
+    )
 
 
 def _yield_file_events(output_dir: Path | None, chat_id: str) -> Iterator[str]:
@@ -171,6 +176,52 @@ def _save_chat_history(
     )
 
 
+async def _stream_agent_response(
+    *,
+    request: Request,
+    chat_id: str,
+    user_prompt: str,
+    message: MessageRequest,
+    history: list[dict],
+    credentials: RossumCredentials,
+    agent_service: AgentService,
+    mcp_mode: Literal["read-only", "read-write"],
+    persona: Persona,
+    images: list[ImageContent] | None,
+    documents: list[DocumentContent] | None,
+    state: StreamState,
+) -> AsyncIterator[str]:
+    watcher = asyncio.create_task(_watch_disconnect(request, chat_id, agent_service))
+
+    try:
+        agent_events = agent_service.run_agent(
+            chat_id=chat_id,
+            prompt=user_prompt,
+            images=images,
+            documents=documents,
+            conversation_history=history,
+            rossum_api_token=credentials.token,
+            rossum_api_base_url=credentials.api_url,
+            rossum_url=message.rossum_url,
+            mcp_mode=mcp_mode,
+            persona=persona,
+        )
+        async for event, is_keepalive in _with_sse_keepalive(agent_events):
+            if is_keepalive:
+                yield SSE_KEEPALIVE_COMMENT
+                continue
+
+            result = _process_agent_event(event)
+            if result.done_event is not None:
+                state.done_event = result.done_event
+            if result.final_response_update and not (isinstance(event, StepEvent) and event.is_hook_output):
+                state.final_response = result.final_response_update
+            if result.sse_event is not None:
+                yield result.sse_event
+    finally:
+        watcher.cancel()
+
+
 async def _watch_disconnect(request: Request, chat_id: str, agent_service: AgentService) -> None:
     """Poll for client disconnect and cancel the running agent."""
     try:
@@ -184,7 +235,7 @@ async def _watch_disconnect(request: Request, chat_id: str, agent_service: Agent
         logger.debug(f"Disconnect watcher for chat {chat_id} cancelled")
 
 
-def _resolve_mcp_mode(message: MessageRequest, chat_data: ChatData) -> str:
+def _resolve_mcp_mode(message: MessageRequest, chat_data: ChatData) -> Literal["read-only", "read-write"]:
     """Resolve the effective MCP mode from the message and chat metadata."""
     if message.mcp_mode is not None:
         chat_data.metadata.mcp_mode = message.mcp_mode
@@ -192,7 +243,7 @@ def _resolve_mcp_mode(message: MessageRequest, chat_data: ChatData) -> str:
     return chat_data.metadata.mcp_mode
 
 
-def _resolve_persona(message: MessageRequest, chat_data: ChatData) -> str:
+def _resolve_persona(message: MessageRequest, chat_data: ChatData) -> Persona:
     """Resolve the effective persona from the message and chat metadata."""
     if message.persona is not None:
         chat_data.metadata.persona = message.persona
@@ -290,7 +341,7 @@ def _handle_slash_command(
     },
 )
 @limiter.limit("10/minute")
-async def send_message(  # noqa: C901 - endpoint handler with slash command interception
+async def send_message(
     request: Request,
     chat_id: str,
     message: MessageRequest,
@@ -320,50 +371,33 @@ async def send_message(  # noqa: C901 - endpoint handler with slash command inte
     images: list[ImageContent] | None = message.images
     documents: list[DocumentContent] | None = message.documents
 
-    async def event_generator() -> Iterator[str]:  # type: ignore[misc]
-        final_response: str | None = None
-        done_event: StreamDoneEvent | None = None
-
-        watcher = asyncio.create_task(_watch_disconnect(request, chat_id, agent_service))
+    async def event_generator() -> AsyncIterator[str]:
+        state = StreamState()
 
         try:
-            agent_events = agent_service.run_agent(
+            async for chunk in _stream_agent_response(
+                request=request,
                 chat_id=chat_id,
-                prompt=user_prompt,
-                images=images,
-                documents=documents,
-                conversation_history=history,
-                rossum_api_token=credentials.token,
-                rossum_api_base_url=credentials.api_url,
-                rossum_url=message.rossum_url,
+                user_prompt=user_prompt,
+                message=message,
+                history=history,
+                credentials=credentials,
+                agent_service=agent_service,
                 mcp_mode=mcp_mode,
                 persona=persona,
-            )
-            async for event, is_keepalive in _with_sse_keepalive(agent_events):
-                if is_keepalive:
-                    yield SSE_KEEPALIVE_COMMENT
-                    continue
-                result = _process_agent_event(event)
-                if result.done_event:
-                    done_event = result.done_event
-                # Hook output is shown in chat but excluded from conversation history
-                if result.final_response_update and not (isinstance(event, StepEvent) and event.is_hook_output):
-                    final_response = result.final_response_update
-                if result.sse_event:
-                    yield result.sse_event
-
+                images=images,
+                documents=documents,
+                state=state,
+            ):
+                yield chunk
         except asyncio.CancelledError:
             logger.info(f"Request cancelled for chat {chat_id}")
             return
-
         except Exception as e:
             logger.error(f"Error during agent execution: {e}", exc_info=True)
             error_event = StepEvent(type="error", step_number=0, content=str(e), is_final=True)
             yield _format_sse_event("step", error_event.model_dump_json())
             return
-
-        finally:
-            watcher.cancel()
 
         output_dir = agent_service.get_output_dir(chat_id)
         memory = agent_service.pop_last_memory(chat_id)
@@ -377,20 +411,20 @@ async def send_message(  # noqa: C901 - endpoint handler with slash command inte
             chat_data=chat_data,
             history=history,
             user_prompt=user_prompt,
-            final_response=final_response,
+            final_response=state.final_response,
             images=images,
             documents=documents,
             output_dir=output_dir,
             memory=memory,
-            done_event=done_event,
+            done_event=state.done_event,
             summary=summary,
         )
 
         for file_event in _yield_file_events(output_dir, chat_id):
             yield file_event
 
-        if done_event:
-            yield _format_sse_event("done", done_event.model_dump_json())
+        if state.done_event:
+            yield _format_sse_event("done", state.done_event.model_dump_json())
 
     return StreamingResponse(
         event_generator(),

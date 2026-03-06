@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC
-from typing import get_args
+from typing import cast, get_args
 
 from rossum_agent.agent.skills import get_all_skills
 from rossum_agent.api.commands.registry import COMMANDS, CommandContext, register_command
@@ -129,7 +129,7 @@ async def handle_persona(ctx: CommandContext) -> str:
         available = ", ".join(f"`{persona}`" for persona in VALID_PERSONAS)
         return f"Unknown persona `{requested}`. Available personas: {available}"
 
-    chat_data.metadata.persona = requested
+    chat_data.metadata.persona = cast("Persona", requested)
     ctx.chat_service.save_messages(
         user_id=ctx.user_id,
         chat_id=ctx.chat_id,

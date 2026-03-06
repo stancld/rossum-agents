@@ -9,9 +9,14 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import redis
+
+if TYPE_CHECKING:
+    from typing import Literal
+
+    from rossum_agent.api.models.schemas import Persona
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +53,8 @@ class ChatMetadata:
     total_output_tokens: int = 0
     total_tool_calls: int = 0
     total_steps: int = 0
-    mcp_mode: str = "read-only"
-    persona: str = "default"
+    mcp_mode: Literal["read-only", "read-write"] = "read-only"
+    persona: Persona = "default"
     config_commits: list[str] = field(default_factory=list)
     summary: str | None = None
 
