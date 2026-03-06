@@ -15,12 +15,10 @@ from rossum_agent.tools.dynamic_tools import (
     _filter_mcp_tools_by_names,
     _load_categories_impl,
     get_dynamic_tools,
-    get_load_tool_category_definition,
     get_load_tool_definition,
     get_write_tools,
     get_write_tools_async,
     load_tool,
-    load_tool_category,
     preload_categories_for_request,
     reset_dynamic_tools,
     suggest_categories_for_request,
@@ -205,29 +203,6 @@ class TestLoadCategoriesImpl:
             assert len(get_dynamic_tools()) == 1
         finally:
             set_context(AgentContext())
-
-
-class TestLoadToolCategory:
-    """Tests for load_tool_category function."""
-
-    @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
-    def test_delegates_to_impl(self, mock_get_catalog: MagicMock) -> None:
-        reset_dynamic_tools()
-        mock_get_catalog.return_value = {"queues": {"get_queue"}}
-        # Test error case which doesn't need full mocking
-        result = load_tool_category(["nonexistent"])
-        assert "Error: Unknown categories" in result
-
-
-class TestGetLoadToolCategoryDefinition:
-    """Tests for get_load_tool_category_definition function."""
-
-    def test_returns_valid_tool_definition(self) -> None:
-        definition = get_load_tool_category_definition()
-        assert definition["name"] == "load_tool_category"
-        assert "description" in definition
-        assert "input_schema" in definition
-        assert definition["input_schema"]["properties"]["categories"]["type"] == "array"
 
 
 class TestPreloadCategoriesForRequest:
@@ -521,9 +496,11 @@ class TestGetLoadToolDefinition:
         assert "description" in definition
         assert "input_schema" in definition
         assert definition["input_schema"]["properties"]["tool_names"]["type"] == "array"
+        assert "required" in definition["input_schema"]
+        assert "tool_names" in definition["input_schema"]["required"]
 
 
-class TestLoadTool:
+class TestLoadToolsByName:
     """Tests for load_tool function."""
 
     def test_returns_error_when_no_mcp_connection(self) -> None:

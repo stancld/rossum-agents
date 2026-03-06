@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 def register_discovery_tools(mcp: FastMCP) -> None:
     @mcp.tool(
-        description="List tool categories (descriptions, tool names, keywords). Use load_tool_category to load a category. read_only=false indicates write tools."
+        description="List tool categories (descriptions, tool names, keywords). Use load_tool to load tools by name. read_only=false indicates write tools."
     )
     async def list_tool_categories() -> list[dict]:
         all_tools = await mcp.local_provider.list_tools()

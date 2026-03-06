@@ -344,7 +344,6 @@ class TestListAgentToolsHandler:
         # Some always-present tools
         assert "write_file" in result
         assert "load_skill" in result
-        assert "load_tool_category" in result
         assert "load_tool" in result
 
     @pytest.mark.asyncio

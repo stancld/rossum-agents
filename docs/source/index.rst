@@ -114,7 +114,7 @@ A compact, fully-typed tool surface — Pydantic models, ``Literal`` unions, and
 **Tool Discovery**
 
 * **list_tool_categories** - List available tool categories with descriptions and keywords
-* **load_tool_category** - Dynamically load tools for a specific category
+* **load_tool** - Dynamically load tools by name or category
 
 **MCP Mode**
 

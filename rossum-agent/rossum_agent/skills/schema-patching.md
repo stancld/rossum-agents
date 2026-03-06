@@ -78,7 +78,7 @@ For simple property updates (formula text, label, hidden), use MCP `patch_schema
 patch_schema(schema_id=12345, operation="update", node_id="field_id", node_data={"formula": "new_code"})
 ```
 
-Load the `schemas` tool category first: `load_tool_category(["schemas"])`
+Load the schema tools first: `load_tool(tool_names=["patch_schema"])`
 
 ## Why `update_schema` Is Hidden
 

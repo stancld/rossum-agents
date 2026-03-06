@@ -157,7 +157,7 @@ The agent provides internal tools and access to 43 MCP tools via dynamic loading
 <details>
 <summary><strong>Dynamic MCP Tool Loading</strong></summary>
 
-Tools are loaded on-demand to reduce context usage. Use `load_tool_category` to load tools by category:
+Tools are loaded on-demand to reduce context usage. Use `load_tool` to load tools by name:
 
 | Category | Description |
 |----------|-------------|
