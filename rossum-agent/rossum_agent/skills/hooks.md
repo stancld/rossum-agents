@@ -69,7 +69,11 @@ Load `txscript` skill for advanced patterns (line items, table columns, messagin
 test_hook(hook_id, event, action)
 ```
 
-Generates a realistic payload and executes it in one call. No annotations on hook's queues → pass annotation URL from another queue via `annotation` parameter.
+| Rule | Detail |
+|------|--------|
+| Annotation required | Events like `annotation_content` need an annotation — `test_hook` fails if the hook's queues have none |
+| Before calling `test_hook` | `search(query={"entity": "annotation", "queue_id": <queue_id>})` to check if annotations exist |
+| No annotations found | Pass an annotation URL from another queue via `annotation` parameter, or upload a document first |
 
 ## Debugging
 

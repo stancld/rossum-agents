@@ -70,11 +70,6 @@ graph TD
 
 Event nodes: light blue (`#E8F4F8`). Hook nodes: darker blue (`#4A90E2`, white text). Add clickable anchors."""
 
-CONFIGURATION_WORKFLOWS = """
-# Configuration
-
-**Testing hooks**: Call `test_hook` with the hook ID, event, and action. It auto-generates a realistic payload internally. If it fails because no annotations exist on the hook's queues, find an annotation from another queue in the same workspace and pass its URL via the `annotation` parameter."""
-
 OUTPUT_FORMATTING = """
 # Output
 
@@ -131,7 +126,6 @@ def get_shared_prompt_sections() -> str:
         [
             CRITICAL_REQUIREMENTS,
             DOCUMENTATION_WORKFLOWS,
-            CONFIGURATION_WORKFLOWS,
             CHANGE_HISTORY,
             OUTPUT_FORMATTING,
             TASK_TRACKING,
