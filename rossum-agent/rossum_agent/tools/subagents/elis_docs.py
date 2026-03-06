@@ -96,7 +96,7 @@ def search_elis_docs(query: str) -> str:
         logger.exception("search_elis_docs failed")
         return json.dumps({"status": "error", "message": f"Sub-agent error: {e}"})
 
-    response = {
+    response: dict[str, object] = {
         "status": "success",
         "answer": result.analysis,
         "iterations": result.iterations_used,

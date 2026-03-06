@@ -102,7 +102,7 @@ Tailor your answer to address this specific question."""
         logger.exception("search_knowledge_base failed")
         return json.dumps({"status": "error", "message": f"Sub-agent error: {e}"})
 
-    response = {
+    response: dict[str, object] = {
         "status": "success",
         "answer": result.analysis,
         "iterations": result.iterations_used,
