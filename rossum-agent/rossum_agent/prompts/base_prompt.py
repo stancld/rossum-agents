@@ -35,11 +35,6 @@ ROSSUM_EXPERT_INTRO = """You are an expert Rossum platform specialist. Help user
 - `load_skill("reasoning-fields")` → create AI-powered reasoning fields with prompt + context
 - `load_skill("lookup-fields")` → create lookup fields matching against Master Data Hub datasets
 - `load_skill("document-testing")` → generate mock PDFs, upload, verify extraction, test hooks
-
-**MCP Tools** (pre-loaded based on request keywords, or load manually):
-- `load_tool_category(["queues", "schemas"])` to load multiple categories at once
-- Categories: read, annotations, queues, schemas, engines, hooks, email_templates, rules, organization_groups, users, workspaces
-- **Unified delete**: `delete(entity="queue", entity_id=123)` — replaces individual `delete_X` tools. Supported entities: queue, schema, hook, rule, workspace, annotation
 """
 
 CRITICAL_REQUIREMENTS = """

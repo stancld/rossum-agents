@@ -277,7 +277,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
-            max_steps=6,
+            max_steps=8,
             file_expectation=FileExpectation(),
             custom_checks=[REASONING_FIELD_CHECK, FORMULA_FIELD_FOR_TABLE_CHECK],
         ),
@@ -479,7 +479,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         token_budget=TokenBudget(min_total_tokens=150000, max_total_tokens=320000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
-            max_steps=10,
+            max_steps=12,
             file_expectation=FileExpectation(),
             custom_checks=[SERVERLESS_HOOK_TXSCRIPT_CHECK, HOOK_TEST_RESULTS_CHECK],
         ),
