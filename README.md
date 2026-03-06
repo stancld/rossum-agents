@@ -282,14 +282,12 @@ The Rossum Agent includes specialized capabilities for complex workflows:
 | `formula-fields` | Create/configure formula fields with TxScript |
 | `reasoning-fields` | Create AI-powered reasoning fields with prompt + context |
 | `lookup-fields` | Create/configure lookup fields backed by Master Data Hub datasets |
-| `schema-creation` | Create new schemas with sections, datapoints, multivalues, and tuples |
 
 **Sub-Agents** - Opus-powered components for complex iterative tasks:
 
 | Sub-Agent | Invoked Via | Purpose |
 |-----------|-------------|---------|
 | Knowledge Base | `search_knowledge_base(query)` | Search Rossum docs with Opus-powered analysis |
-| Schema Creation | `create_schema_with_subagent(...)` | Create new schemas via Opus sub-agent |
 | Schema Patching | `patch_schema_with_subagent(schema_id, changes)` | Programmatic bulk schema modifications |
 
 See the [full documentation](https://stancld.github.io/rossum-agents/skills_and_subagents.html) for details.

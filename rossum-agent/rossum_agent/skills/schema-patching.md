@@ -79,12 +79,3 @@ patch_schema(schema_id=12345, operation="update", node_id="field_id", node_data=
 ```
 
 Load the schema tools first: `load_tool(tool_names=["patch_schema"])`
-
-## Why `update_schema` Is Hidden
-
-`update_schema` is intentionally hidden — it replaces the entire schema content and agents tend to use it incorrectly, unintentionally overwriting all fields. Use `patch_schema` (for single-field updates) or `patch_schema_with_subagent` (for bulk changes) instead.
-
-## Cross-Reference
-
-- Create new schemas from scratch: load `schema-creation` skill
-- Schema customization during queue creation: load `organization-setup` skill

@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 35 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 34 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ---
 
@@ -265,40 +265,7 @@ Creates a queue from a predefined regional template. Automatically creates a mat
 
 ---
 
-## Schema Management (5 tools)
-
-### create_schema
-
-Creates a new schema with sections and datapoints.
-
-**Parameters:**
-- `name` (string, required): Schema name
-- `content` (array, required): Schema content array; must contain at least one section with datapoints
-
-**Example content structure:**
-```json
-[
-  {
-    "category": "section",
-    "id": "document_info",
-    "label": "Document Information",
-    "children": [
-      {
-        "category": "datapoint",
-        "id": "document_type",
-        "label": "Document Type",
-        "type": "enum",
-        "rir_field_names": [],
-        "constraints": {"required": false},
-        "options": [
-          {"value": "invoice", "label": "Invoice"},
-          {"value": "receipt", "label": "Receipt"}
-        ]
-      }
-    ]
-  }
-]
-```
+## Schema Management (4 tools)
 
 ### update_schema
 
@@ -703,10 +670,10 @@ Other states: `created`, `failed_import`, `split`, `in_workflow`, `rejected`, `f
 
 ### Create Queue with Engine
 
-1. Create schema using `create_schema`
-2. Create engine using `create_engine`
-3. Create engine fields using `create_engine_field`
-4. Create queue using `create_queue`
+1. Create queue using `create_queue_from_template` (creates schema as byproduct)
+2. Patch schema as needed using `patch_schema`
+3. Create engine using `create_engine`
+4. Create engine fields using `create_engine_field`
 5. Optionally update engine training queues using `update_engine`
 
 ### Explore a Queue

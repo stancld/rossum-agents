@@ -685,7 +685,7 @@ class TestSubAgentSchemaFlow:
 
     @pytest.fixture
     def schema_conn(self, mock_client):
-        write_tools = {"update_schema", "create_schema", "delete_schema", "patch_schema"}
+        write_tools = {"update_schema", "delete_schema", "patch_schema"}
         c = MCPConnection(client=mock_client, write_tools=write_tools)
         c._call_mcp = AsyncMock()
         return c

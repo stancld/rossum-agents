@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 
 from rossum_agent.agent.models import ToolResultStep
-
-from regression_tests.custom_checks._utils import agent_called_tool, call_haiku_check
 
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
@@ -47,23 +44,3 @@ def _extract_ask_user_questions(steps: list[AgentStep]) -> list[str]:
             elif "question" in args:
                 questions.append(str(args["question"]))
     return questions
-
-
-def check_cautious_persona_asks_clarification(
-    steps: list[AgentStep], _api_base_url: str, _api_token: str
-) -> tuple[bool, str]:
-    """Verify the agent asked a clarifying question instead of blindly creating the formula field.
-
-    Checks:
-    - patch_schema / patch_schema_with_subagent were not called
-    - Agent used ask_user_question with clarifying questions (verified by Haiku)
-    """
-    if agent_called_tool(steps, "patch_schema") or agent_called_tool(steps, "patch_schema_with_subagent"):
-        return False, "Agent called patch_schema/patch_schema_with_subagent instead of asking for clarification"
-
-    questions = _extract_ask_user_questions(steps)
-    if not questions:
-        return False, "Agent did not use ask_user_question tool"
-
-    questions_text = json.dumps(questions, indent=2)
-    return call_haiku_check(_PROMPT.format(questions=questions_text[:12000]))

@@ -167,7 +167,7 @@ The agent signals tool usage through two paired `StepEvent` types sharing the sa
 
 **Rendering** (`ToolCall.tsx`): Tool calls are expandable. Collapsed shows tool name, args summary, status icon (✓/✗), and result preview. Expanded shows full arguments and full result.
 
-**During streaming**: While a tool is executing, the TUI shows a `StreamingIndicator` with a spinner and tool name/progress. Sub-agent progress (for compound tools like `create_schema_with_subagent`) is shown inline.
+**During streaming**: While a tool is executing, the TUI shows a `StreamingIndicator` with a spinner and tool name/progress. Sub-agent progress (for compound tools like `patch_schema_with_subagent`) is shown inline.
 
 ### Field Serialization
 

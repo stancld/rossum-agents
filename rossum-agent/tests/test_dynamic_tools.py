@@ -591,20 +591,20 @@ class TestLoadToolsByName:
         reset_dynamic_tools()
         set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock(), mcp_mode="read-only"))
         try:
-            mock_get_write.return_value = {"create_schema", "delete_schema"}
+            mock_get_write.return_value = {"create_hook", "delete_schema"}
 
             mock_tool1 = MagicMock()
-            mock_tool1.name = "create_schema"
+            mock_tool1.name = "create_hook"
             mock_tool2 = MagicMock()
             mock_tool2.name = "get_schema"
             mock_future = MagicMock()
             mock_future.result.return_value = [mock_tool1, mock_tool2]
             mock_run_coro.return_value = mock_future
 
-            result = load_tool(["create_schema"])
+            result = load_tool(["create_hook"])
 
             assert "Error: Write tools not available in read-only mode" in result
-            assert "create_schema" in result
+            assert "create_hook" in result
         finally:
             set_context(AgentContext())
 
@@ -619,16 +619,16 @@ class TestLoadToolsByName:
         set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock(), mcp_mode="read-write"))
         try:
             mock_tool = MagicMock()
-            mock_tool.name = "create_schema"
+            mock_tool.name = "create_hook"
             mock_future = MagicMock()
             mock_future.result.return_value = [mock_tool]
             mock_run_coro.return_value = mock_future
 
-            mock_convert.return_value = [{"name": "create_schema"}]
+            mock_convert.return_value = [{"name": "create_hook"}]
 
-            result = load_tool(["create_schema"])
+            result = load_tool(["create_hook"])
 
-            assert "Loaded tools: create_schema" in result
+            assert "Loaded tools: create_hook" in result
         finally:
             set_context(AgentContext())
 
@@ -649,14 +649,14 @@ class TestGetWriteTools:
     @patch("rossum_agent.tools.dynamic_tools._fetch_catalog_from_mcp")
     def test_returns_write_tools_from_catalog(self, mock_fetch: MagicMock) -> None:
         mock_fetch.return_value = CatalogData(
-            catalog={"schemas": {"get_schema", "create_schema"}},
+            catalog={"schemas": {"get_schema", "create_hook"}},
             keywords={"schemas": ["schema"]},
-            write_tools={"create_schema"},
+            write_tools={"create_hook"},
         )
 
         result = get_write_tools()
 
-        assert result == {"create_schema", "delete"}
+        assert result == {"create_hook", "delete"}
 
     @patch("rossum_agent.tools.dynamic_tools._fetch_catalog_from_mcp")
     def test_always_includes_unified_delete_tool(self, mock_fetch: MagicMock) -> None:
@@ -701,14 +701,14 @@ class TestGetWriteToolsAsync:
             "rossum_agent.tools.dynamic_tools._fetch_catalog_async",
             AsyncMock(
                 return_value=CatalogData(
-                    catalog={"schemas": {"create_schema", "get_schema"}},
+                    catalog={"schemas": {"create_hook", "get_schema"}},
                     keywords={},
-                    write_tools={"create_schema"},
+                    write_tools={"create_hook"},
                 )
             ),
         ):
             result = await get_write_tools_async(mock_connection)
-        assert result == {"create_schema", DELETE_TOOL_NAME}
+        assert result == {"create_hook", DELETE_TOOL_NAME}
 
 
 class TestFetchCatalogParsesWriteTools:
@@ -735,7 +735,7 @@ class TestFetchCatalogParsesWriteTools:
                 "name": "schemas",
                 "tools": [
                     {"name": "get_schema", "read_only": True},
-                    {"name": "create_schema", "read_only": False},
+                    {"name": "create_hook", "read_only": False},
                     {"name": "update_schema", "read_only": False},
                 ],
                 "keywords": ["schema"],
@@ -747,8 +747,8 @@ class TestFetchCatalogParsesWriteTools:
 
         assert "schemas" in result.catalog
         # update_schema is in HIDDEN_TOOLS, so it's excluded from the catalog
-        assert result.catalog["schemas"] == {"get_schema", "create_schema"}
-        assert result.write_tools == {"create_schema"}
+        assert result.catalog["schemas"] == {"get_schema", "create_hook"}
+        assert result.write_tools == {"create_hook"}
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
     def test_defaults_to_read_only_when_field_missing(self, mock_run_coro: MagicMock) -> None:
@@ -787,8 +787,8 @@ class TestLoadCategoriesImplReadOnlyMode:
         mock_convert: MagicMock,
     ) -> None:
         reset_dynamic_tools()
-        mock_get_catalog.return_value = {"schemas": {"get_schema", "list_schemas", "create_schema", "update_queue"}}
-        mock_get_write.return_value = {"create_schema", "update_queue"}
+        mock_get_catalog.return_value = {"schemas": {"get_schema", "list_schemas", "create_hook", "update_queue"}}
+        mock_get_write.return_value = {"create_hook", "update_queue"}
         set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock(), mcp_mode="read-only"))
         try:
             mock_tool1 = MagicMock()
@@ -796,7 +796,7 @@ class TestLoadCategoriesImplReadOnlyMode:
             mock_tool2 = MagicMock()
             mock_tool2.name = "list_schemas"
             mock_tool3 = MagicMock()
-            mock_tool3.name = "create_schema"
+            mock_tool3.name = "create_hook"
             mock_tool4 = MagicMock()
             mock_tool4.name = "update_queue"
             mock_future = MagicMock()
@@ -811,7 +811,7 @@ class TestLoadCategoriesImplReadOnlyMode:
             assert "(read-only mode)" in result
             call_args = mock_convert.call_args[0][0]
             tool_names_loaded = {t.name for t in call_args}
-            assert "create_schema" not in tool_names_loaded
+            assert "create_hook" not in tool_names_loaded
             assert "update_queue" not in tool_names_loaded
             assert "get_schema" in tool_names_loaded
             assert "list_schemas" in tool_names_loaded
@@ -830,19 +830,19 @@ class TestLoadCategoriesImplReadOnlyMode:
         mock_convert: MagicMock,
     ) -> None:
         reset_dynamic_tools()
-        mock_get_catalog.return_value = {"schemas": {"get_schema", "create_schema"}}
-        mock_get_write.return_value = {"create_schema"}
+        mock_get_catalog.return_value = {"schemas": {"get_schema", "create_hook"}}
+        mock_get_write.return_value = {"create_hook"}
         set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock(), mcp_mode="read-write"))
         try:
             mock_tool1 = MagicMock()
             mock_tool1.name = "get_schema"
             mock_tool2 = MagicMock()
-            mock_tool2.name = "create_schema"
+            mock_tool2.name = "create_hook"
             mock_future = MagicMock()
             mock_future.result.return_value = [mock_tool1, mock_tool2]
             mock_run_coro.return_value = mock_future
 
-            mock_convert.return_value = [{"name": "get_schema"}, {"name": "create_schema"}]
+            mock_convert.return_value = [{"name": "get_schema"}, {"name": "create_hook"}]
 
             result = _load_categories_impl(["schemas"])
 
@@ -850,7 +850,7 @@ class TestLoadCategoriesImplReadOnlyMode:
             assert "(read-only mode)" not in result
             call_args = mock_convert.call_args[0][0]
             tool_names_loaded = {t.name for t in call_args}
-            assert "create_schema" in tool_names_loaded
+            assert "create_hook" in tool_names_loaded
             assert "get_schema" in tool_names_loaded
         finally:
             set_context(AgentContext())

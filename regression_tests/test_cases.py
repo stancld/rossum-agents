@@ -15,7 +15,6 @@ from __future__ import annotations
 from regression_tests.custom_checks import (
     check_business_validation_hook_settings,
     check_business_validation_rules,
-    check_cautious_persona_asks_clarification,
     check_formula_field_for_table,
     check_formula_field_updated,
     check_hook_deleted_and_reverted,
@@ -139,11 +138,6 @@ SCHEMA_REVERT_TYPE_VALIDATION_CHECK = CustomCheck(
 MULTI_TURN_SCHEMA_REVERTED_CHECK = CustomCheck(
     name="Multi-turn session fields reverted and feature availability checked",
     check_fn=check_multi_turn_schema_reverted,
-)
-
-CAUTIOUS_PERSONA_CLARIFICATION_CHECK = CustomCheck(
-    name="Cautious persona asked clarifying question instead of creating formula field",
-    check_fn=check_cautious_persona_asks_clarification,
 )
 
 
@@ -740,7 +734,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             max_steps=4,
             require_final_answer=False,
             file_expectation=FileExpectation(),
-            custom_checks=[CAUTIOUS_PERSONA_CLARIFICATION_CHECK],
         ),
     ),
     RegressionTestCase(

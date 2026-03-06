@@ -609,56 +609,6 @@ Updates an existing engine's settings including learning and training queues.
      "message": "Engine 'My Engine' (ID 12345) updated successfully"
    }
 
-create_schema
-^^^^^^^^^^^^^
-
-Creates a new schema with sections and datapoints.
-
-**Parameters:**
-
-- ``name`` (string, required): Schema name
-- ``content`` (array, required): Schema content array containing sections with datapoints.
-  Must follow Rossum schema structure with sections containing children.
-
-**Example content structure:**
-
-.. code-block:: json
-
-   [
-     {
-       "category": "section",
-       "id": "document_info",
-       "label": "Document Information",
-       "children": [
-         {
-           "category": "datapoint",
-           "id": "document_type",
-           "label": "Document Type",
-           "type": "enum",
-           "rir_field_names": [],
-           "constraints": {"required": false},
-           "options": [
-             {"value": "invoice", "label": "Invoice"},
-             {"value": "receipt", "label": "Receipt"}
-           ]
-         }
-       ]
-     }
-   ]
-
-**Returns:**
-
-.. code-block:: json
-
-   {
-     "id": 12345,
-     "name": "My Schema",
-     "url": "https://elis.rossum.ai/api/v1/schemas/12345",
-     "content": ["..."],
-     "message": "Schema 'My Schema' created successfully with ID 12345"
-   }
-
-
 create_engine
 ^^^^^^^^^^^^^
 
