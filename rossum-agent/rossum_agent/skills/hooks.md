@@ -82,4 +82,3 @@ test_hook(hook_id, event, action)
 ## Cross-Reference
 
 - Formula fields (no hook needed): load `formula-fields` skill
-- Queue creation with hooks: load `organization-setup` skill

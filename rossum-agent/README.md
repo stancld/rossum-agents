@@ -138,7 +138,7 @@ The agent provides internal tools and access to 43 MCP tools via dynamic loading
 - `patch_schema_with_subagent` - Safe schema modifications via Opus
 
 **Skills:**
-- `load_skill` - Load domain-specific workflows (`schema-patching`, `python-execution`, `organization-setup`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
+- `load_skill` - Load domain-specific workflows (`schema-patching`, `python-execution`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
 
 **Document Testing:**
 - `generate_mock_pdf` - Generate schema-aware mock PDFs with realistic field values for end-to-end extraction testing

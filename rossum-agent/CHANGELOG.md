@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Removed `load_tool_category` tool — agent now loads MCP tools individually via `load_tool` by name; `load_tool` description updated with category listing guidance [#243](https://github.com/stancld/rossum-agents/pull/243)
 
 ### Removed
+- Removed `organization-setup` skill — queue creation is handled directly via `create_queue_from_template` without needing a dedicated skill [#245](https://github.com/rossumai/rossum-agents/pull/245)
 - Removed `create_schema_with_subagent` tool and `schema-creation` skill — schema creation is handled by the agent directly using `patch_schema_with_subagent` or `update_schema` (via schema-patching sub-agent) [#244](https://github.com/stancld/rossum-agents/pull/244)
 - Removed `rossum-deployment` skill and all deploy/spawn tools — unused and unsolved [#241](https://github.com/stancld/rossum-agents/pull/241)
 - Removed `schema-pruning` skill — use `prune_schema_fields` MCP tool directly [#225](https://github.com/stancld/rossum-agents/pull/225)
