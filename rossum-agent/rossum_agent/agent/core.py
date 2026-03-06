@@ -434,7 +434,7 @@ class RossumAgent:
 
         Initially loads only the discovery tool from MCP (list_tool_categories)
         plus internal tools. Additional MCP tools are loaded dynamically via
-        load_tool_category.
+        load_tool.
         """
         current_version = get_tools_version()
         if self._tools_cache is None or self._tools_cache_version != current_version:

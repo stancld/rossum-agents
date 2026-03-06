@@ -157,7 +157,7 @@ When ``ROSSUM_MCP_MODE`` is set to ``read-only``, only read-tagged tools are ava
 * ``get_annotation_content`` - Fetch annotation extracted content
 * ``get_schema_tree_structure`` - Get lightweight schema tree view
 * ``get_engine_fields`` - Retrieve engine fields
-* ``list_tool_categories`` / ``load_tool_category`` - Tool discovery
+* ``list_tool_categories`` / ``load_tool`` - Tool discovery and loading
 
 All CREATE, UPDATE, and UPLOAD operations are disabled in read-only mode for security purposes.
 

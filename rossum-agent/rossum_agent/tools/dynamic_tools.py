@@ -25,8 +25,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Tools hidden from the agent. These are excluded from catalog listings and cannot
-# be loaded via load_tool_category or load_tool. Internal subagent code that calls
-# MCP tools directly (e.g. schema_patching) is not affected.
+# be loaded via load_tool. Internal subagent code that calls MCP tools directly
+# (e.g. schema_patching) is not affected.
 HIDDEN_TOOLS: dict[str, str] = {
     "update_schema": (
         "Hidden: agent tends to use update_schema incorrectly, unintentionally "
@@ -286,48 +286,22 @@ def preload_categories_for_request(request_text: str) -> str | None:
     return result
 
 
-def get_load_tool_category_definition() -> ToolParam:
-    """Get the tool definition for load_tool_category."""
-    return {
-        "name": "load_tool_category",
-        "description": (
-            "Load MCP tools from one or more categories. Once loaded, the tools become "
-            "available for use. Use list_tool_categories first to see available categories.\n"
-            "Categories: read, annotations, queues, schemas, engines, hooks, email_templates, "
-            "rules, organization_groups, users, workspaces"
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "categories": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Category names to load (e.g., ['queues', 'schemas'])",
-                }
-            },
-            "required": ["categories"],
-        },
-    }
-
-
-def load_tool_category(categories: list[str]) -> str:
-    """Load MCP tools from specified categories."""
-    return _load_categories_impl(categories)
-
-
 def get_load_tool_definition() -> ToolParam:
     """Get the tool definition for load_tool."""
     return {
         "name": "load_tool",
-        "description": "Load specific MCP tools by name.",
+        "description": (
+            "Load specific MCP tools by name. Once loaded, the tools become "
+            "available for use. Use list_tool_categories to see available tool names."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "tool_names": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Tool names to load",
-                }
+                    "description": "Tool names to load (e.g., ['get_queue', 'list_schemas'])",
+                },
             },
             "required": ["tool_names"],
         },

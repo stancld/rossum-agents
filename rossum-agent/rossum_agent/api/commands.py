@@ -13,7 +13,6 @@ from rossum_agent.prompts.base_prompt import PERSONA_BEHAVIORS
 from rossum_agent.tools import INTERNAL_TOOLS
 from rossum_agent.tools.dynamic_tools import (
     get_cached_category_tool_names,
-    get_load_tool_category_definition,
     get_load_tool_definition,
 )
 
@@ -168,7 +167,7 @@ async def _handle_list_agent_tools(ctx: CommandContext) -> str:
     for tool in INTERNAL_TOOLS:
         d = tool.to_dict()
         tools.append((d["name"], d.get("description", "")))
-    for defn in [get_load_tool_category_definition(), get_load_tool_definition()]:
+    for defn in [get_load_tool_definition()]:
         tools.append((defn["name"], defn.get("description", "")))
 
     tools.sort(key=lambda t: t[0])

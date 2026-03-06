@@ -19,7 +19,19 @@
 | Documentation | Changes reflected in README.md and CLAUDE.md |
 | Tests | New features/bug fixes have tests; existing tests not deleted without cause |
 | Breaking changes | Public API or tool signatures changed without backward compatibility |
+| Tools consolidation | If tools were added, removed, or merged — see **Tools Consolidation** below |
 | Opus prompts | If `rossum_agent/prompts/` or `rossum_agent/skills/` changed — see **Opus Prompt Guidelines** below |
+
+## Tools Consolidation
+
+Apply when tools are added, removed, or merged in `rossum_agent/tools/` or `rossum_mcp/tools/`:
+
+| Principle | What to check |
+|-----------|---------------|
+| Efficiency | Does the consolidation reduce token overhead, tool-call round trips, or redundant functionality? |
+| SOTA alignment | Is the tool design aligned with current state-of-the-art agentic patterns (e.g., fewer specialized tools vs. many narrow ones, proper use of structured outputs)? |
+| Capability preservation | No previously available functionality silently dropped without justification |
+| Naming clarity | Tool names and descriptions remain clear and discoverable by the agent |
 
 ## Opus Prompt Guidelines
 

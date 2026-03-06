@@ -178,20 +178,17 @@ How It Works
 
 1. **Discovery**: The MCP server provides a ``list_tool_categories`` tool that returns all available categories with metadata
 2. **Automatic Pre-loading**: On the first user message, keywords are matched against category keywords to pre-load relevant tools
-3. **On-demand Loading**: The agent can explicitly load additional categories using ``load_tool_category``
+3. **On-demand Loading**: The agent can explicitly load additional tools using ``load_tool``
 
 Loading Tools
 ^^^^^^^^^^^^^
 
-Use ``load_tool_category`` to load MCP tools from specific categories:
+Use ``load_tool`` to load specific MCP tools by name:
 
 .. code-block:: python
 
-   # Load single category
-   load_tool_category(categories=["schemas"])
-
-   # Load multiple categories
-   load_tool_category(categories=["queues", "schemas", "engines"])
+   # Load specific tools
+   load_tool(tool_names=["get_queue", "list_schemas"])
 
 Available Categories
 ^^^^^^^^^^^^^^^^^^^^
