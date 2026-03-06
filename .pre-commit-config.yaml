@@ -36,7 +36,7 @@ repos:
     hooks:
       - id: ty
         name: ty
-        entry: uv run ty check
+        entry: env UV_CACHE_DIR=.uv-cache uv run ty check
         language: system
         pass_filenames: false
         types: [python]

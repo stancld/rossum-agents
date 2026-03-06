@@ -314,7 +314,7 @@ class TestListMcpToolsHandler:
     @pytest.mark.asyncio
     async def test_catalog_not_loaded(self):
         ctx = _make_ctx()
-        with patch("rossum_agent.api.commands.get_cached_category_tool_names", return_value=None):
+        with patch("rossum_agent.api.commands.listing.get_cached_category_tool_names", return_value=None):
             result = await execute_command("/list-mcp-tools", ctx)
         assert "not loaded yet" in result
 
@@ -325,7 +325,7 @@ class TestListMcpToolsHandler:
             "queues": {"list_queues", "get_queue"},
             "schemas": {"list_schemas"},
         }
-        with patch("rossum_agent.api.commands.get_cached_category_tool_names", return_value=catalog):
+        with patch("rossum_agent.api.commands.listing.get_cached_category_tool_names", return_value=catalog):
             result = await execute_command("/list-mcp-tools", ctx)
 
         assert "3 tools in 2 categories" in result
