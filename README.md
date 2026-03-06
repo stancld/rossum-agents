@@ -274,6 +274,7 @@ The Rossum Agent includes specialized capabilities for complex workflows:
 | Skill | Purpose |
 |-------|---------|
 | `schema-patching` | Add, update, or remove individual schema fields |
+| `python-execution` | Constrained Python snippets, schema export of bulky structured outputs |
 | `ui-settings` | Update queue UI settings without corrupting structure |
 | `hooks` | Hook templates, token_owner, testing, debugging |
 | `txscript` | TxScript language reference for formula fields, serverless functions, and rule trigger conditions |

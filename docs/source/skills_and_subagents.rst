@@ -40,6 +40,8 @@ Available Skills
      - Purpose
    * - ``schema-patching``
      - Add, update, or remove individual schema fields
+   * - ``python-execution``
+     - Constrained Python snippets, schema export of bulky structured outputs
    * - ``ui-settings``
      - Update queue UI settings (annotation list columns) without corrupting structure
    * - ``rules-and-actions``
