@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
 
 # Expected visible columns: (column_type, identifier)
-# Based on ORGANIZATION_SETUP.md UI settings (minus "The Net Terms"):
+# Based on test prompt UI settings:
 # - status, original file name, details, Document ID, Due Date, Total Amount, Vendor Name, Received at
 EXPECTED_VISIBLE_COLUMNS = {
     ("meta", "status"),

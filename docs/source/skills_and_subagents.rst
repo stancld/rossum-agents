@@ -40,8 +40,8 @@ Available Skills
      - Purpose
    * - ``schema-patching``
      - Add, update, or remove individual schema fields
-   * - ``organization-setup``
-     - Set up Rossum for new customers with correct document types and regional configurations
+   * - ``python-execution``
+     - Constrained Python snippets, schema export of bulky structured outputs
    * - ``ui-settings``
      - Update queue UI settings (annotation list columns) without corrupting structure
    * - ``rules-and-actions``
@@ -89,13 +89,6 @@ Schema Pruning Skill
        schema_id=12345,
        fields_to_keep=["invoice_number", "invoice_date", "total_amount"]
    )
-
-Organization Setup Skill
-""""""""""""""""""""""""
-
-**Goal**: Set up Rossum for new customers with correct document types and regional configurations.
-
-Use ``create_queue_from_template`` for new customer onboarding with regional templates (EU/US/UK/CZ/CN).
 
 Python Execution Skill
 """"""""""""""""""""""

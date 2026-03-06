@@ -33,9 +33,6 @@ from regression_tests.custom_checks.lookup_field import (
 from regression_tests.custom_checks.multi_turn_schema_revert import (
     check_multi_turn_schema_reverted,
 )
-from regression_tests.custom_checks.net_terms_formula_field import (
-    check_net_terms_formula_field_added,
-)
 from regression_tests.custom_checks.no_misleading_training_suggestions import (
     check_no_misleading_training_suggestions,
 )
@@ -72,7 +69,6 @@ __all__ = [
     "check_lookup_field_configured",
     "check_lookup_match_results",
     "check_multi_turn_schema_reverted",
-    "check_net_terms_formula_field_added",
     "check_no_misleading_training_suggestions",
     "check_queue_deleted",
     "check_queue_ui_settings",

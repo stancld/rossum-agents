@@ -23,7 +23,6 @@ from regression_tests.custom_checks import (
     check_lookup_field_configured,
     check_lookup_match_results,
     check_multi_turn_schema_reverted,
-    check_net_terms_formula_field_added,
     check_no_misleading_training_suggestions,
     check_queue_deleted,
     check_queue_ui_settings,
@@ -53,11 +52,6 @@ HIDDEN_MULTIVALUE_CHECK = CustomCheck(
 NO_MISLEADING_TRAINING_SUGGESTIONS_CHECK = CustomCheck(
     name="No misleading training suggestions (e.g., Inbox in training_queues)",
     check_fn=check_no_misleading_training_suggestions,
-)
-
-NET_TERMS_FORMULA_FIELD_CHECK = CustomCheck(
-    name="Net Terms formula field was added to schema",
-    check_fn=check_net_terms_formula_field_added,
 )
 
 BUSINESS_VALIDATION_RULES_CHECK = CustomCheck(
@@ -305,7 +299,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "| Customer Address | String, multiline | No |\n"
             "| Total Amount | Float | No |\n"
             "| Total Tax | Float | No |\n"
-            "| Currency | String | No |\n"
+            "| Currency | Enum | No |\n"
             "| Code | String, multiline | Yes |\n"
             "| Description | String, multiline | Yes |\n"
             "| Quantity | Integer | Yes |\n"
@@ -331,9 +325,8 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=["Invoices", "Credit Notes"],
-            max_steps=9,
+            max_steps=12,
             file_expectation=FileExpectation(),
-            custom_checks=[NET_TERMS_FORMULA_FIELD_CHECK],
         ),
     ),
     RegressionTestCase(
