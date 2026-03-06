@@ -135,11 +135,10 @@ The agent provides internal tools and access to 43 MCP tools via dynamic loading
 - `execute_python` - Run constrained Python snippets; load the relevant skill first and use `write_file(...)` for large outputs
 
 **Schema:**
-- `create_schema_with_subagent` - Create new schemas via Opus sub-agent
 - `patch_schema_with_subagent` - Safe schema modifications via Opus
 
 **Skills:**
-- `load_skill` - Load domain-specific workflows (`schema-patching`, `schema-creation`, `python-execution`, `organization-setup`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
+- `load_skill` - Load domain-specific workflows (`schema-patching`, `python-execution`, `organization-setup`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
 
 **Document Testing:**
 - `generate_mock_pdf` - Generate schema-aware mock PDFs with realistic field values for end-to-end extraction testing

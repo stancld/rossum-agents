@@ -20,7 +20,7 @@ at multiple points to provide real-time updates to the client. The yield flow is
         │
         └── #7 forwards from _execute_tools_with_progress
                 ├── Tool starting (which tool is about to run)
-                └── Sub-agent progress (from nested agent tools like create_schema_with_subagent)
+                └── Sub-agent progress (from nested agent tools like patch_schema_with_subagent)
 
 Key concepts:
 - Initial text buffering (INITIAL_TEXT_BUFFER_DELAY=1.5s) allows determining step type

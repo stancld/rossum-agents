@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class SubAgentProgress:
-    """Progress information from a sub-agent (e.g., schema creation Opus sub-agent)."""
+    """Progress information from a sub-agent (e.g., schema patching Opus sub-agent)."""
 
     tool_name: str
     iteration: int
@@ -50,7 +50,7 @@ class SubAgentTokenUsage:
 
 @dataclass
 class SubAgentText:
-    """Text output from a sub-agent (e.g., schema creation Opus sub-agent)."""
+    """Text output from a sub-agent (e.g., schema patching Opus sub-agent)."""
 
     tool_name: str
     text: str

@@ -42,8 +42,6 @@ Available Skills
      - Add, update, or remove individual schema fields
    * - ``organization-setup``
      - Set up Rossum for new customers with correct document types and regional configurations
-   * - ``schema-creation``
-     - Create new schemas from scratch with correct content array structure
    * - ``ui-settings``
      - Update queue UI settings (annotation list columns) without corrupting structure
    * - ``rules-and-actions``
@@ -98,18 +96,6 @@ Organization Setup Skill
 **Goal**: Set up Rossum for new customers with correct document types and regional configurations.
 
 Use ``create_queue_from_template`` for new customer onboarding with regional templates (EU/US/UK/CZ/CN).
-
-Schema Creation Skill
-"""""""""""""""""""""
-
-**Goal**: Create new schemas from scratch with correct content array structure (sections, datapoints, multivalues, tuples).
-
-.. code-block:: python
-
-   create_schema_with_subagent(
-       name="Invoice Schema",
-       requirements="Describe sections, fields, and tables needed"
-   )
 
 Python Execution Skill
 """"""""""""""""""""""

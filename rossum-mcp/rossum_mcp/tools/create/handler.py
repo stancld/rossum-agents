@@ -8,7 +8,6 @@ from rossum_api.models.engine import Engine, EngineField, EngineFieldType
 from rossum_api.models.hook import Hook, HookEventAndAction, HookType
 from rossum_api.models.queue import Queue
 from rossum_api.models.rule import Rule, RuleAction
-from rossum_api.models.schema import Schema
 from rossum_api.models.user import User
 from rossum_api.models.workspace import Workspace
 
@@ -18,7 +17,6 @@ from rossum_mcp.tools.create.engines import _create_engine, _create_engine_field
 from rossum_mcp.tools.create.hooks import _create_hook, _create_hook_from_template
 from rossum_mcp.tools.create.queues import _create_queue, _create_queue_from_template
 from rossum_mcp.tools.create.rules import _create_rule
-from rossum_mcp.tools.create.schemas import _create_schema
 from rossum_mcp.tools.create.users import _create_user
 from rossum_mcp.tools.create.workspaces import _create_workspace
 from rossum_mcp.tools.models import (  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
@@ -108,15 +106,6 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         return await _create_queue_from_template(
             client, base_url, name, template_name, workspace_id, include_documents, engine_id
         )
-
-    # --- Schemas ---
-    @mcp.tool(
-        description="Create a schema; requires at least one section containing datapoints.",
-        tags={"schemas", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_schema(name: str, content: list[dict]) -> Schema | dict:
-        return await _create_schema(client, name, content)
 
     # --- Engines ---
     @mcp.tool(

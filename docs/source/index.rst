@@ -72,7 +72,6 @@ A compact, fully-typed tool surface — Pydantic models, ``Literal`` unions, and
 
 **Schema Management**
 
-* **create_schema** - Create new schemas
 * **update_schema** - Configure field-level thresholds
 * **patch_schema** - Add, update, or remove individual schema nodes
 * **get_schema_tree_structure** - Get lightweight tree structure of schema

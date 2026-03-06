@@ -137,7 +137,7 @@ Supported entities: `queue`, `schema`, `hook`, `rule`, `workspace`, `annotation`
 `create_queue`, `create_queue_from_template`, `update_queue`
 
 **Schema Management:**
-`create_schema`, `update_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`
+`update_schema`, `patch_schema`, `get_schema_tree_structure`, `prune_schema_fields`
 
 **Engine Management:**
 `create_engine`, `update_engine`, `create_engine_field`, `get_engine_fields`

@@ -295,10 +295,10 @@ class TestListSkillsHandler:
         result = await execute_command("/list-skills", ctx)
 
         assert "Available skills" in result
-        assert "schema-creation" in result
+        assert "schema-patching" in result
         assert "hooks" in result
         # Goal descriptions extracted from skill content
-        assert "Create new schemas" in result
+        assert "Add, update, or remove" in result
 
     @pytest.mark.asyncio
     async def test_skills_sorted_alphabetically(self):
