@@ -79,10 +79,13 @@ class FileExpectation:
     Attributes:
         expected_files: List of file patterns that should be created/modified.
             Supports glob wildcards (e.g., "*.md", "report_*.txt").
-            Paths are relative to the outputs/ directory. Asserts exact count match.
+            Paths are relative to the outputs/ directory.
+        allow_extra: If True, extra files beyond expected_files are allowed (e.g. workspace files).
+            If False (default), asserts exact count match.
     """
 
     expected_files: Sequence[str] = field(default_factory=list)
+    allow_extra: bool = False
 
 
 @dataclass

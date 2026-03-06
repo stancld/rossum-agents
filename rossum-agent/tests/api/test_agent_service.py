@@ -241,7 +241,7 @@ class TestCreateToolStartEvent:
             tool_progress=(1, 2),
             current_tool="list_annotations",
         )
-        event = _create_tool_start_event(step, "list_annotations")
+        event = _create_tool_start_event(step, current_tool="list_annotations")
 
         assert event.type == "tool_start"
         assert event.step_number == 1
@@ -260,12 +260,31 @@ class TestCreateToolStartEvent:
             tool_progress=(2, 3),
             current_tool="get_annotation",
         )
-        event = _create_tool_start_event(step, "get_annotation")
+        event = _create_tool_start_event(step, current_tool="get_annotation")
 
         assert event.type == "tool_start"
         assert event.tool_name == "get_annotation"
         assert event.tool_arguments is None
         assert event.tool_call_id is None
+
+    def test_create_tool_start_event_prefers_tool_call_id_for_same_name_tools(self):
+        """Test that same-name tools resolve by call id, not first matching name."""
+        step = ToolStartStep(
+            step_number=1,
+            tool_calls=[
+                ToolCall(id="tc_1", name="search", arguments={"entity": "workspace"}),
+                ToolCall(id="tc_2", name="search", arguments={"entity": "queue"}),
+            ],
+            tool_progress=(2, 2),
+            current_tool="search",
+            current_tool_call_id="tc_2",
+        )
+        event = _create_tool_start_event(step, current_tool="search")
+
+        assert event.type == "tool_start"
+        assert event.tool_name == "search"
+        assert event.tool_arguments == {"entity": "queue"}
+        assert event.tool_call_id == "tc_2"
 
 
 class TestCreateToolResultEvent:

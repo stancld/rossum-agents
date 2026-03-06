@@ -1363,8 +1363,8 @@ class TestExecuteTool:
         assert "Connection failed" in result.content
 
     @pytest.mark.asyncio
-    async def test_truncates_long_content(self):
-        """Test that long tool output is truncated."""
+    async def test_spills_long_content_to_file(self):
+        """Test that long tool output is spilled to a workspace file."""
         agent = self._create_agent()
         long_output = "A" * 50000
         agent.mcp_connection.call_tool.return_value = long_output
@@ -1374,7 +1374,8 @@ class TestExecuteTool:
         result = await self._get_final_result(agent, tool_call)
 
         assert len(result.content) < 50000
-        assert "truncated" in result.content.lower()
+        assert "result saved to" in result.content.lower()
+        assert "workspace" in result.content.lower()
 
 
 class TestExecuteToolsInParallel:
@@ -1530,6 +1531,53 @@ class TestExecuteToolsInParallel:
         # First step should be progress indicator
         assert isinstance(steps[0], ToolStartStep)
         assert steps[0].tool_progress == (0, 2)
+
+    @pytest.mark.asyncio
+    async def test_deduplicates_identical_tool_calls_within_step(self):
+        """Test that identical tool calls execute once but keep per-call memory results."""
+        agent = self._create_agent()
+
+        execution_count = 0
+
+        async def counting_tool(name, args):
+            nonlocal execution_count
+            execution_count += 1
+            return f"result_{name}"
+
+        agent.mcp_connection.call_tool = counting_tool
+
+        tool_calls = [
+            ToolCall(id="tc_1", name="search", arguments={"entity": "workspace"}),
+            ToolCall(id="tc_2", name="search", arguments={"entity": "workspace"}),
+        ]
+
+        steps = []
+        async for step in agent._execute_tools_with_progress(
+            step_num=1,
+            response_text="",
+            tool_calls=tool_calls,
+            input_tokens=100,
+            output_tokens=50,
+        ):
+            steps.append(step)
+
+        assert execution_count == 1
+        assert isinstance(steps[0], ToolStartStep)
+        assert len(steps[0].tool_calls) == 1
+        assert steps[0].tool_progress == (0, 1)
+
+        final_step = steps[-1]
+        assert isinstance(final_step, ToolResultStep)
+        assert len(final_step.tool_results) == 1
+        assert final_step.tool_results[0].tool_call_id == "tc_1"
+
+        memory_step = agent.memory.steps[-1]
+        assert isinstance(memory_step, MemoryStep)
+        assert len(memory_step.tool_calls) == 2
+        assert len(memory_step.tool_results) == 2
+        assert memory_step.tool_results[0].tool_call_id == "tc_1"
+        assert memory_step.tool_results[1].tool_call_id == "tc_2"
+        assert memory_step.tool_results[0].content == memory_step.tool_results[1].content
 
     @pytest.mark.asyncio
     async def test_cancellation_cancels_child_tasks_and_reraises(self):

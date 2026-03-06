@@ -1,6 +1,6 @@
 """File system tools for the Rossum Agent.
 
-We use these tools to write into a specific output location.
+Read/write tools for the agent's output directory and workspace files.
 """
 
 from __future__ import annotations

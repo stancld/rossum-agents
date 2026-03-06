@@ -49,6 +49,7 @@ CRITICAL_REQUIREMENTS = """
 - `score_threshold` cannot be null (default `0.8`) - API rejects null values
 - Annotation updates use numeric `id`, not `schema_id` string
 - `search` tool `name` filter is exact API-side match by default; pass `use_regex=True` for regex pattern matching (client-side)
+- `run_jq` expects real jq syntax; when fields may be null or missing, use jq-native null-safe operators like `?`, `//`, and `tonumber?`
 
 **Engine training**: Inbox queues cannot train classification engines - they contain unsplit documents without `document_type`. Only typed documents in training_queues contribute."""
 

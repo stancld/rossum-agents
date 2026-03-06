@@ -18,7 +18,7 @@ class TestResolveContent:
         f.write_text(json.dumps(data))
         result = json.loads(run_jq('.[] | select(.status == "active") | .id', str(f)))
         assert result["status"] == "success"
-        assert "1" in result["result"]
+        assert result["result"] == 1
 
     def test_grep_reads_file_path(self, tmp_path: Path) -> None:
         f = tmp_path / "content.txt"
@@ -32,7 +32,7 @@ class TestResolveContent:
         data = json.dumps({"key": "value"})
         result = json.loads(run_jq(".key", data))
         assert result["status"] == "success"
-        assert "value" in result["result"]
+        assert result["result"] == "value"
 
     def test_grep_falls_back_to_raw_string_when_no_file(self) -> None:
         result = json.loads(run_grep("hello", "hello world\nfoo bar"))
@@ -46,7 +46,7 @@ class TestResolveContent:
         f.write_text(json.dumps(annotation))
         result = json.loads(run_jq('.[] | select(.schema_id == "amount_total") | .value', str(f)))
         assert result["status"] == "success"
-        assert "100.00" in result["result"]
+        assert result["result"] == "100.00"
 
 
 class TestRunJq:
@@ -54,20 +54,19 @@ class TestRunJq:
         data = json.dumps({"name": "Alice", "age": 30})
         result = json.loads(run_jq(".name", data))
         assert result["status"] == "success"
-        assert "Alice" in result["result"]
+        assert result["result"] == "Alice"
 
     def test_array_filter(self) -> None:
         data = json.dumps([{"id": 1, "active": True}, {"id": 2, "active": False}])
         result = json.loads(run_jq(".[] | select(.active) | .id", data))
         assert result["status"] == "success"
-        assert "1" in result["result"]
-        assert "2" not in result["result"]
+        assert result["result"] == 1
 
     def test_keys_query(self) -> None:
         data = json.dumps({"a": 1, "b": 2, "c": 3})
         result = json.loads(run_jq("keys", data))
         assert result["status"] == "success"
-        assert "a" in result["result"]
+        assert result["result"] == ["a", "b", "c"]
 
     def test_invalid_json_input(self) -> None:
         result = json.loads(run_jq(".", "not json"))
@@ -84,21 +83,22 @@ class TestRunJq:
         data = json.dumps({f"key_{i}": "v" * 200 for i in range(500)})
         result = json.loads(run_jq(".", data))
         assert result["status"] == "success"
-        assert "truncated" in result["result"]
+        assert result["truncated"] is True
+        assert isinstance(result["result"], str)
+        assert result["result"].endswith("... (truncated)")
         assert len(result["result"]) <= _JQ_OUTPUT_LIMIT + len("\n... (truncated)")
 
     def test_nested_extraction(self) -> None:
         data = json.dumps({"a": {"b": {"c": 42}}})
         result = json.loads(run_jq(".a.b.c", data))
         assert result["status"] == "success"
-        assert "42" in result["result"]
+        assert result["result"] == 42
 
     def test_map_field(self) -> None:
         data = json.dumps([{"id": 10}, {"id": 20}, {"id": 30}])
         result = json.loads(run_jq("map(.id)", data))
         assert result["status"] == "success"
-        parsed = json.loads(result["result"])
-        assert parsed == [10, 20, 30]
+        assert result["result"] == [10, 20, 30]
 
 
 class TestRunGrep:
