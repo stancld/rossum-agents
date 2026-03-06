@@ -125,35 +125,21 @@ The agent provides internal tools and access to 43 MCP tools via dynamic loading
 **File & Knowledge:**
 - `write_file` - Save reports, documentation, analysis results
 - `search_knowledge_base` - Search Rossum docs with AI analysis (sub-agent)
-- `kb_grep` - Regex search across Knowledge Base article titles and content
-- `kb_get_article` - Retrieve full Knowledge Base article by slug
+- `search_elis_docs` - AI-powered search of API documentation (sub-agent)
 
 **Data Tools:**
 - `run_jq` - Run jq expressions on JSON content or file paths
 - `run_grep` - Regex search in text content or file paths
 
-**API Reference:**
-- `elis_openapi_jq` - Query Rossum API OpenAPI spec with jq
-- `elis_openapi_grep` - Free-text search in API spec
-- `search_elis_docs` - AI-powered search of API documentation
-
-**Formula:**
-- `suggest_formula_field` - Suggest formula field expressions via Rossum Local Copilot
-
-**Rules:**
-- `suggest_rule` - Suggest rule trigger conditions and actions via Rossum Local Copilot
-
-**Lookup Fields:**
-- `suggest_lookup_field` - Suggest lookup field matching configuration for MDH datasets
-- `evaluate_lookup_field` - Evaluate lookup field results on a real annotation
-- `get_lookup_dataset_raw_values` - Fetch raw MDH dataset rows for unmatched/ambiguous case verification
+**Copilot Execution:**
+- `execute_python` - Run constrained Python snippets; load the relevant skill first and use `write_file(...)` for large outputs
 
 **Schema:**
 - `create_schema_with_subagent` - Create new schemas via Opus sub-agent
 - `patch_schema_with_subagent` - Safe schema modifications via Opus
 
 **Skills:**
-- `load_skill` - Load domain-specific workflows (`schema-patching`, `organization-setup`, `schema-creation`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
+- `load_skill` - Load domain-specific workflows (`schema-patching`, `schema-creation`, `python-execution`, `organization-setup`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
 
 **Document Testing:**
 - `generate_mock_pdf` - Generate schema-aware mock PDFs with realistic field values for end-to-end extraction testing
@@ -201,8 +187,6 @@ flowchart TB
 
     subgraph Agent["Rossum Agent (Claude Bedrock)"]
         IT[Internal Tools]
-        DT[Deploy Tools]
-        MT[Spawn MCP Tools]
         SK[Skills System]
     end
 

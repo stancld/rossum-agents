@@ -1,6 +1,6 @@
-"""Rule suggestion tool for the Rossum Agent.
+"""Rule suggestion helpers for the Rossum Agent.
 
-This module provides a tool to get rule suggestions from Rossum's internal API
+This module provides functions to get rule suggestions from Rossum's internal API
 based on natural language descriptions.
 """
 
@@ -10,9 +10,8 @@ import json
 import logging
 
 import httpx
-from anthropic import beta_tool
 
-from rossum_agent.tools.copilot._shared import _json_headers
+from rossum_agent.python_tools.copilot._shared import _json_headers
 from rossum_agent.tools.core import get_context
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,6 @@ def _build_annotation_content_url(api_base_url: str, annotation_id: int) -> str:
     return f"{api_base_url.rstrip('/')}/annotations/{annotation_id}/content"
 
 
-@beta_tool
 def suggest_rule(user_query: str, queue_id: int) -> str:
     """Get an AI-generated rule suggestion (trigger condition + actions) from a natural language description.
 
@@ -93,7 +91,6 @@ def suggest_rule(user_query: str, queue_id: int) -> str:
         return json.dumps({"status": "error", "error": str(e)})
 
 
-@beta_tool
 def evaluate_rules(queue_id: int, annotation_id: int, schema_rules: list[dict]) -> str:
     """Test rules against a real document annotation to preview triggered messages and actions.
 

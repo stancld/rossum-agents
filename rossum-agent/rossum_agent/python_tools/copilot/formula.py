@@ -1,6 +1,6 @@
-"""Formula field suggestion tool for the Rossum Agent.
+"""Formula field suggestion helpers for the Rossum Agent.
 
-This module provides a tool to get formula suggestions from Rossum's internal API
+This module provides functions to get formula suggestions from Rossum's internal API
 for formula fields based on natural language descriptions.
 """
 
@@ -11,9 +11,8 @@ import logging
 import re
 
 import httpx
-from anthropic import beta_tool
 
-from rossum_agent.tools.copilot._shared import _fetch_schema_content, _inject_field_into_schema, _json_headers
+from rossum_agent.python_tools.copilot._shared import _fetch_schema_content, _inject_field_into_schema, _json_headers
 from rossum_agent.tools.core import get_context
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,6 @@ def _create_formula_field_definition(label: str, field_schema_id: str | None = N
     }
 
 
-@beta_tool
 def suggest_formula_field(
     label: str, hint: str, schema_id: int, section_id: str, field_schema_id: str | None = None
 ) -> str:

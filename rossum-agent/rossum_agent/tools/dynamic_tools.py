@@ -79,11 +79,6 @@ def mark_skill_loaded(name: str) -> None:
     state.version += 1
 
 
-def is_skill_loaded(name: str) -> bool:
-    """Check if a skill has been loaded."""
-    return name in get_context().dynamic_tools.loaded_skills
-
-
 def get_tools_version() -> int:
     """Get current tools version for cache invalidation."""
     return get_context().dynamic_tools.version

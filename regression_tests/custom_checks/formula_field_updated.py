@@ -1,9 +1,4 @@
-"""Check that a formula field was updated (not just added) on the schema.
-
-The agent writes schema_v1.json (after adding the formula) and schema_v2.json
-(after updating it). We parse both, find the total_quantity field, and verify
-the formula actually changed.
-"""
+"""Check that a formula field was updated on the schema, not merely created."""
 
 from __future__ import annotations
 
@@ -12,70 +7,98 @@ from typing import TYPE_CHECKING
 
 from rossum_agent.agent.models import ToolResultStep
 
+from regression_tests.custom_checks._utils import create_api_client, extract_datapoints, extract_schema_id_from_steps
+
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
 
 
-def _extract_write_file_content(steps: list[AgentStep], filename: str) -> str | None:
-    """Extract the content argument from a write_file tool call for a given filename."""
+def _extract_subagent_formulas(changes_raw: object, field_id: str) -> list[str]:
+    """Extract formulas from patch_schema_with_subagent changes JSON."""
+    if not isinstance(changes_raw, str):
+        return []
+
+    try:
+        changes = json.loads(changes_raw)
+    except json.JSONDecodeError:
+        return []
+
+    if not isinstance(changes, list):
+        return []
+
+    formulas: list[str] = []
+    for change in changes:
+        if not isinstance(change, dict) or change.get("id") != field_id:
+            continue
+
+        formula = change.get("formula")
+        if isinstance(formula, str) and formula:
+            formulas.append(formula)
+            continue
+
+        field_definition = change.get("field_definition")
+        if isinstance(field_definition, dict):
+            nested_formula = field_definition.get("formula")
+            if isinstance(nested_formula, str) and nested_formula:
+                formulas.append(nested_formula)
+
+    return formulas
+
+
+def _extract_formula_changes(steps: list[AgentStep], field_id: str) -> list[str]:
+    """Collect formulas applied to a field via patch_schema or patch_schema_with_subagent."""
+    formulas: list[str] = []
+
     for step in steps:
         if not isinstance(step, ToolResultStep):
             continue
+
         for tc in step.tool_calls:
-            if tc.name != "write_file":
-                continue
-            if tc.arguments.get("filename", "") == filename:
-                return tc.arguments.get("content")
-    return None
+            if tc.name == "patch_schema":
+                if tc.arguments.get("node_id") != field_id:
+                    continue
+                node_data = tc.arguments.get("node_data")
+                if isinstance(node_data, dict):
+                    formula = node_data.get("formula")
+                    if isinstance(formula, str) and formula:
+                        formulas.append(formula)
+
+            if tc.name == "patch_schema_with_subagent":
+                formulas.extend(_extract_subagent_formulas(tc.arguments.get("changes"), field_id))
+
+    return formulas
 
 
-def _find_field_formula(schema_content: str | dict | list, field_id: str) -> str | None:
-    """Recursively find a field by id in a Rossum schema and return its formula."""
-    if isinstance(schema_content, str):
-        try:
-            schema_content = json.loads(schema_content)
-        except json.JSONDecodeError:
-            return None
+def check_formula_field_updated(steps: list[AgentStep], api_base_url: str, api_token: str) -> tuple[bool, str]:
+    """Verify the total_quantity formula changed between add/update operations."""
+    schema_id = extract_schema_id_from_steps(steps)
+    if not schema_id:
+        return False, "Could not find schema_id in agent steps"
 
-    if isinstance(schema_content, dict):
-        if schema_content.get("id") == field_id:
-            return schema_content.get("formula", "")
-        for value in schema_content.values():
-            result = _find_field_formula(value, field_id)
-            if result is not None:
-                return result
+    formulas = _extract_formula_changes(steps, "total_quantity")
+    if len(formulas) < 2:
+        return False, f"Expected at least 2 formula changes for total_quantity, found {len(formulas)}"
 
-    if isinstance(schema_content, list):
-        for item in schema_content:
-            result = _find_field_formula(item, field_id)
-            if result is not None:
-                return result
+    first_formula = formulas[0]
+    last_formula = formulas[-1]
+    if first_formula == last_formula:
+        return False, f"Formulas are identical — update did not change the formula: {first_formula}"
 
-    return None
+    client = create_api_client(api_base_url, api_token)
+    schema = client.retrieve_schema(schema_id)
+    datapoints = extract_datapoints(schema.content)
+    field = next((dp for dp in datapoints if dp.id == "total_quantity"), None)
+    if field is None:
+        return False, f"total_quantity field not found in schema {schema_id}"
 
+    final_formula = field.formula or ""
+    if not final_formula:
+        return False, "total_quantity field has empty final formula"
 
-def check_formula_field_updated(steps: list[AgentStep], _api_base_url: str, _api_token: str) -> tuple[bool, str]:
-    """Compare schema_v1.json and schema_v2.json to verify the formula was updated."""
-    v1_content = _extract_write_file_content(steps, "schema_v1.json")
-    if v1_content is None:
-        return False, "No write_file call found for schema_v1.json"
+    if final_formula != last_formula:
+        return False, "Final schema formula does not match the last schema patch applied to total_quantity"
 
-    v2_content = _extract_write_file_content(steps, "schema_v2.json")
-    if v2_content is None:
-        return False, "No write_file call found for schema_v2.json"
+    if "all_values" not in final_formula:
+        return False, f"Updated formula does not use all_values: {final_formula}"
 
-    v1_formula = _find_field_formula(v1_content, "total_quantity")
-    if v1_formula is None:
-        return False, "total_quantity field not found in schema_v1.json"
-
-    v2_formula = _find_field_formula(v2_content, "total_quantity")
-    if v2_formula is None:
-        return False, "total_quantity field not found in schema_v2.json"
-
-    if v1_formula == v2_formula:
-        return False, f"Formulas are identical — update did not change the formula: {v1_formula}"
-
-    if "all_values" not in v2_formula:
-        return False, f"Updated formula does not use all_values: {v2_formula}"
-
-    return True, f"Formula updated from '{v1_formula[:80]}...' to '{v2_formula[:80]}...'"
+    return True, f"Formula updated from '{first_formula[:80]}...' to '{final_formula[:80]}...'"

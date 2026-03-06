@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Removed `elis_openapi_grep` and `elis_openapi_jq` as direct agent tools — Elis API reference lookups now route exclusively through the `search_elis_docs` sub-agent ([#220](https://github.com/rossumai/rossum-agents/pull/220))
+- Replaced individual copilot tools (`suggest_formula_field`, `suggest_lookup_field`, `evaluate_lookup_field`, `get_lookup_dataset_raw_values`, `query_lookup_dataset`) with a single `execute_python` tool — copilot functions are now called via Python execution instead of dedicated agent tools [#242](https://github.com/stancld/rossum-agents/pull/242)
 
 ### Removed
 - Removed `rossum-deployment` skill and all deploy/spawn tools — unused and unsolved [#241](https://github.com/stancld/rossum-agents/pull/241)

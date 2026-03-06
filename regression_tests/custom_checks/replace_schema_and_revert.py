@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from regression_tests.custom_checks._utils import agent_called_tool, create_api_client, extract_datapoints
-from regression_tests.custom_checks.replace_schema_with_formula import (
-    _extract_schema_id_from_steps,
+from regression_tests.custom_checks._utils import (
+    agent_called_tool,
+    create_api_client,
+    extract_datapoints,
+    extract_schema_id_from_steps,
 )
 
 if TYPE_CHECKING:
@@ -18,7 +20,7 @@ def check_schema_replaced_and_reverted(steps: list[AgentStep], api_base_url: str
     if not agent_called_tool(steps, "revert_commit"):
         return False, "Agent never called revert_commit"
 
-    if not (schema_id := _extract_schema_id_from_steps(steps)):
+    if not (schema_id := extract_schema_id_from_steps(steps)):
         return False, "Could not find schema_id in agent steps"
 
     client = create_api_client(api_base_url, api_token)

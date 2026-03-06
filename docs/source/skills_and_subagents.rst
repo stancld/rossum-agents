@@ -111,6 +111,13 @@ Schema Creation Skill
        requirements="Describe sections, fields, and tables needed"
    )
 
+Python Execution Skill
+""""""""""""""""""""""
+
+**Goal**: Use constrained Python snippets for MCP result transformation, schema export/edit flows, and Rossum copilot helpers.
+
+This skill is the canonical place for Python helper availability. Load it before using Python snippets for Rossum-specific work.
+
 UI Settings Skill
 """""""""""""""""
 
@@ -425,10 +432,12 @@ Load with ``load_skill(name="lookup-fields")`` when configuring or debugging loo
 
 Key workflow:
 
-1. ``suggest_lookup_field`` for matching config
-2. ``evaluate_lookup_field`` on real annotations — do not write to schema until this passes
+1. ``execute_python`` for matching config generation
+2. ``execute_python`` for evaluation on real annotations — do not write to schema until this passes
 3. ``patch_schema_with_subagent`` to apply it
-4. ``get_lookup_dataset_raw_values`` + ``query_lookup_dataset`` for unmatched or ambiguous results, then re-call ``suggest_lookup_field`` with corrected hints
+4. ``execute_python`` for dataset inspection and refinement, then regenerate the matching config if needed
+
+When ``execute_python`` produces bulky structured data during these flows, save it with ``write_file(...)`` instead of returning the full payload inline.
 
 Schema Patching Sub-Agent
 ^^^^^^^^^^^^^^^^^^^^^^^^^

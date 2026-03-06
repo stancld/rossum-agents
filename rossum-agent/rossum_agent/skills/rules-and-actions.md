@@ -1,25 +1,29 @@
 # Rules & Actions Skill
 
-**Goal**: Translate user-described validations into Rossum rules via `suggest_rule` → `create_rule`.
+**Goal**: Translate user-described validations into Rossum rules via `execute_python` helper → `create_rule`.
 
-## Workflow
+## Creating Rules
 
-Call `suggest_rule(user_query, queue_id)`, then `create_rule(...)` immediately with the returned values — no confirmation needed.
+Always use `execute_python` with `suggest_rule` to generate rules — never hand-write trigger conditions or actions.
 
-If the user asks to test a rule, call `evaluate_rules(queue_id, annotation_id, schema_rules)` to preview which actions would trigger.
-`evaluate_rules` requires an existing annotation in the queue — upload documents first if none exist:
-1. Fetch schema fields (`get(entity="schema", id=schema_id)`)
-2. Generate test PDFs (`generate_mock_pdf` with `overrides` to control field values)
-3. Upload each PDF (`upload_document`)
-4. Call `evaluate_rules` with the returned annotation IDs
+```python
+result = suggest_rule(
+    user_query='Show error on amount_total when >= 400. Message: "Total exceeds 400."',
+    queue_id=2519495,
+)
+```
 
-**Example query**: `'Show error on amount_total when >= 400. Message: "Total exceeds 400."'`
+Then apply immediately with `create_rule` — no confirmation needed.
+
+## Testing Rules
+
+To preview which actions would trigger, call `execute_python` with `evaluate_rules(queue_id, annotation_id, schema_rules)`. Requires an existing annotation — if none exist, upload test documents first via `generate_mock_pdf` + `upload_document`.
 
 ## Constraints
 
 | Constraint | Detail |
 |------------|--------|
-| `suggest_rule` before `create_rule` | Never hand-write trigger conditions or actions |
-| One call per check | One `suggest_rule` + one `create_rule` per independent validation |
-| Concise `user_query` | Field, condition, error message — one sentence, no elaboration |
+| No hand-written rules | Always generate via `suggest_rule` |
+| One rule per check | One `suggest_rule` + one `create_rule` per independent validation |
+| Concise `user_query` | Field, condition, error message — one sentence |
 | `queue_ids` required | Scope every rule to at least one queue |

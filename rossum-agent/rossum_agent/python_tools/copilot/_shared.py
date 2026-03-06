@@ -1,4 +1,4 @@
-"""Shared helpers for copilot tools (formula, lookup, rule)."""
+"""Shared helpers for copilot functions (formula, lookup, rule)."""
 
 from __future__ import annotations
 

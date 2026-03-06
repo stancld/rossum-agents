@@ -2,42 +2,17 @@
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
-from rossum_agent.agent.models import ToolResultStep
-
-from regression_tests.custom_checks._utils import create_api_client, extract_datapoints, get_final_answer
+from regression_tests.custom_checks._utils import create_api_client, extract_datapoints, extract_schema_id_from_steps
 
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
 
 
-def _extract_schema_id_from_steps(steps: list[AgentStep]) -> int | None:
-    """Extract schema_id from create_queue_from_template result or final answer."""
-    for step in steps:
-        if not isinstance(step, ToolResultStep):
-            continue
-        for tc in step.tool_calls:
-            if tc.name == "create_queue_from_template":
-                for tr in step.tool_results:
-                    if tr.tool_call_id == tc.id and isinstance(tr.content, str):
-                        match = re.search(r'"schema_id":\s*(\d+)', tr.content)
-                        if match:
-                            return int(match.group(1))
-
-    # Fallback: extract from final answer
-    if final_answer := get_final_answer(steps):
-        match = re.search(r"\b(\d{5,})\b", final_answer)
-        if match:
-            return int(match.group(1))
-
-    return None
-
-
 def check_schema_replaced_with_formula(steps: list[AgentStep], api_base_url: str, api_token: str) -> tuple[bool, str]:
     """Verify schema contains only a single formula field with the expected constant."""
-    schema_id = _extract_schema_id_from_steps(steps)
+    schema_id = extract_schema_id_from_steps(steps)
     if not schema_id:
         return False, "Could not find schema_id in agent steps"
 

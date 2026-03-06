@@ -194,5 +194,6 @@ Optional `ui_configuration` controls field behavior:
 
 ## Cross-Reference
 
+- Python snippets and helper catalog: load `python-execution` skill
 - Modify existing schemas: load `schema-patching` skill
 - Schema customization during queue setup: load `organization-setup` skill

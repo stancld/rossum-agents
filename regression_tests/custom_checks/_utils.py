@@ -72,6 +72,30 @@ def extract_id_from_final_answer(steps: list[AgentStep]) -> str | None:
     return None
 
 
+def extract_schema_id_from_steps(steps: list[AgentStep]) -> int | None:
+    """Extract schema_id from queue creation output or final answer."""
+    for step in steps:
+        if not isinstance(step, ToolResultStep):
+            continue
+        for tc in step.tool_calls:
+            if tc.name != "create_queue_from_template":
+                continue
+            for tr in step.tool_results:
+                if tr.tool_call_id != tc.id or not isinstance(tr.content, str):
+                    continue
+                # Queue result has "schema": "https://.../schemas/12345" (URL, not schema_id int)
+                match = re.search(r"/schemas/(\d+)", tr.content)
+                if match:
+                    return int(match.group(1))
+
+    if final_answer := get_final_answer(steps):
+        match = re.search(r"\b(\d{5,})\b", final_answer)
+        if match:
+            return int(match.group(1))
+
+    return None
+
+
 def agent_called_tool(steps: list[AgentStep], tool_name: str) -> bool:
     """Check if a tool was called in any step."""
     return any(tc.name == tool_name for step in steps if isinstance(step, ToolResultStep) for tc in step.tool_calls)

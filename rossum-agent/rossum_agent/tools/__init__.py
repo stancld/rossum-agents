@@ -19,26 +19,17 @@ from rossum_agent.tools.change_history import (
     show_commit_details,
     show_entity_history,
 )
-from rossum_agent.tools.copilot import (
-    evaluate_lookup_field,
-    evaluate_rules,
-    get_lookup_dataset_raw_values,
-    query_lookup_dataset,
-    suggest_formula_field,
-    suggest_lookup_field,
-    suggest_rule,
-)
 from rossum_agent.tools.core import get_context
 from rossum_agent.tools.data_tools import run_grep, run_jq
 from rossum_agent.tools.dynamic_tools import (
     get_load_tool_category_definition,
     get_load_tool_definition,
-    is_skill_loaded,
     load_tool,
     load_tool_category,
 )
 from rossum_agent.tools.file_tools import write_file
 from rossum_agent.tools.mock_pdf import generate_mock_pdf
+from rossum_agent.tools.python_exec import execute_python, get_execute_python_definition
 from rossum_agent.tools.skills import load_skill
 from rossum_agent.tools.subagents import patch_schema_with_subagent, search_elis_docs, search_knowledge_base
 from rossum_agent.tools.task_tracker import create_task, list_tasks, update_task
@@ -60,17 +51,7 @@ _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     run_jq,
     run_grep,
     generate_mock_pdf,
-]
-
-_FORMULA_TOOLS: list[BetaTool[..., str]] = [
-    suggest_formula_field,
-]
-
-_LOOKUP_TOOLS: list[BetaTool[..., str]] = [
-    suggest_lookup_field,
-    evaluate_lookup_field,
-    get_lookup_dataset_raw_values,
-    query_lookup_dataset,
+    execute_python,
 ]
 
 _CHANGE_HISTORY_TOOLS: list[BetaTool[..., str]] = [
@@ -81,33 +62,29 @@ _CHANGE_HISTORY_TOOLS: list[BetaTool[..., str]] = [
     restore_entity_version,
 ]
 
-_RULES_TOOLS: list[BetaTool[..., str]] = [
-    suggest_rule,
-    evaluate_rules,
-]
-
 _INTERNAL_TOOL_REGISTRY: dict[str, BetaTool[..., str]] = {
-    t.name: t for t in (_ALWAYS_INTERNAL_TOOLS + _FORMULA_TOOLS + _LOOKUP_TOOLS + _CHANGE_HISTORY_TOOLS + _RULES_TOOLS)
+    t.name: t for t in (_ALWAYS_INTERNAL_TOOLS + _CHANGE_HISTORY_TOOLS)
 }
 
 
 def _get_active_internal_tools() -> list[BetaTool[..., str]]:
     """Get internal tools based on loaded skills."""
     tools = _ALWAYS_INTERNAL_TOOLS
-    if is_skill_loaded("formula-fields"):
-        tools = tools + _FORMULA_TOOLS
-    if is_skill_loaded("lookup-fields"):
-        tools = tools + _LOOKUP_TOOLS
     if get_context().commit_store is not None:
         tools = tools + _CHANGE_HISTORY_TOOLS
-    if is_skill_loaded("rules-and-actions"):
-        tools = tools + _RULES_TOOLS
     return tools
 
 
 def get_internal_tools() -> list[ToolParam]:
     """Get internal tools in Anthropic format (deployment tools only when skill is loaded)."""
-    return [tool.to_dict() for tool in _get_active_internal_tools()] + [
+    visible_tools: list[ToolParam] = []
+    for tool in _get_active_internal_tools():
+        if tool.name == "execute_python":
+            visible_tools.append(get_execute_python_definition())
+        else:
+            visible_tools.append(tool.to_dict())
+    return [
+        *visible_tools,
         get_load_tool_category_definition(),
         get_load_tool_definition(),
         get_ask_user_question_definition(),
@@ -116,7 +93,11 @@ def get_internal_tools() -> list[ToolParam]:
 
 def get_internal_tool_names() -> set[str]:
     """Get names of all executable internal tools (always includes all for dispatch)."""
-    return set(_INTERNAL_TOOL_REGISTRY.keys()) | {"load_tool_category", "load_tool", "ask_user_question"}
+    return set(_INTERNAL_TOOL_REGISTRY.keys()) | {
+        "load_tool_category",
+        "load_tool",
+        "ask_user_question",
+    }
 
 
 def execute_internal_tool(name: str, arguments: dict[str, object]) -> str:
@@ -165,7 +146,7 @@ def execute_tool(name: str, arguments: dict[str, object], tools: list[BetaTool[.
     raise ValueError(f"Unknown tool: {name}")
 
 
-INTERNAL_TOOLS = _ALWAYS_INTERNAL_TOOLS + _FORMULA_TOOLS + _LOOKUP_TOOLS + _CHANGE_HISTORY_TOOLS + _RULES_TOOLS
+INTERNAL_TOOLS = _ALWAYS_INTERNAL_TOOLS + _CHANGE_HISTORY_TOOLS
 
 __all__ = [
     "INTERNAL_TOOLS",
