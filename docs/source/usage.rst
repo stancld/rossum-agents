@@ -1311,17 +1311,17 @@ Use after ``kb_grep`` to read the complete content of a specific article.
 search_knowledge_base
 """""""""""""""""""""
 
-Search the Rossum Knowledge Base using an Opus sub-agent for complex questions requiring multiple lookups.
+Search the Rossum Knowledge Base with a retrieve-first flow.
 
-The sub-agent iterates through pre-scraped KB articles using ``kb_grep`` and ``kb_get_article`` to find comprehensive answers. Use for complex questions; for quick lookups, use ``kb_grep`` and ``kb_get_article`` directly.
+The tool ranks pre-scraped KB articles locally using slug, title, and content matches. When there is a clear best article, it returns structured JSON immediately. Only ambiguous queries fall back to the Opus sub-agent for multi-step synthesis.
 
 **Parameters:**
 
 - ``query`` (string, required): Search query. Be specific - include extension names, error messages,
   or feature names. Examples: 'document splitting extension', 'duplicate handling configuration',
   'webhook timeout error'.
-- ``user_query`` (string, optional): The original user question for context. Pass the user's full
-  question here so the sub-agent can tailor the analysis to address their specific needs.
+- ``user_query`` (string, optional): The original user question for context. Used for ranking and,
+  on ambiguous queries, passed to the fallback sub-agent.
 
 **Returns:**
 
@@ -1329,11 +1329,31 @@ The sub-agent iterates through pre-scraped KB articles using ``kb_grep`` and ``k
 
    {
      "status": "success",
-     "answer": "## Document Splitting Extension\n\nThe document splitting extension...",
-     "iterations": 2,
-     "input_tokens": 1500,
-     "output_tokens": 800,
-     "searches": [{"tool": "kb_grep", "input": {"pattern": "splitting"}}]
+     "strategy": "direct_lookup",
+     "answer": "Found best matching article 'Document Splitting Extension' (https://knowledge-base.rossum.ai/docs/document-splitting-extension). Use selected_article.content for the full article.",
+     "iterations": 0,
+     "input_tokens": 0,
+     "output_tokens": 0,
+     "candidates": [
+       {
+         "slug": "document-splitting-extension",
+         "title": "Document Splitting Extension",
+         "url": "https://knowledge-base.rossum.ai/docs/document-splitting-extension",
+         "score": 320,
+         "match_reasons": ["slug_contains", "title_contains"],
+         "excerpt": "..."
+       }
+     ],
+     "selected_article": {
+       "slug": "document-splitting-extension",
+       "title": "Document Splitting Extension",
+       "url": "https://knowledge-base.rossum.ai/docs/document-splitting-extension",
+       "score": 320,
+       "match_reasons": ["slug_contains", "title_contains"],
+       "excerpt": "...",
+       "content": "# Document Splitting Extension\n\nSplit documents into multiple pages...",
+       "content_truncated": false
+     }
    }
 
 Hook Testing Tools (MCP)

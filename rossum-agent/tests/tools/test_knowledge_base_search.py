@@ -212,6 +212,49 @@ class TestKbGrep:
             assert parsed["matches"] == _GREP_MATCH_LIMIT + 50
             assert len(parsed["result"]) <= _GREP_MATCH_LIMIT
 
+    def test_spillover_populated_on_match(self, populated_cache):
+        """Test that spillover is populated with full results."""
+        import rossum_agent.tools.subagents.knowledge_base as kb_mod
+
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
+            kb_grep("webhook")
+            assert len(kb_mod._spillover) >= 1
+            assert any(m["slug"] == "webhook-configuration" for m in kb_mod._spillover)
+
+    def test_spillover_cleared_on_no_match(self, populated_cache):
+        """Test that spillover is cleared when no matches found."""
+        import rossum_agent.tools.subagents.knowledge_base as kb_mod
+
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
+            kb_grep("zzz_nonexistent_zzz")
+            assert kb_mod._spillover == []
+
+    def test_spillover_has_all_matches_before_truncation(self, cache_path):
+        """Test that spillover retains all matches even when output is truncated."""
+        import rossum_agent.tools.subagents.knowledge_base as kb_mod
+
+        articles = [
+            {
+                "slug": f"article-{i}",
+                "url": f"https://kb.example.com/docs/article-{i}",
+                "title": f"Article {i} about testing",
+                "content": f"Content about testing article {i}",
+            }
+            for i in range(_GREP_MATCH_LIMIT + 50)
+        ]
+        data = {"scraped_at": "2026-01-01T00:00:00Z", "articles": articles}
+        cache_path.write_text(json.dumps(data))
+        cache = KBCache(cache_path=cache_path)
+
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", cache):
+            result = kb_grep("testing")
+            parsed = json.loads(result)
+
+            # Output is truncated
+            assert len(parsed["result"]) <= _GREP_MATCH_LIMIT
+            # But spillover has everything
+            assert len(kb_mod._spillover) == _GREP_MATCH_LIMIT + 50
+
     def test_load_error(self, tmp_path):
         """Test error when KB data can't be loaded."""
         cache = KBCache(cache_path=tmp_path / "nonexistent.json")

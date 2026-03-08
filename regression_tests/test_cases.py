@@ -195,7 +195,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=150000),
         success_criteria=SuccessCriteria(
-            require_subagent=True,
+            require_subagent=None,
             required_keywords=[],
             max_steps=6,
             file_expectation=FileExpectation(expected_files=["roast.md"], allow_extra=True),

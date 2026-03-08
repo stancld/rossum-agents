@@ -368,16 +368,16 @@ The agent also exposes the underlying search tools directly for quick lookups wi
       elis_openapi_grep(pattern="pagination")
       elis_openapi_grep(pattern="annotation_status")
 
-Knowledge Base Sub-Agent
-^^^^^^^^^^^^^^^^^^^^^^^^
+Knowledge Base Search
+^^^^^^^^^^^^^^^^^^^^^
 
-Invoked via the ``search_knowledge_base`` tool. Iterates through pre-scraped Knowledge Base articles using ``kb_grep`` and ``kb_get_article`` tools.
+Invoked via the ``search_knowledge_base`` tool. It ranks pre-scraped Knowledge Base articles locally first, then falls back to the sub-agent only when the query is ambiguous.
 
 **Capabilities:**
 
-- Searches pre-scraped KB articles by keyword/regex (``kb_grep``)
-- Retrieves full article content by slug (``kb_get_article``)
-- Opus synthesizes actionable answers from multiple articles
+- Deterministically ranks pre-scraped KB articles by slug, recovered title, and content matches
+- Returns structured JSON with ranked candidates and the selected article on high-confidence lookups
+- Falls back to Opus only for ambiguous queries that genuinely need multiple lookups
 - Articles cached locally with 24-hour TTL from S3-hosted JSON
 
 **Direct search tools** (available without sub-agent overhead):
@@ -398,7 +398,7 @@ Invoked via the ``search_knowledge_base`` tool. Iterates through pre-scraped Kno
       kb_get_article(slug="document-splitting-extension")
       kb_get_article(slug="webhook")
 
-**Sub-agent usage** (for complex questions requiring multiple lookups):
+**Ambiguous-query fallback** (only when deterministic ranking is not decisive):
 
 .. code-block:: python
 
@@ -409,10 +409,10 @@ Invoked via the ``search_knowledge_base`` tool. Iterates through pre-scraped Kno
 
 Returns JSON with:
 
-- Synthesized answer from Opus
-- Number of iterations used
-- Token usage (input/output)
-- List of searches performed
+- Retrieval strategy (``direct_lookup`` or ``sub_agent_fallback``)
+- Ranked candidate articles
+- Selected article content on the fast path
+- Token usage and tool searches when the sub-agent fallback runs
 
 Lookup Fields Skill
 ^^^^^^^^^^^^^^^^^^^
