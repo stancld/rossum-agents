@@ -99,9 +99,9 @@ class TestKnowledgeBaseSubAgent:
 
         with patch(f"{_AGENT_MOD}.run_jq") as mock_run_jq:
             mock_run_jq.return_value = json.dumps({"status": "success", "result": "content"})
-            result = agent.execute_tool("run_jq", {"jq_query": ".content", "data": "/tmp/article.json"})
+            result = agent.execute_tool("run_jq", {"jq_query": ".content", "data": "/data/article.json"})
 
-            mock_run_jq.assert_called_once_with(".content", "/tmp/article.json")
+            mock_run_jq.assert_called_once_with(".content", "/data/article.json")
             parsed = json.loads(result)
             assert parsed["status"] == "success"
 
@@ -323,7 +323,7 @@ class TestSearchKnowledgeBaseTool:
                 f"{_AGENT_MOD}.persist_article_payload",
                 return_value={
                     "status": "success",
-                    "path": "/tmp/knowledge-base-document-splitting-extension.json",
+                    "path": "/data/knowledge-base-document-splitting-extension.json",
                     "jq_hint": ".content",
                 },
             ),
@@ -342,7 +342,7 @@ class TestSearchKnowledgeBaseTool:
             assert parsed["input_tokens"] == 100
             assert parsed["output_tokens"] == 50
             assert "searches" in parsed
-            assert parsed["selected_article_path"] == "/tmp/knowledge-base-document-splitting-extension.json"
+            assert parsed["selected_article_path"] == "/data/knowledge-base-document-splitting-extension.json"
             assert parsed["selected_article_jq_hint"] == ".content"
 
     def test_user_query_appended_to_prompt(self):

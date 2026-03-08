@@ -379,7 +379,7 @@ class TestBuildDirectResult:
         candidate = rank_article(article, "document splitting")
         candidates = [candidate]
 
-        file_result = json.dumps({"status": "success", "path": "/tmp/knowledge-base-doc-splitting.json"})
+        file_result = json.dumps({"status": "success", "path": "/data/knowledge-base-doc-splitting.json"})
         with patch(f"{_RANKING_MOD}.write_file", return_value=file_result) as mock_write:
             result = json.loads(build_direct_result("document splitting", None, candidates))
 
@@ -409,7 +409,7 @@ class TestBuildDirectResult:
         articles = [_article(f"article-{i}") for i in range(10)]
         candidates = [rank_article(a, "article") for a in articles]
 
-        file_result = json.dumps({"status": "success", "path": "/tmp/test.json"})
+        file_result = json.dumps({"status": "success", "path": "/data/test.json"})
         with patch(f"{_RANKING_MOD}.write_file", return_value=file_result):
             result = json.loads(build_direct_result("article", None, candidates))
 

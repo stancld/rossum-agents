@@ -256,7 +256,7 @@ class TestKbGetArticle:
             patch(f"{_TOOLS_MOD}.cache", populated_cache),
             patch(
                 f"{_TOOLS_MOD}.persist_article_payload",
-                return_value={"status": "success", "path": "/tmp/document-splitting.json", "jq_hint": ".content"},
+                return_value={"status": "success", "path": "/data/document-splitting.json", "jq_hint": ".content"},
             ),
         ):
             result = kb_get_article("document-splitting-extension")
@@ -265,7 +265,7 @@ class TestKbGetArticle:
             assert parsed["status"] == "success"
             assert parsed["slug"] == "document-splitting-extension"
             assert parsed["title"] == "Document Splitting Extension"
-            assert parsed["article_path"] == "/tmp/document-splitting.json"
+            assert parsed["article_path"] == "/data/document-splitting.json"
             assert parsed["article_jq_hint"] == ".content"
             assert "content" not in parsed
 
@@ -274,7 +274,7 @@ class TestKbGetArticle:
             patch(f"{_TOOLS_MOD}.cache", populated_cache),
             patch(
                 f"{_TOOLS_MOD}.persist_article_payload",
-                return_value={"status": "success", "path": "/tmp/document-splitting.json", "jq_hint": ".content"},
+                return_value={"status": "success", "path": "/data/document-splitting.json", "jq_hint": ".content"},
             ),
         ):
             result = kb_get_article("splitting")
@@ -288,7 +288,7 @@ class TestKbGetArticle:
             patch(f"{_TOOLS_MOD}.cache", populated_cache),
             patch(
                 f"{_TOOLS_MOD}.persist_article_payload",
-                return_value={"status": "success", "path": "/tmp/webhook.json", "jq_hint": ".content"},
+                return_value={"status": "success", "path": "/data/webhook.json", "jq_hint": ".content"},
             ),
         ):
             result = kb_get_article("WEBHOOK")
@@ -401,7 +401,7 @@ class TestKbGetArticle:
             patch(f"{_TOOLS_MOD}.cache", cache),
             patch(
                 f"{_TOOLS_MOD}.persist_article_payload",
-                return_value={"status": "success", "path": "/tmp/webhook.json", "jq_hint": ".content"},
+                return_value={"status": "success", "path": "/data/webhook.json", "jq_hint": ".content"},
             ),
         ):
             result = kb_get_article("webhook")
@@ -445,7 +445,7 @@ class TestRealKBData:
             patch(f"{_TOOLS_MOD}.cache", real_kb_cache),
             patch(
                 f"{_TOOLS_MOD}.persist_article_payload",
-                return_value={"status": "success", "path": "/tmp/document-splitting.json", "jq_hint": ".content"},
+                return_value={"status": "success", "path": "/data/document-splitting.json", "jq_hint": ".content"},
             ),
         ):
             result = kb_get_article("document-splitting-extension")
@@ -453,14 +453,14 @@ class TestRealKBData:
 
             assert parsed["status"] == "success"
             assert parsed["slug"] == "document-splitting-extension"
-            assert parsed["article_path"] == "/tmp/document-splitting.json"
+            assert parsed["article_path"] == "/data/document-splitting.json"
 
     def test_get_article_by_partial_slug(self, real_kb_cache):
         with (
             patch(f"{_TOOLS_MOD}.cache", real_kb_cache),
             patch(
                 f"{_TOOLS_MOD}.persist_article_payload",
-                return_value={"status": "success", "path": "/tmp/formula-fields.json", "jq_hint": ".content"},
+                return_value={"status": "success", "path": "/data/formula-fields.json", "jq_hint": ".content"},
             ),
         ):
             result = kb_get_article("formula-fields")
