@@ -391,7 +391,7 @@ Invoked via the ``search_knowledge_base`` tool. It ranks pre-scraped Knowledge B
       kb_grep(pattern="webhook|email_template")
 
 ``kb_get_article(slug)``
-   Retrieve full article content by slug. Supports partial match.
+   Persist the full article JSON by slug and return a filesystem path for follow-up ``run_jq`` queries. Supports partial match.
 
    .. code-block:: python
 
@@ -411,7 +411,7 @@ Returns JSON with:
 
 - Retrieval strategy (``direct_lookup`` or ``sub_agent_fallback``)
 - Ranked candidate articles
-- Selected article path on the fast path for follow-up ``run_jq`` queries
+- Selected article path whenever a concrete article is identified, for follow-up ``run_jq`` queries
 - Token usage and tool searches when the sub-agent fallback runs
 
 Lookup Fields Skill

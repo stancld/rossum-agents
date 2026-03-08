@@ -33,8 +33,9 @@ class TestConstants:
         tool_names = [t["name"] for t in _TOOLS]
         assert "kb_grep" in tool_names
         assert "kb_get_article" in tool_names
+        assert "run_jq" in tool_names
         assert "kb_python_exec" in tool_names
-        assert len(tool_names) == 3
+        assert len(tool_names) == 4
 
     def test_tool_result_limits(self):
         assert _TOOL_RESULT_LIMIT > 0
@@ -58,7 +59,7 @@ class TestKnowledgeBaseSubAgent:
 
         assert agent.config.tool_name == "search_knowledge_base"
         assert agent.config.max_iterations == 4
-        assert len(agent.config.tools) == 3
+        assert len(agent.config.tools) == 4
 
     def test_execute_tool_kb_grep(self):
         agent = KnowledgeBaseSubAgent()
@@ -90,6 +91,17 @@ class TestKnowledgeBaseSubAgent:
             result = agent.execute_tool("kb_python_exec", {"code": "1 + 1"})
 
             mock_exec.assert_called_once_with("1 + 1")
+            parsed = json.loads(result)
+            assert parsed["status"] == "success"
+
+    def test_execute_tool_run_jq(self):
+        agent = KnowledgeBaseSubAgent()
+
+        with patch(f"{_AGENT_MOD}.run_jq") as mock_run_jq:
+            mock_run_jq.return_value = json.dumps({"status": "success", "result": "content"})
+            result = agent.execute_tool("run_jq", {"jq_query": ".content", "data": "/tmp/article.json"})
+
+            mock_run_jq.assert_called_once_with(".content", "/tmp/article.json")
             parsed = json.loads(result)
             assert parsed["status"] == "success"
 
@@ -284,13 +296,37 @@ class TestSearchKnowledgeBaseTool:
             input_tokens=100,
             output_tokens=50,
             iterations_used=2,
-            tool_calls=[{"tool": "kb_grep", "input": {"pattern": "splitting"}}],
+            tool_calls=[
+                {"tool": "kb_grep", "input": {"pattern": "splitting"}},
+                {"tool": "kb_get_article", "input": {"slug": "document-splitting-extension"}},
+            ],
         )
 
         with (
             patch(f"{_AGENT_MOD}.KnowledgeBaseSubAgent") as mock_cls,
             patch(f"{_AGENT_MOD}.find_ranked_articles", return_value=[]),
             patch(f"{_AGENT_MOD}.is_high_confidence_match", return_value=False),
+            patch(
+                f"{_AGENT_MOD}.cache.load",
+                return_value={
+                    "articles": [
+                        {
+                            "slug": "document-splitting-extension",
+                            "title": "Document Splitting Extension",
+                            "url": "https://kb.example/doc-splitting",
+                            "content": "Document splitting details",
+                        }
+                    ]
+                },
+            ),
+            patch(
+                f"{_AGENT_MOD}.persist_article_payload",
+                return_value={
+                    "status": "success",
+                    "path": "/tmp/knowledge-base-document-splitting-extension.json",
+                    "jq_hint": ".content",
+                },
+            ),
             patch("rossum_agent.tools.subagents.base.create_bedrock_client"),
         ):
             mock_instance = MagicMock()
@@ -306,6 +342,8 @@ class TestSearchKnowledgeBaseTool:
             assert parsed["input_tokens"] == 100
             assert parsed["output_tokens"] == 50
             assert "searches" in parsed
+            assert parsed["selected_article_path"] == "/tmp/knowledge-base-document-splitting-extension.json"
+            assert parsed["selected_article_jq_hint"] == ".content"
 
     def test_user_query_appended_to_prompt(self):
         mock_result = SubAgentResult(

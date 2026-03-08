@@ -252,17 +252,31 @@ class TestKbGetArticle:
     """Test kb_get_article tool."""
 
     def test_exact_slug_match(self, populated_cache):
-        with patch(f"{_TOOLS_MOD}.cache", populated_cache):
+        with (
+            patch(f"{_TOOLS_MOD}.cache", populated_cache),
+            patch(
+                f"{_TOOLS_MOD}.persist_article_payload",
+                return_value={"status": "success", "path": "/tmp/document-splitting.json", "jq_hint": ".content"},
+            ),
+        ):
             result = kb_get_article("document-splitting-extension")
             parsed = json.loads(result)
 
             assert parsed["status"] == "success"
             assert parsed["slug"] == "document-splitting-extension"
             assert parsed["title"] == "Document Splitting Extension"
-            assert "Split documents" in parsed["content"]
+            assert parsed["article_path"] == "/tmp/document-splitting.json"
+            assert parsed["article_jq_hint"] == ".content"
+            assert "content" not in parsed
 
     def test_partial_slug_match(self, populated_cache):
-        with patch(f"{_TOOLS_MOD}.cache", populated_cache):
+        with (
+            patch(f"{_TOOLS_MOD}.cache", populated_cache),
+            patch(
+                f"{_TOOLS_MOD}.persist_article_payload",
+                return_value={"status": "success", "path": "/tmp/document-splitting.json", "jq_hint": ".content"},
+            ),
+        ):
             result = kb_get_article("splitting")
             parsed = json.loads(result)
 
@@ -270,7 +284,13 @@ class TestKbGetArticle:
             assert parsed["slug"] == "document-splitting-extension"
 
     def test_case_insensitive_partial_match(self, populated_cache):
-        with patch(f"{_TOOLS_MOD}.cache", populated_cache):
+        with (
+            patch(f"{_TOOLS_MOD}.cache", populated_cache),
+            patch(
+                f"{_TOOLS_MOD}.persist_article_payload",
+                return_value={"status": "success", "path": "/tmp/webhook.json", "jq_hint": ".content"},
+            ),
+        ):
             result = kb_get_article("WEBHOOK")
             parsed = json.loads(result)
 
@@ -285,7 +305,7 @@ class TestKbGetArticle:
             assert parsed["status"] == "error"
             assert "No article found" in parsed["message"]
 
-    def test_content_truncation(self, cache_path):
+    def test_inline_fallback_when_persistence_fails(self, cache_path):
         long_content = "x" * (_ARTICLE_OUTPUT_LIMIT + 1000)
         data = {
             "scraped_at": "2026-01-01T00:00:00Z",
@@ -301,11 +321,19 @@ class TestKbGetArticle:
         cache_path.write_text(json.dumps(data))
         cache = KBCache(cache_path=cache_path)
 
-        with patch(f"{_TOOLS_MOD}.cache", cache):
+        with (
+            patch(f"{_TOOLS_MOD}.cache", cache),
+            patch(
+                f"{_TOOLS_MOD}.persist_article_payload",
+                return_value={"status": "error", "error": {"status": "error", "message": "disk full"}},
+            ),
+        ):
             result = kb_get_article("long-article")
             parsed = json.loads(result)
 
             assert parsed["status"] == "success"
+            assert "article_error" in parsed
+            assert "inline content fallback" in parsed["message"]
             assert len(parsed["content"]) <= _ARTICLE_OUTPUT_LIMIT + 50
             assert parsed["content"].endswith("... (truncated)")
 
@@ -369,7 +397,13 @@ class TestKbGetArticle:
         cache_path.write_text(json.dumps(data))
         cache = KBCache(cache_path=cache_path)
 
-        with patch(f"{_TOOLS_MOD}.cache", cache):
+        with (
+            patch(f"{_TOOLS_MOD}.cache", cache),
+            patch(
+                f"{_TOOLS_MOD}.persist_article_payload",
+                return_value={"status": "success", "path": "/tmp/webhook.json", "jq_hint": ".content"},
+            ),
+        ):
             result = kb_get_article("webhook")
             parsed = json.loads(result)
 
@@ -407,16 +441,28 @@ class TestRealKBData:
             assert parsed["matches"] >= 1
 
     def test_get_article_by_exact_slug(self, real_kb_cache):
-        with patch(f"{_TOOLS_MOD}.cache", real_kb_cache):
+        with (
+            patch(f"{_TOOLS_MOD}.cache", real_kb_cache),
+            patch(
+                f"{_TOOLS_MOD}.persist_article_payload",
+                return_value={"status": "success", "path": "/tmp/document-splitting.json", "jq_hint": ".content"},
+            ),
+        ):
             result = kb_get_article("document-splitting-extension")
             parsed = json.loads(result)
 
             assert parsed["status"] == "success"
             assert parsed["slug"] == "document-splitting-extension"
-            assert len(parsed["content"]) > 100
+            assert parsed["article_path"] == "/tmp/document-splitting.json"
 
     def test_get_article_by_partial_slug(self, real_kb_cache):
-        with patch(f"{_TOOLS_MOD}.cache", real_kb_cache):
+        with (
+            patch(f"{_TOOLS_MOD}.cache", real_kb_cache),
+            patch(
+                f"{_TOOLS_MOD}.persist_article_payload",
+                return_value={"status": "success", "path": "/tmp/formula-fields.json", "jq_hint": ".content"},
+            ),
+        ):
             result = kb_get_article("formula-fields")
             parsed = json.loads(result)
 

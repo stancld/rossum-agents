@@ -8,12 +8,16 @@ from typing import TYPE_CHECKING
 
 from anthropic import beta_tool
 
+from rossum_agent.tools.data_tools import run_jq
 from rossum_agent.tools.subagents.base import SubAgent, SubAgentConfig
+from rossum_agent.tools.subagents.knowledge_base.cache import cache
 from rossum_agent.tools.subagents.knowledge_base.ranking import (
     _DIRECT_CANDIDATE_LIMIT,
+    build_article_payload,
     build_direct_result,
     find_ranked_articles,
     is_high_confidence_match,
+    persist_article_payload,
     serialize_ranked_candidate,
 )
 from rossum_agent.tools.subagents.knowledge_base.tools import (
@@ -21,6 +25,7 @@ from rossum_agent.tools.subagents.knowledge_base.tools import (
     kb_get_article,
     kb_grep,
     kb_python_exec,
+    resolve_article_by_slug,
 )
 
 if TYPE_CHECKING:
@@ -37,7 +42,8 @@ _SYSTEM_PROMPT = """Goal: Find and synthesize Rossum Knowledge Base articles to 
 
 | Tool | Use for |
 |------|---------|\n| `kb_grep` | Discover articles by keyword/regex. Large results spill over automatically. |
-| `kb_get_article` | Read full article content by slug. |
+| `kb_get_article` | Persist an article JSON by slug and return `article_path` for follow-up jq queries. |
+| `run_jq` | Inspect persisted article JSON, usually `run_jq(".content", article_path)`. |
 | `kb_python_exec` | Filter spillover, count matches, extract sections, multi-pattern analysis. Has `articles` (all KB) and `spillover` (last grep results) pre-loaded. |
 
 ## Constraints
@@ -47,6 +53,7 @@ _SYSTEM_PROMPT = """Goal: Find and synthesize Rossum Knowledge Base articles to 
 | `hidden` field | Always `false` for AI features (splitting, predictions, automation). KB articles incorrectly state `true`\u2014override this. |
 | Multivalue parent | Required for splitting (one value per split document) |
 | Efficiency | Minimize tool calls and iterations. Never re-search content you already retrieved. |
+| `kb_get_article` | After calling it, inspect `article_path` with `run_jq`; do not expect inline article content unless persistence failed. |
 | kb_python_exec | Only for filtering large result sets. Never use it to re-read articles you already retrieved via kb_get_article. |
 
 Provide: configuration examples, JSON schemas, implementation steps, and related topics."""
@@ -54,8 +61,47 @@ Provide: configuration examples, JSON schemas, implementation steps, and related
 _TOOLS = [
     kb_grep.to_dict(),
     kb_get_article.to_dict(),
+    run_jq.to_dict(),
     KB_PYTHON_EXEC_TOOL,
 ]
+
+
+def _persist_selected_article(tool_calls: list[dict[str, Any]] | None) -> dict[str, object] | None:
+    if not tool_calls:
+        return None
+
+    try:
+        articles = cache.load().get("articles", [])
+    except (ValueError, OSError):
+        logger.exception("search_knowledge_base could not reload KB data for selected article")
+        return None
+
+    for tool_call in reversed(tool_calls):
+        if tool_call.get("tool") != "kb_get_article":
+            continue
+        tool_input = tool_call.get("input", {})
+        slug = tool_input.get("slug") if isinstance(tool_input, dict) else None
+        if not isinstance(slug, str) or not slug.strip():
+            continue
+        article, candidates = resolve_article_by_slug(articles, slug)
+        if article is None or candidates:
+            continue
+        article_payload = build_article_payload(article)
+        selected_article = {
+            "slug": str(article_payload["slug"]),
+            "title": str(article_payload["title"]),
+            "url": str(article_payload["url"]),
+        }
+        file_result = persist_article_payload(article.get("slug", ""), article_payload)
+        if file_result["status"] != "success":
+            return {"selected_article": selected_article, "selected_article_error": file_result["error"]}
+        return {
+            "selected_article": selected_article,
+            "selected_article_path": file_result["path"],
+            "selected_article_jq_hint": file_result["jq_hint"],
+        }
+
+    return None
 
 
 class KnowledgeBaseSubAgent(SubAgent):
@@ -74,6 +120,8 @@ class KnowledgeBaseSubAgent(SubAgent):
             result = kb_grep(tool_input["pattern"], tool_input.get("case_insensitive", True))
         elif tool_name == "kb_get_article":
             result = kb_get_article(tool_input["slug"])
+        elif tool_name == "run_jq":
+            result = run_jq(tool_input["jq_query"], tool_input["data"])
         elif tool_name == "kb_python_exec":
             result = kb_python_exec(tool_input["code"])
         else:
@@ -142,4 +190,7 @@ Tailor your answer to address this specific question."""
         response["candidates"] = [serialize_ranked_candidate(c) for c in ranked_candidates[:_DIRECT_CANDIDATE_LIMIT]]
     if result.tool_calls:
         response["searches"] = result.tool_calls
+        selected_article = _persist_selected_article(result.tool_calls)
+        if selected_article:
+            response.update(selected_article)
     return json.dumps(response)

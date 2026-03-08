@@ -14,7 +14,9 @@ from anthropic import beta_tool
 from rossum_agent.tools.subagents.knowledge_base.cache import cache
 from rossum_agent.tools.subagents.knowledge_base.ranking import (
     article_display_title,
+    build_article_payload,
     make_snippet,
+    persist_article_payload,
     rank_article,
 )
 
@@ -177,17 +179,36 @@ def kb_grep(pattern: str, case_insensitive: bool = True) -> str:
     return result
 
 
+def resolve_article_by_slug(
+    articles: list[dict[str, str]], slug: str
+) -> tuple[dict[str, str] | None, list[str] | None]:
+    """Resolve a slug to a single article, supporting unique partial matches."""
+    for article in articles:
+        if article.get("slug", "") == slug:
+            return article, None
+
+    slug_lower = slug.lower()
+    partial_matches = [article for article in articles if slug_lower in article.get("slug", "").lower()]
+    if len(partial_matches) == 1:
+        return partial_matches[0], None
+    if len(partial_matches) > 1:
+        return None, [article.get("slug", "") for article in partial_matches[:10]]
+    return None, None
+
+
 @beta_tool
 def kb_get_article(slug: str) -> str:
-    """Retrieve a full Knowledge Base article by its slug.
+    """Persist a Knowledge Base article by slug so the sub-agent can inspect it with run_jq.
 
-    Use after kb_grep to read the complete content of a specific article.
+    Use after kb_grep to retrieve a specific article. On success, the full article JSON is
+    written to the output directory and the response includes `article_path` for `run_jq`.
+    If persistence fails, returns inline content as a fallback.
 
     Args:
         slug: Article slug (e.g. "document-splitting-extension"). Partial match supported.
 
     Returns:
-        Full article content in markdown, or error if not found.
+        Persisted article metadata and path, or error if not found.
     """
     logger.debug(f"kb_get_article called with slug: {slug!r}")
     try:
@@ -199,6 +220,24 @@ def kb_get_article(slug: str) -> str:
     articles = data.get("articles", [])
 
     def _serialize(article: dict[str, str]) -> str:
+        article_payload = build_article_payload(article)
+        persisted = persist_article_payload(article.get("slug", ""), article_payload)
+        if persisted["status"] == "success":
+            return json.dumps(
+                {
+                    "status": "success",
+                    "slug": article.get("slug", ""),
+                    "title": article_display_title(article),
+                    "url": article.get("url", ""),
+                    "article_path": persisted["path"],
+                    "article_jq_hint": persisted["jq_hint"],
+                    "result": (
+                        "Article persisted for follow-up jq queries. "
+                        "Use `run_jq(article_jq_hint, article_path)` to inspect the content."
+                    ),
+                }
+            )
+
         content = article.get("content", "")
         if len(content) > _ARTICLE_OUTPUT_LIMIT:
             content = content[:_ARTICLE_OUTPUT_LIMIT] + "\n... (truncated)"
@@ -208,21 +247,16 @@ def kb_get_article(slug: str) -> str:
                 "slug": article["slug"],
                 "title": article_display_title(article),
                 "url": article.get("url", ""),
+                "message": "Article persistence failed, returning inline content fallback",
+                "article_error": persisted["error"],
                 "content": content,
             }
         )
 
-    for article in articles:
-        if article.get("slug", "") == slug:
-            return _serialize(article)
-
-    slug_lower = slug.lower()
-    partial_matches = [a for a in articles if slug_lower in a.get("slug", "").lower()]
-
-    if len(partial_matches) == 1:
-        return _serialize(partial_matches[0])
-    if len(partial_matches) > 1:
-        candidates = [a.get("slug", "") for a in partial_matches[:10]]
+    article, candidates = resolve_article_by_slug(articles, slug)
+    if article is not None:
+        return _serialize(article)
+    if candidates:
         return json.dumps({"status": "error", "message": f"Ambiguous slug '{slug}', candidates: {candidates}"})
 
     return json.dumps({"status": "error", "message": f"No article found matching slug: {slug}"})

@@ -276,17 +276,40 @@ def serialize_ranked_candidate(candidate: RankedArticle) -> dict[str, str | int 
     }
 
 
+def build_article_payload(
+    article: dict[str, str], extra_fields: dict[str, str | int | list[str]] | None = None
+) -> dict[str, object]:
+    """Build the JSON payload persisted for follow-up jq queries."""
+    payload: dict[str, object] = {
+        "slug": article.get("slug", ""),
+        "title": article_display_title(article),
+        "url": article.get("url", ""),
+        "content": article.get("content", ""),
+    }
+    if extra_fields:
+        payload.update(extra_fields)
+    return payload
+
+
+def persist_article_payload(slug: str, article_payload: dict[str, object]) -> dict[str, object]:
+    """Persist article JSON and return an absolute path usable by run_jq."""
+    file_result = json.loads(write_file(filename=f"knowledge-base-{slug}.json", content=article_payload))
+    if file_result.get("status") != "success":
+        return {"status": "error", "error": file_result}
+    return {
+        "status": "success",
+        "path": str(Path(str(file_result["path"])).resolve()),
+        "jq_hint": ".content",
+    }
+
+
 def build_direct_result(query: str, user_query: str | None, candidates: list[RankedArticle]) -> str:
     """Return structured KB JSON and persist the full article for follow-up jq queries."""
     best = candidates[0]
     article = best["article"]
     top_candidates = [serialize_ranked_candidate(candidate) for candidate in candidates[:_DIRECT_CANDIDATE_LIMIT]]
-
-    article_payload = {
-        **serialize_ranked_candidate(best),
-        "content": article.get("content", ""),
-    }
-    file_result = json.loads(write_file(filename=f"knowledge-base-{best['slug']}.json", content=article_payload))
+    article_payload = build_article_payload(article, serialize_ranked_candidate(best))
+    file_result = persist_article_payload(best["slug"], article_payload)
 
     response: dict[str, object] = {
         "status": "success",
@@ -300,19 +323,19 @@ def build_direct_result(query: str, user_query: str | None, candidates: list[Ran
         "selected_article": top_candidates[0],
     }
 
-    if file_result.get("status") == "success":
-        selected_article_path = str(Path(str(file_result["path"])).resolve())
+    if file_result["status"] == "success":
+        selected_article_path = str(file_result["path"])
         response["answer"] = (
             f"Found best matching article '{best['title']}' ({best['url']}). "
             "Use `run_jq('.content', selected_article_path)` to read the full article."
         )
         response["selected_article_path"] = selected_article_path
-        response["selected_article_jq_hint"] = ".content"
+        response["selected_article_jq_hint"] = file_result["jq_hint"]
     else:
         response["answer"] = (
             f"Found best matching article '{best['title']}' ({best['url']}). "
             "The full article could not be persisted, so only the excerpt is included inline."
         )
-        response["selected_article_error"] = file_result
+        response["selected_article_error"] = file_result["error"]
 
     return json.dumps(response)
