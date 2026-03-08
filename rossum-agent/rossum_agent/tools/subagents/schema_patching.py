@@ -626,10 +626,6 @@ class SchemaPatchingSubAgent(SubAgent):
         """Execute a tool call from the LLM."""
         return _execute_opus_tool(tool_name, tool_input)
 
-    def process_response_block(self, block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
-        """No special block processing needed for schema patching."""
-        return None
-
 
 def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> SubAgentResult:
     """Call Opus model for schema patching with deterministic tool workflow.

@@ -268,9 +268,6 @@ class KnowledgeBaseSubAgent(SubAgent):
             return result[:_TOOL_RESULT_LIMIT] + "\n... (truncated, refine your query)"
         return result
 
-    def process_response_block(self, block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
-        return None
-
 
 @beta_tool
 def search_knowledge_base(query: str, user_query: str | None = None) -> str:

@@ -84,12 +84,12 @@ class SubAgent(ABC):
     def execute_tool(self, tool_name: str, tool_input: dict[str, Any]) -> str:
         """Execute a tool call from the LLM and return the result as a string."""
 
-    @abstractmethod
     def process_response_block(self, block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
-        """Process a response block for special handling (e.g., web search).
+        """Process a response block for special handling. Override if needed.
 
         Returns tool result dict if the block was processed, None otherwise.
         """
+        return None
 
     def run(self, initial_message: str) -> SubAgentResult:
         """Run the sub-agent iteration loop."""

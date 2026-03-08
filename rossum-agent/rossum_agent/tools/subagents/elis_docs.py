@@ -321,9 +321,6 @@ class ElisDocsSubAgent(SubAgent):
             return result[:_TOOL_RESULT_LIMIT] + "\n... (truncated, refine your query)"
         return result
 
-    def process_response_block(self, block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
-        return None
-
 
 @beta_tool
 def search_elis_docs(query: str) -> str:
