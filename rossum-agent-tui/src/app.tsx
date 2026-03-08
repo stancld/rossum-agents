@@ -121,6 +121,7 @@ function isExpandable(kind: string): boolean {
   return (
     kind === "thinking" ||
     kind === "tool_call" ||
+    kind === "tool_group" ||
     kind === "intermediate" ||
     kind === "final_answer"
   );

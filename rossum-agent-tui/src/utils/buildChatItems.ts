@@ -134,7 +134,7 @@ export function buildChatItems(
   let msgIdx = 0;
   let turnIndex = 0;
 
-  for (let i = 0; i < paired.length; i++) {
+  for (let i = 0; i < paired.length; ) {
     while (
       msgIdx < state.userMessages.length &&
       state.userMessages[msgIdx]!.stepIndexBefore <=
@@ -149,10 +149,36 @@ export function buildChatItems(
       msgIdx++;
     }
     const pair = paired[i]!;
+
+    // Group consecutive tool_start calls with the same tool name (3+)
+    if (pair.step.type === "tool_start" && pair.step.toolName) {
+      const toolName = pair.step.toolName;
+      let groupEnd = i + 1;
+      while (
+        groupEnd < paired.length &&
+        paired[groupEnd]!.step.type === "tool_start" &&
+        paired[groupEnd]!.step.toolName === toolName
+      ) {
+        groupEnd++;
+      }
+      const groupSize = groupEnd - i;
+      if (groupSize >= 3) {
+        const calls = paired.slice(i, groupEnd);
+        items.push({
+          kind: "tool_group",
+          toolName,
+          calls,
+        });
+        i = groupEnd;
+        continue;
+      }
+    }
+
     items.push(pairedStepToItem(pair, turnIndex, feedback));
     if (pair.step.type === "final_answer") {
       turnIndex++;
     }
+    i++;
   }
 
   while (msgIdx < state.userMessages.length) {
