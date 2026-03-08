@@ -89,6 +89,9 @@ class TestUpdateHook:
             config={"new": "config"},
             settings={"setting": "value"},
             active=False,
+            secret="new-webhook-secret",
+            token_owner="https://api.test.rossum.ai/v1/users/42",
+            run_after=["https://api.test.rossum.ai/v1/hooks/99"],
         )
 
         assert result.id == 100
@@ -99,6 +102,9 @@ class TestUpdateHook:
         assert call_args["config"] == {"new": "config"}
         assert call_args["settings"] == {"setting": "value"}
         assert call_args["active"] is False
+        assert call_args["secret"] == "new-webhook-secret"
+        assert call_args["token_owner"] == "https://api.test.rossum.ai/v1/users/42"
+        assert call_args["run_after"] == ["https://api.test.rossum.ai/v1/hooks/99"]
 
 
 @pytest.mark.unit

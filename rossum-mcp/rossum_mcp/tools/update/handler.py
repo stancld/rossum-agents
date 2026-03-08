@@ -106,7 +106,7 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
 
     # --- Hooks ---
     @mcp.tool(
-        description="Patch a hook; only provided fields change.",
+        description="Patch a hook; only provided fields change. secret is the webhook verification secret. token_owner is a User URL for API token generation (cannot be organization_group_admin). run_after is a list of hook URLs that must execute before this hook.",
         tags={"hooks", "write"},
         annotations={"readOnlyHint": False},
     )
@@ -118,8 +118,13 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         config: dict | None = None,
         settings: dict | None = None,
         active: bool | None = None,
-    ) -> Hook | dict:
-        return await _update_hook(client, hook_id, name, queues, events, config, settings, active)
+        secret: str | None = None,
+        token_owner: str | None = None,
+        run_after: list[str] | None = None,
+    ) -> Hook:
+        return await _update_hook(
+            client, hook_id, name, queues, events, config, settings, active, secret, token_owner, run_after
+        )
 
     @mcp.tool(
         description="Test a hook by auto-generating a realistic payload and executing it. For annotation_content/annotation_status events, annotation and status are auto-resolved from the hook's queues if not provided. If no annotations exist on the hook's queues, ask the user to upload a document first — never upload documents yourself.",

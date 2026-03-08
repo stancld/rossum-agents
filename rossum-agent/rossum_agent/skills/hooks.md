@@ -30,7 +30,7 @@ Check template's `use_token_owner` and `events` fields before calling `create_ho
 ## Creating Custom Hooks
 
 ```
-create_hook(name="My Hook", type="function", queues=["https://..."], events=["annotation_content.export"], config={"source": "<code>"})
+create_hook(name="My Hook", type="function", queues=["https://..."], events=["annotation_content.export"], config={"source": "<code>"}, token_owner="https://.../users/456", run_after=["https://.../hooks/99"])
 ```
 
 | Detail | Value |

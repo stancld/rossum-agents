@@ -13,6 +13,9 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - Removed `are_lookup_fields_enabled` and `are_reasoning_fields_enabled` tools — feature availability is inferred by the agent from organization group data via the `get` / `search` tools
 
+### Fixed
+- `create_hook` and `update_hook` now expose `token_owner`, `run_after`, and `secret` (update only) parameters — previously these fields were missing from the tool signatures [#247](https://github.com/stancld/rossum-agents/pull/247)
+
 ### Changed
 - Error handling in MCP tools now uses `raise ToolError(...)` instead of `return {"error": ...}` dicts — FastMCP surfaces these as proper MCP error responses, and return types are tightened by removing `| dict` unions [#236](https://github.com/stancld/rossum-agents/pull/236)
 - `create_queue` and `update_queue` parameters `locale` and `automation_level` are now `Literal` types instead of plain strings — LLMs see valid values directly in the JSON schema [#237](https://github.com/stancld/rossum-agents/pull/237)

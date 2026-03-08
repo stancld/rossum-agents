@@ -116,6 +116,33 @@ class TestCreateHook:
         assert call_args["settings"] == {"key": "value"}
         assert call_args["secret"] == "my-secret"
 
+    @pytest.mark.asyncio
+    async def test_create_hook_with_token_owner_and_run_after(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test hook creation with token_owner and run_after."""
+        monkeypatch.setenv("API_TOKEN_OWNER", "https://api.test.rossum.ai/v1/users/1")
+
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
+
+        mock_hook = create_mock_hook(id=202, name="Ordered Hook")
+        mock_client.create_new_hook.return_value = mock_hook
+
+        create_hook = mock_mcp._tools["create_hook"]
+        result = await create_hook(
+            name="Ordered Hook",
+            type="function",
+            queues=["https://api.test.rossum.ai/v1/queues/1"],
+            events=["annotation_content.initialize"],
+            token_owner="https://api.test.rossum.ai/v1/users/42",
+            run_after=["https://api.test.rossum.ai/v1/hooks/99"],
+        )
+
+        assert result.id == 202
+        call_args = mock_client.create_new_hook.call_args[0][0]
+        assert call_args["token_owner"] == "https://api.test.rossum.ai/v1/users/42"
+        assert call_args["run_after"] == ["https://api.test.rossum.ai/v1/hooks/99"]
+
 
 @pytest.mark.unit
 class TestCreateHookFromTemplate:
