@@ -15,16 +15,14 @@ from rossum_mcp.tools.create.annotations import _copy_annotations, _upload_docum
 from rossum_mcp.tools.create.email_templates import _create_email_template
 from rossum_mcp.tools.create.engines import _create_engine, _create_engine_field
 from rossum_mcp.tools.create.hooks import _create_hook, _create_hook_from_template
-from rossum_mcp.tools.create.queues import _create_queue, _create_queue_from_template
+from rossum_mcp.tools.create.queues import _create_queue_from_template
 from rossum_mcp.tools.create.rules import _create_rule
 from rossum_mcp.tools.create.users import _create_user
 from rossum_mcp.tools.create.workspaces import _create_workspace
 from rossum_mcp.tools.models import (  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
-    AutomationLevel,
     EmailRecipient,
     EmailTemplateType,
     EngineType,
-    QueueLocale,
     QueueTemplateName,
 )
 
@@ -33,7 +31,7 @@ if TYPE_CHECKING:
     from rossum_api import AsyncRossumAPIClient
 
 
-def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: str) -> None:  # noqa: C901 - many tool registrations
+def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: str) -> None:
     # --- Annotations ---
     @mcp.tool(
         description="Upload a document; use search(entity='annotation', queue_id=...) to find the created annotation.",
@@ -57,40 +55,6 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         return await _copy_annotations(client, base_url, annotation_ids, target_queue_id, target_status, reimport)
 
     # --- Queues ---
-    @mcp.tool(
-        description="Create a queue.",
-        tags={"queues", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def create_queue(
-        name: str,
-        workspace_id: int,
-        schema_id: int,
-        engine_id: int | None = None,
-        inbox_id: int | None = None,
-        connector_id: int | None = None,
-        locale: QueueLocale = "en_GB",
-        automation_enabled: bool = False,
-        automation_level: AutomationLevel = "never",
-        training_enabled: bool = True,
-        splitting_screen_feature_flag: bool = False,
-    ) -> Queue | dict:
-        return await _create_queue(
-            client,
-            base_url,
-            name,
-            workspace_id,
-            schema_id,
-            engine_id,
-            inbox_id,
-            connector_id,
-            locale,
-            automation_enabled,
-            automation_level,
-            training_enabled,
-            splitting_screen_feature_flag,
-        )
-
     @mcp.tool(
         description="Create a queue from a template (includes schema + engine defaults).",
         tags={"queues", "write"},

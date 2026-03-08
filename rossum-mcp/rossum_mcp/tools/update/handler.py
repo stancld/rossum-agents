@@ -6,7 +6,6 @@ from rossum_api.models.engine import Engine
 from rossum_api.models.hook import Hook, HookAction, HookEvent, HookEventAndAction
 from rossum_api.models.queue import Queue
 from rossum_api.models.rule import Rule, RuleAction
-from rossum_api.models.schema import Schema
 from rossum_api.models.user import User
 
 from rossum_mcp.tools.models import (
@@ -22,7 +21,7 @@ from rossum_mcp.tools.update.models import (  # noqa: TC001 - needed at runtime 
 )
 from rossum_mcp.tools.update.queues import _update_queue
 from rossum_mcp.tools.update.rules import _patch_rule, _update_rule
-from rossum_mcp.tools.update.schemas.handler import _patch_schema, _prune_schema_fields, _update_schema
+from rossum_mcp.tools.update.schemas.handler import _patch_schema, _prune_schema_fields
 from rossum_mcp.tools.update.schemas.patching import (
     PatchOperation,  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
 )
@@ -69,14 +68,6 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         return await _update_queue(client, queue_id, queue_data)
 
     # --- Schemas ---
-    @mcp.tool(
-        description="Update schema settings; requires full schema.",
-        tags={"schemas", "write"},
-        annotations={"readOnlyHint": False},
-    )
-    async def update_schema(schema_id: int, schema_data: dict) -> Schema | dict:
-        return await _update_schema(client, schema_id, schema_data)
-
     @mcp.tool(
         description="Patch schema nodes (add/update/remove). Prereq: load schema-patching skill. Ops: add (parent_id + node_data), update (node_id + node_data), remove (node_id only). Tuple datapoints require explicit id; section-level datapoints use the passed node_id.",
         tags={"schemas", "write"},

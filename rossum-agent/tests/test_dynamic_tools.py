@@ -9,7 +9,6 @@ from rossum_agent.tools.core import AgentContext, DynamicToolsState, get_context
 from rossum_agent.tools.dynamic_tools import (
     DELETE_TOOL_NAME,
     DISCOVERY_TOOL_NAME,
-    HIDDEN_TOOLS,
     CatalogData,
     _fetch_catalog_from_mcp,
     _filter_mcp_tools_by_names,
@@ -746,9 +745,8 @@ class TestFetchCatalogParsesWriteTools:
         result = _fetch_catalog_from_mcp()
 
         assert "schemas" in result.catalog
-        # update_schema is in HIDDEN_TOOLS, so it's excluded from the catalog
-        assert result.catalog["schemas"] == {"get_schema", "create_hook"}
-        assert result.write_tools == {"create_hook"}
+        assert result.catalog["schemas"] == {"get_schema", "create_hook", "update_schema"}
+        assert result.write_tools == {"create_hook", "update_schema"}
 
     @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
     def test_defaults_to_read_only_when_field_missing(self, mock_run_coro: MagicMock) -> None:
@@ -852,69 +850,5 @@ class TestLoadCategoriesImplReadOnlyMode:
             tool_names_loaded = {t.name for t in call_args}
             assert "create_hook" in tool_names_loaded
             assert "get_schema" in tool_names_loaded
-        finally:
-            set_context(AgentContext())
-
-
-class TestHiddenTools:
-    """Tests for HIDDEN_TOOLS filtering."""
-
-    def test_update_schema_is_hidden(self) -> None:
-        assert "update_schema" in HIDDEN_TOOLS
-
-    def test_create_queue_is_hidden(self) -> None:
-        assert "create_queue" in HIDDEN_TOOLS
-
-    @patch("rossum_agent.tools.dynamic_tools.mcp_tools_to_anthropic_format")
-    @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    @patch("rossum_agent.tools.dynamic_tools.get_write_tools")
-    @patch("rossum_agent.tools.dynamic_tools.get_category_tool_names")
-    def test_load_categories_excludes_hidden_tools(
-        self,
-        mock_get_catalog: MagicMock,
-        mock_get_write: MagicMock,
-        mock_run_coro: MagicMock,
-        mock_convert: MagicMock,
-    ) -> None:
-        reset_dynamic_tools()
-        mock_get_catalog.return_value = {"schemas": {"get_schema", "update_schema"}}
-        mock_get_write.return_value = set()
-        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock(), mcp_mode="read-write"))
-        try:
-            mock_tool1 = MagicMock()
-            mock_tool1.name = "get_schema"
-            mock_tool2 = MagicMock()
-            mock_tool2.name = "update_schema"
-            mock_future = MagicMock()
-            mock_future.result.return_value = [mock_tool1, mock_tool2]
-            mock_run_coro.return_value = mock_future
-
-            mock_convert.return_value = [{"name": "get_schema"}]
-
-            result = _load_categories_impl(["schemas"])
-
-            assert "Loaded" in result
-            call_args = mock_convert.call_args[0][0]
-            tool_names_loaded = {t.name for t in call_args}
-            assert "update_schema" not in tool_names_loaded
-            assert "get_schema" in tool_names_loaded
-        finally:
-            set_context(AgentContext())
-
-    @patch("rossum_agent.tools.dynamic_tools.asyncio.run_coroutine_threadsafe")
-    def test_load_tool_rejects_hidden_tools(self, mock_run_coro: MagicMock) -> None:
-        reset_dynamic_tools()
-        set_context(AgentContext(mcp_connection=MagicMock(), mcp_event_loop=MagicMock()))
-        try:
-            mock_tool = MagicMock()
-            mock_tool.name = "update_schema"
-            mock_future = MagicMock()
-            mock_future.result.return_value = [mock_tool]
-            mock_run_coro.return_value = mock_future
-
-            result = load_tool(["update_schema"])
-
-            assert "Error" in result
-            assert "update_schema" in result
         finally:
             set_context(AgentContext())

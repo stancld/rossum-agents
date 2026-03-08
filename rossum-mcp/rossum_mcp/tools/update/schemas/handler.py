@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 from fastmcp.exceptions import ToolError
 from rossum_api import APIClientError
 from rossum_api.domain_logic.resources import Resource
-from rossum_api.models.schema import Schema
 
 from rossum_mcp.tools.update.schemas.patching import PatchOperation, _find_node_anywhere, apply_schema_patch
 from rossum_mcp.tools.update.schemas.pruning import (
@@ -71,15 +70,6 @@ async def _update_schema_with_retry(
                 continue
             raise
     raise RuntimeError("Unreachable")
-
-
-async def _update_schema(client: AsyncRossumAPIClient, schema_id: int, schema_data: dict) -> Schema:
-    logger.debug(f"Updating schema: schema_id={schema_id}")
-    if "content" in schema_data and isinstance(schema_data["content"], list):
-        schema_data = {**schema_data, "content": sanitize_schema_content(schema_data["content"])}
-    await client._http_client.update(Resource.Schema, schema_id, schema_data)
-    updated_schema: Schema = await client.retrieve_schema(schema_id)
-    return updated_schema
 
 
 async def _patch_schema(

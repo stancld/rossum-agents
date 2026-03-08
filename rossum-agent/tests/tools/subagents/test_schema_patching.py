@@ -853,8 +853,7 @@ class TestExecuteOpusTool:
             }
         ]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._update_schema_via_api"):
             result = _execute_opus_tool(
                 "apply_schema_changes",
                 {
@@ -866,7 +865,6 @@ class TestExecuteOpusTool:
                 },
             )
 
-            mock_mcp.assert_called_once()
             parsed = json.loads(result)
             assert "field2" in parsed["fields_added"]
             assert 123 not in _schema_content_cache
@@ -883,8 +881,7 @@ class TestExecuteOpusTool:
             }
         ]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._update_schema_via_api") as mock_api:
             result = _execute_opus_tool(
                 "apply_schema_changes",
                 {
@@ -895,8 +892,7 @@ class TestExecuteOpusTool:
 
             parsed = json.loads(result)
             assert "field1" in parsed["fields_updated"]
-            call_args = mock_mcp.call_args[0]
-            updated_content = call_args[1]["schema_data"]["content"]
+            updated_content = mock_api.call_args[0][1]
             assert updated_content[0]["children"][0]["formula"] == "new"
             assert 123 not in _schema_content_cache
 
@@ -1299,20 +1295,18 @@ class TestApplySchemaChanges:
             }
         ]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._update_schema_via_api") as mock_api:
             result = _apply_schema_changes(123, content, ["field1"], None)
 
             assert "field2" in result["fields_removed"]
             assert "field1" in result["fields_kept"]
-            mock_mcp.assert_called_once()
+            mock_api.assert_called_once()
 
     def test_adds_new_fields(self):
         """Test that new fields are added."""
         content = [{"id": "section1", "category": "section", "children": []}]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._update_schema_via_api"):
             result = _apply_schema_changes(
                 123,
                 content,
@@ -1332,8 +1326,7 @@ class TestApplySchemaChanges:
             }
         ]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._update_schema_via_api"):
             result = _apply_schema_changes(
                 123,
                 content,
@@ -1357,8 +1350,7 @@ class TestApplySchemaChanges:
             }
         ]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.return_value = {"id": 123}
+        with patch("rossum_agent.tools.subagents.schema_patching._update_schema_via_api") as mock_api:
             result = _apply_schema_changes(
                 123,
                 content,
@@ -1368,8 +1360,7 @@ class TestApplySchemaChanges:
             )
 
             assert "field1" in result["fields_updated"]
-            call_args = mock_mcp.call_args[0]
-            updated_content = call_args[1]["schema_data"]["content"]
+            updated_content = mock_api.call_args[0][1]
             assert updated_content[0]["children"][0]["formula"] == "new_code"
 
 
@@ -1446,7 +1437,7 @@ class TestApplySchemaChangesEngineRestrictionRecovery:
     """Test auto-recovery when API rejects schema due to engine field restrictions."""
 
     def test_retries_after_stripping_bad_rir_fields(self):
-        """When update_schema fails with engine restriction, strip rir_field_names and retry."""
+        """When API rejects with engine restriction, strip rir_field_names and retry."""
         content = [
             {
                 "id": "section1",
@@ -1457,20 +1448,19 @@ class TestApplySchemaChangesEngineRestrictionRecovery:
             }
         ]
         engine_error = Exception(
-            "Error calling tool 'update_schema': [PATCH] https://example.com/api/v1/schemas/123 "
+            "[PATCH] https://example.com/api/v1/schemas/123 "
             '- HTTP 400 - {"content":[{"children":{"1":{"id":["Engine (id: 44371) restriction: '
             "extracted field 'month_in_spanish' is not present among names of engine fields\"]}}}]}"
         )
         call_count = 0
 
-        def mock_call_mcp(name, args):
+        def mock_update(schema_id, modified_content):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
                 raise engine_error
-            return {"id": 123}
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool", side_effect=mock_call_mcp):
+        with patch("rossum_agent.tools.subagents.schema_patching._update_schema_via_api", side_effect=mock_update):
             result = _apply_schema_changes(
                 123,
                 content,
@@ -1493,8 +1483,8 @@ class TestApplySchemaChangesEngineRestrictionRecovery:
         """Non-engine-restriction errors propagate normally."""
         content = [{"id": "s1", "category": "section", "children": []}]
 
-        with patch("rossum_agent.tools.subagents.schema_patching.call_mcp_tool") as mock_mcp:
-            mock_mcp.side_effect = Exception("Some other API error")
+        with patch("rossum_agent.tools.subagents.schema_patching._update_schema_via_api") as mock_api:
+            mock_api.side_effect = Exception("Some other API error")
             raised = False
             try:
                 _apply_schema_changes(123, content, None, None)

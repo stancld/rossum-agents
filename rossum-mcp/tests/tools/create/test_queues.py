@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -16,9 +15,6 @@ from rossum_mcp.tools.create.queues import (
     _get_engine_url,
 )
 from rossum_mcp.tools.resource_tracking import TRACKED_RESOURCES_KEY
-
-if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
 
 
 def create_mock_queue(**kwargs) -> Queue:
@@ -111,96 +107,6 @@ def mock_mcp() -> Mock:
     mcp.tool = tool_decorator
     mcp._tools = tools
     return mcp
-
-
-@pytest.mark.unit
-class TestCreateQueue:
-    """Tests for create_queue tool."""
-
-    @pytest.mark.asyncio
-    async def test_create_queue_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test successful queue creation."""
-        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
-
-        mock_queue = create_mock_queue(
-            id=200,
-            name="New Queue",
-            workspace="https://api.test.rossum.ai/v1/workspaces/1",
-            schema="https://api.test.rossum.ai/v1/schemas/10",
-        )
-        mock_client.create_new_queue.return_value = mock_queue
-
-        create_queue = mock_mcp._tools["create_queue"]
-        result = await create_queue(
-            name="New Queue",
-            workspace_id=1,
-            schema_id=10,
-        )
-
-        assert result.id == 200
-        assert result.name == "New Queue"
-        mock_client.create_new_queue.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_create_queue_with_inbox_id(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test create_queue with inbox_id parameter."""
-        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
-
-        mock_queue = create_mock_queue(id=200, name="New Queue")
-        mock_client.create_new_queue.return_value = mock_queue
-
-        create_queue = mock_mcp._tools["create_queue"]
-        await create_queue(name="New Queue", workspace_id=1, schema_id=10, inbox_id=5)
-
-        call_args = mock_client.create_new_queue.call_args[0][0]
-        assert call_args["inbox"] == "https://api.test.rossum.ai/v1/inboxes/5"
-
-    @pytest.mark.asyncio
-    async def test_create_queue_with_connector_id(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test create_queue with connector_id parameter."""
-        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
-
-        mock_queue = create_mock_queue(id=200, name="New Queue")
-        mock_client.create_new_queue.return_value = mock_queue
-
-        create_queue = mock_mcp._tools["create_queue"]
-        await create_queue(name="New Queue", workspace_id=1, schema_id=10, connector_id=7)
-
-        call_args = mock_client.create_new_queue.call_args[0][0]
-        assert call_args["connector"] == "https://api.test.rossum.ai/v1/connectors/7"
-
-    @pytest.mark.asyncio
-    async def test_create_queue_with_splitting_screen_flag_success(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_queue with splitting_screen_feature_flag when env vars are set."""
-        monkeypatch.setenv("SPLITTING_SCREEN_FLAG_NAME", "enable_splitting")
-        monkeypatch.setenv("SPLITTING_SCREEN_FLAG_VALUE", "true")
-        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
-
-        mock_queue = create_mock_queue(id=200, name="New Queue")
-        mock_client.create_new_queue.return_value = mock_queue
-
-        create_queue = mock_mcp._tools["create_queue"]
-        await create_queue(name="New Queue", workspace_id=1, schema_id=10, splitting_screen_feature_flag=True)
-
-        call_args = mock_client.create_new_queue.call_args[0][0]
-        assert call_args["settings"] == {"enable_splitting": "true"}
-
-    @pytest.mark.asyncio
-    async def test_create_queue_with_splitting_screen_flag_missing_env(
-        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
-    ) -> None:
-        """Test create_queue with splitting_screen_feature_flag when env vars are missing."""
-        monkeypatch.delenv("SPLITTING_SCREEN_FLAG_NAME", raising=False)
-        monkeypatch.delenv("SPLITTING_SCREEN_FLAG_VALUE", raising=False)
-        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
-
-        create_queue = mock_mcp._tools["create_queue"]
-        with pytest.raises(ToolError, match="splitting_screen_feature_flag requested"):
-            await create_queue(name="New Queue", workspace_id=1, schema_id=10, splitting_screen_feature_flag=True)
-
-        mock_client.create_new_queue.assert_not_called()
 
 
 @pytest.mark.unit
