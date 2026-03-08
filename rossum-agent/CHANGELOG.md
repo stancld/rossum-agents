@@ -19,7 +19,8 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 - Removed `organization-setup` skill — queue creation is handled directly via `create_queue_from_template` without needing a dedicated skill [#245](https://github.com/rossumai/rossum-agents/pull/245)
-- Removed `create_schema_with_subagent` tool and `schema-creation` skill — schema creation is handled by the agent directly using `patch_schema_with_subagent` or `update_schema` (via schema-patching sub-agent) [#244](https://github.com/stancld/rossum-agents/pull/244)
+- Removed `create_schema_with_subagent` tool and `schema-creation` skill — schema creation is handled by the agent directly using `patch_schema_with_subagent` (via schema-patching sub-agent) [#244](https://github.com/stancld/rossum-agents/pull/244)
+- Removed `HIDDEN_TOOLS` concept — `update_schema` and `create_queue` MCP tools are fully removed; schema patching subagent now calls the Rossum API directly via `httpx` instead of routing through `update_schema` MCP tool [#245](https://github.com/stancld/rossum-agents/pull/245)
 - Removed `rossum-deployment` skill and all deploy/spawn tools — unused and unsolved [#241](https://github.com/stancld/rossum-agents/pull/241)
 - Removed `schema-pruning` skill — use `prune_schema_fields` MCP tool directly [#225](https://github.com/stancld/rossum-agents/pull/225)
 - Updated skills and MCP integration for rossum-mcp's unified `get`/`search` read layer — base prompt, 5 skill files (document-testing, hooks, rossum-deployment, rules-and-actions, ui-settings), and copilot tools now reference new tool names instead of removed `get_*/list_*` tools [#221](https://github.com/stancld/rossum-agents/pull/221)

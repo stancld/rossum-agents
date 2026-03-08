@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 34 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 32 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ---
 
@@ -223,24 +223,7 @@ Copies annotations to another queue. Use `reimport=True` to re-extract data in t
 
 ---
 
-## Queue Management (4 tools)
-
-### create_queue
-
-Creates a new queue.
-
-**Parameters:**
-- `name` (string, required): Name of the queue to create
-- `workspace_id` (integer, required): Workspace ID where the queue should be created
-- `schema_id` (integer, required): Schema ID to assign to the queue
-- `engine_id` (integer, optional): Engine ID to assign for document processing
-- `inbox_id` (integer, optional): Inbox ID to associate with the queue
-- `connector_id` (integer, optional): Connector ID to associate with the queue
-- `locale` (string, optional, default: `en_GB`): Queue locale
-- `automation_enabled` (boolean, optional, default: false): Enable automation
-- `automation_level` (string, optional, default: `never`): Automation level
-- `training_enabled` (boolean, optional, default: true): Enable training
-- `splitting_screen_feature_flag` (boolean, optional, default: false): Enable splitting screen feature
+## Queue Management (3 tools)
 
 ### update_queue
 
@@ -265,15 +248,7 @@ Creates a queue from a predefined regional template. Automatically creates a mat
 
 ---
 
-## Schema Management (4 tools)
-
-### update_schema
-
-Full update of an existing schema. Typically used to set field-level automation thresholds.
-
-**Parameters:**
-- `schema_id` (integer, required): Schema ID to update
-- `schema_data` (object, required): Dictionary containing schema fields to update (full schema required)
+## Schema Management (3 tools)
 
 ### patch_schema
 

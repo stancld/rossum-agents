@@ -24,19 +24,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Tools hidden from the agent. These are excluded from catalog listings and cannot
-# be loaded via load_tool. Internal subagent code that calls MCP tools directly
-# (e.g. schema_patching) is not affected.
-HIDDEN_TOOLS: dict[str, str] = {
-    "update_schema": (
-        "Hidden: agent tends to use update_schema incorrectly, unintentionally "
-        "overwriting the whole schema. Use the schema_patching subagent instead."
-    ),
-    "create_queue": (
-        "Hidden: use create_queue_from_template instead. Ask the user which template to use if not specified."
-    ),
-}
-
 
 @dataclass
 class CatalogData:
@@ -104,11 +91,9 @@ def _parse_catalog_result(result: object) -> CatalogData:
 
     for category in categories:
         name = category["name"]
-        catalog[name] = {tool["name"] for tool in category["tools"] if tool["name"] not in HIDDEN_TOOLS}
+        catalog[name] = {tool["name"] for tool in category["tools"]}
         keywords[name] = category.get("keywords", [])
         for tool in category["tools"]:
-            if tool["name"] in HIDDEN_TOOLS:
-                continue
             if not tool.get("read_only", True):
                 write_tools.add(tool["name"])
 
@@ -247,8 +232,6 @@ def _load_categories_impl(categories: list[str]) -> str:
     if read_only:
         tool_names_to_load -= get_write_tools()
 
-    tool_names_to_load -= set(HIDDEN_TOOLS)
-
     mcp_tools = asyncio.run_coroutine_threadsafe(ctx.mcp_connection.get_tools(), ctx.mcp_event_loop).result()
     tools_to_add = _filter_mcp_tools_by_names(mcp_tools, tool_names_to_load)
 
@@ -317,11 +300,6 @@ def load_tool(tool_names: list[str]) -> str:
 
     mcp_tools = asyncio.run_coroutine_threadsafe(ctx.mcp_connection.get_tools(), ctx.mcp_event_loop).result()
     available_tool_names = {t.name for t in mcp_tools}
-
-    hidden = [name for name in tool_names if name in HIDDEN_TOOLS]
-    if hidden:
-        reasons = "; ".join(f"{n}: {HIDDEN_TOOLS[n]}" for n in hidden)
-        return f"Error: {reasons}"
 
     invalid = [name for name in tool_names if name not in available_tool_names]
     if invalid:

@@ -5,7 +5,7 @@ Provides deterministic programmatic schema manipulation. The workflow:
 2. Get full schema content
 3. LLM instructs which fields to keep/add based on user requirements
 4. Programmatic filtering/modification of schema content
-5. Single PUT to update schema
+5. Single PATCH to update schema via direct API call
 """
 
 from __future__ import annotations
@@ -21,8 +21,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
 
+import httpx
 from anthropic import beta_tool
+from rossum_mcp.tools.validation import sanitize_schema_content
 
+from rossum_agent.tools.core import get_context
 from rossum_agent.tools.subagents.base import (
     SubAgent,
     SubAgentConfig,
@@ -276,54 +279,6 @@ def _collect_field_ids(content: list[dict[str, Any]]) -> set[str]:
     return ids
 
 
-def _filter_content(
-    content: list[dict[str, Any]],
-    fields_to_keep: set[str],
-) -> tuple[list[dict[str, Any]], list[str]]:
-    """Filter schema content to keep only specified fields. Sections always preserved."""
-    filtered: list[dict[str, Any]] = []
-    removed: list[str] = []
-
-    for node in content:
-        node_id = node.get("id", "")
-        category = node.get("category", "")
-
-        if category == "section":
-            new_section = copy.deepcopy(node)
-            if "children" in new_section and isinstance(new_section["children"], list):
-                new_children, section_removed = _filter_content(new_section["children"], fields_to_keep)
-                new_section["children"] = new_children
-                removed.extend(section_removed)
-            filtered.append(new_section)
-
-        elif category == "multivalue":
-            new_mv = copy.deepcopy(node)
-            mv_children_removed: list[str] = []
-
-            if "children" in new_mv and isinstance(new_mv["children"], dict):
-                tuple_node = new_mv["children"]
-                if "children" in tuple_node and isinstance(tuple_node["children"], list):
-                    tuple_children, mv_children_removed = _filter_content(tuple_node["children"], fields_to_keep)
-                    tuple_node["children"] = tuple_children
-
-            has_remaining_children = bool(new_mv.get("children", {}).get("children", []))
-
-            if node_id in fields_to_keep or has_remaining_children:
-                filtered.append(new_mv)
-                removed.extend(mv_children_removed)
-            else:
-                removed.append(node_id)
-                removed.extend(_collect_field_ids([node]) - {node_id})
-
-        else:
-            if node_id in fields_to_keep:
-                filtered.append(copy.deepcopy(node))
-            elif node_id:
-                removed.append(node_id)
-
-    return filtered, removed
-
-
 def _coerce_type_to_string(value: Any) -> str:
     """Coerce a type value to a string, handling LLM-generated dicts like {"type": "number"}."""
     if isinstance(value, str):
@@ -375,6 +330,79 @@ def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
         node["matching"] = spec["matching"]
 
     return node
+
+
+def _filter_content(
+    content: list[dict[str, Any]],
+    fields_to_keep: set[str],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Filter schema content to keep only specified fields. Sections always preserved."""
+    filtered: list[dict[str, Any]] = []
+    removed: list[str] = []
+
+    for node in content:
+        node_id = node.get("id", "")
+        category = node.get("category", "")
+
+        if category == "section":
+            new_section = copy.deepcopy(node)
+            if "children" in new_section and isinstance(new_section["children"], list):
+                new_children, section_removed = _filter_content(new_section["children"], fields_to_keep)
+                new_section["children"] = new_children
+                removed.extend(section_removed)
+            filtered.append(new_section)
+
+        elif category == "multivalue":
+            new_mv = copy.deepcopy(node)
+            mv_children_removed: list[str] = []
+
+            if "children" in new_mv and isinstance(new_mv["children"], dict):
+                tuple_node = new_mv["children"]
+                if "children" in tuple_node and isinstance(tuple_node["children"], list):
+                    tuple_children, mv_children_removed = _filter_content(tuple_node["children"], fields_to_keep)
+                    tuple_node["children"] = tuple_children
+
+            has_remaining_children = bool(new_mv.get("children", {}).get("children", []))
+
+            if node_id in fields_to_keep or has_remaining_children:
+                filtered.append(new_mv)
+                removed.extend(mv_children_removed)
+            else:
+                removed.append(node_id)
+                removed.extend(_collect_field_ids([node]) - {node_id})
+
+        else:
+            if node_id in fields_to_keep:
+                filtered.append(copy.deepcopy(node))
+            elif node_id:
+                removed.append(node_id)
+
+    return filtered, removed
+
+
+def _strip_invalid_rir_fields(content: list[dict[str, Any]], bad_names: set[str]) -> list[str]:
+    """Remove rir_field_names entries matching bad_names from all fields in content. Returns list of fixed field IDs."""
+    fixed: list[str] = []
+
+    def _walk(nodes: list[dict[str, Any]]) -> None:
+        for node in nodes:
+            rir = node.get("rir_field_names")
+            if isinstance(rir, list):
+                cleaned = [name for name in rir if name not in bad_names]
+                if len(cleaned) != len(rir):
+                    fixed.append(node.get("id", "?"))
+                    if cleaned:
+                        node["rir_field_names"] = cleaned
+                    else:
+                        del node["rir_field_names"]
+            children = node.get("children")
+            if isinstance(children, list):
+                _walk(children)
+            elif isinstance(children, dict):
+                _walk([children])
+
+    _walk(content)
+    return fixed
 
 
 def _section_label_from_id(section_id: str) -> str:
@@ -482,29 +510,15 @@ def _update_fields_in_content(
     return modified, updated
 
 
-def _strip_invalid_rir_fields(content: list[dict[str, Any]], bad_names: set[str]) -> list[str]:
-    """Remove rir_field_names entries matching bad_names from all fields in content. Returns list of fixed field IDs."""
-    fixed: list[str] = []
-
-    def _walk(nodes: list[dict[str, Any]]) -> None:
-        for node in nodes:
-            rir = node.get("rir_field_names")
-            if isinstance(rir, list):
-                cleaned = [name for name in rir if name not in bad_names]
-                if len(cleaned) != len(rir):
-                    fixed.append(node.get("id", "?"))
-                    if cleaned:
-                        node["rir_field_names"] = cleaned
-                    else:
-                        del node["rir_field_names"]
-            children = node.get("children")
-            if isinstance(children, list):
-                _walk(children)
-            elif isinstance(children, dict):
-                _walk([children])
-
-    _walk(content)
-    return fixed
+def _update_schema_via_api(schema_id: int, content: list[dict[str, Any]]) -> None:
+    """Update schema content via direct Rossum API call (no MCP)."""
+    ctx = get_context()
+    base_url, token = ctx.require_rossum_credentials()
+    url = f"{base_url}/schemas/{schema_id}"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    sanitized = sanitize_schema_content(content)
+    response = httpx.patch(url, json={"content": sanitized}, headers=headers, timeout=60)
+    response.raise_for_status()
 
 
 def _apply_schema_changes(
@@ -514,7 +528,7 @@ def _apply_schema_changes(
     fields_to_add: list[dict[str, Any]] | None,
     fields_to_update: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Apply changes to schema content and PUT to API."""
+    """Apply changes to schema content and PATCH to API."""
     result: dict[str, Any] = {
         "schema_id": schema_id,
         "fields_removed": [],
@@ -542,21 +556,17 @@ def _apply_schema_changes(
         result["fields_updated"] = updated
 
     try:
-        mcp_result = call_mcp_tool(
-            "update_schema", {"schema_id": schema_id, "schema_data": {"content": modified_content}}
-        )
+        _update_schema_via_api(schema_id, modified_content)
     except Exception as e:
         bad_names = set(_ENGINE_RESTRICTION_RE.findall(str(e)))
         if not bad_names:
             raise
         fixed = _strip_invalid_rir_fields(modified_content, bad_names)
         logger.info(f"Auto-fixed engine restriction: stripped rir_field_names from fields {fixed}")
-        mcp_result = call_mcp_tool(
-            "update_schema", {"schema_id": schema_id, "schema_data": {"content": modified_content}}
-        )
+        _update_schema_via_api(schema_id, modified_content)
 
     result["fields_kept"] = sorted(_collect_field_ids(modified_content))
-    result["update_result"] = "success" if mcp_result else "failed"
+    result["update_result"] = "success"
 
     return result
 

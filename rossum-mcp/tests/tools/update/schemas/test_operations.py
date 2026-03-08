@@ -203,40 +203,6 @@ class TestListSchemas:
 
 
 @pytest.mark.unit
-class TestUpdateSchema:
-    """Tests for update_schema tool."""
-
-    @pytest.mark.asyncio
-    async def test_update_schema_success(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        """Test successful schema update."""
-        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
-
-        updated_schema = create_mock_schema(id=50, name="Updated Schema")
-        mock_client._http_client.update.return_value = {"id": 50}
-        mock_client.retrieve_schema.return_value = updated_schema
-
-        update_schema = mock_mcp._tools["update_schema"]
-        result = await update_schema(schema_id=50, schema_data={"name": "Updated Schema"})
-
-        assert result.id == 50
-        assert result.name == "Updated Schema"
-
-    @pytest.mark.asyncio
-    async def test_update_schema_allows_empty_content(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
-        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
-
-        updated_schema = create_mock_schema(id=50, name="Empty Schema", content=[])
-        mock_client._http_client.update.return_value = {"id": 50}
-        mock_client.retrieve_schema.return_value = updated_schema
-
-        update_schema = mock_mcp._tools["update_schema"]
-        result = await update_schema(schema_id=50, schema_data={"content": []})
-
-        assert result.id == 50
-        mock_client._http_client.update.assert_called_once()
-
-
-@pytest.mark.unit
 class TestPatchSchema:
     """Tests for patch_schema tool."""
 

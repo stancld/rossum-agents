@@ -91,4 +91,3 @@ A false match is worse than no match. Apply this principle at every query tier:
 | No `rir_field_names` | Lookup fields cannot use AI extraction hints |
 | No `enabled_without_warning` | Edit mode cannot be `enabled_without_warning` |
 | `type` or `hook_interface` | Provide one, not both |
-| No `update_schema` or `patch_schema` | Use `patch_schema_with_subagent` — direct schema writes lose the matching config |

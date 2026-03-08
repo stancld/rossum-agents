@@ -66,13 +66,11 @@ A compact, fully-typed tool surface — Pydantic models, ``Literal`` unions, and
 
 **Queue Management**
 
-* **create_queue** - Create new queues
 * **create_queue_from_template** - Create queues from predefined templates (EU/US/UK/CZ/CN)
 * **update_queue** - Configure automation thresholds
 
 **Schema Management**
 
-* **update_schema** - Configure field-level thresholds
 * **patch_schema** - Add, update, or remove individual schema nodes
 * **get_schema_tree_structure** - Get lightweight tree structure of schema
 * **prune_schema_fields** - Remove multiple fields from schema at once
