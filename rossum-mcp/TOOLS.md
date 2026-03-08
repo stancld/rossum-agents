@@ -223,7 +223,7 @@ Copies annotations to another queue. Use `reimport=True` to re-extract data in t
 
 ---
 
-## Queue Management (3 tools)
+## Queue Management (2 tools)
 
 ### update_queue
 

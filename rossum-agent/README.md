@@ -26,7 +26,7 @@
 
 | Capability | Description |
 |------------|-------------|
-| **Rossum MCP Integration** | Full access to 43 MCP tools for document processing |
+| **Rossum MCP Integration** | Full access to 32 MCP tools for document processing |
 | **Hook Debugging** | Test hooks via native Rossum API endpoints |
 | **Deployment Tools** | Pull, push, diff, copy configs across environments |
 | **Knowledge Base Search** | AI-powered Rossum documentation search |
@@ -117,7 +117,7 @@ asyncio.run(main())
 
 ## Available Tools
 
-The agent provides internal tools and access to 43 MCP tools via dynamic loading.
+The agent provides internal tools and access to 32 MCP tools via dynamic loading.
 
 <details>
 <summary><strong>Internal Tools</strong></summary>
@@ -190,7 +190,7 @@ flowchart TB
     end
 
     subgraph MCP["Rossum MCP Server"]
-        Tools[43 MCP Tools]
+        Tools[32 MCP Tools]
     end
 
     API[Rossum API]
