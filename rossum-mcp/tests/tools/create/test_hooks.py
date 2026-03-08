@@ -143,6 +143,31 @@ class TestCreateHook:
         assert call_args["token_owner"] == "https://api.test.rossum.ai/v1/users/42"
         assert call_args["run_after"] == ["https://api.test.rossum.ai/v1/hooks/99"]
 
+    @pytest.mark.asyncio
+    async def test_create_hook_with_sideload(
+        self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Test hook creation with sideload parameter."""
+        monkeypatch.setenv("API_TOKEN_OWNER", "https://api.test.rossum.ai/v1/users/1")
+
+        register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
+
+        mock_hook = create_mock_hook(id=203, name="Hook With Sideloads")
+        mock_client.create_new_hook.return_value = mock_hook
+
+        create_hook = mock_mcp._tools["create_hook"]
+        result = await create_hook(
+            name="Hook With Sideloads",
+            type="function",
+            queues=["https://api.test.rossum.ai/v1/queues/1"],
+            events=["annotation_content.initialize"],
+            sideload=["schemas", "queues", "emails"],
+        )
+
+        assert result.id == 203
+        call_args = mock_client.create_new_hook.call_args[0][0]
+        assert call_args["sideload"] == ["schemas", "queues", "emails"]
+
 
 @pytest.mark.unit
 class TestCreateHookFromTemplate:

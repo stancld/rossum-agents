@@ -224,6 +224,25 @@ class TestGetRouting:
         assert result["entity"] == "document_relation"
         assert result["id"] == 60
 
+    @pytest.mark.asyncio
+    async def test_get_hook_secrets_keys(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
+        mock_client._http_client.request_json.return_value = ["SLACK_TOKEN", "API_KEY"]
+        register_get_tools(mock_mcp, mock_client)
+
+        result = await mock_mcp._tools["get"](entity="hook_secrets_keys", entity_id=123)
+        assert result["entity"] == "hook_secrets_keys"
+        assert result["id"] == 123
+        assert result["data"] == ["SLACK_TOKEN", "API_KEY"]
+        mock_client._http_client.request_json.assert_called_once_with("GET", "hooks/123/secrets_keys")
+
+    @pytest.mark.asyncio
+    async def test_get_hook_secrets_keys_empty(self, mock_mcp: Mock, mock_client: AsyncMock, setup_env: None) -> None:
+        mock_client._http_client.request_json.return_value = []
+        register_get_tools(mock_mcp, mock_client)
+
+        result = await mock_mcp._tools["get"](entity="hook_secrets_keys", entity_id=456)
+        assert result["data"] == []
+
 
 # ───────────────────────── GET Batch (list[int]) ─────────────────────────
 
