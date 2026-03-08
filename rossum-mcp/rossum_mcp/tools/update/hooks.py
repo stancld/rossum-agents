@@ -24,6 +24,9 @@ async def _update_hook(
     config: dict | None = None,
     settings: dict | None = None,
     active: bool | None = None,
+    secret: str | None = None,
+    token_owner: str | None = None,
+    run_after: list[str] | None = None,
 ) -> Hook:
     logger.debug(f"Updating hook: hook_id={hook_id}")
 
@@ -47,6 +50,12 @@ async def _update_hook(
         hook_data["settings"] = settings
     if active is not None:
         hook_data["active"] = active
+    if secret is not None:
+        hook_data["secret"] = secret
+    if token_owner is not None:
+        hook_data["token_owner"] = token_owner
+    if run_after is not None:
+        hook_data["run_after"] = run_after
 
     updated_hook: Hook = await client.update_part_hook(hook_id, hook_data)
     return updated_hook

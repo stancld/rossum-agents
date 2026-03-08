@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Added `ask_user_question` tool — agent can ask the user structured questions (free-text or multiple-choice) mid-execution when it needs information it cannot determine on its own; streamed via SSE `agent_question` event [#224](https://github.com/rossumai/rossum-agents/pull/224)
 
 ### Changed
+- Updated hooks skill prompt to show `token_owner` and `run_after` in `create_hook` example [#247](https://github.com/stancld/rossum-agents/pull/247)
 - Removed `elis_openapi_grep` and `elis_openapi_jq` as direct agent tools — Elis API reference lookups now route exclusively through the `search_elis_docs` sub-agent ([#220](https://github.com/rossumai/rossum-agents/pull/220))
 - Replaced individual copilot tools (`suggest_formula_field`, `suggest_lookup_field`, `evaluate_lookup_field`, `get_lookup_dataset_raw_values`, `query_lookup_dataset`) with a single `execute_python` tool — copilot functions are now called via Python execution instead of dedicated agent tools [#242](https://github.com/stancld/rossum-agents/pull/242)
 - Removed `load_tool_category` tool — agent now loads MCP tools individually via `load_tool` by name; `load_tool` description updated with category listing guidance [#243](https://github.com/stancld/rossum-agents/pull/243)

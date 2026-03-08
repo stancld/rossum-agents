@@ -23,6 +23,8 @@ async def _create_hook(
     config: dict | None = None,
     settings: dict | None = None,
     secret: str | None = None,
+    token_owner: str | None = None,
+    run_after: list[str] | None = None,
 ) -> Hook:
     hook_data: dict[str, Any] = {"name": name, "type": type, "sideload": ["schemas"]}
 
@@ -43,6 +45,10 @@ async def _create_hook(
         hook_data["settings"] = settings
     if secret is not None:
         hook_data["secret"] = secret
+    if token_owner is not None:
+        hook_data["token_owner"] = token_owner
+    if run_after is not None:
+        hook_data["run_after"] = run_after
 
     hook: Hook = await client.create_new_hook(hook_data)
     return hook
