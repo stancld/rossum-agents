@@ -1,4 +1,4 @@
-"""Tests for rossum_agent.tools.knowledge_base_search module."""
+"""Tests for knowledge base search tools (inlined in subagents/knowledge_base.py)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import time
 from unittest.mock import patch
 
 import pytest
-from rossum_agent.tools.knowledge_base_search import (
+from rossum_agent.tools.subagents.knowledge_base import (
     _ARTICLE_OUTPUT_LIMIT,
     _GREP_MATCH_LIMIT,
     KBCache,
@@ -134,7 +134,7 @@ class TestKbGrep:
 
     def test_empty_pattern_returns_error(self, populated_cache):
         """Test that empty or whitespace-only patterns return an error."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
             for pattern in ["", "   ", "\t"]:
                 result = kb_grep(pattern)
                 parsed = json.loads(result)
@@ -144,7 +144,7 @@ class TestKbGrep:
 
     def test_invalid_regex_returns_error(self, populated_cache):
         """Test that invalid regex patterns return an error."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
             result = kb_grep("[invalid")
             parsed = json.loads(result)
 
@@ -153,7 +153,7 @@ class TestKbGrep:
 
     def test_no_matches(self, populated_cache):
         """Test that no matches returns appropriate message."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
             result = kb_grep("zzz_nonexistent_zzz")
             parsed = json.loads(result)
 
@@ -162,7 +162,7 @@ class TestKbGrep:
 
     def test_basic_keyword_search(self, populated_cache):
         """Test searching for a keyword that matches article content."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
             result = kb_grep("webhook")
             parsed = json.loads(result)
 
@@ -173,7 +173,7 @@ class TestKbGrep:
 
     def test_case_insensitive_by_default(self, populated_cache):
         """Test that search is case-insensitive by default."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
             result = kb_grep("WEBHOOK")
             parsed = json.loads(result)
 
@@ -182,7 +182,7 @@ class TestKbGrep:
 
     def test_title_match_in_snippet(self, populated_cache):
         """Test that title matches are indicated in snippet."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
             result = kb_grep("Email Import")
             parsed = json.loads(result)
 
@@ -204,7 +204,7 @@ class TestKbGrep:
         cache_path.write_text(json.dumps(data))
         cache = KBCache(cache_path=cache_path)
 
-        with patch("rossum_agent.tools.knowledge_base_search._cache", cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", cache):
             result = kb_grep("testing")
             parsed = json.loads(result)
 
@@ -215,7 +215,7 @@ class TestKbGrep:
     def test_load_error(self, tmp_path):
         """Test error when KB data can't be loaded."""
         cache = KBCache(cache_path=tmp_path / "nonexistent.json")
-        with patch("rossum_agent.tools.knowledge_base_search._cache", cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", cache):
             result = kb_grep("test")
             parsed = json.loads(result)
 
@@ -228,7 +228,7 @@ class TestKbGetArticle:
 
     def test_exact_slug_match(self, populated_cache):
         """Test fetching article by exact slug."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
             result = kb_get_article("document-splitting-extension")
             parsed = json.loads(result)
 
@@ -239,7 +239,7 @@ class TestKbGetArticle:
 
     def test_partial_slug_match(self, populated_cache):
         """Test fetching article by partial slug."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
             result = kb_get_article("splitting")
             parsed = json.loads(result)
 
@@ -248,7 +248,7 @@ class TestKbGetArticle:
 
     def test_case_insensitive_partial_match(self, populated_cache):
         """Test partial match is case-insensitive."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
             result = kb_get_article("WEBHOOK")
             parsed = json.loads(result)
 
@@ -257,7 +257,7 @@ class TestKbGetArticle:
 
     def test_not_found(self, populated_cache):
         """Test slug not found returns error."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", populated_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", populated_cache):
             result = kb_get_article("nonexistent-article")
             parsed = json.loads(result)
 
@@ -281,7 +281,7 @@ class TestKbGetArticle:
         cache_path.write_text(json.dumps(data))
         cache = KBCache(cache_path=cache_path)
 
-        with patch("rossum_agent.tools.knowledge_base_search._cache", cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", cache):
             result = kb_get_article("long-article")
             parsed = json.loads(result)
 
@@ -292,7 +292,7 @@ class TestKbGetArticle:
     def test_load_error(self, tmp_path):
         """Test error when KB data can't be loaded."""
         cache = KBCache(cache_path=tmp_path / "nonexistent.json")
-        with patch("rossum_agent.tools.knowledge_base_search._cache", cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", cache):
             result = kb_get_article("test-slug")
             parsed = json.loads(result)
 
@@ -321,7 +321,7 @@ class TestKbGetArticle:
         cache_path.write_text(json.dumps(data))
         cache = KBCache(cache_path=cache_path)
 
-        with patch("rossum_agent.tools.knowledge_base_search._cache", cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", cache):
             result = kb_get_article("webhook")
             parsed = json.loads(result)
 
@@ -352,7 +352,7 @@ class TestKbGetArticle:
         cache_path.write_text(json.dumps(data))
         cache = KBCache(cache_path=cache_path)
 
-        with patch("rossum_agent.tools.knowledge_base_search._cache", cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", cache):
             result = kb_get_article("webhook")
             parsed = json.loads(result)
 
@@ -365,7 +365,7 @@ class TestRealKBData:
 
     def test_grep_finds_document_splitting(self, real_kb_cache):
         """Test kb_grep finds document splitting articles in real data."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", real_kb_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", real_kb_cache):
             result = kb_grep("document splitting")
             parsed = json.loads(result)
 
@@ -376,7 +376,7 @@ class TestRealKBData:
 
     def test_grep_finds_webhook(self, real_kb_cache):
         """Test kb_grep finds webhook articles in real data."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", real_kb_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", real_kb_cache):
             result = kb_grep("webhook")
             parsed = json.loads(result)
 
@@ -385,7 +385,7 @@ class TestRealKBData:
 
     def test_grep_finds_hooks(self, real_kb_cache):
         """Test kb_grep finds hook-related articles in real data."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", real_kb_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", real_kb_cache):
             result = kb_grep("serverless function")
             parsed = json.loads(result)
 
@@ -394,7 +394,7 @@ class TestRealKBData:
 
     def test_get_article_by_exact_slug(self, real_kb_cache):
         """Test kb_get_article retrieves a real article by exact slug."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", real_kb_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", real_kb_cache):
             result = kb_get_article("document-splitting-extension")
             parsed = json.loads(result)
 
@@ -404,7 +404,7 @@ class TestRealKBData:
 
     def test_get_article_by_partial_slug(self, real_kb_cache):
         """Test kb_get_article retrieves article by partial slug."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", real_kb_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", real_kb_cache):
             result = kb_get_article("formula-fields")
             parsed = json.loads(result)
 
@@ -413,7 +413,7 @@ class TestRealKBData:
 
     def test_get_nonexistent_article(self, real_kb_cache):
         """Test kb_get_article returns error for nonexistent slug."""
-        with patch("rossum_agent.tools.knowledge_base_search._cache", real_kb_cache):
+        with patch("rossum_agent.tools.subagents.knowledge_base._cache", real_kb_cache):
             result = kb_get_article("this-article-does-not-exist-xyz")
             parsed = json.loads(result)
 
