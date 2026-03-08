@@ -9,6 +9,7 @@ from rossum_api.models.rule import Rule, RuleAction
 from rossum_api.models.user import User
 
 from rossum_mcp.tools.models import (
+    HookSideload,  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
     SchemaNode,  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
 )
 from rossum_mcp.tools.update.annotations import _bulk_update_annotation_fields, _confirm_annotation, _start_annotation
@@ -106,7 +107,7 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
 
     # --- Hooks ---
     @mcp.tool(
-        description="Patch a hook; only provided fields change. secret is the webhook verification secret. token_owner is a User URL for API token generation (cannot be organization_group_admin). run_after is a list of hook URLs that must execute before this hook.",
+        description="Patch a hook; only provided fields change. secret is the webhook verification secret. token_owner is a User URL for API token generation (cannot be organization_group_admin). run_after is a list of hook URLs that must execute before this hook. sideload controls which related objects are included in hook request payloads.",
         tags={"hooks", "write"},
         annotations={"readOnlyHint": False},
     )
@@ -121,9 +122,10 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         secret: str | None = None,
         token_owner: str | None = None,
         run_after: list[str] | None = None,
+        sideload: list[HookSideload] | None = None,
     ) -> Hook:
         return await _update_hook(
-            client, hook_id, name, queues, events, config, settings, active, secret, token_owner, run_after
+            client, hook_id, name, queues, events, config, settings, active, secret, token_owner, run_after, sideload
         )
 
     @mcp.tool(
