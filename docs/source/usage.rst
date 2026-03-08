@@ -1330,17 +1330,20 @@ The tool ranks pre-scraped KB articles locally using slug, title, and content ma
    {
      "status": "success",
      "strategy": "direct_lookup",
-     "answer": "Found best matching article 'Document Splitting Extension' (https://knowledge-base.rossum.ai/docs/document-splitting-extension). Use selected_article.content for the full article.",
+     "answer": "Found best matching article 'Document Splitting Extension' (https://knowledge-base.rossum.ai/docs/document-splitting-extension). Use `run_jq('.content', selected_article_path)` to read the full article.",
      "iterations": 0,
      "input_tokens": 0,
      "output_tokens": 0,
+     "selected_article_path": "/abs/path/to/knowledge-base-document-splitting-extension.json",
+     "selected_article_jq_hint": ".content",
      "candidates": [
        {
          "slug": "document-splitting-extension",
          "title": "Document Splitting Extension",
          "url": "https://knowledge-base.rossum.ai/docs/document-splitting-extension",
-         "score": 320,
-         "match_reasons": ["slug_contains", "title_contains"],
+         "score": 3,
+         "match_level": "strong",
+         "match_reasons": ["slug_phrase", "title_phrase"],
          "excerpt": "..."
        }
      ],
@@ -1348,11 +1351,10 @@ The tool ranks pre-scraped KB articles locally using slug, title, and content ma
        "slug": "document-splitting-extension",
        "title": "Document Splitting Extension",
        "url": "https://knowledge-base.rossum.ai/docs/document-splitting-extension",
-       "score": 320,
-       "match_reasons": ["slug_contains", "title_contains"],
-       "excerpt": "...",
-       "content": "# Document Splitting Extension\n\nSplit documents into multiple pages...",
-       "content_truncated": false
+       "score": 3,
+       "match_level": "strong",
+       "match_reasons": ["slug_phrase", "title_phrase"],
+       "excerpt": "..."
      }
    }
 

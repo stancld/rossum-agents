@@ -411,7 +411,7 @@ Returns JSON with:
 
 - Retrieval strategy (``direct_lookup`` or ``sub_agent_fallback``)
 - Ranked candidate articles
-- Selected article content on the fast path
+- Selected article path on the fast path for follow-up ``run_jq`` queries
 - Token usage and tool searches when the sub-agent fallback runs
 
 Lookup Fields Skill

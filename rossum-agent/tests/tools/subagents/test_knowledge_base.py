@@ -18,6 +18,9 @@ from rossum_agent.tools.subagents.knowledge_base import (
     search_knowledge_base,
 )
 
+_AGENT_MOD = "rossum_agent.tools.subagents.knowledge_base.agent"
+_TOOLS_MOD = "rossum_agent.tools.subagents.knowledge_base.tools"
+
 
 class TestConstants:
     """Test module constants."""
@@ -60,7 +63,7 @@ class TestKnowledgeBaseSubAgent:
     def test_execute_tool_kb_grep(self):
         agent = KnowledgeBaseSubAgent()
 
-        with patch("rossum_agent.tools.subagents.knowledge_base.kb_grep") as mock_grep:
+        with patch(f"{_AGENT_MOD}.kb_grep") as mock_grep:
             mock_grep.return_value = json.dumps({"status": "success", "matches": 1, "result": []})
             result = agent.execute_tool("kb_grep", {"pattern": "webhook", "case_insensitive": True})
 
@@ -71,7 +74,7 @@ class TestKnowledgeBaseSubAgent:
     def test_execute_tool_kb_get_article(self):
         agent = KnowledgeBaseSubAgent()
 
-        with patch("rossum_agent.tools.subagents.knowledge_base.kb_get_article") as mock_get:
+        with patch(f"{_AGENT_MOD}.kb_get_article") as mock_get:
             mock_get.return_value = json.dumps({"status": "success", "slug": "test", "content": "content"})
             result = agent.execute_tool("kb_get_article", {"slug": "test-article"})
 
@@ -82,7 +85,7 @@ class TestKnowledgeBaseSubAgent:
     def test_execute_tool_kb_python_exec(self):
         agent = KnowledgeBaseSubAgent()
 
-        with patch("rossum_agent.tools.subagents.knowledge_base.kb_python_exec") as mock_exec:
+        with patch(f"{_AGENT_MOD}.kb_python_exec") as mock_exec:
             mock_exec.return_value = json.dumps({"status": "success", "result": 42})
             result = agent.execute_tool("kb_python_exec", {"code": "1 + 1"})
 
@@ -102,7 +105,7 @@ class TestKnowledgeBaseSubAgent:
         agent = KnowledgeBaseSubAgent()
 
         large_result = json.dumps({"status": "success", "result": "x" * (_TOOL_RESULT_LIMIT + 1000)})
-        with patch("rossum_agent.tools.subagents.knowledge_base.kb_grep", return_value=large_result):
+        with patch(f"{_AGENT_MOD}.kb_grep", return_value=large_result):
             result = agent.execute_tool("kb_grep", {"pattern": "test"})
 
             assert len(result) < len(large_result)
@@ -112,7 +115,7 @@ class TestKnowledgeBaseSubAgent:
         agent = KnowledgeBaseSubAgent()
 
         large_result = json.dumps({"status": "success", "content": "x" * (_TOOL_RESULT_LIMIT + 1000)})
-        with patch("rossum_agent.tools.subagents.knowledge_base.kb_get_article", return_value=large_result):
+        with patch(f"{_AGENT_MOD}.kb_get_article", return_value=large_result):
             result = agent.execute_tool("kb_get_article", {"slug": "test"})
 
             parsed = json.loads(result)
@@ -121,7 +124,7 @@ class TestKnowledgeBaseSubAgent:
     def test_execute_tool_default_case_insensitive(self):
         agent = KnowledgeBaseSubAgent()
 
-        with patch("rossum_agent.tools.subagents.knowledge_base.kb_grep") as mock_grep:
+        with patch(f"{_AGENT_MOD}.kb_grep") as mock_grep:
             mock_grep.return_value = json.dumps({"status": "success", "result": "No matches found"})
             agent.execute_tool("kb_grep", {"pattern": "test"})
 
@@ -158,7 +161,7 @@ class TestKbPythonExec:
         sample_data = {
             "articles": [{"slug": "test-article", "title": "Test", "url": "http://test", "content": "content"}]
         }
-        with patch("rossum_agent.tools.subagents.knowledge_base._cache") as mock_cache:
+        with patch(f"{_TOOLS_MOD}.cache") as mock_cache:
             mock_cache.load.return_value = sample_data
             result = kb_python_exec("len(articles)")
             parsed = json.loads(result)
@@ -166,17 +169,17 @@ class TestKbPythonExec:
             assert parsed["result"] == 1
 
     def test_spillover_available(self):
-        import rossum_agent.tools.subagents.knowledge_base as kb_mod
+        import rossum_agent.tools.subagents.knowledge_base.tools as kb_tools
 
-        old_spillover = kb_mod._spillover
+        old_spillover = kb_tools.spillover
         try:
-            kb_mod._spillover = [{"slug": "a", "title": "A", "url": "http://a", "snippet": "test"}]
+            kb_tools.spillover = [{"slug": "a", "title": "A", "url": "http://a", "snippet": "test"}]
             result = kb_python_exec("len(spillover)")
             parsed = json.loads(result)
             assert parsed["status"] == "success"
             assert parsed["result"] == 1
         finally:
-            kb_mod._spillover = old_spillover
+            kb_tools.spillover = old_spillover
 
     def test_re_module_available(self):
         result = kb_python_exec("bool(re.search('test', 'this is a test'))")
@@ -232,11 +235,11 @@ class TestKbPythonExec:
 
     def test_filter_spillover_pattern(self):
         """Test the typical use case: filtering spillover from a grep."""
-        import rossum_agent.tools.subagents.knowledge_base as kb_mod
+        import rossum_agent.tools.subagents.knowledge_base.tools as kb_tools
 
-        old_spillover = kb_mod._spillover
+        old_spillover = kb_tools.spillover
         try:
-            kb_mod._spillover = [
+            kb_tools.spillover = [
                 {
                     "slug": "webhook-config",
                     "title": "Webhook Config",
@@ -256,7 +259,7 @@ class TestKbPythonExec:
             assert parsed["status"] == "success"
             assert parsed["result"] == ["webhook-config", "webhook-events"]
         finally:
-            kb_mod._spillover = old_spillover
+            kb_tools.spillover = old_spillover
 
     def test_allowed_import_in_code(self):
         result = kb_python_exec("import math\nmath.sqrt(4)")
@@ -285,9 +288,9 @@ class TestSearchKnowledgeBaseTool:
         )
 
         with (
-            patch("rossum_agent.tools.subagents.knowledge_base.KnowledgeBaseSubAgent") as mock_cls,
-            patch("rossum_agent.tools.subagents.knowledge_base._find_ranked_articles", return_value=[]),
-            patch("rossum_agent.tools.subagents.knowledge_base._is_high_confidence_match", return_value=False),
+            patch(f"{_AGENT_MOD}.KnowledgeBaseSubAgent") as mock_cls,
+            patch(f"{_AGENT_MOD}.find_ranked_articles", return_value=[]),
+            patch(f"{_AGENT_MOD}.is_high_confidence_match", return_value=False),
             patch("rossum_agent.tools.subagents.base.create_bedrock_client"),
         ):
             mock_instance = MagicMock()
@@ -313,9 +316,9 @@ class TestSearchKnowledgeBaseTool:
         )
 
         with (
-            patch("rossum_agent.tools.subagents.knowledge_base.KnowledgeBaseSubAgent") as mock_cls,
-            patch("rossum_agent.tools.subagents.knowledge_base._find_ranked_articles", return_value=[]),
-            patch("rossum_agent.tools.subagents.knowledge_base._is_high_confidence_match", return_value=False),
+            patch(f"{_AGENT_MOD}.KnowledgeBaseSubAgent") as mock_cls,
+            patch(f"{_AGENT_MOD}.find_ranked_articles", return_value=[]),
+            patch(f"{_AGENT_MOD}.is_high_confidence_match", return_value=False),
         ):
             mock_instance = MagicMock()
             mock_instance.run.return_value = mock_result
@@ -336,9 +339,9 @@ class TestSearchKnowledgeBaseTool:
         )
 
         with (
-            patch("rossum_agent.tools.subagents.knowledge_base.KnowledgeBaseSubAgent") as mock_cls,
-            patch("rossum_agent.tools.subagents.knowledge_base._find_ranked_articles", return_value=[]),
-            patch("rossum_agent.tools.subagents.knowledge_base._is_high_confidence_match", return_value=False),
+            patch(f"{_AGENT_MOD}.KnowledgeBaseSubAgent") as mock_cls,
+            patch(f"{_AGENT_MOD}.find_ranked_articles", return_value=[]),
+            patch(f"{_AGENT_MOD}.is_high_confidence_match", return_value=False),
         ):
             mock_instance = MagicMock()
             mock_instance.run.return_value = mock_result
@@ -352,14 +355,11 @@ class TestSearchKnowledgeBaseTool:
     def test_sub_agent_error_handled(self):
         with (
             patch(
-                "rossum_agent.tools.subagents.knowledge_base.KnowledgeBaseSubAgent",
+                f"{_AGENT_MOD}.KnowledgeBaseSubAgent",
                 side_effect=RuntimeError("Connection failed"),
             ),
-            patch("rossum_agent.tools.subagents.knowledge_base._find_ranked_articles", return_value=[]),
-            patch(
-                "rossum_agent.tools.subagents.knowledge_base._is_high_confidence_match",
-                return_value=False,
-            ),
+            patch(f"{_AGENT_MOD}.find_ranked_articles", return_value=[]),
+            patch(f"{_AGENT_MOD}.is_high_confidence_match", return_value=False),
         ):
             result = search_knowledge_base("test query")
 
@@ -377,9 +377,9 @@ class TestSearchKnowledgeBaseTool:
         )
 
         with (
-            patch("rossum_agent.tools.subagents.knowledge_base.KnowledgeBaseSubAgent") as mock_cls,
-            patch("rossum_agent.tools.subagents.knowledge_base._find_ranked_articles", return_value=[]),
-            patch("rossum_agent.tools.subagents.knowledge_base._is_high_confidence_match", return_value=False),
+            patch(f"{_AGENT_MOD}.KnowledgeBaseSubAgent") as mock_cls,
+            patch(f"{_AGENT_MOD}.find_ranked_articles", return_value=[]),
+            patch(f"{_AGENT_MOD}.is_high_confidence_match", return_value=False),
         ):
             mock_instance = MagicMock()
             mock_instance.run.return_value = mock_result
