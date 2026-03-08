@@ -666,6 +666,302 @@ copy_annotations
   results and errors separately for graceful partial failure handling. Uses
   ``_http_client.request_json`` directly since the SDK has no copy method.
 
+start_annotation
+^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``start_annotation(annotation_id: int)``
+
+**Description:**
+  Set annotation status to 'reviewing' (from 'to_review').
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.start_annotation(annotation_id)``
+
+**API Endpoint:**
+  ``POST /v1/annotations/{annotation_id}/start``
+
+**Returns:**
+
+.. code-block:: json
+
+   {"annotation_id": 12345, "message": "Annotation 12345 started successfully. Status changed to 'reviewing'."}
+
+**Implementation:**
+  See ``rossum_mcp.tools.update.annotations``
+
+bulk_update_annotation_fields
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``bulk_update_annotation_fields(annotation_id: int, operations: list[dict])``
+
+**Description:**
+  Bulk update extracted fields. Requires annotation in 'reviewing' status.
+  Use datapoint IDs from content, not schema_id.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.bulk_update_annotation_data(annotation_id, operations)``
+
+**API Endpoint:**
+  ``POST /v1/annotations/{annotation_id}/content/operations``
+
+**Parameters:**
+
+- ``annotation_id`` (int): Annotation to update
+- ``operations`` (list[dict]): List of update operations, each containing datapoint ID and new value
+
+**Returns:**
+
+.. code-block:: json
+
+   {"annotation_id": 12345, "operations_count": 3, "message": "Annotation 12345 updated with 3 operations successfully."}
+
+**Implementation:**
+  See ``rossum_mcp.tools.update.annotations``
+
+confirm_annotation
+^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``confirm_annotation(annotation_id: int)``
+
+**Description:**
+  Set annotation status to 'confirmed' (typically after field updates).
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.confirm_annotation(annotation_id)``
+
+**API Endpoint:**
+  ``POST /v1/annotations/{annotation_id}/confirm``
+
+**Returns:**
+
+.. code-block:: json
+
+   {"annotation_id": 12345, "message": "Annotation 12345 confirmed successfully. Status changed to 'confirmed'."}
+
+**Implementation:**
+  See ``rossum_mcp.tools.update.annotations``
+
+create_engine
+^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_engine(name: str, organization_id: int, engine_type: EngineType)``
+
+**Description:**
+  Create an engine; create matching engine fields for the target schema immediately after.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient._http_client.create(Resource.Engine, engine_data)``
+
+**API Endpoint:**
+  ``POST /v1/engines``
+
+**Parameters:**
+
+- ``name`` (str): Engine name
+- ``organization_id`` (int): Organization to create the engine in
+- ``engine_type`` (Literal["extractor", "splitter"]): Type of engine
+
+**Returns:**
+  ``Engine`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.create.engines``
+
+create_engine_field
+^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_engine_field(engine_id: int, name: str, label: str, field_type: EngineFieldType, schema_ids: list[int], tabular: bool = False, multiline: bool = False, subtype: str | None = None, pre_trained_field_id: str | None = None)``
+
+**Description:**
+  Create an engine field corresponding to a schema field (used during engine+schema setup).
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient._http_client.create(Resource.EngineField, engine_field_data)``
+
+**API Endpoint:**
+  ``POST /v1/engine_fields``
+
+**Parameters:**
+
+- ``engine_id`` (int): Engine to add the field to
+- ``name`` (str): Field name (should match schema field id)
+- ``label`` (str): Human-readable label
+- ``field_type`` (Literal["string", "number", "date", "enum"]): Data type
+- ``schema_ids`` (list[int]): Schemas this field is linked to (at least one required)
+- ``tabular`` (bool): Whether the field is inside a table (default: False)
+- ``multiline`` (bool): Whether the field spans multiple lines (default: False)
+- ``subtype`` (str, optional): Field subtype
+- ``pre_trained_field_id`` (str, optional): Pre-trained field identifier for transfer learning
+
+**Returns:**
+  ``EngineField`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.create.engines``
+
+get_engine_fields
+^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``get_engine_fields(engine_id: int | None = None)``
+
+**Description:**
+  Retrieve engine fields for a specific engine or all engine fields.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.retrieve_engine_fields(engine_id=engine_id)``
+
+**API Endpoint:**
+  ``GET /v1/engine_fields?engine={engine_id}``
+
+**Parameters:**
+
+- ``engine_id`` (int, optional): Filter by engine ID. If not provided, returns all engine fields.
+
+**Returns:**
+  ``list[EngineField]``
+
+**Implementation:**
+  See ``rossum_mcp.tools.get.engines``
+
+create_user
+^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_user(username: str, email: str, queues: list[str] | None = None, groups: list[str] | None = None, first_name: str | None = None, last_name: str | None = None, is_active: bool = True, metadata: dict | None = None, oidc_id: str | None = None, auth_type: str = "password")``
+
+**Description:**
+  Create a user (requires username + email). Use list_user_roles for role/group URLs;
+  queue/group fields take full API URLs.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.create_new_user(user_data)``
+
+**API Endpoint:**
+  ``POST /v1/users``
+
+**Parameters:**
+
+- ``username`` (str): Username (typically email)
+- ``email`` (str): User email
+- ``queues`` (list[str], optional): Queue URLs to grant access to
+- ``groups`` (list[str], optional): Role/group URLs (use ``search(entity='user_role')`` to find)
+- ``first_name`` (str, optional): First name
+- ``last_name`` (str, optional): Last name
+- ``is_active`` (bool): Whether user is active (default: True)
+- ``metadata`` (dict, optional): Custom metadata
+- ``oidc_id`` (str, optional): OIDC identifier for SSO
+- ``auth_type`` (str): Authentication type (default: "password")
+
+**Returns:**
+  ``User`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.create.users``
+
+update_user
+^^^^^^^^^^^
+
+**MCP Tool:**
+  ``update_user(user_id: int, username: str | None = None, email: str | None = None, first_name: str | None = None, last_name: str | None = None, queues: list[str] | None = None, groups: list[str] | None = None, is_active: bool | None = None, metadata: dict | None = None, oidc_id: str | None = None, auth_type: str | None = None, ui_settings: dict | None = None)``
+
+**Description:**
+  Patch a user; only provided fields change. Use list_user_roles for role/group URLs.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient._http_client.update(Resource.User, user_id, patch_data)``
+
+**API Endpoint:**
+  ``PATCH /v1/users/{user_id}``
+
+**Parameters:**
+
+- ``user_id`` (int): User to update
+- ``username`` (str, optional): New username
+- ``email`` (str, optional): New email
+- ``first_name`` (str, optional): First name
+- ``last_name`` (str, optional): Last name
+- ``queues`` (list[str], optional): Queue URLs
+- ``groups`` (list[str], optional): Role/group URLs
+- ``is_active`` (bool, optional): Active status
+- ``metadata`` (dict, optional): Custom metadata
+- ``oidc_id`` (str, optional): OIDC identifier
+- ``auth_type`` (str, optional): Authentication type
+- ``ui_settings`` (dict, optional): UI preferences
+
+**Returns:**
+  ``User`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.update.users``
+
+create_workspace
+^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_workspace(name: str, organization_id: int, metadata: dict | None = None)``
+
+**Description:**
+  Create a new workspace.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.create_new_workspace(workspace_data)``
+
+**API Endpoint:**
+  ``POST /v1/workspaces``
+
+**Parameters:**
+
+- ``name`` (str): Workspace name
+- ``organization_id`` (int): Organization to create workspace in
+- ``metadata`` (dict, optional): Custom metadata
+
+**Returns:**
+  ``Workspace`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.create.workspaces``
+
+create_email_template
+^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_email_template(name: str, queue: int, subject: str, message: str, type: EmailTemplateType = "custom", automate: bool = False, to: list[EmailRecipient] | None = None, cc: list[EmailRecipient] | None = None, bcc: list[EmailRecipient] | None = None, triggers: list[str] | None = None)``
+
+**Description:**
+  Create an email template; set automate=true for automatic sending.
+  to/cc/bcc are recipient objects ``{type: annotator|constant|datapoint, value: ...}``.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.create_new_email_template(template_data)``
+
+**API Endpoint:**
+  ``POST /v1/email_templates``
+
+**Parameters:**
+
+- ``name`` (str): Template name
+- ``queue`` (int): Queue ID to attach the template to
+- ``subject`` (str): Email subject line
+- ``message`` (str): Email body (supports HTML)
+- ``type`` (Literal["rejection", "rejection_default", "email_with_no_processable_attachments", "custom"]): Template type (default: "custom")
+- ``automate`` (bool): Send automatically when triggered (default: False)
+- ``to`` (list[EmailRecipient], optional): To recipients
+- ``cc`` (list[EmailRecipient], optional): CC recipients
+- ``bcc`` (list[EmailRecipient], optional): BCC recipients
+- ``triggers`` (list[str], optional): Events that trigger the email
+
+**Returns:**
+  ``EmailTemplate`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.create.email_templates``
+
 Delete Layer
 ------------
 
