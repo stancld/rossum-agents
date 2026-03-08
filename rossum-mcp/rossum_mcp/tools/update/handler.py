@@ -121,7 +121,7 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         secret: str | None = None,
         token_owner: str | None = None,
         run_after: list[str] | None = None,
-    ) -> Hook | dict:
+    ) -> Hook:
         return await _update_hook(
             client, hook_id, name, queues, events, config, settings, active, secret, token_owner, run_after
         )

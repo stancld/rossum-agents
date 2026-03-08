@@ -126,7 +126,7 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         secret: str | None = None,
         token_owner: str | None = None,
         run_after: list[str] | None = None,
-    ) -> Hook | dict:
+    ) -> Hook:
         return await _create_hook(client, name, type, queues, events, config, settings, secret, token_owner, run_after)
 
     @mcp.tool(
@@ -140,7 +140,7 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         queues: list[str],
         events: list[HookEventAndAction] | None = None,
         token_owner: str | None = None,
-    ) -> Hook | dict:
+    ) -> Hook:
         return await _create_hook_from_template(client, name, hook_template_id, queues, events, token_owner)
 
     # --- Rules ---
