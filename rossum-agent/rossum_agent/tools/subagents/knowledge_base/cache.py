@@ -15,15 +15,12 @@ _BUNDLED_KB_PATH = Path(__file__).resolve().parent.parent.parent.parent / "data"
 
 
 class KBCache:
-    """In-memory cache for pre-scraped Knowledge Base articles."""
-
     def __init__(self, cache_path: Path = _BUNDLED_KB_PATH) -> None:
         self._cache_path = cache_path
         self._data: dict[str, Any] | None = None
         self._mtime: float = 0
 
     def load(self) -> dict[str, Any]:
-        """Load KB data with in-memory caching keyed on file mtime."""
         path = self._resolve_path()
         current_mtime = path.stat().st_mtime
 
@@ -36,7 +33,6 @@ class KBCache:
         return data
 
     def _resolve_path(self) -> Path:
-        """Return the KB data file path (env override or bundled)."""
         local_path = os.environ.get(_KB_DATA_PATH_ENV)
         if local_path:
             p = Path(local_path)

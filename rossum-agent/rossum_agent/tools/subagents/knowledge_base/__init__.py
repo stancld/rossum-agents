@@ -1,8 +1,4 @@
-"""Knowledge base search sub-agent.
-
-Provides a sub-agent that searches pre-scraped Rossum Knowledge Base articles
-using kb_grep, kb_get_article, and kb_python_exec tools.
-"""
+"""Knowledge base search sub-agent."""
 
 from __future__ import annotations
 

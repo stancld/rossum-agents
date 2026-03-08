@@ -79,7 +79,6 @@ _DISALLOWED_AST_NODES = (
     ast.YieldFrom,
 )
 
-# Spillover buffer for large grep results (per sub-agent instance)
 spillover: list[dict[str, str]] = []
 
 

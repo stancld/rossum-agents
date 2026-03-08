@@ -53,7 +53,6 @@ class RankedArticle(TypedDict):
 
 
 def make_snippet(text: str, match: re.Match[str]) -> str:
-    """Build a snippet around a regex match with surrounding context."""
     start = max(0, match.start() - _SNIPPET_CONTEXT)
     end = min(len(text), match.end() + _SNIPPET_CONTEXT)
     prefix = "..." if start > 0 else ""
@@ -63,12 +62,10 @@ def make_snippet(text: str, match: re.Match[str]) -> str:
 
 
 def normalize_text(text: str) -> str:
-    """Lowercase and collapse non-word characters for ranking."""
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 
 def query_terms(*parts: str) -> list[str]:
-    """Extract meaningful deduplicated terms from the query and context."""
     terms: list[str] = []
     seen: set[str] = set()
     for part in parts:
@@ -107,7 +104,6 @@ def article_display_title(article: dict[str, str]) -> str:
 
 
 def _article_excerpt(article: dict[str, str], query: str, terms: list[str]) -> str:
-    """Build a short excerpt around the best phrase or term match."""
     content = article.get("content", "")
     if not content:
         return ""
@@ -127,7 +123,6 @@ def _article_excerpt(article: dict[str, str], query: str, terms: list[str]) -> s
 
 
 def _first_match_position(content: str, patterns: list[str]) -> int | None:
-    """Return the earliest position of any phrase or term match in the content."""
     positions: list[int] = []
     for pattern in patterns:
         if not pattern:
@@ -148,7 +143,6 @@ def _match_level(
     title_term_hits: int,
     content_term_hits: int,
 ) -> str:
-    """Map matches to a small set of relevance buckets."""
     if exact_slug or exact_title:
         return "exact"
     if phrase_in_slug or phrase_in_title:
@@ -161,12 +155,10 @@ def _match_level(
 
 
 def _match_level_score(level: str) -> int:
-    """Convert relevance bucket to a stable small integer."""
     return {"exact": 4, "strong": 3, "medium": 2, "weak": 1}.get(level, 0)
 
 
 def rank_article(article: dict[str, str], query: str, user_query: str | None = None) -> RankedArticle:
-    """Rank an article using simple buckets and deterministic tie-breaks."""
     title = article_display_title(article)
     slug = article.get("slug", "")
     url = article.get("url", "")

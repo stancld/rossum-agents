@@ -59,8 +59,6 @@ _TOOLS = [
 
 
 class KnowledgeBaseSubAgent(SubAgent):
-    """Sub-agent for searching Knowledge Base articles."""
-
     def __init__(self) -> None:
         super().__init__(
             SubAgentConfig(
