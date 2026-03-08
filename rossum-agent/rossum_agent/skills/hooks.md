@@ -14,7 +14,7 @@
 | Type | Purpose | Key config |
 |------|---------|------------|
 | `function` | Serverless Python executed by Rossum | `config.code`, `config.runtime`, `config.timeout_s` |
-| `webhook` | External HTTP endpoint | `secret` for payload verification |
+| `webhook` | External HTTP endpoint | `settings` for auth/headers |
 | `job` | Scheduled/invocation-based | Used with `invocation.*` events |
 
 ## Events
@@ -62,7 +62,6 @@ create_hook(name="My Hook", type="function", queues=["https://..."], events=["an
 
 | Field | Detail |
 |-------|--------|
-| `secret` | Webhook verification secret (write-only, top-level param — not inside `config`) |
 | `settings` | Webhook-specific configuration (headers, auth, etc.) |
 
 ## token_owner
@@ -74,14 +73,16 @@ create_hook(name="My Hook", type="function", queues=["https://..."], events=["an
 | Forbidden role | `organization_group_admin` users cannot be token owners |
 | Finding a valid user | `search(query={"entity": "user", "is_organization_group_admin": false})` -> use `url` field of an active user |
 
-## Secrets vs Secret
+## Secrets
 
-These are completely different mechanisms — do not confuse them.
+`secrets` is a `dict[str, str]` of key-value env vars for serverless functions (API keys, credentials).
 
-| Field | Purpose | How to set |
-|-------|---------|------------|
-| `secret` (singular) | Webhook verification secret | `create_hook(secret="...")` or `update_hook(secret="...")` — write-only top-level param |
-| `secrets` (plural) | Key-value env vars for serverless functions (API keys, credentials) | Managed separately via Rossum UI or API `POST /hooks/{id}/secrets` — not settable via `create_hook`/`update_hook` |
+| Behavior | Detail |
+|----------|--------|
+| Write-only | Values are never returned by the API — `get(entity="hook")` always shows `secrets: {}` even when secrets are set |
+| Set via | `create_hook(secrets={"KEY": "val"})` or `update_hook(secrets={"KEY": "val"})` |
+| Check configured keys | `get(entity="hook_secrets_keys", entity_id=<hook_id>)` — returns list of key names (not values) |
+| Schema | `secrets_schema` on the hook defines which keys are expected |
 
 ## Sideloads
 
@@ -155,7 +156,7 @@ To update function code: pass the full new `config` dict (including `code`/`sour
 | Pitfall | Detail |
 |---------|--------|
 | Wrong event format | Must be `"event.action"` (e.g., `"annotation_content.export"`), not just `"annotation_content"` |
-| `secret` vs `secrets` | `secret` = webhook verification; `secrets` = serverless env vars — different mechanisms, different APIs |
+| `secrets` looks empty | `secrets` is write-only — API always returns `{}` even when set; use `get(entity="hook_secrets_keys")` to check configured keys |
 | Timeout silently capped | `timeout_s > 60` is silently reduced to 60 — no error raised |
 | Token owner role | `organization_group_admin` users silently fail as token owners — always verify role first |
 | Test without annotations | Testing annotation events fails if no annotations exist on the hook's queues |

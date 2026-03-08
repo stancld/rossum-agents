@@ -25,7 +25,7 @@ async def _update_hook(
     config: dict | None = None,
     settings: dict | None = None,
     active: bool | None = None,
-    secret: str | None = None,
+    secrets: dict[str, str] | None = None,
     token_owner: str | None = None,
     run_after: list[str] | None = None,
     sideload: list[HookSideload] | None = None,
@@ -52,8 +52,8 @@ async def _update_hook(
         hook_data["settings"] = settings
     if active is not None:
         hook_data["active"] = active
-    if secret is not None:
-        hook_data["secret"] = secret
+    if secrets is not None:
+        hook_data["secrets"] = secrets
     if token_owner is not None:
         hook_data["token_owner"] = token_owner
     if run_after is not None:

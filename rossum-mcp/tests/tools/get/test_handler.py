@@ -501,6 +501,7 @@ class TestRegistry:
             "hook_template",
             "user_role",
             "queue_template_name",
+            "hook_secrets_keys",
         }
         assert set(registry.keys()) == expected
 

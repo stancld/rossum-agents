@@ -90,10 +90,10 @@ class TestCreateHook:
         assert "code" in call_args["config"]  # source converted to code
 
     @pytest.mark.asyncio
-    async def test_create_hook_with_settings_secret_timeout(
+    async def test_create_hook_with_settings_secrets_timeout(
         self, mock_mcp: Mock, mock_client: AsyncMock, monkeypatch: MonkeyPatch
     ) -> None:
-        """Test hook creation with settings, secret, and timeout_s capping."""
+        """Test hook creation with settings, secrets, and timeout_s capping."""
         monkeypatch.setenv("API_TOKEN_OWNER", "https://api.test.rossum.ai/v1/users/1")
 
         register_create_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
@@ -107,14 +107,14 @@ class TestCreateHook:
             type="function",
             config={"timeout_s": 120},
             settings={"key": "value"},
-            secret="my-secret",
+            secrets={"slack_token": "xoxb-123"},
         )
 
         assert result.id == 201
         call_args = mock_client.create_new_hook.call_args[0][0]
         assert call_args["config"]["timeout_s"] == 60  # capped at 60
         assert call_args["settings"] == {"key": "value"}
-        assert call_args["secret"] == "my-secret"
+        assert call_args["secrets"] == {"slack_token": "xoxb-123"}
 
     @pytest.mark.asyncio
     async def test_create_hook_with_token_owner_and_run_after(

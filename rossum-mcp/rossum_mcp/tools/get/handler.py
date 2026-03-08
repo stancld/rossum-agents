@@ -37,6 +37,7 @@ EntityType = Literal[
     "relation",
     "document_relation",
     "organization_limit",
+    "hook_secrets_keys",
 ]
 
 
@@ -93,7 +94,8 @@ def register_get_tools(mcp: FastMCP, client: AsyncRossumAPIClient) -> None:  # n
     @mcp.tool(
         description=(
             "Get entities by ID. Accepts a single ID or a list of IDs for batch retrieval. "
-            "include_related=True enriches with related data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events)."
+            "include_related=True enriches with related data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events). "
+            "hook_secrets_keys returns stored secret key names (values are write-only, never returned)."
         ),
         tags={"read"},
         annotations={"readOnlyHint": True},

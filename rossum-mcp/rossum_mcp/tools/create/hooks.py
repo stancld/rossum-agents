@@ -23,7 +23,7 @@ async def _create_hook(
     events: list[HookEventAndAction] | None = None,
     config: dict | None = None,
     settings: dict | None = None,
-    secret: str | None = None,
+    secrets: dict[str, str] | None = None,
     token_owner: str | None = None,
     run_after: list[str] | None = None,
     sideload: list[HookSideload] | None = None,
@@ -45,8 +45,8 @@ async def _create_hook(
     hook_data["config"] = config
     if settings is not None:
         hook_data["settings"] = settings
-    if secret is not None:
-        hook_data["secret"] = secret
+    if secrets is not None:
+        hook_data["secrets"] = secrets
     if token_owner is not None:
         hook_data["token_owner"] = token_owner
     if run_after is not None:

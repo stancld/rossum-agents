@@ -107,7 +107,7 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
 
     # --- Hooks ---
     @mcp.tool(
-        description="Patch a hook; only provided fields change. secret is the webhook verification secret. token_owner is a User URL for API token generation (cannot be organization_group_admin). run_after is a list of hook URLs that must execute before this hook. sideload controls which related objects are included in hook request payloads.",
+        description="Patch a hook; only provided fields change. secrets is a dict of key-value env vars for serverless functions (write-only, values never returned). token_owner is a User URL for API token generation (cannot be organization_group_admin). run_after is a list of hook URLs that must execute before this hook. sideload controls which related objects are included in hook request payloads.",
         tags={"hooks", "write"},
         annotations={"readOnlyHint": False},
     )
@@ -119,13 +119,13 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         config: dict | None = None,
         settings: dict | None = None,
         active: bool | None = None,
-        secret: str | None = None,
+        secrets: dict[str, str] | None = None,
         token_owner: str | None = None,
         run_after: list[str] | None = None,
         sideload: list[HookSideload] | None = None,
     ) -> Hook:
         return await _update_hook(
-            client, hook_id, name, queues, events, config, settings, active, secret, token_owner, run_after, sideload
+            client, hook_id, name, queues, events, config, settings, active, secrets, token_owner, run_after, sideload
         )
 
     @mcp.tool(
