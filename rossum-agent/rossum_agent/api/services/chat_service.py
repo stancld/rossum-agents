@@ -15,11 +15,13 @@ from rossum_agent.api.models.schemas import (
     FileInfo,
     Message,
 )
-from rossum_agent.redis_storage import ChatData, ChatMetadata, RedisStorage
+from rossum_agent.storage import ChatData, ChatMetadata
 
 if TYPE_CHECKING:
     from pathlib import Path
     from typing import Any, Literal
+
+    from rossum_agent.storage import ChatStorage
 
 logger = logging.getLogger(__name__)
 
@@ -27,20 +29,20 @@ logger = logging.getLogger(__name__)
 class ChatService:
     """Service for managing chat sessions.
 
-    Wraps RedisStorage to provide chat CRUD operations with proper
+    Wraps a ChatStorage backend to provide chat CRUD operations with proper
     data transformation to/from API schemas.
     """
 
-    def __init__(self, redis_storage: RedisStorage | None = None) -> None:
-        self._storage = redis_storage or RedisStorage()
+    def __init__(self, storage: ChatStorage) -> None:
+        self._storage = storage
 
     @property
-    def storage(self) -> RedisStorage:
-        """Get the underlying RedisStorage instance."""
+    def storage(self) -> ChatStorage:
+        """Get the underlying storage instance."""
         return self._storage
 
     def is_connected(self) -> bool:
-        """Check if Redis is connected."""
+        """Check if storage backend is connected."""
         return self._storage.is_connected()
 
     def create_chat(

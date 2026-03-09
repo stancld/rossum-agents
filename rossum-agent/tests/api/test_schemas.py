@@ -406,15 +406,19 @@ class TestHealthResponse:
 
     def test_healthy_response(self):
         """Test healthy response."""
-        response = HealthResponse(status="healthy", redis_connected=True, version="0.2.0")
+        response = HealthResponse(
+            status="healthy", storage_connected=True, storage_backend="postgres", version="0.2.0"
+        )
         assert response.status == "healthy"
-        assert response.redis_connected is True
+        assert response.storage_connected is True
 
     def test_unhealthy_response(self):
         """Test unhealthy response."""
-        response = HealthResponse(status="unhealthy", redis_connected=False, version="0.2.0")
+        response = HealthResponse(
+            status="unhealthy", storage_connected=False, storage_backend="postgres", version="0.2.0"
+        )
         assert response.status == "unhealthy"
-        assert response.redis_connected is False
+        assert response.storage_connected is False
 
 
 class TestErrorResponse:

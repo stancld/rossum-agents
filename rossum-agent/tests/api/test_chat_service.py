@@ -4,30 +4,19 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from rossum_agent.api.services.chat_service import ChatService
-from rossum_agent.redis_storage import ChatData, ChatMetadata
+from rossum_agent.storage import ChatData, ChatMetadata
 
 
 class TestChatServiceInit:
     """Tests for ChatService initialization."""
 
-    @patch("rossum_agent.api.services.chat_service.RedisStorage")
-    def test_init_creates_default_storage(self, mock_redis_storage):
-        """Test that init creates RedisStorage if none provided."""
-        mock_storage = MagicMock()
-        mock_redis_storage.return_value = mock_storage
-
-        service = ChatService()
-
-        mock_redis_storage.assert_called_once()
-        assert service.storage is mock_storage
-
     def test_init_with_provided_storage(self):
         """Test init with provided storage."""
         mock_storage = MagicMock()
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
 
         assert service.storage is mock_storage
 
@@ -40,7 +29,7 @@ class TestChatServiceIsConnected:
         mock_storage = MagicMock()
         mock_storage.is_connected.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.is_connected()
 
         assert result is True
@@ -55,7 +44,7 @@ class TestChatServiceCreateChat:
         mock_storage = MagicMock()
         mock_storage.save_chat.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         response = service.create_chat(user_id="user_123", mcp_mode="read-only")
 
         assert response.chat_id.startswith("chat_")
@@ -67,7 +56,7 @@ class TestChatServiceCreateChat:
         mock_storage = MagicMock()
         mock_storage.save_chat.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         response = service.create_chat(user_id=None)
 
         assert response.chat_id.startswith("chat_")
@@ -80,7 +69,7 @@ class TestChatServiceCreateChat:
         mock_storage = MagicMock()
         mock_storage.save_chat.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
 
         response1 = service.create_chat(user_id="user_123")
         response2 = service.create_chat(user_id="user_123")
@@ -92,7 +81,7 @@ class TestChatServiceCreateChat:
         mock_storage = MagicMock()
         mock_storage.save_chat.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         service.create_chat(user_id="user_123", persona="cautious")
 
         call_kwargs = mock_storage.save_chat.call_args.kwargs
@@ -108,7 +97,7 @@ class TestChatServiceListChats:
         mock_storage = MagicMock()
         mock_storage.list_all_chats.return_value = []
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         response = service.list_chats(user_id="user_123")
 
         assert response.chats == []
@@ -130,7 +119,7 @@ class TestChatServiceListChats:
             {"chat_id": "chat_2", "timestamp": 1702132253, "message_count": 10, "first_message": "World"},
         ]
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         response = service.list_chats(user_id="user_123", limit=50, offset=0)
 
         assert len(response.chats) == 2
@@ -148,7 +137,7 @@ class TestChatServiceListChats:
             for i in range(10)
         ]
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         response = service.list_chats(user_id="user_123", limit=3, offset=2)
 
         assert len(response.chats) == 3
@@ -166,7 +155,7 @@ class TestChatServiceGetChat:
         mock_storage = MagicMock()
         mock_storage.load_chat.return_value = None
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.get_chat(user_id="user_123", chat_id="chat_nonexistent")
 
         assert result is None
@@ -184,7 +173,7 @@ class TestChatServiceGetChat:
             {"filename": "chart.html", "size": 12345, "timestamp": "2024-12-09T14:35:00Z"},
         ]
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.get_chat(user_id="user_123", chat_id="chat_20241209143052_abc123")
 
         assert result is not None
@@ -208,7 +197,7 @@ class TestChatServiceGetChat:
         )
         mock_storage.list_files.return_value = []
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.get_chat(user_id="user_123", chat_id="chat_20241209143052_abc123")
 
         assert result is not None
@@ -242,7 +231,7 @@ class TestChatServiceGetChat:
         )
         mock_storage.list_files.return_value = []
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.get_chat(user_id="user_123", chat_id="chat_20241209143052_abc123")
 
         assert result is not None
@@ -266,7 +255,7 @@ class TestChatServiceDeleteChat:
         mock_storage.delete_all_files.return_value = None
         mock_storage.delete_chat.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.delete_chat(user_id="user_123", chat_id="chat_123")
 
         assert result is True
@@ -279,7 +268,7 @@ class TestChatServiceDeleteChat:
         mock_storage.delete_all_files.return_value = None
         mock_storage.delete_chat.return_value = False
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.delete_chat(user_id="user_123", chat_id="chat_nonexistent")
 
         assert result is False
@@ -293,7 +282,7 @@ class TestChatServiceChatExists:
         mock_storage = MagicMock()
         mock_storage.chat_exists.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.chat_exists(user_id="user_123", chat_id="chat_123")
 
         assert result is True
@@ -303,7 +292,7 @@ class TestChatServiceChatExists:
         mock_storage = MagicMock()
         mock_storage.chat_exists.return_value = False
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.chat_exists(user_id="user_123", chat_id="chat_nonexistent")
 
         assert result is False
@@ -317,7 +306,7 @@ class TestChatServiceGetMessages:
         mock_storage = MagicMock()
         mock_storage.load_chat.return_value = None
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.get_messages(user_id="user_123", chat_id="chat_nonexistent")
 
         assert result is None
@@ -331,7 +320,7 @@ class TestChatServiceGetMessages:
             messages=messages, output_dir=output_dir, metadata=ChatMetadata()
         )
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.get_messages(user_id="user_123", chat_id="chat_123")
 
         assert result == messages
@@ -345,7 +334,7 @@ class TestChatServiceSaveMessages:
         mock_storage = MagicMock()
         mock_storage.save_chat.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         messages = [{"role": "user", "content": "Hello"}]
         result = service.save_messages(user_id="user_123", chat_id="chat_123", messages=messages)
 
@@ -357,7 +346,7 @@ class TestChatServiceSaveMessages:
         mock_storage = MagicMock()
         mock_storage.save_chat.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         messages = [{"role": "user", "content": "Hello"}]
         output_dir = Path(tempfile.gettempdir()) / "output"
         result = service.save_messages(
@@ -372,7 +361,7 @@ class TestChatServiceSaveMessages:
         mock_storage = MagicMock()
         mock_storage.save_chat.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         messages = [{"role": "user", "content": "Hello"}]
         metadata = ChatMetadata(
             commit_sha="abc123",
@@ -394,7 +383,7 @@ class TestChatServiceFeedback:
         mock_storage = MagicMock()
         mock_storage.save_feedback.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.save_feedback(user_id="user_123", chat_id="chat_123", turn_index=2, is_positive=True)
 
         assert result is True
@@ -404,7 +393,7 @@ class TestChatServiceFeedback:
         mock_storage = MagicMock()
         mock_storage.get_feedback.return_value = {0: True, 2: False}
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.get_feedback(user_id="user_123", chat_id="chat_123")
 
         assert result == {0: True, 2: False}
@@ -414,7 +403,7 @@ class TestChatServiceFeedback:
         mock_storage = MagicMock()
         mock_storage.delete_feedback.return_value = True
 
-        service = ChatService(redis_storage=mock_storage)
+        service = ChatService(storage=mock_storage)
         result = service.delete_feedback(user_id="user_123", chat_id="chat_123", turn_index=2)
 
         assert result is True

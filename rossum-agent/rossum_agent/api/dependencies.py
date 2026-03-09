@@ -16,6 +16,7 @@ from fastapi import Header, HTTPException, Request, status
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
 from rossum_agent.api.services.file_service import FileService
+from rossum_agent.redis_storage import RedisStorage
 
 logger = logging.getLogger(__name__)
 
@@ -183,3 +184,10 @@ def get_file_service(request: Request) -> FileService:
     if not hasattr(request.app.state, "file_service"):
         raise RuntimeError("File service not initialized - ensure lifespan context is used")
     return request.app.state.file_service
+
+
+def get_redis_storage(request: Request) -> RedisStorage:
+    """Get the shared RedisStorage for change tracking."""
+    if not hasattr(request.app.state, "redis_storage"):
+        raise RuntimeError("Redis storage not initialized - ensure lifespan context is used")
+    return request.app.state.redis_storage

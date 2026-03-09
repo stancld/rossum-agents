@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from rossum_agent.api.dependencies import RossumCredentials, get_chat_service, get_validated_credentials
+from rossum_agent.api.dependencies import (
+    RossumCredentials,
+    get_chat_service,
+    get_redis_storage,
+    get_validated_credentials,
+)
 from rossum_agent.api.models.schemas import (
     ChatDetail,
     ChatListResponse,
@@ -25,6 +30,7 @@ from rossum_agent.api.models.schemas import (
 )
 from rossum_agent.api.services.chat_service import ChatService
 from rossum_agent.change_tracking.store import CommitStore
+from rossum_agent.redis_storage import RedisStorage
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -85,6 +91,7 @@ async def list_chat_commits(
     chat_id: str,
     credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
     chat_service: Annotated[ChatService, Depends(get_chat_service)],
+    redis: Annotated[RedisStorage, Depends(get_redis_storage)],
 ) -> CommitListResponse:
     """List configuration commits made in a chat session."""
     chat_data = chat_service.get_chat_data(user_id=credentials.user_id, chat_id=chat_id)
@@ -92,10 +99,10 @@ async def list_chat_commits(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
 
     commit_hashes = chat_data.metadata.config_commits
-    if not commit_hashes or not chat_service.storage.is_connected():
+    if not commit_hashes or not redis.is_connected():
         return CommitListResponse(commits=[])
 
-    commit_store = CommitStore(chat_service.storage.client)
+    commit_store = CommitStore(redis.client)
     commits = []
     for h in commit_hashes:
         commit = commit_store.get_commit(credentials.api_url, h)

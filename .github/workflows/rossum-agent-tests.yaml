@@ -20,6 +20,19 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      postgres:
+        image: postgres:17
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: rossum_agent
+          POSTGRES_USER: rossum
+          POSTGRES_PASSWORD: rossum
+        options: >-
+          --health-cmd "pg_isready -U rossum -d rossum_agent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       matrix:
         python-version: ["3.12", "3.14"]

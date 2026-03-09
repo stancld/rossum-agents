@@ -7,92 +7,14 @@ import datetime as dt
 import json
 import logging
 import os
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import redis
 
-if TYPE_CHECKING:
-    from typing import Literal
-
-    from rossum_agent.api.models.schemas import Persona
+from rossum_agent.storage import ChatData, ChatMetadata, _build_chat_list_item, _extract_first_user_text
 
 logger = logging.getLogger(__name__)
-
-
-def extract_text_from_content(content: str | list[dict[str, Any]] | None) -> str:
-    """Extract text from message content which can be a string or multimodal list."""
-    if content is None:
-        return ""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return " ".join(
-            block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text"
-        )
-    return ""
-
-
-def _extract_first_user_text(messages: list[dict[str, Any]]) -> str:
-    """Extract text from the first user message, handling both legacy and task_step formats."""
-    for msg in messages:
-        if msg.get("type") == "task_step":
-            return msg.get("task", "")
-        if msg.get("role") == "user":
-            return extract_text_from_content(msg.get("content"))
-    return ""
-
-
-@dataclass
-class ChatMetadata:
-    """Metadata for a chat session."""
-
-    commit_sha: str | None = None
-    total_input_tokens: int = 0
-    total_output_tokens: int = 0
-    total_tool_calls: int = 0
-    total_steps: int = 0
-    mcp_mode: Literal["read-only", "read-write"] = "read-only"
-    persona: Persona = "default"
-    config_commits: list[str] = field(default_factory=list)
-    summary: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "commit_sha": self.commit_sha,
-            "total_input_tokens": self.total_input_tokens,
-            "total_output_tokens": self.total_output_tokens,
-            "total_tool_calls": self.total_tool_calls,
-            "total_steps": self.total_steps,
-            "mcp_mode": self.mcp_mode,
-            "persona": self.persona,
-            "config_commits": self.config_commits,
-            "summary": self.summary,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ChatMetadata:
-        return cls(
-            commit_sha=data.get("commit_sha"),
-            total_input_tokens=data.get("total_input_tokens", 0),
-            total_output_tokens=data.get("total_output_tokens", 0),
-            total_tool_calls=data.get("total_tool_calls", 0),
-            total_steps=data.get("total_steps", 0),
-            mcp_mode=data.get("mcp_mode", "read-only"),
-            persona=data.get("persona", "default"),
-            config_commits=data.get("config_commits", []),
-            summary=data.get("summary"),
-        )
-
-
-@dataclass
-class ChatData:
-    """Data structure for chat storage results."""
-
-    messages: list[dict[str, Any]] = field(default_factory=list)
-    output_dir: str | None = None
-    metadata: ChatMetadata = field(default_factory=ChatMetadata)
 
 
 class RedisStorage:
@@ -233,25 +155,13 @@ class RedisStorage:
                 chat_data = self.load_chat(user_id, chat_id)
 
                 if chat_data:
-                    messages = chat_data.messages
-                    timestamp_str = chat_id.split("_")[1]
-                    timestamp = int(dt.datetime.strptime(timestamp_str, "%Y%m%d%H%M%S").timestamp())
-                    first_message = _extract_first_user_text(messages)
-
                     chats.append(
-                        {
-                            "chat_id": chat_id,
-                            "timestamp": timestamp,
-                            "message_count": len(messages),
-                            "first_message": first_message[:100],
-                            "preview": first_message[:100] or None,
-                            "commit_sha": chat_data.metadata.commit_sha,
-                            "total_input_tokens": chat_data.metadata.total_input_tokens,
-                            "total_output_tokens": chat_data.metadata.total_output_tokens,
-                            "total_tool_calls": chat_data.metadata.total_tool_calls,
-                            "total_steps": chat_data.metadata.total_steps,
-                            "summary": chat_data.metadata.summary,
-                        }
+                        _build_chat_list_item(
+                            chat_id,
+                            len(chat_data.messages),
+                            _extract_first_user_text(chat_data.messages),
+                            chat_data.metadata,
+                        )
                     )
 
             chats.sort(key=lambda x: x["timestamp"], reverse=True)
