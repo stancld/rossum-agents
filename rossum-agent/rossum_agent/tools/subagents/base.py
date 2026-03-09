@@ -127,13 +127,28 @@ class SubAgent(ABC):
                 # Cache breakpoint: last message
                 add_message_cache_breakpoint(messages)
 
+                # On the final iteration, omit tools and inject a synthesis
+                # prompt so the LLM produces a useful answer instead of trying
+                # to call more tools whose results would never be consumed.
+                is_final_iteration = current_iteration == self.config.max_iterations
+                iter_tools = tools
+                if is_final_iteration:
+                    iter_tools = []
+                    messages = [
+                        *messages,
+                        {
+                            "role": "user",
+                            "content": "Synthesize your final answer from the information gathered so far.",
+                        },
+                    ]
+
                 llm_start = time.perf_counter()
                 response = self.client.messages.create(
                     model=get_model_id(),
                     max_tokens=self.config.max_tokens,
                     system=system,
                     messages=messages,
-                    tools=tools,
+                    tools=iter_tools,
                 )
                 llm_elapsed_ms = (time.perf_counter() - llm_start) * 1000
 

@@ -89,6 +89,9 @@ class TestUpdateHook:
             config={"new": "config"},
             settings={"setting": "value"},
             active=False,
+            secrets={"slack_token": "xoxb-456"},
+            token_owner="https://api.test.rossum.ai/v1/users/42",
+            run_after=["https://api.test.rossum.ai/v1/hooks/99"],
         )
 
         assert result.id == 100
@@ -99,6 +102,30 @@ class TestUpdateHook:
         assert call_args["config"] == {"new": "config"}
         assert call_args["settings"] == {"setting": "value"}
         assert call_args["active"] is False
+        assert call_args["secrets"] == {"slack_token": "xoxb-456"}
+        assert call_args["token_owner"] == "https://api.test.rossum.ai/v1/users/42"
+        assert call_args["run_after"] == ["https://api.test.rossum.ai/v1/hooks/99"]
+
+    @pytest.mark.asyncio
+    async def test_update_hook_with_sideload(self, mock_mcp: Mock, mock_client: AsyncMock) -> None:
+        """Test hook update with sideload parameter."""
+        register_update_tools(mock_mcp, mock_client, "https://api.test.rossum.ai/v1")
+
+        existing_hook = create_mock_hook(id=100, name="Old Name", config=None)
+        mock_client.retrieve_hook.return_value = existing_hook
+
+        updated_hook = create_mock_hook(id=100, name="Old Name")
+        mock_client.update_part_hook.return_value = updated_hook
+
+        update_hook = mock_mcp._tools["update_hook"]
+        result = await update_hook(
+            hook_id=100,
+            sideload=["schemas", "queues"],
+        )
+
+        assert result.id == 100
+        call_args = mock_client.update_part_hook.call_args[0][1]
+        assert call_args["sideload"] == ["schemas", "queues"]
 
 
 @pytest.mark.unit

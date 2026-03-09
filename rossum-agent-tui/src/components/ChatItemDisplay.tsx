@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { AgentQuestion } from "./AgentQuestion.js";
 import { ThinkingBlock } from "./ThinkingBlock.js";
 import { ToolCall } from "./ToolCall.js";
+import { ToolGroup } from "./ToolGroup.js";
 import { StreamingIndicator } from "./StreamingIndicator.js";
 import { renderMarkdown } from "../utils/markdown.js";
 import { truncate } from "../utils/format.js";
@@ -169,6 +170,16 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
         <ToolCall
           step={item.step}
           resultStep={item.resultStep}
+          expanded={expanded}
+          selected={selected}
+        />
+      );
+
+    case "tool_group":
+      return (
+        <ToolGroup
+          toolName={item.toolName}
+          calls={item.calls}
           expanded={expanded}
           selected={selected}
         />

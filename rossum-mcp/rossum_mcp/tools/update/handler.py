@@ -9,6 +9,7 @@ from rossum_api.models.rule import Rule, RuleAction
 from rossum_api.models.user import User
 
 from rossum_mcp.tools.models import (
+    HookSideload,  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
     SchemaNode,  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
 )
 from rossum_mcp.tools.update.annotations import _bulk_update_annotation_fields, _confirm_annotation, _start_annotation
@@ -106,7 +107,7 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
 
     # --- Hooks ---
     @mcp.tool(
-        description="Patch a hook; only provided fields change.",
+        description="Patch a hook; only provided fields change. secrets is a dict of key-value env vars for serverless functions (write-only, values never returned). token_owner is a User URL for API token generation (cannot be organization_group_admin). run_after is a list of hook URLs that must execute before this hook. sideload controls which related objects are included in hook request payloads.",
         tags={"hooks", "write"},
         annotations={"readOnlyHint": False},
     )
@@ -118,8 +119,14 @@ def register_update_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         config: dict | None = None,
         settings: dict | None = None,
         active: bool | None = None,
-    ) -> Hook | dict:
-        return await _update_hook(client, hook_id, name, queues, events, config, settings, active)
+        secrets: dict[str, str] | None = None,
+        token_owner: str | None = None,
+        run_after: list[str] | None = None,
+        sideload: list[HookSideload] | None = None,
+    ) -> Hook:
+        return await _update_hook(
+            client, hook_id, name, queues, events, config, settings, active, secrets, token_owner, run_after, sideload
+        )
 
     @mcp.tool(
         description="Test a hook by auto-generating a realistic payload and executing it. For annotation_content/annotation_status events, annotation and status are auto-resolved from the hook's queues if not provided. If no annotations exist on the hook's queues, ask the user to upload a document first — never upload documents yourself.",

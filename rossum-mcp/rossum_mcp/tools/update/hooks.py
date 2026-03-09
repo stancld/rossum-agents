@@ -7,6 +7,7 @@ from fastmcp.exceptions import ToolError
 from rossum_api.models.hook import Hook, HookAction, HookEvent, HookEventAndAction
 
 from rossum_mcp.tools.base import extract_id_from_url
+from rossum_mcp.tools.models import HookSideload  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
 from rossum_mcp.tools.validation import validate_hook_events
 
 if TYPE_CHECKING:
@@ -24,6 +25,10 @@ async def _update_hook(
     config: dict | None = None,
     settings: dict | None = None,
     active: bool | None = None,
+    secrets: dict[str, str] | None = None,
+    token_owner: str | None = None,
+    run_after: list[str] | None = None,
+    sideload: list[HookSideload] | None = None,
 ) -> Hook:
     logger.debug(f"Updating hook: hook_id={hook_id}")
 
@@ -47,6 +52,14 @@ async def _update_hook(
         hook_data["settings"] = settings
     if active is not None:
         hook_data["active"] = active
+    if secrets is not None:
+        hook_data["secrets"] = secrets
+    if token_owner is not None:
+        hook_data["token_owner"] = token_owner
+    if run_after is not None:
+        hook_data["run_after"] = run_after
+    if sideload is not None:
+        hook_data["sideload"] = sideload
 
     updated_hook: Hook = await client.update_part_hook(hook_id, hook_data)
     return updated_hook

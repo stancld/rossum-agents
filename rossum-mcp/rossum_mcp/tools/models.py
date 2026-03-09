@@ -164,4 +164,20 @@ QUEUE_TEMPLATE_NAMES = get_args(QueueTemplateName)
 
 EmailTemplateType = Literal["rejection", "rejection_default", "email_with_no_processable_attachments", "custom"]
 
+HookSideload = Literal[
+    "queues",
+    "modifiers",
+    "schemas",
+    "emails",
+    "related_emails",
+    "relations",
+    "child_relation",
+    "notes",
+    "suggested_edits",
+    "assignees",
+    "pages",
+    "labels",
+    "automation_blockers",
+]
+
 type EngineType = Literal["extractor", "splitter"]

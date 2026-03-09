@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from fastmcp.exceptions import ToolError
 from rossum_api.models.hook import Hook, HookEventAndAction, HookType
 
+from rossum_mcp.tools.models import HookSideload  # noqa: TC001 - needed at runtime for FastMCP parameter serialization
 from rossum_mcp.tools.validation import validate_hook_events
 
 if TYPE_CHECKING:
@@ -22,9 +23,12 @@ async def _create_hook(
     events: list[HookEventAndAction] | None = None,
     config: dict | None = None,
     settings: dict | None = None,
-    secret: str | None = None,
+    secrets: dict[str, str] | None = None,
+    token_owner: str | None = None,
+    run_after: list[str] | None = None,
+    sideload: list[HookSideload] | None = None,
 ) -> Hook:
-    hook_data: dict[str, Any] = {"name": name, "type": type, "sideload": ["schemas"]}
+    hook_data: dict[str, Any] = {"name": name, "type": type}
 
     if queues is not None:
         hook_data["queues"] = queues
@@ -41,8 +45,14 @@ async def _create_hook(
     hook_data["config"] = config
     if settings is not None:
         hook_data["settings"] = settings
-    if secret is not None:
-        hook_data["secret"] = secret
+    if secrets is not None:
+        hook_data["secrets"] = secrets
+    if token_owner is not None:
+        hook_data["token_owner"] = token_owner
+    if run_after is not None:
+        hook_data["run_after"] = run_after
+    if sideload is not None:
+        hook_data["sideload"] = sideload
 
     hook: Hook = await client.create_new_hook(hook_data)
     return hook

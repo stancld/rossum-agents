@@ -380,8 +380,8 @@ class TestSubAgent:
             assert result.input_tokens == 0
             assert result.output_tokens == 0
 
-    def test_run_max_iterations_reached(self):
-        """Test behavior when max iterations is reached."""
+    def test_run_final_iteration_omits_tools_for_synthesis(self):
+        """Test that the final iteration omits tools to force answer synthesis."""
         config = SubAgentConfig(
             tool_name="test",
             system_prompt="prompt",
@@ -396,38 +396,58 @@ class TestSubAgent:
         mock_tool_block.input = {}
         mock_tool_block.id = "tool_1"
 
-        mock_response = MagicMock()
-        mock_response.content = [mock_tool_block]
-        mock_response.stop_reason = "tool_use"
-        mock_response.usage.input_tokens = 100
-        mock_response.usage.output_tokens = 50
-        mock_response.usage.cache_creation_input_tokens = 0
-        mock_response.usage.cache_read_input_tokens = 0
+        tool_use_response = MagicMock()
+        tool_use_response.content = [mock_tool_block]
+        tool_use_response.stop_reason = "tool_use"
+        tool_use_response.usage.input_tokens = 100
+        tool_use_response.usage.output_tokens = 50
+        tool_use_response.usage.cache_creation_input_tokens = 0
+        tool_use_response.usage.cache_read_input_tokens = 0
+
+        mock_text_block = MagicMock()
+        mock_text_block.type = "text"
+        mock_text_block.text = "Synthesized answer from gathered information"
+
+        synthesis_response = MagicMock()
+        synthesis_response.content = [mock_text_block]
+        synthesis_response.stop_reason = "end_of_turn"
+        synthesis_response.usage.input_tokens = 100
+        synthesis_response.usage.output_tokens = 50
+        synthesis_response.usage.cache_creation_input_tokens = 0
+        synthesis_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_response
+        mock_client.messages.create.side_effect = [tool_use_response, synthesis_response]
 
         set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
         try:
-            with (
-                patch(
-                    "rossum_agent.tools.subagents.base.create_bedrock_client",
-                    return_value=mock_client,
-                ),
-                patch("rossum_agent.tools.subagents.base.logger") as mock_logger,
+            with patch(
+                "rossum_agent.tools.subagents.base.create_bedrock_client",
+                return_value=mock_client,
             ):
                 result = agent.run("Test")
 
                 assert result.iterations_used == 2
+                assert result.analysis == "Synthesized answer from gathered information"
                 assert result.input_tokens == 200
                 assert result.output_tokens == 100
-                mock_logger.warning.assert_called()
-                assert "max iterations" in mock_logger.warning.call_args[0][0]
+
+                # Verify final iteration was called without tools and with synthesis prompt
+                calls = mock_client.messages.create.call_args_list
+                assert len(calls) == 2
+                assert len(calls[0].kwargs["tools"]) == 1
+                assert calls[0].kwargs["tools"][0]["name"] == "tool"
+                assert calls[1].kwargs["tools"] == []
+                final_messages = calls[1].kwargs["messages"]
+                assert final_messages[-1] == {
+                    "role": "user",
+                    "content": "Synthesize your final answer from the information gathered so far.",
+                }
         finally:
             set_context(AgentContext())
 
     def test_run_max_iterations_tracks_tool_calls(self):
-        """Test that tool_calls are tracked when max iterations is reached."""
+        """Test that tool_calls from non-final iterations are tracked."""
         config = SubAgentConfig(
             tool_name="test",
             system_prompt="prompt",
@@ -442,16 +462,28 @@ class TestSubAgent:
         mock_tool_block.input = {"q": "test"}
         mock_tool_block.id = "tool_1"
 
-        mock_response = MagicMock()
-        mock_response.content = [mock_tool_block]
-        mock_response.stop_reason = "tool_use"
-        mock_response.usage.input_tokens = 100
-        mock_response.usage.output_tokens = 50
-        mock_response.usage.cache_creation_input_tokens = 0
-        mock_response.usage.cache_read_input_tokens = 0
+        tool_use_response = MagicMock()
+        tool_use_response.content = [mock_tool_block]
+        tool_use_response.stop_reason = "tool_use"
+        tool_use_response.usage.input_tokens = 100
+        tool_use_response.usage.output_tokens = 50
+        tool_use_response.usage.cache_creation_input_tokens = 0
+        tool_use_response.usage.cache_read_input_tokens = 0
+
+        mock_text_block = MagicMock(spec=["type", "text"])
+        mock_text_block.type = "text"
+        mock_text_block.text = "Final answer"
+
+        synthesis_response = MagicMock()
+        synthesis_response.content = [mock_text_block]
+        synthesis_response.stop_reason = "end_of_turn"
+        synthesis_response.usage.input_tokens = 100
+        synthesis_response.usage.output_tokens = 50
+        synthesis_response.usage.cache_creation_input_tokens = 0
+        synthesis_response.usage.cache_read_input_tokens = 0
 
         mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_response
+        mock_client.messages.create.side_effect = [tool_use_response, synthesis_response]
 
         set_context(AgentContext(progress_callback=MagicMock(), token_callback=MagicMock()))
         try:
@@ -464,8 +496,8 @@ class TestSubAgent:
             ):
                 result = agent.run("Test")
 
+                # Only iteration 1 produced tool calls; iteration 2 was synthesis-only
                 assert result.tool_calls == [
-                    {"tool": "tool", "input": {"q": "test"}},
                     {"tool": "tool", "input": {"q": "test"}},
                 ]
         finally:

@@ -195,6 +195,11 @@ export type ChatItem =
       step: CompletedStep;
       resultStep?: CompletedStep;
     }
+  | {
+      kind: "tool_group";
+      toolName: string;
+      calls: Array<{ step: CompletedStep; resultStep?: CompletedStep }>;
+    }
   | { kind: "intermediate"; stepNumber: number; content: string }
   | {
       kind: "final_answer";

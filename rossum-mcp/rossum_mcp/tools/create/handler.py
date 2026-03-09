@@ -23,6 +23,7 @@ from rossum_mcp.tools.models import (  # noqa: TC001 - needed at runtime for Fas
     EmailRecipient,
     EmailTemplateType,
     EngineType,
+    HookSideload,
     QueueTemplateName,
 )
 
@@ -112,7 +113,7 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
 
     # --- Hooks ---
     @mcp.tool(
-        description="Create a hook. Function hooks: config.source auto-renamed to config.code, default runtime python3.12, timeout_s capped at 60. token_owner cannot be an organization_group_admin user.",
+        description="Create a hook. Function hooks: config.source auto-renamed to config.code, default runtime python3.12, timeout_s capped at 60. secrets is a dict of key-value env vars for serverless functions (write-only, values never returned). token_owner is a User URL for API token generation (cannot be organization_group_admin). run_after is a list of hook URLs that must execute before this hook. sideload controls which related objects are included in hook request payloads.",
         tags={"hooks", "write"},
         annotations={"readOnlyHint": False},
     )
@@ -123,9 +124,14 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         events: list[HookEventAndAction] | None = None,
         config: dict | None = None,
         settings: dict | None = None,
-        secret: str | None = None,
-    ) -> Hook | dict:
-        return await _create_hook(client, name, type, queues, events, config, settings, secret)
+        secrets: dict[str, str] | None = None,
+        token_owner: str | None = None,
+        run_after: list[str] | None = None,
+        sideload: list[HookSideload] | None = None,
+    ) -> Hook:
+        return await _create_hook(
+            client, name, type, queues, events, config, settings, secrets, token_owner, run_after, sideload
+        )
 
     @mcp.tool(
         description="Create a hook from a template; events may override template defaults. If template requires use_token_owner, provide token_owner (not an organization_group_admin user).",
@@ -138,7 +144,7 @@ def register_create_tools(mcp: FastMCP, client: AsyncRossumAPIClient, base_url: 
         queues: list[str],
         events: list[HookEventAndAction] | None = None,
         token_owner: str | None = None,
-    ) -> Hook | dict:
+    ) -> Hook:
         return await _create_hook_from_template(client, name, hook_template_id, queues, events, token_owner)
 
     # --- Rules ---

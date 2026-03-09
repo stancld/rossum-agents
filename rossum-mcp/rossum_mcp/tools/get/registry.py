@@ -105,6 +105,11 @@ async def _get_document_relation(client: AsyncRossumAPIClient, document_relation
     return await client.retrieve_document_relation(document_relation_id)
 
 
+async def _get_hook_secrets_keys(client: AsyncRossumAPIClient, hook_id: int) -> list[str]:
+    result = await client._http_client.request_json("GET", f"hooks/{hook_id}/secrets_keys")
+    return cast("list[str]", result)
+
+
 # --- Registry builder ---
 
 
@@ -183,5 +188,9 @@ def build_get_registry(client: AsyncRossumAPIClient) -> dict[str, EntityConfig]:
         "queue_template_name": EntityConfig(
             retrieve_fn=None,
             search_fn=search_reg["queue_template_name"],
+        ),
+        "hook_secrets_keys": EntityConfig(
+            retrieve_fn=lambda id: _get_hook_secrets_keys(client, id),
+            search_fn=None,
         ),
     }
