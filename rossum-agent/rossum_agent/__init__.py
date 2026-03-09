@@ -15,7 +15,7 @@ from rossum_agent.agent import (
     create_agent,
 )
 
-__version__ = "1.3.7"
+__version__ = "1.4.0"
 
 __all__ = [
     "AgentConfig",
