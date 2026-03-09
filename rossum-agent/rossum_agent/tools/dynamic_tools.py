@@ -283,7 +283,7 @@ def get_load_tool_definition() -> ToolParam:
                 "tool_names": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Tool names to load (e.g., ['get_queue', 'list_schemas'])",
+                    "description": "Tool names to load (e.g., ['get', 'search'])",
                 },
             },
             "required": ["tool_names"],

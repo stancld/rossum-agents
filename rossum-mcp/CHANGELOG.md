@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Added `get` tool: fetch any entity by ID with a single unified tool — supports `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`, `hook_secrets_keys`; `include_related=True` enriches with linked data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events) [#221](https://github.com/stancld/rossum-agents/pull/221)
-- Added `search` tool: list/filter any entity with typed, entity-specific query objects — covers all `get`-supported types plus search-only entities `hook_log`, `hook_template`, `user_role`, `queue_template_name` [#221](https://github.com/stancld/rossum-agents/pull/221)
+- Added `search` tool: list/filter any entity with typed, entity-specific query objects — covers all `get`-supported types except `organization_limit` and `hook_secrets_keys` (get-only), plus search-only entities `hook_log`, `hook_template`, `user_role`, `queue_template_name` [#221](https://github.com/stancld/rossum-agents/pull/221)
 - Added `hook_secrets_keys` entity to the `get` tool — returns stored secret key names for a hook (values are write-only, never returned) [#247](https://github.com/stancld/rossum-agents/pull/247)
 
 ### Removed

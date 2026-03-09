@@ -114,7 +114,7 @@ A compact, fully-typed tool surface — Pydantic models, `Literal` unions, and c
 
 Supported entities for `get` (by ID): `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`, `hook_secrets_keys`
 
-Supported entities for `search` (with typed filters): all `get` entities plus `hook_log`, `hook_template`, `user_role`, `queue_template_name`
+Supported entities for `search` (with typed filters): all `get` entities except `organization_limit` and `hook_secrets_keys`, plus search-only entities `hook_log`, `hook_template`, `user_role`, `queue_template_name`
 
 **Delete Layer** (unified delete replacing individual delete_X tools):
 `delete`
