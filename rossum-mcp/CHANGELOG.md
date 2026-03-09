@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [2.0.0] - 2026-03-09
 
 ### Added
 - Added `get` tool: fetch any entity by ID with a single unified tool — supports `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`, `hook_secrets_keys`; `include_related=True` enriches with linked data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events) [#221](https://github.com/stancld/rossum-agents/pull/221)
