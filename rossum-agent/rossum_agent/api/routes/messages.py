@@ -29,6 +29,7 @@ from rossum_agent.api.models.schemas import (
     AgentQuestionEvent,
     CancelResponse,
     DocumentContent,
+    ErrorResponse,
     FileCreatedEvent,
     ImageContent,
     MessageRequest,
@@ -336,8 +337,8 @@ def _handle_slash_command(
     response_class=StreamingResponse,
     responses={
         200: {"description": "SSE stream of agent step events", "content": {"text/event-stream": {}}},
-        404: {"description": "Chat not found"},
-        429: {"description": "Rate limit exceeded"},
+        404: {"model": ErrorResponse, "description": "Chat not found"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
     },
 )
 @limiter.limit("10/minute")
@@ -438,7 +439,7 @@ async def send_message(
     response_model=CancelResponse,
     responses={
         200: {"description": "Cancellation result"},
-        404: {"description": "Chat not found"},
+        404: {"model": ErrorResponse, "description": "Chat not found"},
     },
 )
 async def cancel_message(
