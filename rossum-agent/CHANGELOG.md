@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+## [1.4.0] - 2026-03-09
+
 ### Added
 - Auto-spillover for large tool results — results exceeding 30k chars are automatically saved to `{output_dir}/workspace/` and replaced with a compact summary + file path; agent uses `run_jq` or `run_grep` to query full content on demand [#240](https://github.com/rossumai/rossum-agents/pull/240)
 - Per-message boolean feedback (thumbs up/down) — `PUT/GET/DELETE /api/v1/chats/{chat_id}/feedback` endpoints for rating agent responses by turn index [#222](https://github.com/rossumai/rossum-agents/pull/222)
