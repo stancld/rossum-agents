@@ -22,6 +22,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from rossum_agent import __version__
 from rossum_agent.api.routes import chats, commands, files, health, messages, slack
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
@@ -93,8 +94,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 app = FastAPI(
     title="Rossum Agent API",
-    description="REST API for Rossum Agent - AI-powered document processing assistant",
-    version="0.2.0",
+    description="AI agent for Rossum document processing. Debug hooks, deploy configs, and automate workflows conversationally.",
+    version=__version__,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",

@@ -267,6 +267,7 @@ MIT License - see [LICENSE](../LICENSE) for details.
 ## Resources
 
 - [Full Documentation](https://stancld.github.io/rossum-agents/)
+- [API Reference](https://stancld.github.io/rossum-agents/api-reference/)
 - [MCP Server README](../rossum-mcp/README.md)
 - [Rossum API Documentation](https://rossum.app/api/docs/)
 - [Main Repository](https://github.com/stancld/rossum-agents)
