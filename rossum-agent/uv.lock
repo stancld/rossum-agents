@@ -2229,7 +2229,6 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "rossum-api" },
-    { name = "rossum-deploy" },
     { name = "rossum-mcp" },
     { name = "tqdm" },
 ]
@@ -2334,8 +2333,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'api'", specifier = ">=7.0.0" },
     { name = "redis", marker = "extra == 'tests'", specifier = ">=7.0.0" },
     { name = "rossum-api", specifier = ">=3.9.1" },
-    { name = "rossum-deploy", specifier = ">=0.1.0" },
-    { name = "rossum-mcp", specifier = ">=2.0.0" },
+    { name = "rossum-mcp", specifier = ">=2.0.0,<3.0.0" },
     { name = "slack-sdk", extras = ["optional"], marker = "extra == 'all'", specifier = ">=3.27.0" },
     { name = "slack-sdk", extras = ["optional"], marker = "extra == 'slack'", specifier = ">=3.27.0" },
     { name = "slack-sdk", extras = ["optional"], marker = "extra == 'tests'", specifier = ">=3.27.0" },
@@ -2374,19 +2372,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/32/a9/a7113548ac62ee1863cf453aca9e57afd574dbe4306be3a2295747902140/rossum_api-3.11.0.tar.gz", hash = "sha256:92c774f15e1a74df3c36a93107d92975ea80113fd735221db9c0aa835ad39eed", size = 158500, upload-time = "2026-03-04T13:32:51.423Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ca/b3/2dc1bc97cdc60c44709b1dbf9ca7d6923b35db5eba69600636716e9d3d16/rossum_api-3.11.0-py3-none-any.whl", hash = "sha256:b789c5bfca82074f0d574817792b9e8eeb7accfc8739b7e94be6ad768ed3fbb6", size = 76725, upload-time = "2026-03-04T13:32:50.126Z" },
-]
-
-[[package]]
-name = "rossum-deploy"
-version = "0.1.0.post0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "rossum-api" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/db/e3/dfafce6bdb4494d64132dc32d490ce9c990345f761f38baa828ff53dd376/rossum_deploy-0.1.0.post0.tar.gz", hash = "sha256:b1bf4211995c6d4abb909fea7691352bb6393f39940ba3c799cbd6ab66d9eb6a", size = 41751, upload-time = "2025-12-31T12:44:08.945Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7a/f7/3a2c7c0082f9d4249a5473c229d8335490e7805b9fcecd50b99b7e36860c/rossum_deploy-0.1.0.post0-py3-none-any.whl", hash = "sha256:c9fca916d506470f925af3ef62d1cc6b88f0cade1304dec535615b06df15119d", size = 24584, upload-time = "2025-12-31T12:44:07.694Z" },
 ]
 
 [[package]]

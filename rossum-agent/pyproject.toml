@@ -36,7 +36,6 @@ dependencies = [
     "python-dotenv",
     "fpdf2>=2.8.0",
     "rossum-api>=3.9.1",
-    "rossum-deploy>=0.1.0",
     "rossum-mcp>=2.0.0,<3.0.0",
     "tqdm>=4.66",
 ]
