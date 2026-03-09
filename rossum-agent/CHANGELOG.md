@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.3.7] - 2026-03-09
+
+### Changed
+- Pinned `rossum-mcp<2.0.0` to avoid breaking changes from major version bump
+
 ## [1.3.6] - 2026-03-02
 
 ### Fixed
