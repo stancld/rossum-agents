@@ -167,7 +167,7 @@ Use ``load_tool`` to load specific MCP tools by name:
 .. code-block:: python
 
    # Load specific tools
-   load_tool(tool_names=["get_queue", "list_schemas"])
+   load_tool(tool_names=["get", "search"])
 
 Available Categories
 ^^^^^^^^^^^^^^^^^^^^
