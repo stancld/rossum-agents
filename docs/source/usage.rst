@@ -181,7 +181,7 @@ Unified tool to fetch any entity by ID (single or batch).
 - ``entity`` (string, required): Entity type. One of: ``queue``, ``schema``, ``hook``,
   ``engine``, ``rule``, ``user``, ``workspace``, ``email_template``,
   ``organization_group``, ``organization_limit``, ``annotation``, ``relation``,
-  ``document_relation``
+  ``document_relation``, ``hook_secrets_keys``
 - ``entity_id`` (integer or list of integers, required): ID or list of IDs to fetch
 - ``include_related`` (boolean, optional, default false): Enriches the result with related
   data. ``queue`` adds ``schema_tree``, ``engine``, ``hooks``, ``hooks_count``;

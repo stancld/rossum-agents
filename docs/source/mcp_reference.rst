@@ -31,7 +31,7 @@ upload_document
 
 **Implementation:**
   The tool wraps the SDK's upload_document method in an async executor to maintain
-  compatibility with MCP's async interface. See ``rossum_mcp.server:45-67``
+  compatibility with MCP's async interface. See ``rossum_mcp.tools.create.annotations``
 
 get_annotation_content
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -63,7 +63,7 @@ get
 **Supported entities:**
   ``queue``, ``schema``, ``hook``, ``engine``, ``rule``, ``user``, ``workspace``,
   ``email_template``, ``organization_group``, ``organization_limit``, ``annotation``,
-  ``relation``, ``document_relation``
+  ``relation``, ``document_relation``, ``hook_secrets_keys``
 
 **Returns:**
   ``{"entity": "<type>", "id": <id>, "data": {...}}``
@@ -77,7 +77,7 @@ get
   Varies by entity — ``GET /v1/{entity_plural}/{id}``
 
 **Implementation:**
-  See ``rossum_mcp.tools.generic.read``
+  See ``rossum_mcp.tools.get`` and ``rossum_mcp.tools.search``
 
 search
 ^^^^^^
@@ -135,7 +135,7 @@ search
   Varies by entity — ``GET /v1/{entity_plural}``
 
 **Implementation:**
-  See ``rossum_mcp.tools.generic.read``
+  See ``rossum_mcp.tools.get`` and ``rossum_mcp.tools.search``
 
 create_queue_from_template
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -183,7 +183,7 @@ update_queue
 
 **Implementation:**
   Updates specific queue fields using PATCH semantics. Commonly used to configure
-  automation thresholds and settings. See ``rossum_mcp.server:444-486``
+  automation thresholds and settings. See ``rossum_mcp.tools.update.queues``
 
 update_engine
 ^^^^^^^^^^^^^
@@ -209,7 +209,7 @@ update_engine
 
 **Implementation:**
   Updates engine configuration using PATCH semantics. Commonly used to manage
-  training queues and learning settings. See ``rossum_mcp.server:450-495``
+  training queues and learning settings. See ``rossum_mcp.tools.update.engines``
 
 **Common Use Case:**
   Update training queues to specify which queues an engine should learn from:
@@ -232,9 +232,10 @@ create_hook
 ^^^^^^^^^^^
 
 **MCP Tool:**
-  ``create_hook(name: str, target: str, queues: list[str] | None,
-  events: list[str] | None, config: dict | None, enabled: bool,
-  insecure_ssl: bool, secret: str | None, response_event: dict | None)``
+  ``create_hook(name: str, type: HookType, queues: list[str] | None,
+  events: list[HookEventAndAction] | None, config: dict | None, settings: dict | None,
+  secrets: dict[str, str] | None, token_owner: str | None,
+  run_after: list[str] | None, sideload: list[HookSideload] | None)``
 
 **Rossum SDK Method:**
   ``AsyncRossumAPIClient.create_new_hook(hook_data: dict)``
@@ -243,53 +244,26 @@ create_hook
   ``POST /v1/hooks``
 
 **Request Body:**
-  JSON object with hook configuration including name, target URL, optional
-  queue URLs, event triggers, configuration, and security settings.
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
+  JSON object with hook configuration including name, type, optional
+  queue URLs, event triggers, configuration, and settings.
 
 **Implementation:**
-  Creates a new webhook or serverless function hook. The hook will trigger on specified
-  events and send requests to the target URL. See ``rossum_mcp.server:972-1046``
-
-**Common Use Cases:**
-
-  .. code-block:: python
-
-     # Create a simple webhook for all queues
-     basic_hook = await server.create_hook(
-         name="Invoice Processing Hook",
-         target="https://example.com/webhook"
-     )
-
-     # Create a hook for specific queues and events
-     advanced_hook = await server.create_hook(
-         name="Status Tracker",
-         target="https://example.com/status",
-         queues=["https://api.elis.rossum.ai/v1/queues/12345"],
-         events=["annotation_status", "annotation_content"],
-         config={"custom_header": "value"},
-         secret="webhook_secret_123"
-     )
+  Creates a new webhook or serverless function hook. For function hooks,
+  ``config.source`` is auto-renamed to ``config.code``, default runtime is
+  ``python3.12``, and ``timeout_s`` is capped at 60.
+  See ``rossum_mcp.tools.create.hooks``
 
 **Parameters:**
-  - ``name`` (str): Hook name for identification
-  - ``target`` (str): URL endpoint where webhook requests are sent
-  - ``queues`` (list[str], optional): List of queue URLs to attach the hook to.
-    If not provided, hook applies to all queues
-  - ``events`` (list[str], optional): List of events that trigger the hook:
-
-    * ``annotation_status`` - Annotation status changes
-    * ``annotation_content`` - Content modifications
-    * ``annotation_export`` - Export operations
-    * ``datapoint_value`` - Individual field value changes
-
-  - ``config`` (dict, optional): Additional configuration (e.g., custom headers)
-  - ``enabled`` (bool): Whether the hook is active (default: True)
-  - ``insecure_ssl`` (bool): Skip SSL verification (default: False)
-  - ``secret`` (str, optional): Secret key for securing webhook requests
-  - ``response_event`` (dict, optional): Configuration for response event handling
+  - ``name`` (str): Hook name
+  - ``type`` (HookType): ``webhook`` or ``function``
+  - ``queues`` (list[str], optional): List of queue URLs to attach the hook to
+  - ``events`` (list[HookEventAndAction], optional): List of trigger events in ``event.action`` format
+  - ``config`` (dict, optional): Hook configuration
+  - ``settings`` (dict, optional): Hook settings
+  - ``secrets`` (dict[str, str], optional): Secret key-value pairs for the hook
+  - ``token_owner`` (str, optional): User URL for token ownership; cannot be an ``organization_group_admin`` user
+  - ``run_after`` (list[str], optional): List of hook URLs that must run before this hook
+  - ``sideload`` (list[HookSideload], optional): Sideload configuration for the hook
 
 create_rule
 ^^^^^^^^^^^
@@ -407,7 +381,10 @@ update_hook
 ^^^^^^^^^^^
 
 **MCP Tool:**
-  ``update_hook(hook_id: int, name: str | None, queues: list[str] | None, events: list[str] | None, config: dict | None, settings: dict | None, active: bool | None)``
+  ``update_hook(hook_id: int, name: str | None, queues: list[str] | None,
+  events: list[HookEventAndAction] | None, config: dict | None, settings: dict | None,
+  active: bool | None, secrets: dict[str, str] | None, token_owner: str | None,
+  run_after: list[str] | None, sideload: list[HookSideload] | None)``
 
 **Rossum SDK Method:**
   ``AsyncRossumAPIClient.update_part_hook(hook_id, hook_data)``
@@ -418,12 +395,9 @@ update_hook
 **Request Body:**
   Partial JSON object with only the fields to update.
 
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
 **Implementation:**
   Updates an existing hook's properties. Only provided fields are updated; others remain
-  unchanged. Commonly used to modify hook name, attached queues, events, config, or active status.
+  unchanged. See ``rossum_mcp.tools.update.hooks``
 
 create_hook_from_template
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -955,8 +929,8 @@ delete
      - Soft delete — moves to 'deleted' status
 
 **Implementation:**
-  Defined in ``rossum_mcp/tools/generic/delete.py``. A registry maps entity
-  names to existing private delete functions from individual tool modules.
+  Defined in ``rossum_mcp/tools/delete/handler.py``. A registry maps entity
+  names to SDK delete methods.
 
 Rossum API Resources
 ---------------------

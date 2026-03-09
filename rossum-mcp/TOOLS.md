@@ -1,6 +1,6 @@
 # Rossum MCP Tools Reference
 
-Complete API reference for all 32 MCP tools. For quick start and setup, see [README.md](README.md).
+Complete API reference for all 31 MCP tools. For quick start and setup, see [README.md](README.md).
 
 ---
 
@@ -370,9 +370,10 @@ Creates a new hook (webhook or serverless function).
 - `events` (array of strings, optional): List of trigger events in `event.action` format
 - `config` (object, optional): Hook configuration. For function hooks: `config.source` is auto-renamed to `config.code`, default runtime is `python3.12`, `timeout_s` is capped at 60
 - `settings` (object, optional): Hook settings
-- `secret` (string, optional): Secret key for webhooks
-
-**Note:** `token_owner` cannot be an `organization_group_admin` user.
+- `secrets` (dict[str, str], optional): Secret key-value pairs for the hook
+- `token_owner` (string, optional): User URL for token ownership; cannot be an `organization_group_admin` user
+- `run_after` (array of strings, optional): List of hook URLs that must run before this hook
+- `sideload` (array of HookSideload, optional): Sideload configuration for the hook
 
 **Common events:**
 - `annotation_content.initialize` — When annotation is first created
@@ -392,6 +393,10 @@ Patches an existing hook; only provided fields change.
 - `config` (object, optional): New hook configuration
 - `settings` (object, optional): New hook settings
 - `active` (boolean, optional): Enable or disable the hook
+- `secrets` (dict[str, str], optional): Secret key-value pairs for the hook
+- `token_owner` (string, optional): User URL for token ownership
+- `run_after` (array of strings, optional): List of hook URLs that must run before this hook
+- `sideload` (array of HookSideload, optional): Sideload configuration for the hook
 
 ### create_hook_from_template
 
@@ -410,8 +415,8 @@ Tests a hook by auto-generating a realistic payload and executing it. For `annot
 
 **Parameters:**
 - `hook_id` (integer, required): Hook ID to test
-- `event` (string, required): Hook event (e.g., `annotation_content`, `annotation_status`)
-- `action` (string, required): Hook action (e.g., `initialize`, `confirm`, `export`)
+- `event` (HookEvent, required): Hook event (e.g., `annotation_content`, `annotation_status`)
+- `action` (HookAction, required): Hook action (e.g., `initialize`, `confirm`, `export`)
 - `annotation` (string, optional): Annotation URL to use for real data
 - `status` (string, optional): Annotation status
 - `previous_status` (string, optional): Previous annotation status
