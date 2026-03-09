@@ -71,11 +71,17 @@ uv sync --extra api        # REST API (FastAPI, Redis)
 | `ROSSUM_API_TOKEN` | Yes | Rossum API authentication token |
 | `ROSSUM_API_BASE_URL` | Yes | Base URL (e.g., `https://api.elis.rossum.ai/v1`) |
 | `AWS_PROFILE` | Yes | AWS profile for Bedrock access |
-| `AWS_DEFAULT_REGION` | No | AWS region (default: `us-east-1`) |
+| `AWS_REGION` | No | AWS region for Bedrock (default: `us-east-1`) |
+| `AWS_BEDROCK_MODEL_ARN` | No | Custom ARN for the Opus model in Bedrock |
+| `AWS_BEDROCK_MODEL_ARN_SMALL` | No | Custom ARN for the Haiku model in Bedrock |
 | `REDIS_HOST` | No | Redis host for chat persistence |
 | `REDIS_PORT` | No | Redis port (default: `6379`) |
 | `ROSSUM_MCP_MODE` | No | MCP mode: `read-only` (default) or `read-write` |
 | `ROSSUM_AGENT_PERSONA` | No | Agent persona: `default` (default) or `cautious` — read by the TUI client, not the server |
+| `ROSSUM_KB_DATA_PATH` | No | Path to local knowledge base JSON file |
+| `ADDITIONAL_ALLOWED_ROSSUM_HOSTS` | No | Comma-separated regex patterns for additional allowed Rossum API hosts |
+| `SLACK_BOT_TOKEN` | No | Slack bot token for report integration |
+| `SLACK_CHANNEL` | No | Slack channel for posting reports |
 
 ## Usage
 

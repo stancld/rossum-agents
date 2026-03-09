@@ -70,6 +70,7 @@ Configure Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_c
 | `ROSSUM_API_TOKEN` | Yes | Your Rossum API authentication token |
 | `ROSSUM_API_BASE_URL` | Yes | Base URL for the Rossum API |
 | `ROSSUM_MCP_MODE` | No | `read-write` (default) or `read-only` |
+| `ROSSUM_MCP_LOG_LEVEL` | No | Logging level (default: `INFO`) |
 
 ### Read-Only Mode
 

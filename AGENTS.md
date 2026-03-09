@@ -196,6 +196,16 @@ TUI types still declare `{ event: "error"; data: { message: string } }` in `SSEE
 | `ROSSUM_API_BASE_URL` | Required - API endpoint |
 | `REDIS_HOST`, `REDIS_PORT` | Optional - Redis connection (default port: 6379) |
 | `ROSSUM_MCP_MODE` | Optional - read-only or read-write |
+| `ROSSUM_MCP_LOG_LEVEL` | Optional - MCP server log level (default: INFO) |
+| `AWS_REGION` | Optional - AWS region for Bedrock (default: us-east-1) |
+| `AWS_BEDROCK_MODEL_ARN` | Optional - Custom ARN for Opus model |
+| `AWS_BEDROCK_MODEL_ARN_SMALL` | Optional - Custom ARN for Haiku model |
+| `ROSSUM_KB_DATA_PATH` | Optional - Path to local knowledge base JSON |
+| `ADDITIONAL_ALLOWED_ROSSUM_HOSTS` | Optional - Comma-separated regex for extra allowed API hosts |
+| `SLACK_BOT_TOKEN` | Optional - Slack bot token for reports |
+| `SLACK_CHANNEL` | Optional - Slack channel for reports |
+| `ROSSUM_AGENT_API_URL` | Optional - Agent API URL (rossum-agent-client) |
+| `ROSSUM_AGENT_PERSONA` | Optional - Agent persona: default or cautious |
 
 ## Planning Files
 
