@@ -9,24 +9,20 @@ from pathlib import Path
 import jq  # ty: ignore[unresolved-import] - no type stubs for jq
 from anthropic import beta_tool
 
+from rossum_agent.tools.utils import _truncate_output
+
 _JQ_OUTPUT_LIMIT = 50_000
 _GREP_MATCH_LIMIT = 200
-
-
-def _truncate_output(output: str, limit: int) -> str:
-    if len(output) <= limit:
-        return output
-    truncation_point = output.rfind("\n", 0, limit)
-    if truncation_point <= 0:
-        truncation_point = limit
-    return output[:truncation_point] + "\n... (truncated)"
 
 
 def _resolve_content(value: str) -> str:
     """Return file contents if value is an existing path, otherwise return value as-is."""
     path = Path(value)
-    if path.is_absolute() and path.is_file():
-        return path.read_text(encoding="utf-8")
+    if path.is_absolute():
+        try:
+            return path.read_text(encoding="utf-8")
+        except (FileNotFoundError, IsADirectoryError, PermissionError):
+            pass
     return value
 
 
@@ -42,6 +38,11 @@ def run_jq(jq_query: str, data: str) -> str:
     - `.[0].name` — extract nested value
     - `keys` — list object keys
     - `map(.id)` — extract field from array
+
+    Null safety — fields like .workspace can be null; always guard before string ops:
+    - `.workspace // "" | split("/") | last` — safe split with fallback
+    - `select(.workspace != null) | .workspace | split("/") | last` — skip nulls
+    - `.field | tonumber? // null` — safe numeric conversion
 
     Annotation content structure (get_annotation_content):
     - Top-level array of sections, each with `.children[]` (datapoints or multivalues)
@@ -63,12 +64,20 @@ def run_jq(jq_query: str, data: str) -> str:
         return json.dumps({"status": "error", "message": f"Invalid JSON: {e}"})
 
     try:
-        output = jq.compile(jq_query).input_value(parsed).text()
+        results = jq.compile(jq_query).input_value(parsed).all()
     except (ValueError, SystemError) as e:
-        return json.dumps({"status": "error", "message": f"jq error: {e}"})
+        msg = f"jq error: {e}"
+        err_str = str(e).lower()
+        if "null" in err_str or "must be" in err_str or "cannot be" in err_str:
+            msg += ' (hint: a field is likely null — use `// ""` fallback or `select(.field != null)` to guard)'
+        return json.dumps({"status": "error", "message": msg})
 
-    output = _truncate_output(output, _JQ_OUTPUT_LIMIT)
-    return json.dumps({"status": "success", "result": output})
+    result = results[0] if len(results) == 1 else results
+    serialized = json.dumps(result)
+    if len(serialized) > _JQ_OUTPUT_LIMIT:
+        serialized = _truncate_output(serialized, _JQ_OUTPUT_LIMIT)
+        return json.dumps({"status": "success", "result": serialized, "truncated": True})
+    return json.dumps({"status": "success", "result": result})
 
 
 @beta_tool

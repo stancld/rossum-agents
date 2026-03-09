@@ -1,4 +1,4 @@
-"""Tests for elis_backend_openapi_search module."""
+"""Tests for OpenAPI search tools (inlined in subagents/elis_docs.py)."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
-import rossum_agent.tools.elis_backend_openapi_search as openapi_module
-from rossum_agent.tools.elis_backend_openapi_search import SpecCache
+import rossum_agent.tools.subagents.elis_docs as openapi_module
+from rossum_agent.tools.subagents.elis_docs import SpecCache
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -218,7 +218,7 @@ class TestSpecCacheEnsureDownloaded:
         mock_response.text = '{"openapi": "3.0.0", "info": {"title": "Test"}}'
         mock_response.raise_for_status = MagicMock()
 
-        with patch("rossum_agent.tools.elis_backend_openapi_search.httpx.get", return_value=mock_response):
+        with patch("rossum_agent.tools.subagents.elis_docs.httpx.get", return_value=mock_response):
             result = cache._ensure_downloaded()
             assert result == cache_file
             assert cache_file.exists()
@@ -237,7 +237,7 @@ class TestSpecCacheEnsureDownloaded:
         mock_response.raise_for_status = MagicMock()
 
         cache = SpecCache(cache_file)
-        with patch("rossum_agent.tools.elis_backend_openapi_search.httpx.get", return_value=mock_response):
+        with patch("rossum_agent.tools.subagents.elis_docs.httpx.get", return_value=mock_response):
             result = cache._ensure_downloaded()
             assert result == cache_file
             content = json.loads(cache_file.read_text())
@@ -253,7 +253,7 @@ class TestSpecCacheEnsureDownloaded:
         mock_response.text = html
         mock_response.raise_for_status = MagicMock()
 
-        with patch("rossum_agent.tools.elis_backend_openapi_search.httpx.get", return_value=mock_response):
+        with patch("rossum_agent.tools.subagents.elis_docs.httpx.get", return_value=mock_response):
             result = cache._ensure_downloaded()
             assert result == cache_file
             content = json.loads(cache_file.read_text())
@@ -295,7 +295,7 @@ class TestSpecCacheLoad:
         mock_response.raise_for_status = MagicMock()
 
         cache = SpecCache(cache_file)
-        with patch("rossum_agent.tools.elis_backend_openapi_search.httpx.get", return_value=mock_response):
+        with patch("rossum_agent.tools.subagents.elis_docs.httpx.get", return_value=mock_response):
             spec = cache.load()
             assert spec["openapi"] == "3.0.0"
 

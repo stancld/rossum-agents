@@ -1,50 +1,48 @@
 # Formula Fields Skill
 
-**Goal**: Create or update formula fields that compute values from other fields using TxScript (Python-based).
+**Goal**: Create or update formula fields that compute deterministic values from other fields using TxScript.
 
-## Workflow
+Use formula fields for clear rules, math, string ops, conditional logic, and aggregations. For ambiguous interpretation, use reasoning fields instead.
 
-1. Call `suggest_formula_field(label, hint, schema_id, section_id, field_schema_id)` to get AI-generated formula
-2. Call `patch_schema_with_subagent(schema_id, changes)` to add the field with the generated formula to the schema
+## Creating / Updating
 
-### Updating Existing Formulas
+Always use `execute_python` with `suggest_formula_field` to generate formulas — never write TxScript formulas by hand.
 
-To fix or modify an existing formula field, use `action: "update"`:
-
+```python
+result = suggest_formula_field(
+    label="Net Terms",
+    hint="Compute payment terms based on due date and issue date",
+    schema_id=9389721,
+    section_id="basic_info",
+    field_schema_id="net_terms",
+)
 ```
-patch_schema_with_subagent(schema_id="12345", changes='[{"action": "update", "id": "existing_field_id", "formula": "new_formula_code"}]')
-```
 
-Or use MCP `patch_schema` directly for simple formula updates:
+Then apply via `patch_schema_with_subagent(schema_id, changes)` using `result["formula"]` or `result["field_definition"]`.
+
+For simple formula updates on existing fields, `patch_schema` MCP tool works directly:
 
 ```
 patch_schema(schema_id=12345, operation="update", node_id="field_id", node_data={"formula": "new_code"})
 ```
 
-## When to Use
+## Schema Config
 
-| Scenario | Use Formula Field |
-|----------|-------------------|
-| Deterministic transformation | Yes — clear rules, math, string ops |
-| Conditional logic | Yes — if/else on field values |
-| Aggregation across line items | Yes — `sum()`, `all_values` |
-| Ambiguous interpretation | No — use reasoning field instead |
+Formula fields require:
+- `ui_configuration`: `{"type": "formula", "edit": "disabled"}`
+- `formula`: TxScript code string
 
 ## TxScript
 
-Full language reference: load `txscript` skill. Key formula-field specifics:
-- No imports needed — all helpers are globals
-- No `return` — last expression is the output
-- 2000 character limit
-- Can only write to own value
+Full reference: load `txscript` skill. Key formula-specific constraint: 2000 character limit per formula.
 
 ## Common Patterns
 
 ```python
-# Date + 14 days
+# Date arithmetic
 field.date_issue + timedelta(days=14)
 
-# Conditional discount
+# Conditional
 field.amount_total * 0.8 if field.amount_total > 20000 else field.amount_total
 
 # Fallback chain
@@ -67,25 +65,9 @@ else:
     field.order_id
 ```
 
-## Schema Config
+## Related Skills
 
-Formula fields require:
-- `ui_configuration`: `{"type": "formula", "edit": "disabled"}`
-- `formula`: TxScript code string
-
-## Constraints
-
-| Rule | Detail |
-|------|--------|
-| No circular refs | Formula must not reference itself |
-| No return statements | Last expression is the output |
-| Always produce result | Empty formula = empty field |
-| Round floats | `round(x, 2)` for equality checks |
-| Use `suggest_formula_field` first | Get AI-generated formula, then patch |
-| No `update_schema` | Hidden intentionally — use `patch_schema` or `patch_schema_with_subagent` |
-
-## Cross-Reference
-
-- AI-generated formula suggestions: `suggest_formula_field` tool (always available)
-- Add formula field to schema: load `schema-patching` skill
-- Contextual AI inference: load `reasoning-fields` skill
+- `python-execution` — shared Python helper reference
+- `txscript` — full language reference
+- `schema-patching` — adding fields to schema
+- `reasoning-fields` — contextual AI inference (non-deterministic)

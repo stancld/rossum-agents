@@ -1,7 +1,9 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { AgentQuestion } from "./AgentQuestion.js";
 import { ThinkingBlock } from "./ThinkingBlock.js";
 import { ToolCall } from "./ToolCall.js";
+import { ToolGroup } from "./ToolGroup.js";
 import { StreamingIndicator } from "./StreamingIndicator.js";
 import { renderMarkdown } from "../utils/markdown.js";
 import { truncate } from "../utils/format.js";
@@ -71,14 +73,24 @@ function ConfigCommitItem({ commit }: { commit: ConfigCommitInfo }) {
   );
 }
 
+function FeedbackBadge({ feedback }: { feedback: boolean | null }) {
+  if (feedback === null) return null;
+  if (feedback) {
+    return <Text color="green"> [+1]</Text>;
+  }
+  return <Text color="red"> [-1]</Text>;
+}
+
 function FinalAnswerBlock({
   content,
   expanded,
   selected,
+  feedback,
 }: {
   content: string;
   expanded: boolean;
   selected: boolean;
+  feedback: boolean | null;
 }) {
   const lines = content.split("\n");
   const lineCount = lines.length;
@@ -96,6 +108,7 @@ function FinalAnswerBlock({
         </Text>
         {firstLine || "(empty)"}
         {lineCount > 1 ? ` ... (${lineCount} lines)` : ""}
+        <FeedbackBadge feedback={feedback} />
       </Text>
     );
   }
@@ -108,6 +121,7 @@ function FinalAnswerBlock({
           {"● "}
         </Text>
         Response
+        <FeedbackBadge feedback={feedback} />
       </Text>
       <Box marginLeft={2}>
         <Text wrap="wrap">{renderMarkdown(content)}</Text>
@@ -116,6 +130,7 @@ function FinalAnswerBlock({
   );
 }
 
+// eslint-disable-next-line complexity -- discriminated union switch on ChatItem.kind
 export const ChatItemDisplay = React.memo(function ChatItemDisplay({
   item,
   expanded,
@@ -160,6 +175,16 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
         />
       );
 
+    case "tool_group":
+      return (
+        <ToolGroup
+          toolName={item.toolName}
+          calls={item.calls}
+          expanded={expanded}
+          selected={selected}
+        />
+      );
+
     case "intermediate":
       return (
         <IntermediateBlock
@@ -175,6 +200,7 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
           content={item.content}
           expanded={expanded}
           selected={selected}
+          feedback={item.feedback}
         />
       );
 
@@ -195,6 +221,17 @@ export const ChatItemDisplay = React.memo(function ChatItemDisplay({
 
     case "config_commit":
       return <ConfigCommitItem commit={item.commit} />;
+
+    case "agent_question":
+      return (
+        <AgentQuestion
+          question={item.question}
+          options={item.options}
+          multiSelect={item.multiSelect}
+          questionIndex={item.questionIndex}
+          totalQuestions={item.totalQuestions}
+        />
+      );
 
     case "streaming":
       return (

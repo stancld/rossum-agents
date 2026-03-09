@@ -52,14 +52,5 @@ def add_message_cache_breakpoint(messages: list[dict[str, Any]]) -> None:
 
 
 def get_display_tool_name(tool_call_name: str, tool_arguments: dict[str, Any] | None = None) -> str:
-    """Get display name for a tool, expanding call_on_connection to show the actual MCP tool.
-
-    For call_on_connection, returns 'call_on_connection[connection_id.tool_name]' format.
-    For other tools, returns the original name.
-    """
-    if tool_call_name == "call_on_connection" and tool_arguments:
-        connection_id = tool_arguments.get("connection_id", "")
-        inner_tool = tool_arguments.get("tool_name", "")
-        if connection_id and inner_tool:
-            return f"call_on_connection[{connection_id}.{inner_tool}]"
+    """Get display name for a tool."""
     return tool_call_name

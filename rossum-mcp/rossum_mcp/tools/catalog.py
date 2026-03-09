@@ -20,6 +20,10 @@ class CategoryMeta:
 # Category descriptions and keywords for agent pre-loading.
 # Tool lists are derived dynamically from tags on @mcp.tool decorators.
 CATEGORY_META: dict[str, CategoryMeta] = {
+    "read": CategoryMeta(
+        description="Unified read layer: get one entity by ID or search/list with typed filters",
+        keywords=["get", "search", "list", "read", "retrieve", "find", "lookup"],
+    ),
     "annotations": CategoryMeta(
         description="Document processing: upload, retrieve, update, and confirm annotations",
         keywords=["annotation", "document", "upload", "extract", "confirm", "review"],
@@ -38,40 +42,15 @@ CATEGORY_META: dict[str, CategoryMeta] = {
     ),
     "hooks": CategoryMeta(
         description="Extensions/webhooks: create and manage automation hooks",
-        keywords=["hook", "extension", "webhook", "automation", "function", "serverless"],
+        keywords=["hook", "extension", "webhook", "automation", "function", "serverless", "workflow"],
     ),
     "email_templates": CategoryMeta(
         description="Email templates: configure automated email responses",
-        keywords=["email", "template", "notification", "rejection"],
-    ),
-    "document_relations": CategoryMeta(
-        description="Document relations: manage export/einvoice document links",
-        keywords=["document relation", "export", "einvoice"],
-    ),
-    "relations": CategoryMeta(
-        description="Annotation relations: manage edit/attachment/duplicate links",
-        keywords=["relation", "duplicate", "attachment"],
+        keywords=["email", "notification", "rejection"],
     ),
     "rules": CategoryMeta(
         description="Validation rules: manage schema validation rules",
         keywords=["rule", "validation", "constraint"],
-    ),
-    "organization_groups": CategoryMeta(
-        description="Organization group management: view license groups shared across organizations",
-        keywords=[
-            "organization group",
-            "license",
-            "trial",
-            "production",
-            "deployment",
-            "lookup fields",
-            "datasets",
-            "reasoning fields",
-        ],
-    ),
-    "organization_limits": CategoryMeta(
-        description="Organization limits: view email sending limits and usage counters",
-        keywords=["organization limit", "email limit", "quota", "email usage"],
     ),
     "users": CategoryMeta(
         description="User management: create, update, list users and roles",

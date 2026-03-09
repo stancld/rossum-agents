@@ -16,7 +16,7 @@ Use the ``load_skill`` tool when a task matches one of the available skills:
 .. code-block:: json
 
    {
-     "name": "rossum-deployment"
+     "name": "schema-patching"
    }
 
 Returns skill instructions as JSON:
@@ -25,8 +25,8 @@ Returns skill instructions as JSON:
 
    {
      "status": "success",
-     "skill_name": "Rossum Deployment",
-     "instructions": "# Rossum Deployment Skill\n\n**Goal**: Deploy configuration changes safely..."
+     "skill_name": "Schema Patching",
+     "instructions": "# Schema Patching Skill\n\n**Goal**: Add, update, or remove individual schema fields..."
    }
 
 Available Skills
@@ -38,16 +38,10 @@ Available Skills
 
    * - Skill
      - Purpose
-   * - ``rossum-deployment``
-     - Deploy configuration changes safely via sandbox with before/after diff
    * - ``schema-patching``
      - Add, update, or remove individual schema fields
-   * - ``schema-pruning``
-     - Remove unwanted fields from schema in one call
-   * - ``organization-setup``
-     - Set up Rossum for new customers with correct document types and regional configurations
-   * - ``schema-creation``
-     - Create new schemas from scratch with correct content array structure
+   * - ``python-execution``
+     - Constrained Python snippets, schema export of bulky structured outputs
    * - ``ui-settings``
      - Update queue UI settings (annotation list columns) without corrupting structure
    * - ``rules-and-actions``
@@ -70,23 +64,7 @@ Hooks Skill
 
 **Goal**: Create, configure, and test hooks — prefer Rossum Store templates over custom code.
 
-Workflow: ``list_hook_templates()`` → ``create_hook_from_template()`` or ``create_hook()`` → ``test_hook()`` → ``list_hook_logs()``.
-
-Rossum Deployment Skill
-"""""""""""""""""""""""
-
-**Goal**: Deploy configuration changes safely via sandbox with before/after diff.
-
-Key workflow:
-
-1. Copy workspace to sandbox (``deploy_copy_workspace``)
-2. Pull BEFORE state (``deploy_pull``)
-3. Modify sandbox via spawned connection (``call_on_connection``)
-4. Pull AFTER state (``deploy_pull``)
-5. Compare and show diff (``deploy_compare_workspaces``) - **wait for user approval**
-6. Deploy to production (``deploy_to_org``)
-
-**Critical rule**: Direct MCP calls modify production. Use ``call_on_connection("sandbox", ...)`` for sandbox modifications.
+Workflow: ``search(query={"entity": "hook_template"})`` → ``create_hook_from_template()`` or ``create_hook()`` → ``test_hook()`` → ``search(query={"entity": "hook_log", ...})``.
 
 Schema Patching Skill
 """""""""""""""""""""
@@ -112,24 +90,12 @@ Schema Pruning Skill
        fields_to_keep=["invoice_number", "invoice_date", "total_amount"]
    )
 
-Organization Setup Skill
-""""""""""""""""""""""""
+Python Execution Skill
+""""""""""""""""""""""
 
-**Goal**: Set up Rossum for new customers with correct document types and regional configurations.
+**Goal**: Use constrained Python snippets for MCP result transformation, schema export/edit flows, and Rossum copilot helpers.
 
-Use ``create_queue_from_template`` for new customer onboarding with regional templates (EU/US/UK/CZ/CN).
-
-Schema Creation Skill
-"""""""""""""""""""""
-
-**Goal**: Create new schemas from scratch with correct content array structure (sections, datapoints, multivalues, tuples).
-
-.. code-block:: python
-
-   create_schema_with_subagent(
-       name="Invoice Schema",
-       requirements="Describe sections, fields, and tables needed"
-   )
+This skill is the canonical place for Python helper availability. Load it before using Python snippets for Rossum-specific work.
 
 UI Settings Skill
 """""""""""""""""
@@ -143,7 +109,7 @@ Document Testing Skill
 
 **Goal**: Test document processing end-to-end — generate a schema-aware mock PDF, upload it, verify extraction, optionally trigger hooks.
 
-Workflow: ``get_schema`` → extract fields → ``generate_mock_pdf(fields=[...])`` → ``upload_document`` → poll ``list_annotations`` → ``get_annotation`` with sideloads → compare expected vs extracted values.
+Workflow: ``get(entity="schema", entity_id=schema_id)`` → extract fields → ``generate_mock_pdf(fields=[...])`` → ``upload_document`` → poll ``search(query={"entity": "annotation", "queue_id": ..., "ordering": ["-created_at"], "first_n": 1})`` → ``get_annotation_content(annotation_id)`` → compare expected vs extracted values.
 
 ``generate_mock_pdf`` tool parameters:
 
@@ -191,20 +157,17 @@ How It Works
 
 1. **Discovery**: The MCP server provides a ``list_tool_categories`` tool that returns all available categories with metadata
 2. **Automatic Pre-loading**: On the first user message, keywords are matched against category keywords to pre-load relevant tools
-3. **On-demand Loading**: The agent can explicitly load additional categories using ``load_tool_category``
+3. **On-demand Loading**: The agent can explicitly load additional tools using ``load_tool``
 
 Loading Tools
 ^^^^^^^^^^^^^
 
-Use ``load_tool_category`` to load MCP tools from specific categories:
+Use ``load_tool`` to load specific MCP tools by name:
 
 .. code-block:: python
 
-   # Load single category
-   load_tool_category(categories=["schemas"])
-
-   # Load multiple categories
-   load_tool_category(categories=["queues", "schemas", "engines"])
+   # Load specific tools
+   load_tool(tool_names=["get", "search"])
 
 Available Categories
 ^^^^^^^^^^^^^^^^^^^^
@@ -349,10 +312,23 @@ Returns JSON with:
 
 For extension setup guides and workflow tutorials, use ``search_knowledge_base`` instead.
 
+Working Memory & File Tools
+"""""""""""""""""""""""""""
+
+Large tool results (>30k chars) are automatically saved to workspace files under ``{output_dir}/workspace/``. The agent receives a compact summary with item count, preview, and file path — then queries the full content on demand.
+
+``write_file(filename, content)``
+   Save content to the agent's output directory. Accepts string, dict, or list content.
+
+   .. code-block:: python
+
+      write_file(filename="report.md", content="# Analysis\n...")
+      write_file(filename="data.json", content={"key": "value"})
+
 General-Purpose Data Tools
 """"""""""""""""""""""""""
 
-Available for any JSON/text content — annotation data, logs, schema dumps, API responses.
+Available for any JSON/text content — annotation data, logs, schema dumps, API responses. Both tools accept file paths, making them ideal for querying spilled workspace files.
 
 ``run_jq(jq_query, data)``
    Run a jq expression on a JSON string or file path. Returns the jq output as a string (truncated at 50 000 chars).
@@ -392,16 +368,16 @@ The agent also exposes the underlying search tools directly for quick lookups wi
       elis_openapi_grep(pattern="pagination")
       elis_openapi_grep(pattern="annotation_status")
 
-Knowledge Base Sub-Agent
-^^^^^^^^^^^^^^^^^^^^^^^^
+Knowledge Base Search
+^^^^^^^^^^^^^^^^^^^^^
 
-Invoked via the ``search_knowledge_base`` tool. Iterates through pre-scraped Knowledge Base articles using ``kb_grep`` and ``kb_get_article`` tools.
+Invoked via the ``search_knowledge_base`` tool. It ranks pre-scraped Knowledge Base articles locally first, then falls back to the sub-agent only when the query is ambiguous.
 
 **Capabilities:**
 
-- Searches pre-scraped KB articles by keyword/regex (``kb_grep``)
-- Retrieves full article content by slug (``kb_get_article``)
-- Opus synthesizes actionable answers from multiple articles
+- Deterministically ranks pre-scraped KB articles by slug, recovered title, and content matches
+- Returns structured JSON with ranked candidates and the selected article on high-confidence lookups
+- Falls back to Opus only for ambiguous queries that genuinely need multiple lookups
 - Articles cached locally with 24-hour TTL from S3-hosted JSON
 
 **Direct search tools** (available without sub-agent overhead):
@@ -415,14 +391,14 @@ Invoked via the ``search_knowledge_base`` tool. Iterates through pre-scraped Kno
       kb_grep(pattern="webhook|email_template")
 
 ``kb_get_article(slug)``
-   Retrieve full article content by slug. Supports partial match.
+   Persist the full article JSON by slug and return a filesystem path for follow-up ``run_jq`` queries. Supports partial match.
 
    .. code-block:: python
 
       kb_get_article(slug="document-splitting-extension")
       kb_get_article(slug="webhook")
 
-**Sub-agent usage** (for complex questions requiring multiple lookups):
+**Ambiguous-query fallback** (only when deterministic ranking is not decisive):
 
 .. code-block:: python
 
@@ -433,10 +409,10 @@ Invoked via the ``search_knowledge_base`` tool. Iterates through pre-scraped Kno
 
 Returns JSON with:
 
-- Synthesized answer from Opus
-- Number of iterations used
-- Token usage (input/output)
-- List of searches performed
+- Retrieval strategy (``direct_lookup`` or ``sub_agent_fallback``)
+- Ranked candidate articles
+- Selected article path whenever a concrete article is identified, for follow-up ``run_jq`` queries
+- Token usage and tool searches when the sub-agent fallback runs
 
 Lookup Fields Skill
 ^^^^^^^^^^^^^^^^^^^
@@ -445,10 +421,12 @@ Load with ``load_skill(name="lookup-fields")`` when configuring or debugging loo
 
 Key workflow:
 
-1. ``suggest_lookup_field`` for matching config
-2. ``evaluate_lookup_field`` on real annotations — do not write to schema until this passes
+1. ``execute_python`` for matching config generation
+2. ``execute_python`` for evaluation on real annotations — do not write to schema until this passes
 3. ``patch_schema_with_subagent`` to apply it
-4. ``get_lookup_dataset_raw_values`` + ``query_lookup_dataset`` for unmatched or ambiguous results, then re-call ``suggest_lookup_field`` with corrected hints
+4. ``execute_python`` for dataset inspection and refinement, then regenerate the matching config if needed
+
+When ``execute_python`` produces bulky structured data during these flows, save it with ``write_file(...)`` instead of returning the full payload inline.
 
 Schema Patching Sub-Agent
 ^^^^^^^^^^^^^^^^^^^^^^^^^

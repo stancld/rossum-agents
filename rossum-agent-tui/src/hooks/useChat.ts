@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { createChat } from "../api/client.js";
+import { createChat, submitFeedback as apiFeedback } from "../api/client.js";
 import { streamMessage } from "../api/sse.js";
 import {
   loadPersistedState,
   savePersistedState,
 } from "../utils/persistence.js";
 import type {
+  AgentQuestionEvent,
   AttachmentInfo,
   ChatState,
   CompletedStep,
@@ -39,6 +40,8 @@ const INITIAL_STATE: ChatState = {
   files: [],
   error: null,
   userMessages: [],
+  feedback: {},
+  pendingQuestion: null,
 };
 
 function stepToCompleted(step: StepEvent): CompletedStep {
@@ -182,6 +185,13 @@ function reduceEvent(prev: ChatState, event: SSEEvent): ChatState {
     case "sub_agent_text":
       return handleSubAgentTextEvent(prev, event.data as SubAgentTextEvent);
 
+    case "agent_question":
+      return {
+        ...prev,
+        pendingQuestion: event.data as AgentQuestionEvent,
+        connectionStatus: "idle",
+      };
+
     case "done":
       return handleDoneEvent(prev, event.data);
 
@@ -241,6 +251,7 @@ export function useChat(config: Config) {
         currentStreaming: null,
         subAgentProgress: null,
         subAgentText: null,
+        pendingQuestion: null,
         finalAnswer: null,
         tokenUsage: null,
         configCommit: null,
@@ -339,5 +350,30 @@ export function useChat(config: Config) {
     });
   }, []);
 
-  return { state, sendMessage, resetChat, abortStreaming };
+  const submitFeedback = useCallback(
+    async (turnIndex: number, isPositive: boolean) => {
+      const chatId = chatIdRef.current;
+      if (!chatId) return;
+
+      // Optimistic update
+      setState((prev) => ({
+        ...prev,
+        feedback: { ...prev.feedback, [turnIndex]: isPositive },
+      }));
+
+      try {
+        await apiFeedback(config, chatId, turnIndex, isPositive);
+      } catch {
+        // Silent revert on failure
+        setState((prev) => {
+          const next = { ...prev.feedback };
+          delete next[turnIndex];
+          return { ...prev, feedback: next };
+        });
+      }
+    },
+    [config],
+  );
+
+  return { state, sendMessage, resetChat, abortStreaming, submitFeedback };
 }

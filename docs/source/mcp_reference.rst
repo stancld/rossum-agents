@@ -31,25 +31,7 @@ upload_document
 
 **Implementation:**
   The tool wraps the SDK's upload_document method in an async executor to maintain
-  compatibility with MCP's async interface. See ``rossum_mcp.server:45-67``
-
-get_annotation
-^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_annotation(annotation_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_annotation(annotation_id)``
-
-**API Endpoint:**
-  ``GET /v1/annotations/{annotation_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  See ``rossum_mcp.tools.annotations``
+  compatibility with MCP's async interface. See ``rossum_mcp.tools.create.annotations``
 
 get_annotation_content
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -72,124 +54,88 @@ get_annotation_content
 **Implementation:**
   See ``rossum_mcp.tools.annotations``
 
-list_annotations
-^^^^^^^^^^^^^^^^
+get
+^^^
 
 **MCP Tool:**
-  ``list_annotations(queue_id: int, status: str)``
+  ``get(entity: EntityType, entity_id: int, include_related: bool = False)``
 
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_annotations(**params)``
+**Supported entities:**
+  ``queue``, ``schema``, ``hook``, ``engine``, ``rule``, ``user``, ``workspace``,
+  ``email_template``, ``organization_group``, ``organization_limit``, ``annotation``,
+  ``relation``, ``document_relation``, ``hook_secrets_keys``
 
-**API Endpoint:**
-  ``GET /v1/annotations``
+**Returns:**
+  ``{"entity": "<type>", "id": <id>, "data": {...}}``
 
-**Query Parameters:**
-  - ``queue``: Queue ID filter
-  - ``status``: Status filter (comma-separated)
-  - ``page_size``: Results per page (default: 100)
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  See ``rossum_mcp.server:100-134``
-
-get_queue
-^^^^^^^^^
-
-**MCP Tool:**
-  ``get_queue(queue_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_queue(queue_id)``
-
-**API Endpoint:**
-  ``GET /v1/queues/{queue_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  See ``rossum_mcp.server:136-156``
-
-get_schema
-^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_schema(schema_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_schema(schema_id)``
-
-**API Endpoint:**
-  ``GET /v1/schemas/{schema_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  See ``rossum_mcp.server:158-174``
-
-get_queue_schema
-^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_queue_schema(queue_id: int)``
-
-**Rossum SDK Methods:**
-  Combines two SDK calls:
-
-  1. ``AsyncRossumAPIClient.retrieve_queue(queue_id)``
-  2. ``AsyncRossumAPIClient.retrieve_schema(schema_id)``
+**include_related enrichment:**
+  - ``queue`` → adds ``schema_tree``, ``engine``, ``hooks``, ``hooks_count``
+  - ``schema`` → adds ``queues``, ``rules``
+  - ``hook`` → adds ``queues``, ``events``
 
 **API Endpoints:**
-  1. ``GET /v1/queues/{queue_id}``
-  2. ``GET /v1/schemas/{schema_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
+  Varies by entity — ``GET /v1/{entity_plural}/{id}``
 
 **Implementation:**
-  This is a convenience method that retrieves both queue and schema information
-  in a single MCP tool call. See ``rossum_mcp.server:226-263``
+  See ``rossum_mcp.tools.get`` and ``rossum_mcp.tools.search``
 
-get_queue_engine
-^^^^^^^^^^^^^^^^
+search
+^^^^^^
 
 **MCP Tool:**
-  ``get_queue_engine(queue_id: int)``
+  ``search(query: SearchQuery)``
 
-**Rossum SDK Methods:**
-  Combines two SDK calls:
+**Query object:** discriminated union on ``entity`` field — each entity type exposes only its valid filter params.
 
-  1. ``AsyncRossumAPIClient.retrieve_queue(queue_id)``
-  2. ``AsyncRossumAPIClient.retrieve_engine(engine_id)`` (if engine URL is a string)
+**Supported entities and their filters:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Entity
+     - Available filters
+   * - ``queue``
+     - ``id``, ``workspace_id``, ``name``, ``use_regex``
+   * - ``schema``
+     - ``name``, ``queue_id``, ``use_regex``
+   * - ``hook``
+     - ``queue_id``, ``active``, ``first_n``
+   * - ``engine``
+     - ``id``, ``engine_type``, ``agenda_id``
+   * - ``rule``
+     - ``schema_id``, ``organization_id``, ``enabled``
+   * - ``user``
+     - ``username``, ``email``, ``first_name``, ``last_name``, ``is_active``, ``is_organization_group_admin``
+   * - ``workspace``
+     - ``organization_id``, ``name``, ``use_regex``
+   * - ``email_template``
+     - ``queue_id``, ``type``, ``name``, ``first_n``, ``use_regex``
+   * - ``organization_group``
+     - ``name``, ``use_regex``
+   * - ``annotation``
+     - ``queue_id`` (required), ``status``, ``ordering``, ``first_n``
+   * - ``relation``
+     - ``id``, ``type``, ``parent``, ``key``, ``annotation``
+   * - ``document_relation``
+     - ``id``, ``type``, ``annotation``, ``key``, ``documents``
+   * - ``hook_log``
+     - ``hook_id``, ``queue_id``, ``annotation_id``, ``email_id``, ``log_level``, ``status``, ``status_code``, ``request_id``, ``timestamp_before/after``, ``start/end_before/after``, ``search``, ``page_size``
+   * - ``hook_template``
+     - *(no filters)*
+   * - ``user_role``
+     - *(no filters)*
+   * - ``queue_template_name``
+     - *(no filters)*
+
+**Returns:**
+  ``list`` of entity objects
 
 **API Endpoints:**
-  1. ``GET /v1/queues/{queue_id}``
-  2. ``GET /v1/engines/{engine_id}`` (if needed)
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
+  Varies by entity — ``GET /v1/{entity_plural}``
 
 **Implementation:**
-  This convenience method retrieves both queue and engine information. It handles
-  three types of engines: dedicated, generic, and standard. If the engine is
-  embedded in the queue response, it deserializes it directly without an additional
-  API call. See ``rossum_mcp.server:265-337``
-
-get_queue_template_names
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_queue_template_names()``
-
-**API Endpoint:**
-  N/A (returns static list of available template names)
-
-**Implementation:**
-  Returns list of 20 available template names for use with ``create_queue_from_template``.
+  See ``rossum_mcp.tools.get`` and ``rossum_mcp.tools.search``
 
 create_queue_from_template
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -216,33 +162,6 @@ create_queue_from_template
   Templates include pre-configured schema and AI engine for specific document types
   (EU/US/UK/CZ/CN invoices, purchase orders, credit notes, etc.).
 
-create_queue
-^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``create_queue(name: str, workspace_id: int, schema_id: int, engine_id: int | None,
-  inbox_id: int | None, connector_id: int | None, locale: str, automation_enabled: bool,
-  automation_level: str, training_enabled: bool)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.create_new_queue(queue_data: dict)``
-
-**API Endpoint:**
-  ``POST /v1/queues``
-
-**Request Body:**
-  JSON object with queue configuration including name, workspace URL, schema URL,
-  optional engine URL, inbox URL, connector URL, locale, automation settings, and
-  training settings.
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Creates a new queue with full configuration options. Constructs URLs for workspace,
-  schema, and optional resources (engine, inbox, connector) using the base URL.
-  See ``rossum_mcp.server:339-442``
-
 update_queue
 ^^^^^^^^^^^^
 
@@ -264,30 +183,7 @@ update_queue
 
 **Implementation:**
   Updates specific queue fields using PATCH semantics. Commonly used to configure
-  automation thresholds and settings. See ``rossum_mcp.server:444-486``
-
-update_schema
-^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``update_schema(schema_id: int, schema_data: dict)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.internal_client.update(Resource.Schema, schema_id, schema_data)``
-
-**API Endpoint:**
-  ``PATCH /v1/schemas/{schema_id}``
-
-**Request Body:**
-  Partial JSON object typically containing the 'content' array with field-level
-  configuration including score_threshold properties.
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Updates schema configuration, typically used to set field-level automation
-  thresholds that override the queue's default threshold. See ``rossum_mcp.server:488-526``
+  automation thresholds and settings. See ``rossum_mcp.tools.update.queues``
 
 update_engine
 ^^^^^^^^^^^^^
@@ -313,7 +209,7 @@ update_engine
 
 **Implementation:**
   Updates engine configuration using PATCH semantics. Commonly used to manage
-  training queues and learning settings. See ``rossum_mcp.server:450-495``
+  training queues and learning settings. See ``rossum_mcp.tools.update.engines``
 
 **Common Use Case:**
   Update training queues to specify which queues an engine should learn from:
@@ -332,53 +228,14 @@ update_engine
 ``json=`` parameter, not ``data=``. The Rossum API expects JSON-encoded data
 (application/json), not form-encoded data (application/x-www-form-urlencoded).
 
-list_hooks
-^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_hooks(queue_id: int | None, active: bool | None)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_hooks(**filters)``
-
-**API Endpoint:**
-  ``GET /v1/hooks``
-
-**Query Parameters:**
-  - ``queue``: Filter by queue ID
-  - ``active``: Filter by active status (true/false)
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists all hooks/extensions (webhooks or serverless functions) configured in
-  your organization. Optionally filter by queue ID and/or active status.
-  See ``rossum_mcp.server:928-970``
-
-**Common Use Cases:**
-
-  .. code-block:: python
-
-     # List all hooks
-     all_hooks = await server.list_hooks()
-
-     # List hooks for a specific queue
-     queue_hooks = await server.list_hooks(queue_id=12345)
-
-     # List only active hooks
-     active_hooks = await server.list_hooks(active=True)
-
-     # List inactive hooks for a queue
-     inactive_queue_hooks = await server.list_hooks(queue_id=12345, active=False)
-
 create_hook
 ^^^^^^^^^^^
 
 **MCP Tool:**
-  ``create_hook(name: str, target: str, queues: list[str] | None,
-  events: list[str] | None, config: dict | None, enabled: bool,
-  insecure_ssl: bool, secret: str | None, response_event: dict | None)``
+  ``create_hook(name: str, type: HookType, queues: list[str] | None,
+  events: list[HookEventAndAction] | None, config: dict | None, settings: dict | None,
+  secrets: dict[str, str] | None, token_owner: str | None,
+  run_after: list[str] | None, sideload: list[HookSideload] | None)``
 
 **Rossum SDK Method:**
   ``AsyncRossumAPIClient.create_new_hook(hook_data: dict)``
@@ -387,94 +244,26 @@ create_hook
   ``POST /v1/hooks``
 
 **Request Body:**
-  JSON object with hook configuration including name, target URL, optional
-  queue URLs, event triggers, configuration, and security settings.
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
+  JSON object with hook configuration including name, type, optional
+  queue URLs, event triggers, configuration, and settings.
 
 **Implementation:**
-  Creates a new webhook or serverless function hook. The hook will trigger on specified
-  events and send requests to the target URL. See ``rossum_mcp.server:972-1046``
-
-**Common Use Cases:**
-
-  .. code-block:: python
-
-     # Create a simple webhook for all queues
-     basic_hook = await server.create_hook(
-         name="Invoice Processing Hook",
-         target="https://example.com/webhook"
-     )
-
-     # Create a hook for specific queues and events
-     advanced_hook = await server.create_hook(
-         name="Status Tracker",
-         target="https://example.com/status",
-         queues=["https://api.elis.rossum.ai/v1/queues/12345"],
-         events=["annotation_status", "annotation_content"],
-         config={"custom_header": "value"},
-         secret="webhook_secret_123"
-     )
+  Creates a new webhook or serverless function hook. For function hooks,
+  ``config.source`` is auto-renamed to ``config.code``, default runtime is
+  ``python3.12``, and ``timeout_s`` is capped at 60.
+  See ``rossum_mcp.tools.create.hooks``
 
 **Parameters:**
-  - ``name`` (str): Hook name for identification
-  - ``target`` (str): URL endpoint where webhook requests are sent
-  - ``queues`` (list[str], optional): List of queue URLs to attach the hook to.
-    If not provided, hook applies to all queues
-  - ``events`` (list[str], optional): List of events that trigger the hook:
-
-    * ``annotation_status`` - Annotation status changes
-    * ``annotation_content`` - Content modifications
-    * ``annotation_export`` - Export operations
-    * ``datapoint_value`` - Individual field value changes
-
-  - ``config`` (dict, optional): Additional configuration (e.g., custom headers)
-  - ``enabled`` (bool): Whether the hook is active (default: True)
-  - ``insecure_ssl`` (bool): Skip SSL verification (default: False)
-  - ``secret`` (str, optional): Secret key for securing webhook requests
-  - ``response_event`` (dict, optional): Configuration for response event handling
-
-list_rules
-^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_rules(schema_id: int | None, organization_id: int | None, enabled: bool | None)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_rules(**filters)``
-
-**API Endpoint:**
-  ``GET /v1/rules``
-
-**Query Parameters:**
-  - ``schema``: Filter by schema ID
-  - ``organization``: Filter by organization ID
-  - ``enabled``: Filter by enabled status (true/false)
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists all business rules configured in your organization. Rules define custom business
-  logic with trigger conditions (TxScript formulas) and actions. Optionally filter by
-  schema ID, organization ID, and/or enabled status. See ``rossum_mcp.server:974-1030``
-
-**Common Use Cases:**
-
-  .. code-block:: python
-
-     # List all rules
-     all_rules = await server.list_rules()
-
-     # List rules for a specific schema
-     schema_rules = await server.list_rules(schema_id=12345)
-
-     # List only enabled rules
-     enabled_rules = await server.list_rules(enabled=True)
-
-     # List enabled rules for a specific schema
-     enabled_schema_rules = await server.list_rules(schema_id=12345, enabled=True)
+  - ``name`` (str): Hook name
+  - ``type`` (HookType): ``webhook`` or ``function``
+  - ``queues`` (list[str], optional): List of queue URLs to attach the hook to
+  - ``events`` (list[HookEventAndAction], optional): List of trigger events in ``event.action`` format
+  - ``config`` (dict, optional): Hook configuration
+  - ``settings`` (dict, optional): Hook settings
+  - ``secrets`` (dict[str, str], optional): Secret key-value pairs for the hook
+  - ``token_owner`` (str, optional): User URL for token ownership; cannot be an ``organization_group_admin`` user
+  - ``run_after`` (list[str], optional): List of hook URLs that must run before this hook
+  - ``sideload`` (list[HookSideload], optional): Sideload configuration for the hook
 
 create_rule
 ^^^^^^^^^^^
@@ -592,7 +381,10 @@ update_hook
 ^^^^^^^^^^^
 
 **MCP Tool:**
-  ``update_hook(hook_id: int, name: str | None, queues: list[str] | None, events: list[str] | None, config: dict | None, settings: dict | None, active: bool | None)``
+  ``update_hook(hook_id: int, name: str | None, queues: list[str] | None,
+  events: list[HookEventAndAction] | None, config: dict | None, settings: dict | None,
+  active: bool | None, secrets: dict[str, str] | None, token_owner: str | None,
+  run_after: list[str] | None, sideload: list[HookSideload] | None)``
 
 **Rossum SDK Method:**
   ``AsyncRossumAPIClient.update_part_hook(hook_id, hook_data)``
@@ -603,31 +395,9 @@ update_hook
 **Request Body:**
   Partial JSON object with only the fields to update.
 
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
 **Implementation:**
   Updates an existing hook's properties. Only provided fields are updated; others remain
-  unchanged. Commonly used to modify hook name, attached queues, events, config, or active status.
-
-list_hook_templates
-^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_hook_templates()``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.request_paginated("hook_templates")``
-
-**API Endpoint:**
-  ``GET /v1/hook_templates``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists all available hook templates from Rossum Store. Hook templates provide pre-built
-  extension configurations that can be used to quickly create hooks with standard functionality.
+  unchanged. See ``rossum_mcp.tools.update.hooks``
 
 create_hook_from_template
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -675,9 +445,6 @@ patch_schema
 **MCP Tool:**
   ``patch_schema(schema_id: int, operation: str, node_id: str, node_data: dict | None, parent_id: str | None, position: int | None)``
 
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.update_schema(schema_id, data)`` (with modified content)
-
 **API Endpoint:**
   ``PATCH /v1/schemas/{schema_id}``
 
@@ -718,9 +485,6 @@ prune_schema_fields
 **MCP Tool:**
   ``prune_schema_fields(schema_id: int, fields_to_keep: list[str])``
 
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.update_schema(schema_id, data)``
-
 **API Endpoint:**
   ``PUT /v1/schemas/{schema_id}``
 
@@ -730,159 +494,6 @@ prune_schema_fields
 **Implementation:**
   Removes multiple fields from a schema at once, keeping only specified fields and their
   ancestor sections/multivalues. Efficient for pruning unwanted fields during setup.
-
-get_user
-^^^^^^^^
-
-**MCP Tool:**
-  ``get_user(user_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_user(user_id)``
-
-**API Endpoint:**
-  ``GET /v1/users/{user_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Retrieves a single user by ID. Use ``list_users`` first to find users by username or email.
-
-list_users
-^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_users(username: str | None, email: str | None, first_name: str | None, last_name: str | None, is_active: bool | None, is_organization_group_admin: bool | None)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_users(**filters)``
-
-**API Endpoint:**
-  ``GET /v1/users``
-
-**Query Parameters:**
-  - ``username``: Filter by username
-  - ``email``: Filter by email
-  - ``first_name``: Filter by first name
-  - ``last_name``: Filter by last name
-  - ``is_active``: Filter by active status
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists users with optional filtering. The ``is_organization_group_admin`` filter is applied
-  client-side by checking user groups against organization_group_admin role URLs.
-
-list_user_roles
-^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_user_roles()``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_user_roles()``
-
-**API Endpoint:**
-  ``GET /v1/groups``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists all user roles (groups of permissions) in the organization.
-
-get_organization_group
-^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_organization_group(organization_group_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_organization_group(org_group_id)``
-
-**API Endpoint:**
-  ``GET /v1/organization_groups/{org_group_id}``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Retrieves a single organization group by ID.
-
-list_organization_groups
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``list_organization_groups(name: str | None, use_regex: bool = False)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.list_organization_groups(**filters)``
-
-**API Endpoint:**
-  ``GET /v1/organization_groups``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Lists organization groups with optional name filter. Uses graceful deserialization
-  to skip items that fail to parse.
-
-are_lookup_fields_enabled
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``are_lookup_fields_enabled()``
-
-**API Endpoint:**
-  ``GET /v1/organization_groups``
-
-**Returns:**
-  ``{"enabled": bool}``
-
-**Implementation:**
-  Returns ``{"enabled": True}`` if any organization group has both ``datasets`` and
-  ``lookup_fields`` features set to ``{"enabled": True}`` in its ``features`` dict.
-  Returns ``{"enabled": False}`` otherwise.
-
-are_reasoning_fields_enabled
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``are_reasoning_fields_enabled()``
-
-**API Endpoint:**
-  ``GET /v1/organization_groups``
-
-**Returns:**
-  ``{"enabled": bool}``
-
-**Implementation:**
-  Returns ``{"enabled": True}`` if any organization group has the ``reasoning_fields``
-  feature set to ``{"enabled": True}`` in its ``features`` dict. Returns
-  ``{"enabled": False}`` otherwise.
-
-get_organization_limit
-^^^^^^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``get_organization_limit(organization_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.retrieve_organization_limit(org_id)``
-
-**API Endpoint:**
-  ``GET /v1/organizations/{org_id}/limits``
-
-**SDK Documentation:**
-  https://github.com/rossumai/rossum-api
-
-**Implementation:**
-  Retrieves email sending limits and usage counters for a given organization.
-  Returns ``OrganizationLimit`` with nested ``EmailLimits`` containing daily/total
-  email counts and limits.
 
 list_tool_categories
 ^^^^^^^^^^^^^^^^^^^^
@@ -917,6 +528,9 @@ list_tool_categories
    * - Category
      - Description
      - Keywords
+   * - ``read``
+     - Unified read layer: get one entity by ID or search/list with typed filters
+     - get, search, list, read, retrieve, find, lookup
    * - ``annotations``
      - Document processing: upload, retrieve, update, confirm
      - annotation, document, upload, extract, confirm, review
@@ -934,29 +548,16 @@ list_tool_categories
      - hook, extension, webhook, automation, function, serverless
    * - ``email_templates``
      - Email templates: automated email responses
-     - email, template, notification, rejection
-   * - ``document_relations``
-     - Document relations: export/einvoice links
-     - document relation, export, einvoice
-   * - ``relations``
-     - Annotation relations: edit/attachment/duplicate links
-     - relation, duplicate, attachment, edit
+     - email, notification, rejection
    * - ``rules``
      - Validation rules: schema validation
      - rule, validation, constraint
    * - ``users``
-     - User management: list users and roles
+     - User management: create and update users
      - user, role, permission, token_owner
    * - ``workspaces``
      - Workspace management: organize queues
      - workspace, organization
-   * - ``organization_groups``
-     - Organization group management: view license groups
-     - organization group, license, trial, production, deployment
-   * - ``organization_limits``
-     - Organization limits: email sending limits and usage
-     - organization limit, email limit, quota, email usage
-
 **Example:**
 
 .. code-block:: python
@@ -983,97 +584,353 @@ copy_annotations
   results and errors separately for graceful partial failure handling. Uses
   ``_http_client.request_json`` directly since the SDK has no copy method.
 
-Delete Operations
------------------
-
-All delete tools follow a consistent pattern using the ``delete_resource`` helper
-from ``rossum_mcp.tools.base``. They check read-only mode and return standardized
-success/error messages.
-
-delete_annotation
-^^^^^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``delete_annotation(annotation_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_annotation(annotation_id)``
-
-**API Endpoint:**
-  ``DELETE /v1/annotations/{annotation_id}``
-
-**Implementation:**
-  Soft delete - moves annotation to 'deleted' status rather than permanent removal.
-
-delete_queue
-^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``delete_queue(queue_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_queue(queue_id)``
-
-**API Endpoint:**
-  ``DELETE /v1/queues/{queue_id}``
-
-**Implementation:**
-  Schedules queue for deletion after 24-hour delay. Also deletes all related
-  objects (annotations, documents).
-
-delete_schema
-^^^^^^^^^^^^^
-
-**MCP Tool:**
-  ``delete_schema(schema_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_schema(schema_id)``
-
-**API Endpoint:**
-  ``DELETE /v1/schemas/{schema_id}``
-
-**Implementation:**
-  Fails with HTTP 409 if schema is linked to a queue or annotation.
-
-delete_hook
-^^^^^^^^^^^
-
-**MCP Tool:**
-  ``delete_hook(hook_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_hook(hook_id)``
-
-**API Endpoint:**
-  ``DELETE /v1/hooks/{hook_id}``
-
-delete_rule
-^^^^^^^^^^^
-
-**MCP Tool:**
-  ``delete_rule(rule_id: int)``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_rule(rule_id)``
-
-**API Endpoint:**
-  ``DELETE /v1/rules/{rule_id}``
-
-delete_workspace
+start_annotation
 ^^^^^^^^^^^^^^^^
 
 **MCP Tool:**
-  ``delete_workspace(workspace_id: int)``
+  ``start_annotation(annotation_id: int)``
+
+**Description:**
+  Set annotation status to 'reviewing' (from 'to_review').
 
 **Rossum SDK Method:**
-  ``AsyncRossumAPIClient.delete_workspace(workspace_id)``
+  ``AsyncRossumAPIClient.start_annotation(annotation_id)``
 
 **API Endpoint:**
-  ``DELETE /v1/workspaces/{workspace_id}``
+  ``POST /v1/annotations/{annotation_id}/start``
+
+**Returns:**
+
+.. code-block:: json
+
+   {"annotation_id": 12345, "message": "Annotation 12345 started successfully. Status changed to 'reviewing'."}
 
 **Implementation:**
-  Fails if workspace contains queues.
+  See ``rossum_mcp.tools.update.annotations``
+
+bulk_update_annotation_fields
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``bulk_update_annotation_fields(annotation_id: int, operations: list[dict])``
+
+**Description:**
+  Bulk update extracted fields. Requires annotation in 'reviewing' status.
+  Use datapoint IDs from content, not schema_id.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.bulk_update_annotation_data(annotation_id, operations)``
+
+**API Endpoint:**
+  ``POST /v1/annotations/{annotation_id}/content/operations``
+
+**Parameters:**
+
+- ``annotation_id`` (int): Annotation to update
+- ``operations`` (list[dict]): List of update operations, each containing datapoint ID and new value
+
+**Returns:**
+
+.. code-block:: json
+
+   {"annotation_id": 12345, "operations_count": 3, "message": "Annotation 12345 updated with 3 operations successfully."}
+
+**Implementation:**
+  See ``rossum_mcp.tools.update.annotations``
+
+confirm_annotation
+^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``confirm_annotation(annotation_id: int)``
+
+**Description:**
+  Set annotation status to 'confirmed' (typically after field updates).
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.confirm_annotation(annotation_id)``
+
+**API Endpoint:**
+  ``POST /v1/annotations/{annotation_id}/confirm``
+
+**Returns:**
+
+.. code-block:: json
+
+   {"annotation_id": 12345, "message": "Annotation 12345 confirmed successfully. Status changed to 'confirmed'."}
+
+**Implementation:**
+  See ``rossum_mcp.tools.update.annotations``
+
+create_engine
+^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_engine(name: str, organization_id: int, engine_type: EngineType)``
+
+**Description:**
+  Create an engine; create matching engine fields for the target schema immediately after.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient._http_client.create(Resource.Engine, engine_data)``
+
+**API Endpoint:**
+  ``POST /v1/engines``
+
+**Parameters:**
+
+- ``name`` (str): Engine name
+- ``organization_id`` (int): Organization to create the engine in
+- ``engine_type`` (Literal["extractor", "splitter"]): Type of engine
+
+**Returns:**
+  ``Engine`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.create.engines``
+
+create_engine_field
+^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_engine_field(engine_id: int, name: str, label: str, field_type: EngineFieldType, schema_ids: list[int], tabular: bool = False, multiline: bool = False, subtype: str | None = None, pre_trained_field_id: str | None = None)``
+
+**Description:**
+  Create an engine field corresponding to a schema field (used during engine+schema setup).
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient._http_client.create(Resource.EngineField, engine_field_data)``
+
+**API Endpoint:**
+  ``POST /v1/engine_fields``
+
+**Parameters:**
+
+- ``engine_id`` (int): Engine to add the field to
+- ``name`` (str): Field name (should match schema field id)
+- ``label`` (str): Human-readable label
+- ``field_type`` (Literal["string", "number", "date", "enum"]): Data type
+- ``schema_ids`` (list[int]): Schemas this field is linked to (at least one required)
+- ``tabular`` (bool): Whether the field is inside a table (default: False)
+- ``multiline`` (bool): Whether the field spans multiple lines (default: False)
+- ``subtype`` (str, optional): Field subtype
+- ``pre_trained_field_id`` (str, optional): Pre-trained field identifier for transfer learning
+
+**Returns:**
+  ``EngineField`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.create.engines``
+
+get_engine_fields
+^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``get_engine_fields(engine_id: int | None = None)``
+
+**Description:**
+  Retrieve engine fields for a specific engine or all engine fields.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.retrieve_engine_fields(engine_id=engine_id)``
+
+**API Endpoint:**
+  ``GET /v1/engine_fields?engine={engine_id}``
+
+**Parameters:**
+
+- ``engine_id`` (int, optional): Filter by engine ID. If not provided, returns all engine fields.
+
+**Returns:**
+  ``list[EngineField]``
+
+**Implementation:**
+  See ``rossum_mcp.tools.get.engines``
+
+create_user
+^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_user(username: str, email: str, queues: list[str] | None = None, groups: list[str] | None = None, first_name: str | None = None, last_name: str | None = None, is_active: bool = True, metadata: dict | None = None, oidc_id: str | None = None, auth_type: str = "password")``
+
+**Description:**
+  Create a user (requires username + email). Use list_user_roles for role/group URLs;
+  queue/group fields take full API URLs.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.create_new_user(user_data)``
+
+**API Endpoint:**
+  ``POST /v1/users``
+
+**Parameters:**
+
+- ``username`` (str): Username (typically email)
+- ``email`` (str): User email
+- ``queues`` (list[str], optional): Queue URLs to grant access to
+- ``groups`` (list[str], optional): Role/group URLs (use ``search(entity='user_role')`` to find)
+- ``first_name`` (str, optional): First name
+- ``last_name`` (str, optional): Last name
+- ``is_active`` (bool): Whether user is active (default: True)
+- ``metadata`` (dict, optional): Custom metadata
+- ``oidc_id`` (str, optional): OIDC identifier for SSO
+- ``auth_type`` (str): Authentication type (default: "password")
+
+**Returns:**
+  ``User`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.create.users``
+
+update_user
+^^^^^^^^^^^
+
+**MCP Tool:**
+  ``update_user(user_id: int, username: str | None = None, email: str | None = None, first_name: str | None = None, last_name: str | None = None, queues: list[str] | None = None, groups: list[str] | None = None, is_active: bool | None = None, metadata: dict | None = None, oidc_id: str | None = None, auth_type: str | None = None, ui_settings: dict | None = None)``
+
+**Description:**
+  Patch a user; only provided fields change. Use list_user_roles for role/group URLs.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient._http_client.update(Resource.User, user_id, patch_data)``
+
+**API Endpoint:**
+  ``PATCH /v1/users/{user_id}``
+
+**Parameters:**
+
+- ``user_id`` (int): User to update
+- ``username`` (str, optional): New username
+- ``email`` (str, optional): New email
+- ``first_name`` (str, optional): First name
+- ``last_name`` (str, optional): Last name
+- ``queues`` (list[str], optional): Queue URLs
+- ``groups`` (list[str], optional): Role/group URLs
+- ``is_active`` (bool, optional): Active status
+- ``metadata`` (dict, optional): Custom metadata
+- ``oidc_id`` (str, optional): OIDC identifier
+- ``auth_type`` (str, optional): Authentication type
+- ``ui_settings`` (dict, optional): UI preferences
+
+**Returns:**
+  ``User`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.update.users``
+
+create_workspace
+^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_workspace(name: str, organization_id: int, metadata: dict | None = None)``
+
+**Description:**
+  Create a new workspace.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.create_new_workspace(workspace_data)``
+
+**API Endpoint:**
+  ``POST /v1/workspaces``
+
+**Parameters:**
+
+- ``name`` (str): Workspace name
+- ``organization_id`` (int): Organization to create workspace in
+- ``metadata`` (dict, optional): Custom metadata
+
+**Returns:**
+  ``Workspace`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.create.workspaces``
+
+create_email_template
+^^^^^^^^^^^^^^^^^^^^^
+
+**MCP Tool:**
+  ``create_email_template(name: str, queue: int, subject: str, message: str, type: EmailTemplateType = "custom", automate: bool = False, to: list[EmailRecipient] | None = None, cc: list[EmailRecipient] | None = None, bcc: list[EmailRecipient] | None = None, triggers: list[str] | None = None)``
+
+**Description:**
+  Create an email template; set automate=true for automatic sending.
+  to/cc/bcc are recipient objects ``{type: annotator|constant|datapoint, value: ...}``.
+
+**Rossum SDK Method:**
+  ``AsyncRossumAPIClient.create_new_email_template(template_data)``
+
+**API Endpoint:**
+  ``POST /v1/email_templates``
+
+**Parameters:**
+
+- ``name`` (str): Template name
+- ``queue`` (int): Queue ID to attach the template to
+- ``subject`` (str): Email subject line
+- ``message`` (str): Email body (supports HTML)
+- ``type`` (Literal["rejection", "rejection_default", "email_with_no_processable_attachments", "custom"]): Template type (default: "custom")
+- ``automate`` (bool): Send automatically when triggered (default: False)
+- ``to`` (list[EmailRecipient], optional): To recipients
+- ``cc`` (list[EmailRecipient], optional): CC recipients
+- ``bcc`` (list[EmailRecipient], optional): BCC recipients
+- ``triggers`` (list[str], optional): Events that trigger the email
+
+**Returns:**
+  ``EmailTemplate`` object
+
+**Implementation:**
+  See ``rossum_mcp.tools.create.email_templates``
+
+Delete Layer
+------------
+
+The unified ``delete`` tool replaces all individual ``delete_X`` tools. It routes
+to the appropriate SDK method based on the ``entity`` parameter, using the
+``delete_resource`` helper from ``rossum_mcp.tools.base`` for consistent
+read-only mode checks and response formatting.
+
+delete
+^^^^^^
+
+**MCP Tool:**
+  ``delete(entity: str, entity_id: int)``
+
+**Supported entities and SDK methods:**
+
+.. list-table::
+   :header-rows: 1
+
+   * - Entity
+     - SDK Method
+     - API Endpoint
+     - Notes
+   * - ``queue``
+     - ``AsyncRossumAPIClient.delete_queue(id)``
+     - ``DELETE /v1/queues/{id}``
+     - Schedules deletion after 24h; cascades to annotations/documents
+   * - ``schema``
+     - ``AsyncRossumAPIClient.delete_schema(id)``
+     - ``DELETE /v1/schemas/{id}``
+     - Fails with 409 if linked to any queue/annotation
+   * - ``hook``
+     - ``AsyncRossumAPIClient.delete_hook(id)``
+     - ``DELETE /v1/hooks/{id}``
+     -
+   * - ``rule``
+     - ``AsyncRossumAPIClient.delete_rule(id)``
+     - ``DELETE /v1/rules/{id}``
+     -
+   * - ``workspace``
+     - ``AsyncRossumAPIClient.delete_workspace(id)``
+     - ``DELETE /v1/workspaces/{id}``
+     - Fails if workspace contains queues
+   * - ``annotation``
+     - ``AsyncRossumAPIClient.delete_annotation(id)``
+     - ``DELETE /v1/annotations/{id}``
+     - Soft delete — moves to 'deleted' status
+
+**Implementation:**
+  Defined in ``rossum_mcp/tools/delete/handler.py``. A registry maps entity
+  names to SDK delete methods.
 
 Rossum API Resources
 ---------------------
@@ -1118,27 +975,6 @@ Returns the current MCP operation mode.
 .. code-block:: json
 
    {"mode": "read-only"}
-
-set_mcp_mode
-""""""""""""
-
-Sets the MCP operation mode at runtime.
-
-**Parameters:**
-
-- ``mode`` (string, required): The mode to set ("read-only" or "read-write")
-
-**Returns:**
-
-.. code-block:: json
-
-   {"message": "MCP mode set to 'read-write'"}
-
-If an invalid mode is provided:
-
-.. code-block:: json
-
-   {"error": "Invalid mode 'invalid'. Must be one of: ('read-only', 'read-write')"}
 
 Error Handling
 --------------

@@ -241,34 +241,13 @@ class TestCreateToolStartEvent:
             tool_progress=(1, 2),
             current_tool="list_annotations",
         )
-        event = _create_tool_start_event(step, "list_annotations")
+        event = _create_tool_start_event(step, current_tool="list_annotations")
 
         assert event.type == "tool_start"
         assert event.step_number == 1
         assert event.tool_name == "list_annotations"
         assert event.tool_arguments == {"queue_id": 123}
         assert event.tool_progress == (1, 2)
-        assert event.tool_call_id == "tc_1"
-
-    def test_create_tool_start_event_expands_call_on_connection(self):
-        """Test that call_on_connection tool names are expanded."""
-        step = ToolStartStep(
-            step_number=1,
-            tool_calls=[
-                ToolCall(
-                    id="tc_1",
-                    name="call_on_connection",
-                    arguments={"connection_id": "sandbox", "tool_name": "get_queues", "arguments": "{}"},
-                ),
-            ],
-            tool_progress=(1, 1),
-            current_tool="call_on_connection",
-        )
-        event = _create_tool_start_event(step, "call_on_connection")
-
-        assert event.type == "tool_start"
-        assert event.tool_name == "call_on_connection[sandbox.get_queues]"
-        assert event.tool_arguments == {"connection_id": "sandbox", "tool_name": "get_queues", "arguments": "{}"}
         assert event.tool_call_id == "tc_1"
 
     def test_create_tool_start_event_no_matching_tool_call(self):
@@ -281,12 +260,31 @@ class TestCreateToolStartEvent:
             tool_progress=(2, 3),
             current_tool="get_annotation",
         )
-        event = _create_tool_start_event(step, "get_annotation")
+        event = _create_tool_start_event(step, current_tool="get_annotation")
 
         assert event.type == "tool_start"
         assert event.tool_name == "get_annotation"
         assert event.tool_arguments is None
         assert event.tool_call_id is None
+
+    def test_create_tool_start_event_prefers_tool_call_id_for_same_name_tools(self):
+        """Test that same-name tools resolve by call id, not first matching name."""
+        step = ToolStartStep(
+            step_number=1,
+            tool_calls=[
+                ToolCall(id="tc_1", name="search", arguments={"entity": "workspace"}),
+                ToolCall(id="tc_2", name="search", arguments={"entity": "queue"}),
+            ],
+            tool_progress=(2, 2),
+            current_tool="search",
+            current_tool_call_id="tc_2",
+        )
+        event = _create_tool_start_event(step, current_tool="search")
+
+        assert event.type == "tool_start"
+        assert event.tool_name == "search"
+        assert event.tool_arguments == {"entity": "queue"}
+        assert event.tool_call_id == "tc_2"
 
 
 class TestCreateToolResultEvent:
@@ -1516,6 +1514,12 @@ class TestAgentServiceUrlContext:
             patch("rossum_agent.api.services.agent_service.get_system_prompt", return_value="Base prompt"),
             patch("rossum_agent.api.services.agent_service.extract_url_context") as mock_extract,
             patch("rossum_agent.api.services.agent_service.format_context_for_prompt", return_value="URL context"),
+            patch.object(
+                AgentService,
+                "_setup_change_tracking",
+                new_callable=AsyncMock,
+                return_value=(None, None, "https://api.rossum.ai"),
+            ),
         ):
             mock_url_context = MagicMock()
             mock_url_context.is_empty.return_value = False

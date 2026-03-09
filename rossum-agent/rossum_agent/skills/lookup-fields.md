@@ -14,13 +14,28 @@
 
 ## Approach
 
-Generate config with `suggest_lookup_field`, test with `evaluate_lookup_field`, write with `patch_schema_with_subagent`. Never write to the schema until evaluation passes. Re-generate at most 3 times; stop and report if results don't improve.
+Always use `execute_python` with `suggest_lookup_field` and `evaluate_lookup_field` — never hand-write matching configurations. Write to the schema only after evaluation passes. Re-generate at most 3 times; stop and report if results don't improve.
 
-`suggest_lookup_field` caches the field definition internally and returns `field_schema_id` + `matching`. Pass `field_schema_id` to `evaluate_lookup_field` — do not pass `field_definition` (avoids repeating the large JSON in context).
+```python
+suggested = suggest_lookup_field(
+    label="Vendor Match",
+    hint="Match vendors by VAT ID, prefer no match over wrong match",
+    schema_id=9389721,
+    section_id="basic_info",
+    dataset="Approved Vendors",
+)
+evaluation = evaluate_lookup_field(
+    schema_id=9389721,
+    annotation_urls=["/api/v1/annotations/123456"],
+    field_schema_id=suggested["field_schema_id"],
+)
+```
+
+`suggest_lookup_field` caches the field definition internally and returns `field_schema_id` + `matching`. Pass `field_schema_id` to `evaluate_lookup_field` — do not pass `field_definition` unless you are intentionally overriding the cached version.
 
 For `patch_schema_with_subagent`, pass the `matching` object from the suggest result in the changes array.
 
-When matches fail, use `get_lookup_dataset_raw_values` + `query_lookup_dataset` to inspect raw data — start with `.[0] | keys` to discover columns — then re-call `suggest_lookup_field` with corrected hints.
+When matches fail, use `execute_python` to call `get_lookup_dataset_raw_values(...)` and `query_lookup_dataset(...)` to inspect raw data — start with `.[0] | keys` to discover columns — then re-call `suggest_lookup_field` with corrected hints.
 
 For existing fields, pass `action: "update"` in `patch_schema_with_subagent` changes.
 
@@ -42,7 +57,7 @@ A false match is worse than no match. Apply this principle at every query tier:
 | Root Cause | Symptom | Resolution |
 |------------|---------|------------|
 | Missing record | No match despite correct columns | Record doesn't exist — report |
-| Field mismatch | Wrong column name | Inspect with `.[0] \| keys`, re-call `suggest_lookup_field` |
+| Field mismatch | Wrong column name | Inspect with `query_lookup_dataset(dataset, ".[0] | keys")`, re-call `suggest_lookup_field` |
 | Normalization gap | Values differ by case/whitespace | Re-call `suggest_lookup_field` with hint about format difference |
 | Ambiguous results | Multiple candidates, none dominant | Re-call to tighten — if ambiguity persists, leave unmatched |
 
@@ -76,4 +91,3 @@ A false match is worse than no match. Apply this principle at every query tier:
 | No `rir_field_names` | Lookup fields cannot use AI extraction hints |
 | No `enabled_without_warning` | Edit mode cannot be `enabled_without_warning` |
 | `type` or `hook_interface` | Provide one, not both |
-| No `update_schema` or `patch_schema` | Use `patch_schema_with_subagent` — direct schema writes lose the matching config |

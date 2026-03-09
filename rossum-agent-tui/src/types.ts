@@ -93,6 +93,23 @@ export interface TaskSnapshotEvent {
   tasks: TaskItem[];
 }
 
+export interface QuestionOption {
+  value: string;
+  label: string;
+  description: string;
+}
+
+export interface AgentQuestionItem {
+  question: string;
+  options: QuestionOption[];
+  multi_select: boolean;
+}
+
+export interface AgentQuestionEvent {
+  type: "agent_question";
+  questions: AgentQuestionItem[];
+}
+
 export interface TokenUsageBySource {
   input_tokens: number;
   output_tokens: number;
@@ -140,6 +157,7 @@ export type SSEEvent =
   | { event: "sub_agent_progress"; data: SubAgentProgressEvent }
   | { event: "sub_agent_text"; data: SubAgentTextEvent }
   | { event: "task_snapshot"; data: TaskSnapshotEvent }
+  | { event: "agent_question"; data: AgentQuestionEvent }
   | { event: "done"; data: StreamDoneEvent }
   | { event: "file_created"; data: FileCreatedEvent }
   | { event: "error"; data: { message: string } };
@@ -177,11 +195,29 @@ export type ChatItem =
       step: CompletedStep;
       resultStep?: CompletedStep;
     }
+  | {
+      kind: "tool_group";
+      toolName: string;
+      calls: Array<{ step: CompletedStep; resultStep?: CompletedStep }>;
+    }
   | { kind: "intermediate"; stepNumber: number; content: string }
-  | { kind: "final_answer"; content: string }
+  | {
+      kind: "final_answer";
+      content: string;
+      turnIndex: number;
+      feedback: boolean | null;
+    }
   | { kind: "error"; content: string }
   | { kind: "file_created"; filename: string; url: string }
   | { kind: "config_commit"; commit: ConfigCommitInfo }
+  | {
+      kind: "agent_question";
+      question: string;
+      options: QuestionOption[];
+      multiSelect: boolean;
+      questionIndex: number;
+      totalQuestions: number;
+    }
   | {
       kind: "streaming";
       streaming: StepEvent;
@@ -237,4 +273,6 @@ export interface ChatState {
   files: FileCreatedEvent[];
   error: string | null;
   userMessages: UserMessage[];
+  feedback: Record<number, boolean>;
+  pendingQuestion: AgentQuestionEvent | null;
 }

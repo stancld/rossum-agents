@@ -37,12 +37,13 @@ class TestMCPConnectionSmoke:
             assert len(tools) > 0, "Expected at least one MCP tool"
 
             tool_names = [t.name for t in tools]
-            assert "list_workspaces" in tool_names, "Expected list_workspaces tool"
+            assert "get" in tool_names, "Expected get tool"
+            assert "search" in tool_names, "Expected search tool"
 
-    async def test_mcp_call_list_workspaces(self) -> None:
-        """Verify MCP tool call works with list_workspaces.
+    async def test_mcp_call_search_workspaces(self) -> None:
+        """Verify MCP tool call works with search for workspaces.
 
-        Note: The tool returns list[Workspace], but FastMCP wraps non-object returns
+        Note: The tool returns list, but FastMCP wraps non-object returns
         (lists, ints, strings) in {"result": ...} to satisfy JSON schema requirement
         that structured content must be an object type.
         See: https://gofastmcp.com/servers/tools#extracting-structured-content
@@ -50,10 +51,10 @@ class TestMCPConnectionSmoke:
         async with connect_mcp_server(
             rossum_api_token=ROSSUM_API_TOKEN, rossum_api_base_url=ROSSUM_API_BASE_URL, mcp_mode="read-only"
         ) as connection:
-            result = await connection.call_tool("list_workspaces")
+            result = await connection.call_tool("search", {"query": {"entity": "workspace"}})
 
             # FastMCP wraps list returns in {"result": [...]} for valid structured output
-            assert isinstance(result, dict), "Expected dict result from list_workspaces"
+            assert isinstance(result, dict), "Expected dict result from search"
             assert "result" in result, "Expected 'result' key in response"
             assert isinstance(result["result"], list), "Expected list in result['result']"
 

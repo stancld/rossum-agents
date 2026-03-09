@@ -385,3 +385,37 @@ class TestChatServiceSaveMessages:
 
         assert result is True
         mock_storage.save_chat.assert_called_once_with("user_123", "chat_123", messages, None, metadata)
+
+
+class TestChatServiceFeedback:
+    """Tests for feedback methods."""
+
+    def test_save_feedback_delegates_to_storage(self):
+        mock_storage = MagicMock()
+        mock_storage.save_feedback.return_value = True
+
+        service = ChatService(redis_storage=mock_storage)
+        result = service.save_feedback(user_id="user_123", chat_id="chat_123", turn_index=2, is_positive=True)
+
+        assert result is True
+        mock_storage.save_feedback.assert_called_once_with("user_123", "chat_123", 2, True)
+
+    def test_get_feedback_delegates_to_storage(self):
+        mock_storage = MagicMock()
+        mock_storage.get_feedback.return_value = {0: True, 2: False}
+
+        service = ChatService(redis_storage=mock_storage)
+        result = service.get_feedback(user_id="user_123", chat_id="chat_123")
+
+        assert result == {0: True, 2: False}
+        mock_storage.get_feedback.assert_called_once_with("user_123", "chat_123")
+
+    def test_delete_feedback_delegates_to_storage(self):
+        mock_storage = MagicMock()
+        mock_storage.delete_feedback.return_value = True
+
+        service = ChatService(redis_storage=mock_storage)
+        result = service.delete_feedback(user_id="user_123", chat_id="chat_123", turn_index=2)
+
+        assert result is True
+        mock_storage.delete_feedback.assert_called_once_with("user_123", "chat_123", 2)

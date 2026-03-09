@@ -39,7 +39,7 @@ from rossum_agent.agent.models import (
     ToolResultStep,
     ToolStartStep,
 )
-from rossum_agent.tools.core import SubAgentTokenUsage
+from rossum_agent.tools.core import AgentContext, SubAgentTokenUsage, reset_context, set_context
 from rossum_agent.utils import add_message_cache_breakpoint
 
 
@@ -980,8 +980,12 @@ class TestStreamModelResponse:
 
         # Simulate: thinking token arrives at T=0, text token arrives at T=2.0
         # (past INITIAL_TEXT_BUFFER_DELAY=1.5), so text should be flushed immediately.
+        # Calls: _StreamState init (stream_start_time, last_progress_log_time),
+        # thinking delta (first_text_token_time, maybe_log_progress),
+        # text delta (maybe_log_progress, _handle_text_delta elapsed check),
+        # stream_elapsed after streaming completes.
         t0 = 1000.0
-        time_calls = iter([t0, t0 + 2.0, t0 + 2.0])
+        time_calls = iter([t0, t0, t0, t0, t0 + 2.0, t0 + 2.0, t0 + 2.0])
 
         with (
             patch.object(agent.client.messages, "stream", return_value=mock_stream),
@@ -1359,8 +1363,8 @@ class TestExecuteTool:
         assert "Connection failed" in result.content
 
     @pytest.mark.asyncio
-    async def test_truncates_long_content(self):
-        """Test that long tool output is truncated."""
+    async def test_spills_long_content_to_file(self):
+        """Test that long tool output is spilled to a workspace file."""
         agent = self._create_agent()
         long_output = "A" * 50000
         agent.mcp_connection.call_tool.return_value = long_output
@@ -1370,28 +1374,8 @@ class TestExecuteTool:
         result = await self._get_final_result(agent, tool_call)
 
         assert len(result.content) < 50000
-        assert "truncated" in result.content.lower()
-
-    @pytest.mark.asyncio
-    async def test_executes_deploy_tool(self):
-        """Test that deploy tools are executed locally."""
-        agent = self._create_agent()
-
-        tool_call = ToolCall(
-            id="tc_1",
-            name="deploy_hook",
-            arguments={"hook_id": "123"},
-        )
-
-        with (
-            patch("rossum_agent.agent.core.execute_tool", return_value="Deploy Success") as mock_execute,
-            patch("rossum_agent.agent.core.get_deploy_tool_names", return_value=["deploy_hook"]),
-        ):
-            result = await self._get_final_result(agent, tool_call)
-
-        mock_execute.assert_called_once()
-        assert result.content == "Deploy Success"
-        assert result.is_error is False
+        assert "result saved to" in result.content.lower()
+        assert "workspace" in result.content.lower()
 
 
 class TestExecuteToolsInParallel:
@@ -1547,6 +1531,53 @@ class TestExecuteToolsInParallel:
         # First step should be progress indicator
         assert isinstance(steps[0], ToolStartStep)
         assert steps[0].tool_progress == (0, 2)
+
+    @pytest.mark.asyncio
+    async def test_deduplicates_identical_tool_calls_within_step(self):
+        """Test that identical tool calls execute once but keep per-call memory results."""
+        agent = self._create_agent()
+
+        execution_count = 0
+
+        async def counting_tool(name, args):
+            nonlocal execution_count
+            execution_count += 1
+            return f"result_{name}"
+
+        agent.mcp_connection.call_tool = counting_tool
+
+        tool_calls = [
+            ToolCall(id="tc_1", name="search", arguments={"entity": "workspace"}),
+            ToolCall(id="tc_2", name="search", arguments={"entity": "workspace"}),
+        ]
+
+        steps = []
+        async for step in agent._execute_tools_with_progress(
+            step_num=1,
+            response_text="",
+            tool_calls=tool_calls,
+            input_tokens=100,
+            output_tokens=50,
+        ):
+            steps.append(step)
+
+        assert execution_count == 1
+        assert isinstance(steps[0], ToolStartStep)
+        assert len(steps[0].tool_calls) == 1
+        assert steps[0].tool_progress == (0, 1)
+
+        final_step = steps[-1]
+        assert isinstance(final_step, ToolResultStep)
+        assert len(final_step.tool_results) == 1
+        assert final_step.tool_results[0].tool_call_id == "tc_1"
+
+        memory_step = agent.memory.steps[-1]
+        assert isinstance(memory_step, MemoryStep)
+        assert len(memory_step.tool_calls) == 2
+        assert len(memory_step.tool_results) == 2
+        assert memory_step.tool_results[0].tool_call_id == "tc_1"
+        assert memory_step.tool_results[1].tool_call_id == "tc_2"
+        assert memory_step.tool_results[0].content == memory_step.tool_results[1].content
 
     @pytest.mark.asyncio
     async def test_cancellation_cancels_child_tasks_and_reraises(self):
@@ -1880,6 +1911,58 @@ class TestAgentGetTools:
 
         # Should include additional tools
         assert any(t.get("name") == "custom_tool" for t in tools if isinstance(t, dict))
+
+    @pytest.mark.asyncio
+    async def test_includes_delete_tool_in_read_write_mode(self):
+        """Test that the unified delete tool is loaded when not in read-only mode."""
+        mock_client = MagicMock()
+        mock_mcp_connection = AsyncMock()
+        delete_tool = MagicMock()
+        delete_tool.name = "delete"
+        delete_tool.description = "Delete an entity"
+        delete_tool.inputSchema = {"type": "object", "properties": {}}
+        mock_mcp_connection.get_tools.return_value = [delete_tool]
+
+        agent = RossumAgent(
+            client=mock_client,
+            mcp_connection=mock_mcp_connection,
+            system_prompt="Test",
+        )
+
+        token = set_context(AgentContext(mcp_mode="read-write"))
+        try:
+            tools = await agent._get_tools()
+        finally:
+            reset_context(token)
+
+        tool_names = [t.get("name") for t in tools if isinstance(t, dict)]
+        assert "delete" in tool_names
+
+    @pytest.mark.asyncio
+    async def test_excludes_delete_tool_in_read_only_mode(self):
+        """Test that the unified delete tool is NOT loaded in read-only mode."""
+        mock_client = MagicMock()
+        mock_mcp_connection = AsyncMock()
+        delete_tool = MagicMock()
+        delete_tool.name = "delete"
+        delete_tool.description = "Delete an entity"
+        delete_tool.inputSchema = {"type": "object", "properties": {}}
+        mock_mcp_connection.get_tools.return_value = [delete_tool]
+
+        agent = RossumAgent(
+            client=mock_client,
+            mcp_connection=mock_mcp_connection,
+            system_prompt="Test",
+        )
+
+        token = set_context(AgentContext(mcp_mode="read-only"))
+        try:
+            tools = await agent._get_tools()
+        finally:
+            reset_context(token)
+
+        tool_names = [t.get("name") for t in tools if isinstance(t, dict)]
+        assert "delete" not in tool_names
 
 
 class TestCreateAgentFactory:
@@ -2395,7 +2478,6 @@ class TestRossumAgentProperties:
         with (
             patch("rossum_agent.agent.core.mcp_tools_to_anthropic_format", return_value=[]),
             patch("rossum_agent.agent.core.get_internal_tools", return_value=[]),
-            patch("rossum_agent.agent.core.get_deploy_tools", return_value=[]),
         ):
             mock_client = MagicMock()
             mock_mcp = MagicMock()
@@ -2445,7 +2527,6 @@ class TestRossumAgentTokenTracking:
         with (
             patch("rossum_agent.agent.core.mcp_tools_to_anthropic_format", return_value=[]),
             patch("rossum_agent.agent.core.get_internal_tools", return_value=[]),
-            patch("rossum_agent.agent.core.get_deploy_tools", return_value=[]),
         ):
             mock_client = MagicMock()
             mock_mcp = MagicMock()

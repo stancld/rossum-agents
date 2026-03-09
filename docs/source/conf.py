@@ -3,10 +3,18 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 from __future__ import annotations
+import __future__
 
 import pathlib
 import sys
 import tomllib
+
+# Sphinx 9.x autodoc crashes on __future__._Feature objects (no __name__ attr).
+# Patch all _Feature instances so autodoc can introspect modules using `from __future__ import`.
+for _name in __future__.all_feature_names:
+    _feat = getattr(__future__, _name)
+    if isinstance(_feat, __future__._Feature) and not hasattr(_feat, "__name__"):
+        _feat.__name__ = _name
 
 sys.path.insert(0, str(pathlib.Path("../../").resolve()))
 

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from anthropic import beta_tool
-from fpdf import FPDF  # ty: ignore[unresolved-import] - fpdf2 package
+from fpdf import FPDF
 
 from rossum_agent.tools.core import get_context
 
@@ -458,7 +458,10 @@ def _render_pdf(
             lbl = label_map.get(fid, fid)
             pdf.cell(0, 5, f"{lbl}: {val}", new_x="LMARGIN", new_y="NEXT")
 
-    return pdf.output()
+    output = pdf.output()
+    if output is None:
+        return b""
+    return bytes(output)
 
 
 @beta_tool

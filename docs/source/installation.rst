@@ -150,39 +150,25 @@ Replace the base URL with your organization's Rossum instance URL if different.
 Read-Only vs Read-Write Mode
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When ``ROSSUM_MCP_MODE`` is set to ``read-only``, only the following tools are available:
+When ``ROSSUM_MCP_MODE`` is set to ``read-only``, only read-tagged tools are available:
 
-* ``get_annotation`` - Retrieve annotation data
-* ``list_annotations`` - List annotations for a queue
-* ``get_queue`` - Retrieve queue details
-* ``get_schema`` - Retrieve schema details
-* ``get_queue_schema`` - Retrieve queue schema in one call
-* ``get_queue_engine`` - Retrieve engine information
-* ``list_hooks`` - List webhooks/extensions
+* ``get`` - Retrieve any entity by ID
+* ``search`` - Search/list entities with filters
+* ``get_annotation_content`` - Fetch annotation extracted content
+* ``get_schema_tree_structure`` - Get lightweight schema tree view
+* ``get_engine_fields`` - Retrieve engine fields
+* ``list_tool_categories`` / ``load_tool`` - Tool discovery and loading
 
 All CREATE, UPDATE, and UPLOAD operations are disabled in read-only mode for security purposes.
 
 Runtime Mode Switching
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The MCP server supports dynamic mode switching at runtime using two tools:
-
-* ``get_mcp_mode`` - Returns the current operation mode ("read-only" or "read-write")
-* ``set_mcp_mode`` - Switches between modes at runtime
-
-This allows you to:
-
-1. Start in read-only mode for safe exploration and analysis
-2. Switch to read-write mode when ready to make changes
-3. Switch back to read-only mode after making changes
-
-Example workflow:
+Use ``get_mcp_mode`` to check the current operation mode:
 
 .. code-block:: text
 
    User: What mode are we in?
    Assistant: [calls get_mcp_mode] → "read-only"
 
-   User: I'm ready to update the schema now.
-   Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
-              [calls update_schema(...)]
+To change the mode, restart the server with a different ``ROSSUM_MCP_MODE`` environment variable.

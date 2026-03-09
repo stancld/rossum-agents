@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from rossum_agent.tools.knowledge_base_search import KBCache
+from rossum_agent.tools.subagents.knowledge_base import KBCache
 
 _KB_DATA_PATH = Path(__file__).resolve().parents[2] / "rossum_agent" / "data" / "rossum-kb.json"
 

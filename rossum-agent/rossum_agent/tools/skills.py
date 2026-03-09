@@ -19,7 +19,7 @@ def load_skill(name: str) -> str:
     The skill will provide detailed instructions, workflows, and context for the task.
 
     Args:
-        name: The name of the skill to load (e.g., "rossum-deployment").
+        name: The name of the skill to load (e.g., "schema-patching").
 
     Returns:
         JSON with skill instructions, or error with available skills if not found.

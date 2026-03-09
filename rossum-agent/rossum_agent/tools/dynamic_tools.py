@@ -24,19 +24,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Tools hidden from the agent. These are excluded from catalog listings and cannot
-# be loaded via load_tool_category or load_tool. Internal subagent code that calls
-# MCP tools directly (e.g. schema_patching) is not affected.
-HIDDEN_TOOLS: dict[str, str] = {
-    "update_schema": (
-        "Hidden: agent tends to use update_schema incorrectly, unintentionally "
-        "overwriting the whole schema. Use the schema_patching subagent instead."
-    ),
-    "create_queue": (
-        "Hidden: use create_queue_from_template instead. Ask the user which template to use if not specified."
-    ),
-}
-
 
 @dataclass
 class CatalogData:
@@ -52,6 +39,9 @@ _catalog_cache: CatalogData | None = None
 
 # Discovery tool that's always loaded
 DISCOVERY_TOOL_NAME = "list_tool_categories"
+
+# Unified delete tool — always loaded in read-write mode (not part of any category)
+DELETE_TOOL_NAME = "delete"
 
 
 # ---------------------------------------------------------------------------
@@ -74,11 +64,6 @@ def mark_skill_loaded(name: str) -> None:
     state = get_context().dynamic_tools
     state.loaded_skills.add(name)
     state.version += 1
-
-
-def is_skill_loaded(name: str) -> bool:
-    """Check if a skill has been loaded."""
-    return name in get_context().dynamic_tools.loaded_skills
 
 
 def get_tools_version() -> int:
@@ -106,11 +91,9 @@ def _parse_catalog_result(result: object) -> CatalogData:
 
     for category in categories:
         name = category["name"]
-        catalog[name] = {tool["name"] for tool in category["tools"] if tool["name"] not in HIDDEN_TOOLS}
+        catalog[name] = {tool["name"] for tool in category["tools"]}
         keywords[name] = category.get("keywords", [])
         for tool in category["tools"]:
-            if tool["name"] in HIDDEN_TOOLS:
-                continue
             if not tool.get("read_only", True):
                 write_tools.add(tool["name"])
 
@@ -171,7 +154,10 @@ def get_category_keywords() -> dict[str, list[str]]:
 
 
 def get_write_tools() -> set[str]:
-    return _fetch_catalog_from_mcp().write_tools
+    tools = _fetch_catalog_from_mcp().write_tools
+    # The unified delete tool lives outside any category but is always a write tool
+    tools.add(DELETE_TOOL_NAME)
+    return tools
 
 
 def get_cached_category_tool_names() -> dict[str, set[str]] | None:
@@ -180,7 +166,10 @@ def get_cached_category_tool_names() -> dict[str, set[str]] | None:
 
 
 async def get_write_tools_async(mcp_connection: MCPConnection) -> set[str]:
-    return (await _fetch_catalog_async(mcp_connection)).write_tools
+    tools = (await _fetch_catalog_async(mcp_connection)).write_tools
+    # The unified delete tool lives outside any category but is always a write tool
+    tools.add(DELETE_TOOL_NAME)
+    return tools
 
 
 def suggest_categories_for_request(request_text: str) -> list[str]:
@@ -243,8 +232,6 @@ def _load_categories_impl(categories: list[str]) -> str:
     if read_only:
         tool_names_to_load -= get_write_tools()
 
-    tool_names_to_load -= set(HIDDEN_TOOLS)
-
     mcp_tools = asyncio.run_coroutine_threadsafe(ctx.mcp_connection.get_tools(), ctx.mcp_event_loop).result()
     tools_to_add = _filter_mcp_tools_by_names(mcp_tools, tool_names_to_load)
 
@@ -265,10 +252,14 @@ def _load_categories_impl(categories: list[str]) -> str:
 
 
 def preload_categories_for_request(request_text: str) -> str | None:
-    """Pre-load tool categories based on keywords in the user's request."""
+    """Pre-load tool categories based on keywords in the user's request.
+
+    The ``read`` category (``get``, ``search``) is always included because the
+    unified read layer is needed by virtually every request.
+    """
     suggestions = suggest_categories_for_request(request_text)
-    if not suggestions:
-        return None
+    if "read" not in suggestions:
+        suggestions.insert(0, "read")
 
     result = _load_categories_impl(suggestions)
     if result.startswith("Error") or result.startswith("Categories already"):
@@ -278,48 +269,22 @@ def preload_categories_for_request(request_text: str) -> str | None:
     return result
 
 
-def get_load_tool_category_definition() -> ToolParam:
-    """Get the tool definition for load_tool_category."""
-    return {
-        "name": "load_tool_category",
-        "description": (
-            "Load MCP tools from one or more categories. Once loaded, the tools become "
-            "available for use. Use list_tool_categories first to see available categories.\n"
-            "Categories: annotations, queues, schemas, engines, hooks, email_templates, "
-            "document_relations, relations, rules, users, workspaces"
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "categories": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Category names to load (e.g., ['queues', 'schemas'])",
-                }
-            },
-            "required": ["categories"],
-        },
-    }
-
-
-def load_tool_category(categories: list[str]) -> str:
-    """Load MCP tools from specified categories."""
-    return _load_categories_impl(categories)
-
-
 def get_load_tool_definition() -> ToolParam:
     """Get the tool definition for load_tool."""
     return {
         "name": "load_tool",
-        "description": "Load specific MCP tools by name.",
+        "description": (
+            "Load specific MCP tools by name. Once loaded, the tools become "
+            "available for use. Use list_tool_categories to see available tool names."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "tool_names": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Tool names to load",
-                }
+                    "description": "Tool names to load (e.g., ['get', 'search'])",
+                },
             },
             "required": ["tool_names"],
         },
@@ -335,11 +300,6 @@ def load_tool(tool_names: list[str]) -> str:
 
     mcp_tools = asyncio.run_coroutine_threadsafe(ctx.mcp_connection.get_tools(), ctx.mcp_event_loop).result()
     available_tool_names = {t.name for t in mcp_tools}
-
-    hidden = [name for name in tool_names if name in HIDDEN_TOOLS]
-    if hidden:
-        reasons = "; ".join(f"{n}: {HIDDEN_TOOLS[n]}" for n in hidden)
-        return f"Error: {reasons}"
 
     invalid = [name for name in tool_names if name not in available_tool_names]
     if invalid:

@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] - YYYY-MM-DD
+
+### Added
+- Auto-spillover for large tool results — results exceeding 30k chars are automatically saved to `{output_dir}/workspace/` and replaced with a compact summary + file path; agent uses `run_jq` or `run_grep` to query full content on demand [#240](https://github.com/rossumai/rossum-agents/pull/240)
+- Per-message boolean feedback (thumbs up/down) — `PUT/GET/DELETE /api/v1/chats/{chat_id}/feedback` endpoints for rating agent responses by turn index [#222](https://github.com/rossumai/rossum-agents/pull/222)
+- Streaming progress logging — logs model/message count at stream start, periodic progress every 10s (phase, elapsed time, character throughput), and total elapsed time on completion for visibility into long Bedrock generations
+- Added `ask_user_question` tool — agent can ask the user structured questions (free-text or multiple-choice) mid-execution when it needs information it cannot determine on its own; streamed via SSE `agent_question` event [#224](https://github.com/rossumai/rossum-agents/pull/224)
+
+### Changed
+- Updated hooks skill prompt to show `token_owner` and `run_after` in `create_hook` example [#247](https://github.com/stancld/rossum-agents/pull/247)
+- Removed `elis_openapi_grep` and `elis_openapi_jq` as direct agent tools — Elis API reference lookups now route exclusively through the `search_elis_docs` sub-agent ([#220](https://github.com/rossumai/rossum-agents/pull/220))
+- Replaced individual copilot tools (`suggest_formula_field`, `suggest_lookup_field`, `evaluate_lookup_field`, `get_lookup_dataset_raw_values`, `query_lookup_dataset`) with a single `execute_python` tool — copilot functions are now called via Python execution instead of dedicated agent tools [#242](https://github.com/stancld/rossum-agents/pull/242)
+- Removed `load_tool_category` tool — agent now loads MCP tools individually via `load_tool` by name; `load_tool` description updated with category listing guidance [#243](https://github.com/stancld/rossum-agents/pull/243)
+
+### Removed
+- Removed `organization-setup` skill — queue creation is handled directly via `create_queue_from_template` without needing a dedicated skill [#245](https://github.com/rossumai/rossum-agents/pull/245)
+- Removed `create_schema_with_subagent` tool and `schema-creation` skill — schema creation is handled by the agent directly using `patch_schema_with_subagent` (via schema-patching sub-agent) [#244](https://github.com/stancld/rossum-agents/pull/244)
+- Removed `HIDDEN_TOOLS` concept — `update_schema` and `create_queue` MCP tools are fully removed; schema patching subagent now calls the Rossum API directly via `httpx` instead of routing through `update_schema` MCP tool [#245](https://github.com/stancld/rossum-agents/pull/245)
+- Removed `rossum-deployment` skill and all deploy/spawn tools — unused and unsolved [#241](https://github.com/stancld/rossum-agents/pull/241)
+- Removed `schema-pruning` skill — use `prune_schema_fields` MCP tool directly [#225](https://github.com/stancld/rossum-agents/pull/225)
+- Updated skills and MCP integration for rossum-mcp's unified `get`/`search` read layer — base prompt, 5 skill files (document-testing, hooks, rossum-deployment, rules-and-actions, ui-settings), and copilot tools now reference new tool names instead of removed `get_*/list_*` tools [#221](https://github.com/stancld/rossum-agents/pull/221)
+- Removed `kb_grep` and `kb_get_article` from main agent tools — knowledge base lookups now route through `search_knowledge_base` sub-agent only [#221](https://github.com/stancld/rossum-agents/pull/221)
+- Formula tools (`suggest_formula_field`) and lookup tools (`suggest_lookup_field`, `evaluate_lookup_field`, `get_lookup_dataset_raw_values`, `query_lookup_dataset`) are now skill-gated — only available after loading `formula-fields` or `lookup-fields` skill respectively [#221](https://github.com/stancld/rossum-agents/pull/221)
+
+### Fixed
+- Fixed `packages.find` in `pyproject.toml` — removed `rossum_mcp*` and `rossum_deploy*` from the `include` list; only `rossum_agent*` belongs in this package's build
+- Fixed Slack reporter name blank when using support access — `/v1/users/{id}` returns 404 for cross-org support tokens; now falls back to `first_name last_name (email)` from `/v1/auth/user` response [#223](https://github.com/rossumai/rossum-agents/pull/223)
+- Schema patching sub-agent now auto-recovers from engine restriction errors — when `update_schema` fails with "extracted field '...' is not present among names of engine fields", invalid `rir_field_names` are auto-stripped and the update retried [#221](https://github.com/stancld/rossum-agents/pull/221)
+
 ## [1.3.7] - 2026-03-09
 
 ### Changed

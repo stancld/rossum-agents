@@ -296,6 +296,12 @@ function estimateItemHeight(
       return estimateThinkingHeight(item, expanded, w);
     case "tool_call":
       return estimateToolCallHeight(item, expanded, w);
+    case "tool_group": {
+      if (expanded) return 1 + item.calls.length;
+      const lastHasResult =
+        item.calls[item.calls.length - 1]?.resultStep?.result;
+      return lastHasResult ? 2 : 1;
+    }
     case "intermediate":
       return estimateIntermediateHeight(item, expanded, w);
     case "final_answer":

@@ -44,8 +44,8 @@ class TestInternalToolsRegistration:
         """Test that executable tool names are a superset of visible tools.
 
         get_internal_tool_names() returns all executable tools (for dispatch routing),
-        while get_internal_tools() returns only currently visible tools (deployment
-        tools are hidden until rossum-deployment skill is loaded).
+        while get_internal_tools() returns only currently visible tools (some tools
+        are hidden until their skill is loaded).
         """
         tools = get_internal_tools()
         names = get_internal_tool_names()
@@ -58,6 +58,37 @@ class TestInternalToolsRegistration:
         assert "write_file" in names
         assert "search_knowledge_base" in names
         assert "load_skill" in names
+        assert "ask_user_question" in names
+
+    def test_ask_user_question_in_internal_tools(self) -> None:
+        """Test that ask_user_question appears in get_internal_tools."""
+        tools = get_internal_tools()
+        tool_names = {t["name"] for t in tools}
+        assert "ask_user_question" in tool_names
+
+    def test_ask_user_question_definition_structure(self) -> None:
+        """Test that ask_user_question has correct tool definition structure."""
+        tools = get_internal_tools()
+        ask_tool = next(t for t in tools if t["name"] == "ask_user_question")
+        assert "description" in ask_tool
+        assert "input_schema" in ask_tool
+        schema = ask_tool["input_schema"]
+        assert schema["type"] == "object"
+        assert "question" in schema["properties"]
+        assert "options" in schema["properties"]
+        assert "multi_select" in schema["properties"]
+        assert "questions" in schema["properties"]
+
+    def test_execute_python_always_visible(self) -> None:
+        """execute_python is always available as an internal tool."""
+        set_context(AgentContext())
+        try:
+            tools = get_internal_tools()
+            tool_names = {t["name"] for t in tools}
+            assert "execute_python" in tool_names
+            assert "execute_python" in get_internal_tool_names()
+        finally:
+            set_context(AgentContext())
 
 
 class TestExecuteTool:
@@ -106,53 +137,52 @@ class TestExecuteInternalTool:
         with pytest.raises(ValueError, match="Unknown internal tool: nonexistent_tool"):
             execute_internal_tool("nonexistent_tool", {})
 
-    def test_execute_load_tool_category(self) -> None:
-        """Test executing load_tool_category through execute_internal_tool."""
+    def test_execute_load_tool(self) -> None:
+        """Test executing load_tool through execute_internal_tool."""
         from unittest.mock import patch
 
         from rossum_agent.tools import execute_internal_tool
 
-        with patch("rossum_agent.tools.load_tool_category") as mock_load:
-            mock_load.return_value = "Loaded 5 tools from ['queues']"
-            result = execute_internal_tool("load_tool_category", {"categories": ["queues"]})
+        with patch("rossum_agent.tools.load_tool") as mock_load:
+            mock_load.return_value = "Loaded tools: get_queue"
+            result = execute_internal_tool("load_tool", {"tool_names": ["get_queue"]})
 
-        mock_load.assert_called_once_with(["queues"])
-        assert result == "Loaded 5 tools from ['queues']"
+        mock_load.assert_called_once_with(["get_queue"])
+        assert result == "Loaded tools: get_queue"
 
-    def test_execute_load_tool_category_converts_to_string_list(self) -> None:
-        """Test that categories are converted to string list."""
+    def test_execute_load_tool_converts_to_string_list(self) -> None:
+        """Test that tool_names are converted to string list."""
         from unittest.mock import patch
 
         from rossum_agent.tools import execute_internal_tool
 
-        with patch("rossum_agent.tools.load_tool_category") as mock_load:
+        with patch("rossum_agent.tools.load_tool") as mock_load:
             mock_load.return_value = "Loaded tools"
-            # Pass mixed types (could happen with LLM-generated arguments)
-            execute_internal_tool("load_tool_category", {"categories": ["queues", 123]})
+            execute_internal_tool("load_tool", {"tool_names": ["get_queue", 123]})
 
-        mock_load.assert_called_once_with(["queues", "123"])
+        mock_load.assert_called_once_with(["get_queue", "123"])
 
-    def test_execute_load_tool_category_handles_non_list(self) -> None:
-        """Test that non-list categories argument is converted to list."""
+    def test_execute_load_tool_handles_non_list(self) -> None:
+        """Test that non-list tool_names argument is converted to list."""
         from unittest.mock import patch
 
         from rossum_agent.tools import execute_internal_tool
 
-        with patch("rossum_agent.tools.load_tool_category") as mock_load:
+        with patch("rossum_agent.tools.load_tool") as mock_load:
             mock_load.return_value = "Loaded tools"
-            execute_internal_tool("load_tool_category", {"categories": "queues"})
+            execute_internal_tool("load_tool", {"tool_names": "get_queue"})
 
-        mock_load.assert_called_once_with(["queues"])
+        mock_load.assert_called_once_with(["get_queue"])
 
-    def test_execute_load_tool_category_handles_empty_categories(self) -> None:
-        """Test that empty categories list is handled."""
+    def test_execute_load_tool_handles_empty(self) -> None:
+        """Test that empty tool_names list is handled."""
         from unittest.mock import patch
 
         from rossum_agent.tools import execute_internal_tool
 
-        with patch("rossum_agent.tools.load_tool_category") as mock_load:
-            mock_load.return_value = "No categories to load"
-            execute_internal_tool("load_tool_category", {})
+        with patch("rossum_agent.tools.load_tool") as mock_load:
+            mock_load.return_value = "No tools to load"
+            execute_internal_tool("load_tool", {})
 
         mock_load.assert_called_once_with([])
 
@@ -169,22 +199,29 @@ class TestExecuteInternalTool:
         finally:
             set_context(AgentContext())
 
-    def test_load_tool_category_is_in_internal_tools(self) -> None:
-        """Test that load_tool_category is listed as an internal tool."""
+    def test_execute_python_alias_dispatches(self) -> None:
+        from rossum_agent.tools import execute_internal_tool
+
+        result = json.loads(execute_internal_tool("execute_python", {"code": "1 + 2"}))
+        assert result["status"] == "success"
+        assert result["result"] == 3
+
+    def test_load_tool_is_in_internal_tools(self) -> None:
+        """Test that load_tool is listed as an internal tool."""
         names = get_internal_tool_names()
-        assert "load_tool_category" in names
+        assert "load_tool" in names
 
         tools = get_internal_tools()
         tool_names = {t["name"] for t in tools}
-        assert "load_tool_category" in tool_names
+        assert "load_tool" in tool_names
 
-    def test_load_tool_category_definition_structure(self) -> None:
-        """Test that load_tool_category has correct tool definition structure."""
+    def test_load_tool_definition_structure(self) -> None:
+        """Test that load_tool has correct tool definition structure."""
         tools = get_internal_tools()
-        load_cat_tool = next(t for t in tools if t["name"] == "load_tool_category")
+        load_tool_def = next(t for t in tools if t["name"] == "load_tool")
 
-        assert "description" in load_cat_tool
-        assert "input_schema" in load_cat_tool
-        assert load_cat_tool["input_schema"]["type"] == "object"
-        assert "categories" in load_cat_tool["input_schema"]["properties"]
-        assert load_cat_tool["input_schema"]["properties"]["categories"]["type"] == "array"
+        assert "description" in load_tool_def
+        assert "input_schema" in load_tool_def
+        assert load_tool_def["input_schema"]["type"] == "object"
+        assert "tool_names" in load_tool_def["input_schema"]["properties"]
+        assert load_tool_def["input_schema"]["properties"]["tool_names"]["type"] == "array"

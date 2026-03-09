@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class SubAgentProgress:
-    """Progress information from a sub-agent (e.g., schema creation Opus sub-agent)."""
+    """Progress information from a sub-agent (e.g., schema patching Opus sub-agent)."""
 
     tool_name: str
     iteration: int
@@ -50,17 +50,43 @@ class SubAgentTokenUsage:
 
 @dataclass
 class SubAgentText:
-    """Text output from a sub-agent (e.g., schema creation Opus sub-agent)."""
+    """Text output from a sub-agent (e.g., schema patching Opus sub-agent)."""
 
     tool_name: str
     text: str
     is_final: bool = False
 
 
+@dataclass
+class QuestionOption:
+    """A single option for an agent question."""
+
+    value: str
+    label: str
+    description: str = ""
+
+
+@dataclass
+class AgentQuestionItem:
+    """A single question within an agent question event."""
+
+    question: str
+    options: list[QuestionOption] = field(default_factory=list)
+    multi_select: bool = False
+
+
+@dataclass
+class AgentQuestion:
+    """Structured question(s) from the agent to the user."""
+
+    questions: list[AgentQuestionItem]
+
+
 SubAgentProgressCallback = Callable[[SubAgentProgress], None]
 SubAgentTextCallback = Callable[[SubAgentText], None]
 SubAgentTokenCallback = Callable[[SubAgentTokenUsage], None]
 TaskSnapshotCallback = Callable[[list[dict[str, object]]], None]
+QuestionCallback = Callable[[AgentQuestion], None]
 
 
 @dataclass
@@ -107,6 +133,7 @@ class AgentContext:
     text_callback: SubAgentTextCallback | None = None
     token_callback: SubAgentTokenCallback | None = None
     task_snapshot_callback: TaskSnapshotCallback | None = None
+    question_callback: QuestionCallback | None = None
 
     @property
     def is_read_only(self) -> bool:
@@ -152,6 +179,10 @@ class AgentContext:
     def report_task_snapshot(self, snapshot: list[dict[str, object]]) -> None:
         if self.task_snapshot_callback is not None:
             self.task_snapshot_callback(snapshot)
+
+    def report_question(self, question: AgentQuestion) -> None:
+        if self.question_callback is not None:
+            self.question_callback(question)
 
 
 _agent_context: contextvars.ContextVar[AgentContext | None] = contextvars.ContextVar("agent_context", default=None)

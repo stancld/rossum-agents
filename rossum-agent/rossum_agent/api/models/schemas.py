@@ -100,6 +100,7 @@ class Message(BaseModel):
 
     role: Literal["user", "assistant"]
     content: str | list[TextContent | ImageContent]
+    feedback: bool | None = None
 
 
 class FileInfo(BaseModel):
@@ -213,6 +214,29 @@ class TaskSnapshotEvent(BaseModel):
 
     type: Literal["task_snapshot"] = "task_snapshot"
     tasks: list[dict[str, object]]
+
+
+class QuestionOptionSchema(BaseModel):
+    """A single option for an agent question."""
+
+    value: str
+    label: str
+    description: str = ""
+
+
+class AgentQuestionItemSchema(BaseModel):
+    """A single question within an agent question event."""
+
+    question: str
+    options: list[QuestionOptionSchema] = Field(default_factory=list)
+    multi_select: bool = False
+
+
+class AgentQuestionEvent(BaseModel):
+    """Event emitted when the agent asks the user a structured question."""
+
+    type: Literal["agent_question"] = "agent_question"
+    questions: list[AgentQuestionItemSchema]
 
 
 class TokenUsageBySource(BaseModel):
@@ -494,3 +518,17 @@ class CommandListResponse(BaseModel):
     """Response for listing available slash commands."""
 
     commands: list[CommandInfo]
+
+
+class FeedbackRequest(BaseModel):
+    turn_index: int = Field(..., ge=0)
+    is_positive: bool
+
+
+class FeedbackResponse(BaseModel):
+    turn_index: int
+    is_positive: bool
+
+
+class FeedbackListResponse(BaseModel):
+    feedback: dict[int, bool]

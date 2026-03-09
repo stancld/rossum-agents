@@ -35,7 +35,8 @@ class ToolExpectation:
 
     Attributes:
         expected_tools: List of tool names expected to be called.
-            For OR conditions, use tuple: ("get_schema", "get_queue_schema") means either is valid.
+            For OR conditions, use tuple: ("get:schema", "get_schema_tree_structure") means either is valid.
+            Read-layer tools use synthesized names: "get:queue", "search:hook", etc.
         mode: How to match tool calls (see ToolMatchMode enum).
         forbidden_tools: List of tool names that must NOT be called.
     """
@@ -78,10 +79,13 @@ class FileExpectation:
     Attributes:
         expected_files: List of file patterns that should be created/modified.
             Supports glob wildcards (e.g., "*.md", "report_*.txt").
-            Paths are relative to the outputs/ directory. Asserts exact count match.
+            Paths are relative to the outputs/ directory.
+        allow_extra: If True, extra files beyond expected_files are allowed (e.g. workspace files).
+            If False (default), asserts exact count match.
     """
 
     expected_files: Sequence[str] = field(default_factory=list)
+    allow_extra: bool = False
 
 
 @dataclass
@@ -101,11 +105,10 @@ class CustomCheck:
 class SuccessCriteria:
     """High-level success conditions for a task.
 
-    All tests require: final answer present, no agent errors.
-
     Attributes:
         required_keywords: Keywords that must appear in the final answer.
         max_steps: Maximum number of steps allowed.
+        require_final_answer: If False, skip the "Final answer present" check (e.g. when agent asks a question).
         require_subagent: True = must use sub-agent, False = must not, None = either is fine.
         mermaid_expectation: Expected mermaid diagram content.
         file_expectation: Expected file outputs.
@@ -114,6 +117,7 @@ class SuccessCriteria:
 
     required_keywords: Sequence[str] = field(default_factory=list)
     max_steps: int | None = None
+    require_final_answer: bool = True
     require_subagent: bool | None = False
     mermaid_expectation: MermaidExpectation = field(default_factory=MermaidExpectation)
     file_expectation: FileExpectation = field(default_factory=FileExpectation)

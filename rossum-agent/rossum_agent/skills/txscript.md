@@ -177,11 +177,15 @@ Trigger conditions are TxScript expressions evaluated in formula-field-like cont
 
 ## Deploying as Serverless Hook
 
-Before calling `create_hook`, check its tool schema to learn the exact parameter names, types, and allowed values. Pass the TxScript source code via `config={"source": "<code>"}`.
+Pass the TxScript source code via `config={"source": "<code>"}` — auto-renamed to `config.code`.
 
 ## Testing Serverless Hooks
 
-Use `test_hook` to execute the hook with an auto-generated payload. For `annotation_content` or `annotation_status` events, an annotation is auto-resolved from the hook's queues. If no annotations exist (e.g., freshly created queue), find an annotation from another queue in the same workspace and pass its URL via the `annotation` parameter.
+| Rule | Detail |
+|------|--------|
+| Annotation required | `annotation_content` and `annotation_status` events need an annotation |
+| Before calling `test_hook` | `search(query={"entity": "annotation", "queue_id": <queue_id>})` to check if annotations exist on the hook's queues |
+| No annotations found | Pass an annotation URL from another queue via `annotation` parameter, or upload a document first |
 
 ## Critical Constraints
 

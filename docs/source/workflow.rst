@@ -22,8 +22,8 @@ Important Considerations
 
 **Important**: After uploading documents, agents should wait for annotations to transition
 from ``importing`` to ``to_review`` (or ``confirmed``/``exported``) before considering them
-fully processed. Use ``get_annotation`` to poll individual annotations or ``list_annotations``
-to check the status of multiple documents in bulk.
+fully processed. Use ``get(entity="annotation", entity_id=...)`` to poll individual annotations or
+``search(query={"entity": "annotation", "queue_id": ...})`` to check the status of multiple documents in bulk.
 
 Example Workflows
 -----------------
@@ -44,12 +44,13 @@ Single Document Upload
 
 .. code-block:: text
 
-   Use list_annotations with:
-   - queue_id: "12345"
+   Use search with:
+   - query: {"entity": "annotation", "queue_id": 12345}
    Find the annotation in the results
 
-   Use get_annotation with:
-   - annotation_id: "annotation_id_from_list"
+   Use get with:
+   - entity: "annotation"
+   - entity_id: annotation_id_from_search
    Check status field - wait until it's "to_review", "confirmed", or "exported"
 
 Bulk Document Upload
@@ -69,10 +70,8 @@ For agents uploading multiple documents:
 
 .. code-block:: text
 
-   Use list_annotations with:
-   - queue_id: "12345"
-   - status: "to_review" (or check all statuses)
-   - ordering: "-created_at"
+   Use search with:
+   - query: {"entity": "annotation", "queue_id": 12345, "status": "to_review", "ordering": ["-created_at"]}
 
    This returns all annotations in the queue, allowing you to verify
    which documents have finished processing.

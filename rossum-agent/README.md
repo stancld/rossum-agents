@@ -26,7 +26,7 @@
 
 | Capability | Description |
 |------------|-------------|
-| **Rossum MCP Integration** | Full access to 71 MCP tools for document processing |
+| **Rossum MCP Integration** | Full access to 32 MCP tools for document processing |
 | **Hook Debugging** | Test hooks via native Rossum API endpoints |
 | **Deployment Tools** | Pull, push, diff, copy configs across environments |
 | **Knowledge Base Search** | AI-powered Rossum documentation search |
@@ -71,11 +71,17 @@ uv sync --extra api        # REST API (FastAPI, Redis)
 | `ROSSUM_API_TOKEN` | Yes | Rossum API authentication token |
 | `ROSSUM_API_BASE_URL` | Yes | Base URL (e.g., `https://api.elis.rossum.ai/v1`) |
 | `AWS_PROFILE` | Yes | AWS profile for Bedrock access |
-| `AWS_DEFAULT_REGION` | No | AWS region (default: `us-east-1`) |
+| `AWS_REGION` | No | AWS region for Bedrock (default: `us-east-1`) |
+| `AWS_BEDROCK_MODEL_ARN` | No | Custom ARN for the Opus model in Bedrock |
+| `AWS_BEDROCK_MODEL_ARN_SMALL` | No | Custom ARN for the Haiku model in Bedrock |
 | `REDIS_HOST` | No | Redis host for chat persistence |
 | `REDIS_PORT` | No | Redis port (default: `6379`) |
 | `ROSSUM_MCP_MODE` | No | MCP mode: `read-only` (default) or `read-write` |
 | `ROSSUM_AGENT_PERSONA` | No | Agent persona: `default` (default) or `cautious` — read by the TUI client, not the server |
+| `ROSSUM_KB_DATA_PATH` | No | Path to local knowledge base JSON file |
+| `ADDITIONAL_ALLOWED_ROSSUM_HOSTS` | No | Comma-separated regex patterns for additional allowed Rossum API hosts |
+| `SLACK_BOT_TOKEN` | No | Slack bot token for report integration |
+| `SLACK_CHANNEL` | No | Slack channel for posting reports |
 
 ## Usage
 
@@ -117,57 +123,28 @@ asyncio.run(main())
 
 ## Available Tools
 
-The agent provides internal tools and access to 71 MCP tools via dynamic loading.
+The agent provides internal tools and access to 32 MCP tools via dynamic loading.
 
 <details>
 <summary><strong>Internal Tools</strong></summary>
 
-**File & Knowledge:**
+**File & Working Memory:**
 - `write_file` - Save reports, documentation, analysis results
-- `search_knowledge_base` - Search Rossum docs with AI analysis (sub-agent)
-- `kb_grep` - Regex search across Knowledge Base article titles and content
-- `kb_get_article` - Retrieve full Knowledge Base article by slug
+- `search_knowledge_base` - Structured KB retrieval with deterministic ranking and sub-agent fallback
+- `search_elis_docs` - AI-powered search of API documentation (sub-agent)
 
 **Data Tools:**
 - `run_jq` - Run jq expressions on JSON content or file paths
 - `run_grep` - Regex search in text content or file paths
 
-**API Reference:**
-- `elis_openapi_jq` - Query Rossum API OpenAPI spec with jq
-- `elis_openapi_grep` - Free-text search in API spec
-- `search_elis_docs` - AI-powered search of API documentation
-
-**Formula:**
-- `suggest_formula_field` - Suggest formula field expressions via Rossum Local Copilot
-
-**Rules:**
-- `suggest_rule` - Suggest rule trigger conditions and actions via Rossum Local Copilot
-
-**Lookup Fields:**
-- `suggest_lookup_field` - Suggest lookup field matching configuration for MDH datasets
-- `evaluate_lookup_field` - Evaluate lookup field results on a real annotation
-- `get_lookup_dataset_raw_values` - Fetch raw MDH dataset rows for unmatched/ambiguous case verification
+**Copilot Execution:**
+- `execute_python` - Run constrained Python snippets; load the relevant skill first and use `write_file(...)` for large outputs
 
 **Schema:**
-- `create_schema_with_subagent` - Create new schemas via Opus sub-agent
 - `patch_schema_with_subagent` - Safe schema modifications via Opus
 
-**Deployment:**
-- `deploy_pull` - Pull configs from organization
-- `deploy_diff` - Compare local vs remote
-- `deploy_push` - Push local changes
-- `deploy_copy_org` - Copy entire organization
-- `deploy_copy_workspace` - Copy single workspace
-- `deploy_compare_workspaces` - Compare two workspaces
-- `deploy_to_org` - Deploy to target organization
-
-**Multi-Environment:**
-- `spawn_mcp_connection` - Connect to different Rossum environment
-- `call_on_connection` - Call tools on spawned connection
-- `close_connection` - Close spawned connection
-
 **Skills:**
-- `load_skill` - Load domain-specific workflows (`rossum-deployment`, `schema-patching`, `schema-pruning`, `organization-setup`, `schema-creation`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
+- `load_skill` - Load domain-specific workflows (`schema-patching`, `python-execution`, `ui-settings`, `hooks`, `txscript`, `rules-and-actions`, `formula-fields`, `reasoning-fields`, `lookup-fields`, `document-testing`)
 
 **Document Testing:**
 - `generate_mock_pdf` - Generate schema-aware mock PDFs with realistic field values for end-to-end extraction testing
@@ -177,12 +154,15 @@ The agent provides internal tools and access to 71 MCP tools via dynamic loading
 - `update_task` - Update a task's status (`pending`, `in_progress`, `completed`) or subject
 - `list_tasks` - List all tracked tasks with current status
 
+**User Interaction:**
+- `ask_user_question` - Ask the user structured questions (free-text or multiple-choice) mid-execution; streamed via SSE `agent_question` event
+
 </details>
 
 <details>
 <summary><strong>Dynamic MCP Tool Loading</strong></summary>
 
-Tools are loaded on-demand to reduce context usage. Use `load_tool_category` to load tools by category:
+Tools are loaded on-demand to reduce context usage. Use `load_tool` to load tools by name:
 
 | Category | Description |
 |----------|-------------|
@@ -212,13 +192,11 @@ flowchart TB
 
     subgraph Agent["Rossum Agent (Claude Bedrock)"]
         IT[Internal Tools]
-        DT[Deploy Tools]
-        MT[Spawn MCP Tools]
         SK[Skills System]
     end
 
     subgraph MCP["Rossum MCP Server"]
-        Tools[71 MCP Tools]
+        Tools[32 MCP Tools]
     end
 
     API[Rossum API]
@@ -239,6 +217,9 @@ flowchart TB
 | `GET /api/v1/chats/{id}` | Get chat details |
 | `DELETE /api/v1/chats/{id}` | Delete chat |
 | `POST /api/v1/chats/{id}/messages` | Send message (SSE) |
+| `PUT /api/v1/chats/{id}/feedback` | Submit thumbs up/down for a turn |
+| `GET /api/v1/chats/{id}/feedback` | Get all feedback for a chat |
+| `DELETE /api/v1/chats/{id}/feedback/{turn}` | Remove feedback for a turn |
 | `GET /api/v1/chats/{id}/files` | List files |
 | `GET /api/v1/chats/{id}/files/{name}` | Download file |
 | `GET /api/v1/commands` | List available slash commands |

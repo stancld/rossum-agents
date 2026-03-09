@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from rossum_agent.agent.models import ToolResultStep
 
-from regression_tests.custom_checks._utils import create_api_client
+from regression_tests.custom_checks._utils import create_api_client, extract_schema_id_from_steps
 
 if TYPE_CHECKING:
     from rossum_agent.agent.models import AgentStep
@@ -24,31 +24,6 @@ EXPECTED_VENDOR_MATCHES: dict[str, bool] = {
     "General Electric Ltd.": True,
     "Blockbuster LLC": True,
 }
-
-
-def _extract_schema_id_from_output_json(steps: list[AgentStep]) -> int | None:
-    """Extract schema_id from output.json written by the agent."""
-    content = _extract_write_file_content(steps, "output.json")
-    if content is None:
-        return None
-
-    if isinstance(content, str):
-        try:
-            content = json.loads(content)
-        except json.JSONDecodeError:
-            return None
-
-    if not isinstance(content, dict):
-        return None
-
-    schema_id = content.get("schema_id")
-    if schema_id is None:
-        return None
-
-    try:
-        return int(schema_id)
-    except (TypeError, ValueError):
-        return None
 
 
 def _find_lookup_field_raw(schema_content: list[dict]) -> dict | None:
@@ -96,9 +71,9 @@ def _aggregate_lookup_results(eval_result: dict) -> list[dict]:
 
 def check_lookup_field_configured(steps: list[AgentStep], api_base_url: str, api_token: str) -> tuple[bool, str]:
     """Verify schema has a lookup field with valid matching config and evaluation succeeded."""
-    schema_id = _extract_schema_id_from_output_json(steps)
+    schema_id = extract_schema_id_from_steps(steps)
     if not schema_id:
-        return False, "Could not parse schema_id from output.json"
+        return False, "Could not find schema_id in agent steps"
 
     # Fetch raw schema to preserve matching dict (not in Datapoint model)
     client = create_api_client(api_base_url, api_token)
@@ -153,60 +128,18 @@ def check_lookup_field_configured(steps: list[AgentStep], api_base_url: str, api
     )
 
 
-def _extract_write_file_content(steps: list[AgentStep], filename: str) -> str | dict | None:
-    """Extract the content argument from a write_file tool call for a given filename."""
-    for step in steps:
-        if not isinstance(step, ToolResultStep):
-            continue
-        for tc in step.tool_calls:
-            if tc.name == "write_file" and tc.arguments.get("filename", "") == filename:
-                return tc.arguments.get("content")
-    return None
-
-
-def _parse_lookup_results(content: str | dict | list | None) -> list[dict] | None:
-    """Parse lookup_results from write_file content (handles str, dict, and list).
-
-    Handles two formats:
-    - Flat: {"schema_id": ..., "lookup_results": [...]} — agent pre-aggregated
-    - Raw evaluate_lookup_field: {"status": "success", "results": [{"lookup_results": [...]}]} — agent saved verbatim
-    """
-    if content is None:
-        return None
-    if isinstance(content, str):
-        try:
-            content = json.loads(content)
-        except json.JSONDecodeError:
-            return None
-    if not isinstance(content, dict):
-        return None
-
-    # Flat format: direct lookup_results key
-    if "lookup_results" in content:
-        return content.get("lookup_results")
-
-    # Raw evaluate_lookup_field format: flatten results[].lookup_results
-    if "results" in content:
-        aggregated: list[dict] = []
-        for r in content.get("results", []):
-            aggregated.extend(r.get("lookup_results", []))
-        return aggregated or None
-
-    return None
-
-
 def check_lookup_match_results(steps: list[AgentStep], _api_base_url: str, _api_token: str) -> tuple[bool, str]:
     """Verify lookup match results in output.json match expected vendor matches.
 
     Uses value (non-empty = matched) since evaluate_lookup_field populates options=[] for unambiguous matches.
     """
-    content = _extract_write_file_content(steps, "output.json")
-    if content is None:
-        return False, "No write_file call found for output.json"
+    eval_result = _find_evaluate_result(steps)
+    if not eval_result:
+        return False, "evaluate_lookup_field was not called or returned no parseable result"
 
-    lookup_results = _parse_lookup_results(content)
-    if lookup_results is None:
-        return False, f"Could not parse lookup_results from output.json content: {str(content)[:200]}"
+    lookup_results = _aggregate_lookup_results(eval_result)
+    if not lookup_results:
+        return False, "evaluate_lookup_field returned empty lookup_results"
 
     if len(lookup_results) != len(EXPECTED_VENDOR_MATCHES):
         return False, f"Expected {len(EXPECTED_VENDOR_MATCHES)} lookup results, got {len(lookup_results)}"

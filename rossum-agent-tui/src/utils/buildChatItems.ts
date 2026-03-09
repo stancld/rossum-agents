@@ -30,10 +30,14 @@ function pairSteps(
   return pairs;
 }
 
-function pairedStepToItem(pair: {
-  step: CompletedStep;
-  resultStep?: CompletedStep;
-}): ChatItem {
+function pairedStepToItem(
+  pair: {
+    step: CompletedStep;
+    resultStep?: CompletedStep;
+  },
+  turnIndex: number,
+  feedback: Record<number, boolean>,
+): ChatItem {
   const { step, resultStep } = pair;
   switch (step.type) {
     case "thinking":
@@ -56,7 +60,12 @@ function pairedStepToItem(pair: {
         content: step.content || "",
       };
     case "final_answer":
-      return { kind: "final_answer", content: step.content || "" };
+      return {
+        kind: "final_answer",
+        content: step.content || "",
+        turnIndex,
+        feedback: turnIndex in feedback ? feedback[turnIndex]! : null,
+      };
     case "error":
       return { kind: "error", content: step.content || "Unknown error" };
     default:
@@ -68,45 +77,33 @@ function pairedStepToItem(pair: {
   }
 }
 
-export function buildChatItems(state: ChatState): ChatItem[] {
-  const items: ChatItem[] = [];
-  const paired = pairSteps(state.completedSteps);
-
-  let msgIdx = 0;
-
-  for (let i = 0; i < paired.length; i++) {
-    while (
-      msgIdx < state.userMessages.length &&
-      state.userMessages[msgIdx]!.stepIndexBefore <=
-        getOriginalStepIndex(paired, i)
-    ) {
-      const msg = state.userMessages[msgIdx]!;
-      items.push({
-        kind: "user_message",
-        text: msg.text,
-        attachments: msg.attachments,
-      });
-      msgIdx++;
-    }
-    items.push(pairedStepToItem(paired[i]!));
-  }
-
-  while (msgIdx < state.userMessages.length) {
-    const msg = state.userMessages[msgIdx]!;
-    items.push({
-      kind: "user_message",
-      text: msg.text,
-      attachments: msg.attachments,
-    });
-    msgIdx++;
-  }
-
+function appendTrailingItems(
+  items: ChatItem[],
+  state: ChatState,
+  paired: Array<{ step: CompletedStep; resultStep?: CompletedStep }>,
+  questionIndex?: number,
+): void {
   for (const f of state.files) {
     items.push({ kind: "file_created", filename: f.filename, url: f.url });
   }
 
   if (state.configCommit) {
     items.push({ kind: "config_commit", commit: state.configCommit });
+  }
+
+  if (state.pendingQuestion) {
+    const qi = questionIndex ?? 0;
+    const currentQ = state.pendingQuestion.questions[qi];
+    if (currentQ) {
+      items.push({
+        kind: "agent_question",
+        question: currentQ.question,
+        options: currentQ.options,
+        multiSelect: currentQ.multi_select,
+        questionIndex: qi,
+        totalQuestions: state.pendingQuestion.questions.length,
+      });
+    }
   }
 
   if (
@@ -124,7 +121,77 @@ export function buildChatItems(state: ChatState): ChatItem[] {
       subAgentText: state.subAgentText,
     });
   }
+}
 
+export function buildChatItems(
+  state: ChatState,
+  questionIndex?: number,
+): ChatItem[] {
+  const items: ChatItem[] = [];
+  const paired = pairSteps(state.completedSteps);
+  const feedback = state.feedback;
+
+  let msgIdx = 0;
+  let turnIndex = 0;
+
+  for (let i = 0; i < paired.length; ) {
+    while (
+      msgIdx < state.userMessages.length &&
+      state.userMessages[msgIdx]!.stepIndexBefore <=
+        getOriginalStepIndex(paired, i)
+    ) {
+      const msg = state.userMessages[msgIdx]!;
+      items.push({
+        kind: "user_message",
+        text: msg.text,
+        attachments: msg.attachments,
+      });
+      msgIdx++;
+    }
+    const pair = paired[i]!;
+
+    // Group consecutive tool_start calls with the same tool name (3+)
+    if (pair.step.type === "tool_start" && pair.step.toolName) {
+      const toolName = pair.step.toolName;
+      let groupEnd = i + 1;
+      while (
+        groupEnd < paired.length &&
+        paired[groupEnd]!.step.type === "tool_start" &&
+        paired[groupEnd]!.step.toolName === toolName
+      ) {
+        groupEnd++;
+      }
+      const groupSize = groupEnd - i;
+      if (groupSize >= 3) {
+        const calls = paired.slice(i, groupEnd);
+        items.push({
+          kind: "tool_group",
+          toolName,
+          calls,
+        });
+        i = groupEnd;
+        continue;
+      }
+    }
+
+    items.push(pairedStepToItem(pair, turnIndex, feedback));
+    if (pair.step.type === "final_answer") {
+      turnIndex++;
+    }
+    i++;
+  }
+
+  while (msgIdx < state.userMessages.length) {
+    const msg = state.userMessages[msgIdx]!;
+    items.push({
+      kind: "user_message",
+      text: msg.text,
+      attachments: msg.attachments,
+    });
+    msgIdx++;
+  }
+
+  appendTrailingItems(items, state, paired, questionIndex);
   return items;
 }
 

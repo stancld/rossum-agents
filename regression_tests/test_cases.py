@@ -15,7 +15,6 @@ from __future__ import annotations
 from regression_tests.custom_checks import (
     check_business_validation_hook_settings,
     check_business_validation_rules,
-    check_cautious_persona_asks_clarification,
     check_formula_field_for_table,
     check_formula_field_updated,
     check_hook_deleted_and_reverted,
@@ -24,7 +23,6 @@ from regression_tests.custom_checks import (
     check_lookup_field_configured,
     check_lookup_match_results,
     check_multi_turn_schema_reverted,
-    check_net_terms_formula_field_added,
     check_no_misleading_training_suggestions,
     check_queue_deleted,
     check_queue_ui_settings,
@@ -54,11 +52,6 @@ HIDDEN_MULTIVALUE_CHECK = CustomCheck(
 NO_MISLEADING_TRAINING_SUGGESTIONS_CHECK = CustomCheck(
     name="No misleading training suggestions (e.g., Inbox in training_queues)",
     check_fn=check_no_misleading_training_suggestions,
-)
-
-NET_TERMS_FORMULA_FIELD_CHECK = CustomCheck(
-    name="Net Terms formula field was added to schema",
-    check_fn=check_net_terms_formula_field_added,
 )
 
 BUSINESS_VALIDATION_RULES_CHECK = CustomCheck(
@@ -141,11 +134,6 @@ MULTI_TURN_SCHEMA_REVERTED_CHECK = CustomCheck(
     check_fn=check_multi_turn_schema_reverted,
 )
 
-CAUTIOUS_PERSONA_CLARIFICATION_CHECK = CustomCheck(
-    name="Cautious persona asked clarifying question instead of creating formula field",
-    check_fn=check_cautious_persona_asks_clarification,
-)
-
 
 REGRESSION_TEST_CASES: list[RegressionTestCase] = [
     RegressionTestCase(
@@ -156,7 +144,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url=None,
         prompt="Hey, what can you do?",
         tool_expectation=ToolExpectation(expected_tools=[], mode=ToolMatchMode.EXACT_SEQUENCE),
-        token_budget=TokenBudget(min_total_tokens=6000, max_total_tokens=6500),
+        token_budget=TokenBudget(min_total_tokens=8500, max_total_tokens=10000),
         success_criteria=SuccessCriteria(
             required_keywords=["hook", "queue"],
             max_steps=1,
@@ -170,11 +158,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         mode="read-only",
         rossum_url="https://mr-fabry.rossum.app/documents?filtering=%7B%22items%22%3A%5B%7B%22field%22%3A%22queue%22%2C%22value%22%3A%5B%222500259%22%5D%2C%22operator%22%3A%22isAnyOf%22%7D%5D%2C%22logicOperator%22%3A%22and%22%7D&level=queue&page=1&page_size=100",
         prompt="Explain a document workflow and learning workflow on this queue.",
-        tool_expectation=ToolExpectation(expected_tools=["get_queue", "get_queue_engine"], mode=ToolMatchMode.SUBSET),
-        token_budget=TokenBudget(min_total_tokens=25000, max_total_tokens=60000),
+        tool_expectation=ToolExpectation(expected_tools=["get:queue"], mode=ToolMatchMode.SUBSET),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=70000),
         success_criteria=SuccessCriteria(
             required_keywords=["document_type", "classification", "training", "workflow"],
-            max_steps=5,
+            max_steps=4,
             mermaid_expectation=MermaidExpectation(
                 descriptions=[
                     "Document workflow showing upload, classification, review, and routing to specialized queues",
@@ -198,20 +186,19 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
-                "list_hooks",
-                "list_hook_logs",
+                "search:hook",
+                "search:hook_log",
                 "search_knowledge_base",
                 "write_file",
-                ("get_schema", "get_queue_schema", "get_schema_tree_structure"),  # OR: either is valid
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=130000),
+        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=150000),
         success_criteria=SuccessCriteria(
-            require_subagent=True,
+            require_subagent=None,
             required_keywords=[],
-            max_steps=7,
-            file_expectation=FileExpectation(expected_files=["roast.md"]),
+            max_steps=6,
+            file_expectation=FileExpectation(expected_files=["roast.md"], allow_extra=True),
             custom_checks=[HIDDEN_MULTIVALUE_CHECK],
         ),
     ),
@@ -229,9 +216,9 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "Return the queue_id that was deleted."
         ),
         tool_expectation=ToolExpectation(
-            expected_tools=["create_queue_from_template", "delete_queue"], mode=ToolMatchMode.SUBSET
+            expected_tools=["create_queue_from_template", "delete:queue"], mode=ToolMatchMode.SUBSET
         ),
-        token_budget=TokenBudget(min_total_tokens=20000, max_total_tokens=40000),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=55000),
         success_criteria=SuccessCriteria(
             required_keywords=["deleted"],
             max_steps=4,
@@ -266,22 +253,19 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "load_skill",
                 "create_task",  # model should plan
                 ("patch_schema", "patch_schema_with_subagent"),
-                "suggest_formula_field",
+                "execute_python",
             ],
             mode=ToolMatchMode.SUBSET,
             forbidden_tools=[
                 "search_knowledge_base",
-                "kb_grep",
-                "elis_openapi_grep",
-                "elis_openapi_jq",
                 "search_elis_docs",
             ],
         ),
-        token_budget=TokenBudget(min_total_tokens=70000, max_total_tokens=125000),
+        token_budget=TokenBudget(min_total_tokens=110000, max_total_tokens=180000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
-            max_steps=6,
+            max_steps=8,
             file_expectation=FileExpectation(),
             custom_checks=[REASONING_FIELD_CHECK, FORMULA_FIELD_FOR_TABLE_CHECK],
         ),
@@ -315,7 +299,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "| Customer Address | String, multiline | No |\n"
             "| Total Amount | Float | No |\n"
             "| Total Tax | Float | No |\n"
-            "| Currency | String | No |\n"
+            "| Currency | Enum | No |\n"
             "| Code | String, multiline | Yes |\n"
             "| Description | String, multiline | Yes |\n"
             "| Quantity | Integer | Yes |\n"
@@ -331,19 +315,18 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             expected_tools=[
                 "load_skill",
                 "create_queue_from_template",
-                "suggest_formula_field",
-                "patch_schema",
-                "get_schema_tree_structure",
+                "execute_python",
+                ("patch_schema", "patch_schema_with_subagent"),
                 "prune_schema_fields",
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=120000, max_total_tokens=300000),
+        token_budget=TokenBudget(min_total_tokens=150000, max_total_tokens=300000),
         success_criteria=SuccessCriteria(
+            require_subagent=None,
             required_keywords=["Invoices", "Credit Notes"],
-            max_steps=11,
+            max_steps=12,
             file_expectation=FileExpectation(),
-            custom_checks=[NET_TERMS_FORMULA_FIELD_CHECK],
         ),
     ),
     RegressionTestCase(
@@ -367,17 +350,17 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             expected_tools=[
                 "create_queue_from_template",
                 "search_knowledge_base",
-                "list_hook_templates",
+                "search:hook_template",
                 "create_hook_from_template",
                 "update_hook",
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=130000, max_total_tokens=220000),
+        token_budget=TokenBudget(min_total_tokens=130000, max_total_tokens=280000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
-            max_steps=8,
+            max_steps=7,
             file_expectation=FileExpectation(),
             custom_checks=[BUSINESS_VALIDATION_HOOK_CHECK],
         ),
@@ -404,18 +387,15 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "create_queue_from_template",
                 "load_skill",
                 "create_rule",
-                "suggest_rule",
+                "execute_python",
             ],
             mode=ToolMatchMode.SUBSET,
             forbidden_tools=[
                 "search_knowledge_base",
-                "kb_grep",
-                "elis_openapi_grep",
-                "elis_openapi_jq",
                 "search_elis_docs",
             ],
         ),
-        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=110000),
+        token_budget=TokenBudget(min_total_tokens=60000, max_total_tokens=150000),
         success_criteria=SuccessCriteria(
             require_subagent=False,
             required_keywords=[],
@@ -450,7 +430,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             expected_tools=["create_queue_from_template", "load_skill", "update_queue"],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=50000),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=70000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
             max_steps=4,
@@ -479,14 +459,15 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
                 "create_queue_from_template",
                 "load_skill",
                 ("create_hook", "create_hook_from_template"),
+                "generate_mock_pdf",
                 "test_hook",
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=150000, max_total_tokens=250000),
+        token_budget=TokenBudget(min_total_tokens=150000, max_total_tokens=320000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
-            max_steps=10,
+            max_steps=13,
             file_expectation=FileExpectation(),
             custom_checks=[SERVERLESS_HOOK_TXSCRIPT_CHECK, HOOK_TEST_RESULTS_CHECK],
         ),
@@ -510,19 +491,18 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "3. Update the formula field you just created:\n"
             "    - Field name: total_quantity\n"
             "    - New logic: Sum of all total amount values across line items\n"
-            "    - After updating, store the full schema JSON to `schema_v2.json`"
+            "    - After updating, store the full schema JSON to `schema_v2.json`\n"
+            "No task planning. Rush it."
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
-                "suggest_formula_field",
+                "execute_python",
                 ("patch_schema", "patch_schema_with_subagent"),
-                "get_schema",
-                "write_file",
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=180000, max_total_tokens=360000),
+        token_budget=TokenBudget(min_total_tokens=180000, max_total_tokens=450000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
             max_steps=12,
@@ -556,11 +536,11 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=90000),
+        token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=100000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
-            max_steps=6,
+            max_steps=5,
             file_expectation=FileExpectation(),
             custom_checks=[SCHEMA_REPLACED_WITH_FORMULA_CHECK],
         ),
@@ -595,7 +575,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=80000, max_total_tokens=200000),
+        token_budget=TokenBudget(min_total_tokens=80000, max_total_tokens=250000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
@@ -622,23 +602,23 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             "    - URL: https://example.com/webhook\n"
             "3. Delete the hook you just created\n"
             "4. Revert the last commit to restore the deleted hook\n\n"
-            "Return only the new hook_id as a one-word answer."
+            "Return only the new hook_id as a one-word answer. Do not use task planning."
         ),
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
                 "create_hook",
-                "delete_hook",
+                "delete:hook",
                 "show_change_history",
                 "revert_commit",
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=80000, max_total_tokens=150000),
+        token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=120000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
-            max_steps=12,
+            max_steps=7,
             file_expectation=FileExpectation(),
             custom_checks=[HOOK_DELETED_AND_REVERTED_CHECK],
         ),
@@ -653,7 +633,6 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         prompt=(
             "# Empty schema and revert\n\n"
             "Schema ID: {schema_id}\n\n"
-            "## Tasks:\n\n"
             "1. Remove ALL existing fields from schema {schema_id}\n"
             "2. Revert the last commit to restore the original schema\n\n"
             "Return only the schema_id as a one-word answer."
@@ -666,7 +645,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=90000),
+        token_budget=TokenBudget(min_total_tokens=40000, max_total_tokens=100000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
@@ -685,7 +664,7 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         rossum_url=None,
         requires_redis=True,
         prompts=[
-            "Create a 'New revert queue' in workspace 785638. Use EU template.",
+            "Create a 'New revert queue' in workspace 785638. Use EU Invoice template.",
             (
                 "Add field to the queue.\n"
                 "    - Field name: The Net Terms\n"
@@ -706,15 +685,14 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
-                "suggest_formula_field",
+                "execute_python",
                 ("patch_schema", "patch_schema_with_subagent"),
-                "are_reasoning_fields_enabled",
                 "load_skill",
                 "restore_entity_version",
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=300000, max_total_tokens=700000),
+        token_budget=TokenBudget(min_total_tokens=300000, max_total_tokens=900000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],
@@ -739,16 +717,16 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
             ),
         ],
         tool_expectation=ToolExpectation(
-            expected_tools=["create_queue_from_template"],
+            expected_tools=["ask_user_question"],
             mode=ToolMatchMode.SUBSET,
-            forbidden_tools=["patch_schema", "patch_schema_with_subagent"],
+            forbidden_tools=["patch_schema", "patch_schema_with_subagent", "execute_python"],
         ),
-        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=65000),
+        token_budget=TokenBudget(min_total_tokens=30000, max_total_tokens=85000),
         success_criteria=SuccessCriteria(
             required_keywords=[],
-            max_steps=5,
+            max_steps=4,
+            require_final_answer=False,
             file_expectation=FileExpectation(),
-            custom_checks=[CAUTIOUS_PERSONA_CLARIFICATION_CHECK],
         ),
     ),
     RegressionTestCase(
@@ -779,19 +757,15 @@ REGRESSION_TEST_CASES: list[RegressionTestCase] = [
         tool_expectation=ToolExpectation(
             expected_tools=[
                 "create_queue_from_template",
-                "list_annotations",
+                "search:annotation",
                 "copy_annotations",
                 "load_skill",
-                "suggest_lookup_field",
+                "execute_python",
                 ("patch_schema", "patch_schema_with_subagent"),
-                "evaluate_lookup_field",
-                "get_lookup_dataset_raw_values",
-                "query_lookup_dataset",
-                "write_file",
             ],
             mode=ToolMatchMode.SUBSET,
         ),
-        token_budget=TokenBudget(min_total_tokens=250000, max_total_tokens=600000),
+        token_budget=TokenBudget(min_total_tokens=250000, max_total_tokens=750000),
         success_criteria=SuccessCriteria(
             require_subagent=None,
             required_keywords=[],

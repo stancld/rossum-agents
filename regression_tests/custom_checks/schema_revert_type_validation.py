@@ -26,10 +26,15 @@ def _extract_schema_id(steps: list[AgentStep]) -> int | None:
         if not isinstance(step, ToolResultStep):
             continue
         for tc in step.tool_calls:
-            if tc.name in ("prune_schema_fields", "get_schema_tree_structure", "get_schema"):
+            if tc.name in ("prune_schema_fields", "get_schema_tree_structure"):
                 args = tc.arguments
                 if isinstance(args, dict) and "schema_id" in args:
                     return int(args["schema_id"])
+            # Unified get tool: get(entity="schema", entity_id=X)
+            if tc.name == "get":
+                args = tc.arguments
+                if isinstance(args, dict) and args.get("entity") == "schema" and "entity_id" in args:
+                    return int(args["entity_id"])
 
     # Fallback: extract from final answer
     if final_answer := get_final_answer(steps):

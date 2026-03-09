@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generic, TypeVar
 
@@ -27,30 +27,6 @@ class GracefulListResult(Generic[T]):  # noqa: UP046 - PEP 695 breaks sphinx-aut
 
 VALID_MODES = ("read-only", "read-write")
 
-_base_url: str = ""
-_mcp_mode: str = ""
-_configured: bool = False
-
-
-def configure(base_url: str, mcp_mode: str) -> None:
-    global _base_url, _mcp_mode, _configured
-    _base_url = base_url.rstrip("/")
-    normalized = mcp_mode.lower()
-    if normalized not in VALID_MODES:
-        raise ValueError(f"Invalid ROSSUM_MCP_MODE: {mcp_mode}. Must be one of: {VALID_MODES}")
-    _mcp_mode = normalized
-    _configured = True
-
-
-def _ensure_configured() -> None:
-    global _configured
-    if _configured:
-        return
-    configure(
-        base_url=os.environ.get("ROSSUM_API_BASE_URL", ""),
-        mcp_mode=os.environ.get("ROSSUM_MCP_MODE", "read-write"),
-    )
-
 
 def extract_id_from_url(url: str) -> int:
     """Extract the integer resource ID from a Rossum API URL."""
@@ -60,30 +36,25 @@ def extract_id_from_url(url: str) -> int:
         raise ValueError(f"Cannot extract resource ID from URL: {url}") from e
 
 
-def get_mcp_mode() -> str:
-    _ensure_configured()
-    return _mcp_mode
-
-
-def set_mcp_mode(mode: str) -> None:
-    """Set the MCP mode (case-insensitive)."""
-    global _mcp_mode, _configured
-    normalized = mode.lower()
-    if normalized not in VALID_MODES:
-        raise ValueError(f"Invalid mode '{mode}'. Must be one of: {VALID_MODES}")
-    _mcp_mode = normalized
-    _configured = True
-
-
-def build_resource_url(resource_type: str, resource_id: int) -> str:
+def build_resource_url(base_url: str, resource_type: str, resource_id: int) -> str:
     """Build a full URL for a Rossum API resource."""
-    _ensure_configured()
-    return f"{_base_url}/{resource_type}/{resource_id}"
+    return f"{base_url}/{resource_type}/{resource_id}"
 
 
 def build_filters(**kwargs: Any) -> dict[str, Any]:
     """Build a filter dict from kwargs, excluding None values."""
     return {k: v for k, v in kwargs.items() if v is not None}
+
+
+def filter_by_name_regex[T](items: list[T], name: str | None, use_regex: bool) -> list[T]:
+    """Apply client-side regex name filtering when use_regex is True."""
+    if not use_regex or name is None:
+        return items
+    return [
+        item
+        for item in items
+        if (item_name := item.name) and re.search(name, item_name, re.IGNORECASE)  # type: ignore[unresolved-attribute] - all callers pass items with .name
+    ]
 
 
 async def graceful_list(

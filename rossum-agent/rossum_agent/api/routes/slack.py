@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from rossum_api import AsyncRossumAPIClient
+from rossum_api import APIClientError, AsyncRossumAPIClient
 from rossum_api.dtos import Token
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -34,6 +34,14 @@ class SlackContext:
     queue_name: str | None = None
 
 
+def _reporter_name_from_credentials(credentials: RossumCredentials) -> str | None:
+    """Build reporter name from /auth/user data stored in credentials."""
+    full_name = f"{credentials.first_name or ''} {credentials.last_name or ''}".strip()
+    if full_name and credentials.email:
+        return f"{full_name} ({credentials.email})"
+    return full_name or credentials.email
+
+
 async def _fetch_slack_context(credentials: RossumCredentials, queue_id: int | None = None) -> SlackContext:
     api_base = credentials.api_url.rstrip("/")
 
@@ -41,9 +49,16 @@ async def _fetch_slack_context(credentials: RossumCredentials, queue_id: int | N
     try:
         client = AsyncRossumAPIClient(base_url=api_base, credentials=Token(token=credentials.token))
 
-        user = await client.retrieve_user(int(credentials.user_id))
-        full_name = f"{user.first_name} {user.last_name}".strip()
-        ctx.reporter_name = full_name or user.username
+        try:
+            user = await client.retrieve_user(int(credentials.user_id))
+            full_name = f"{user.first_name} {user.last_name}".strip()
+            ctx.reporter_name = full_name or user.username
+        except APIClientError as e:
+            if e.status_code != 404:
+                raise
+            # Support access: user_id from /auth/user may not exist in the target org
+            ctx.reporter_name = _reporter_name_from_credentials(credentials)
+            logger.info(f"User {credentials.user_id} not found, using auth fallback: {ctx.reporter_name}")
 
         org = await client.retrieve_own_organization()
         ctx.organization_name = org.name

@@ -18,6 +18,9 @@ from rossum_agent.api.models.schemas import (
     CreateChatRequest,
     DeleteResponse,
     EntityChangeInfo,
+    FeedbackListResponse,
+    FeedbackRequest,
+    FeedbackResponse,
 )
 from rossum_agent.api.services.chat_service import ChatService
 from rossum_agent.change_tracking.store import CommitStore
@@ -31,9 +34,9 @@ router = APIRouter(prefix="/chats", tags=["chats"])
 @limiter.limit("30/minute")
 async def create_chat(
     request: Request,
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
     body: CreateChatRequest | None = None,
-    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
 ) -> ChatResponse:
     """Create a new chat session."""
     mcp_mode = body.mcp_mode if body else "read-only"
@@ -44,10 +47,10 @@ async def create_chat(
 @router.get("", response_model=ChatListResponse)
 async def list_chats(
     request: Request,
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
-    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
 ) -> ChatListResponse:
     """List chat sessions for the authenticated user."""
     return chat_service.list_chats(user_id=credentials.user_id, limit=limit, offset=offset)
@@ -57,8 +60,8 @@ async def list_chats(
 async def get_chat(
     request: Request,
     chat_id: str,
-    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
 ) -> ChatDetail:
     """Get detailed information about a chat session."""
     chat = chat_service.get_chat(user_id=credentials.user_id, chat_id=chat_id)
@@ -73,8 +76,8 @@ async def get_chat(
 async def list_chat_commits(
     request: Request,
     chat_id: str,
-    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
 ) -> CommitListResponse:
     """List configuration commits made in a chat session."""
     chat_data = chat_service.get_chat_data(user_id=credentials.user_id, chat_id=chat_id)
@@ -115,13 +118,57 @@ async def list_chat_commits(
 async def delete_chat(
     request: Request,
     chat_id: str,
-    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)] = None,  # type: ignore[assignment]
-    chat_service: Annotated[ChatService, Depends(get_chat_service)] = None,  # type: ignore[assignment]
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
 ) -> DeleteResponse:
-    """Delete a chat session."""
     if not chat_service.chat_exists(credentials.user_id, chat_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
 
     deleted = chat_service.delete_chat(user_id=credentials.user_id, chat_id=chat_id)
 
+    return DeleteResponse(deleted=deleted)
+
+
+@router.put("/{chat_id}/feedback", response_model=FeedbackResponse)
+async def submit_feedback(
+    request: Request,
+    chat_id: str,
+    body: FeedbackRequest,
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
+) -> FeedbackResponse:
+    if not chat_service.chat_exists(credentials.user_id, chat_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
+
+    chat_service.save_feedback(credentials.user_id, chat_id, body.turn_index, body.is_positive)
+    return FeedbackResponse(turn_index=body.turn_index, is_positive=body.is_positive)
+
+
+@router.get("/{chat_id}/feedback", response_model=FeedbackListResponse)
+async def get_feedback(
+    request: Request,
+    chat_id: str,
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
+) -> FeedbackListResponse:
+    if not chat_service.chat_exists(credentials.user_id, chat_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
+
+    feedback = chat_service.get_feedback(credentials.user_id, chat_id)
+    return FeedbackListResponse(feedback=feedback)
+
+
+@router.delete("/{chat_id}/feedback/{turn_index}", response_model=DeleteResponse)
+async def delete_feedback(
+    request: Request,
+    chat_id: str,
+    turn_index: int,
+    credentials: Annotated[RossumCredentials, Depends(get_validated_credentials)],
+    chat_service: Annotated[ChatService, Depends(get_chat_service)],
+) -> DeleteResponse:
+    """Remove feedback for a specific turn."""
+    if not chat_service.chat_exists(credentials.user_id, chat_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chat {chat_id} not found")
+
+    deleted = chat_service.delete_feedback(credentials.user_id, chat_id, turn_index)
     return DeleteResponse(deleted=deleted)

@@ -4,7 +4,36 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Unreleased] - YYYY-MM-DD
+## [2.0.0] - 2026-03-09
+
+### Added
+- Added `get` tool: fetch any entity by ID with a single unified tool — supports `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`, `hook_secrets_keys`; `include_related=True` enriches with linked data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events) [#221](https://github.com/stancld/rossum-agents/pull/221)
+- Added `search` tool: list/filter any entity with typed, entity-specific query objects — covers all `get`-supported types except `organization_limit` and `hook_secrets_keys` (get-only), plus search-only entities `hook_log`, `hook_template`, `user_role`, `queue_template_name` [#221](https://github.com/stancld/rossum-agents/pull/221)
+- Added `hook_secrets_keys` entity to the `get` tool — returns stored secret key names for a hook (values are write-only, never returned) [#247](https://github.com/stancld/rossum-agents/pull/247)
+
+### Changed
+- Error handling in MCP tools now uses `raise ToolError(...)` instead of `return {"error": ...}` dicts — FastMCP surfaces these as proper MCP error responses, and return types are tightened by removing `| dict` unions [#236](https://github.com/stancld/rossum-agents/pull/236)
+- `create_queue` and `update_queue` parameters `locale` and `automation_level` are now `Literal` types instead of plain strings — LLMs see valid values directly in the JSON schema [#237](https://github.com/stancld/rossum-agents/pull/237)
+- `create_email_template` parameters `to`, `cc`, `bcc` are now typed `EmailRecipient` dicts instead of untyped `dict[str, Any]` [#237](https://github.com/stancld/rossum-agents/pull/237)
+- `update_queue` parameter `queue_data` is now a typed `QueueUpdateData` schema instead of an untyped dict — LLMs see valid field names and types directly in the JSON schema [#221](https://github.com/stancld/rossum-agents/pull/221)
+- `update_engine` parameter `engine_data` is now a typed `EngineUpdateData` schema instead of an untyped dict [#221](https://github.com/stancld/rossum-agents/pull/221)
+- `create_engine_field` parameter `multiline` changed from `str` to `bool` [#221](https://github.com/stancld/rossum-agents/pull/221)
+- **Breaking**: `create_hook` now maps `config.source` to `config.code` (previously mapped to `config.function`) to match the current API field name [#221](https://github.com/stancld/rossum-agents/pull/221)
+
+### Removed
+- Removed `are_lookup_fields_enabled` and `are_reasoning_fields_enabled` tools — feature availability is inferred by the agent from organization group data via the `get` / `search` tools
+- Removed `update_schema` tool — use `patch_schema` for individual field changes or `prune_schema_fields` for bulk removal [#245](https://github.com/stancld/rossum-agents/pull/245)
+- Removed `create_queue` tool — use `create_queue_from_template` instead [#245](https://github.com/stancld/rossum-agents/pull/245)
+- Removed `create_schema` tool — use `patch_schema` to build schemas incrementally [#244](https://github.com/stancld/rossum-agents/pull/244)
+- Removed `set_mcp_mode` tool — mode is now set exclusively via the `ROSSUM_MCP_MODE` environment variable at server startup [#249](https://github.com/stancld/rossum-agents/pull/249)
+- Removed generic `"template"` keyword from `email_templates` category to reduce false-positive tool pre-loads (e.g., queue template queries no longer trigger email template tools)
+- **Breaking**: Replaced 25+ individual read tools with the unified `get` and `search` tools. Removed standalone tools: `get_annotation`, `list_annotations`, `get_queue`, `list_queues`, `get_queue_schema`, `get_queue_engine`, `get_schema`, `list_schemas`, `get_hook`, `list_hooks`, `list_hook_logs`, `list_hook_templates`, `get_engine`, `list_engines`, `get_email_template`, `list_email_templates`, `get_user`, `list_users`, `list_user_roles`, `get_organization_group`, `list_organization_groups`, `get_rule`, `list_rules`, `get_workspace`, `list_workspaces`, `get_relation`, `list_relations`, `get_document_relation`, `list_document_relations`, `get_organization_limit` [#221](https://github.com/stancld/rossum-agents/pull/221)
+- **Breaking**: Replaced 6 individual delete tools with the unified `delete` tool. Removed standalone tools: `delete_queue`, `delete_schema`, `delete_hook`, `delete_rule`, `delete_workspace`, `delete_annotation` [#229](https://github.com/stancld/rossum-agents/pull/229)
+- Removed `get_queue_template_names` — use `search(query={"entity": "queue_template_name"})` instead [#231](https://github.com/stancld/rossum-agents/pull/231)
+- Removed dead validation code (`_validate_node`, `_validate_id`, `_validate_datapoint`, `_validate_tuple`, `_validate_multivalue`, `_validate_section`, `SchemaValidationError`) superseded by the sanitization approach in `sanitize_schema_content`
+
+### Fixed
+- `create_hook` and `update_hook` now expose `token_owner`, `run_after`, `secrets`, and `sideload` parameters — previously these fields were missing from the tool signatures [#247](https://github.com/stancld/rossum-agents/pull/247)
 
 ## [1.4.1] - 2026-02-26
 

@@ -10,22 +10,13 @@ from rossum_api.dtos import Token
 
 from rossum_mcp.logging_config import setup_logging
 from rossum_mcp.tools import (
-    register_annotation_tools,
+    register_create_tools,
+    register_delete_tools,
     register_discovery_tools,
-    register_document_relation_tools,
-    register_email_template_tools,
-    register_engine_tools,
-    register_hook_tools,
-    register_organization_group_tools,
-    register_organization_limit_tools,
-    register_queue_tools,
-    register_relation_tools,
-    register_rule_tools,
-    register_schema_tools,
-    register_user_tools,
-    register_workspace_tools,
+    register_get_tools,
+    register_update_tools,
 )
-from rossum_mcp.tools.base import configure, get_mcp_mode, set_mcp_mode
+from rossum_mcp.tools.base import VALID_MODES
 
 logger = logging.getLogger(__name__)
 
@@ -44,48 +35,25 @@ def create_app() -> FastMCP:
 
     base_url = os.environ["ROSSUM_API_BASE_URL"].rstrip("/")
     api_token = os.environ["ROSSUM_API_TOKEN"]
-    mcp_mode = os.environ.get("ROSSUM_MCP_MODE", "read-write")
+    mcp_mode = os.environ.get("ROSSUM_MCP_MODE", "read-write").lower()
 
-    configure(base_url=base_url, mcp_mode=mcp_mode)
+    if mcp_mode not in VALID_MODES:
+        raise ValueError(f"Invalid ROSSUM_MCP_MODE: {mcp_mode}. Must be one of: {VALID_MODES}")
 
-    logger.info(f"Rossum MCP Server starting in {get_mcp_mode()} mode")
+    logger.info(f"Rossum MCP Server starting in {mcp_mode} mode")
 
     mcp = FastMCP("rossum-mcp-server")
     client = AsyncRossumAPIClient(base_url=base_url, credentials=Token(token=api_token))
 
     register_discovery_tools(mcp)
-    register_annotation_tools(mcp, client)
-    register_queue_tools(mcp, client)
-    register_schema_tools(mcp, client)
-    register_engine_tools(mcp, client)
-    register_hook_tools(mcp, client)
-    register_organization_group_tools(mcp, client)
-    register_organization_limit_tools(mcp, client)
-    register_email_template_tools(mcp, client)
-    register_document_relation_tools(mcp, client)
-    register_relation_tools(mcp, client)
-    register_rule_tools(mcp, client)
-    register_user_tools(mcp, client)
-    register_workspace_tools(mcp, client)
+    register_get_tools(mcp, client)
+    register_delete_tools(mcp, client)
+    register_create_tools(mcp, client, base_url)
+    register_update_tools(mcp, client, base_url)
 
     @mcp.tool(description="Get the current MCP operation mode (read-only or read-write).")
-    async def get_mcp_mode_tool() -> dict:
-        return {"mode": get_mcp_mode()}
-
-    @mcp.tool(
-        description="Set the MCP operation mode. Use 'read-only' to disable write operations, 'read-write' to enable them."
-    )
-    async def set_mcp_mode_tool(mode: str) -> dict:
-        try:
-            set_mcp_mode(mode)
-            current = get_mcp_mode()
-            if current == "read-only":
-                mcp.disable(tags={"write"})
-            else:
-                mcp.enable(tags={"write"})
-            return {"message": f"MCP mode set to '{current}'"}
-        except ValueError as e:
-            return {"error": str(e)}
+    async def get_mcp_mode() -> dict:
+        return {"mode": mcp_mode}
 
     # Enforce read-only mode by hiding write tools via FastMCP visibility
     if mcp_mode == "read-only":

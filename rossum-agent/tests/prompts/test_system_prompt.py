@@ -24,3 +24,19 @@ class TestSystemPromptTaskTracking:
     def test_does_not_forbid_update_task(self):
         prompt = get_system_prompt("default")
         assert "Do not call `update_task`" not in prompt
+
+
+class TestSystemPromptSchemaInstructions:
+    def test_python_execution_skill_mentions_write_file(self):
+        prompt = get_system_prompt("default")
+        assert "use `execute_python` + `write_file(...)` to save the fetched payload directly" in prompt
+
+    def test_python_execution_is_skill_referenced(self):
+        prompt = get_system_prompt("default")
+        assert '`load_skill("python-execution")`' in prompt
+        assert "schema_content(...)" not in prompt
+
+    def test_run_jq_requires_jq_syntax(self):
+        prompt = get_system_prompt("default")
+        assert "`run_jq` expects real jq syntax" in prompt
+        assert "`?`, `//`, and `tonumber?`" in prompt

@@ -5,7 +5,7 @@ Provides deterministic programmatic schema manipulation. The workflow:
 2. Get full schema content
 3. LLM instructs which fields to keep/add based on user requirements
 4. Programmatic filtering/modification of schema content
-5. Single PUT to update schema
+5. Single PATCH to update schema via direct API call
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import re
 import time
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING
@@ -20,8 +21,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
 
+import httpx
 from anthropic import beta_tool
+from rossum_mcp.tools.validation import sanitize_schema_content
 
+from rossum_agent.tools.core import get_context
 from rossum_agent.tools.subagents.base import (
     SubAgent,
     SubAgentConfig,
@@ -30,6 +34,8 @@ from rossum_agent.tools.subagents.base import (
 from rossum_agent.tools.subagents.mcp_helpers import call_mcp_tool
 
 logger = logging.getLogger(__name__)
+
+_ENGINE_RESTRICTION_RE = re.compile(r"extracted field '(\w+)' is not present among names of engine fields")
 
 
 def _to_plain(obj: Any) -> Any:
@@ -47,20 +53,24 @@ def _to_plain(obj: Any) -> Any:
     return obj
 
 
-def _extract_schema_content(mcp_result: Any) -> list[dict[str, Any]]:
-    """Extract schema content list from MCP result, handling dict, dataclass, or Pydantic.
+def _unwrap_get_response(obj: Any) -> Any:
+    """Unwrap unified get response: {"entity": ..., "id": ..., "data": {...}} or FastMCP {"result": ...}."""
+    if isinstance(obj, dict):
+        if "data" in obj and "entity" in obj:
+            return obj["data"]
+        if "result" in obj:
+            return obj["result"]
+    elif hasattr(obj, "result"):
+        return obj.result
+    return obj
 
-    Handles both direct schema dicts and wrapped results like {"result": {...}}.
-    """
+
+def _extract_schema_content(mcp_result: Any) -> list[dict[str, Any]]:
+    """Extract schema content list from MCP result, handling dict, dataclass, or Pydantic."""
     if mcp_result is None:
         return []
 
-    # Unwrap structured_content {"result": {...}} wrapper from FastMCP
-    obj = mcp_result
-    if isinstance(obj, dict) and "result" in obj:
-        obj = obj["result"]
-    elif hasattr(obj, "result"):
-        obj = obj.result
+    obj = _unwrap_get_response(mcp_result)
 
     if isinstance(obj, dict):
         content = obj.get("content", [])
@@ -105,7 +115,7 @@ Optional: format, options (for enum), rir_field_names, hidden, can_export, ui_co
 ## Constraints
 
 - Field `id` must be valid identifier (lowercase, underscores, no spaces)
-- Do NOT set `rir_field_names` unless user explicitly provides engine field names
+- Do NOT set `rir_field_names` unless user explicitly provides engine field names — the API rejects schemas when `rir_field_names` contains values unknown to the engine ("Engine restriction: extracted field '...' is not present among names of engine fields")
 - If user mentions extraction/AI capture, check existing schema for rir_field_names patterns first
 - `ui_configuration.type` must be one of: captured, data, manual, formula, reasoning, lookup
 - `ui_configuration.edit` must be one of: enabled, enabled_without_warning, disabled
@@ -269,54 +279,6 @@ def _collect_field_ids(content: list[dict[str, Any]]) -> set[str]:
     return ids
 
 
-def _filter_content(
-    content: list[dict[str, Any]],
-    fields_to_keep: set[str],
-) -> tuple[list[dict[str, Any]], list[str]]:
-    """Filter schema content to keep only specified fields. Sections always preserved."""
-    filtered: list[dict[str, Any]] = []
-    removed: list[str] = []
-
-    for node in content:
-        node_id = node.get("id", "")
-        category = node.get("category", "")
-
-        if category == "section":
-            new_section = copy.deepcopy(node)
-            if "children" in new_section and isinstance(new_section["children"], list):
-                new_children, section_removed = _filter_content(new_section["children"], fields_to_keep)
-                new_section["children"] = new_children
-                removed.extend(section_removed)
-            filtered.append(new_section)
-
-        elif category == "multivalue":
-            new_mv = copy.deepcopy(node)
-            mv_children_removed: list[str] = []
-
-            if "children" in new_mv and isinstance(new_mv["children"], dict):
-                tuple_node = new_mv["children"]
-                if "children" in tuple_node and isinstance(tuple_node["children"], list):
-                    tuple_children, mv_children_removed = _filter_content(tuple_node["children"], fields_to_keep)
-                    tuple_node["children"] = tuple_children
-
-            has_remaining_children = bool(new_mv.get("children", {}).get("children", []))
-
-            if node_id in fields_to_keep or has_remaining_children:
-                filtered.append(new_mv)
-                removed.extend(mv_children_removed)
-            else:
-                removed.append(node_id)
-                removed.extend(_collect_field_ids([node]) - {node_id})
-
-        else:
-            if node_id in fields_to_keep:
-                filtered.append(copy.deepcopy(node))
-            elif node_id:
-                removed.append(node_id)
-
-    return filtered, removed
-
-
 def _coerce_type_to_string(value: Any) -> str:
     """Coerce a type value to a string, handling LLM-generated dicts like {"type": "number"}."""
     if isinstance(value, str):
@@ -368,6 +330,79 @@ def _build_field_node(spec: dict[str, Any]) -> dict[str, Any]:
         node["matching"] = spec["matching"]
 
     return node
+
+
+def _filter_content(
+    content: list[dict[str, Any]],
+    fields_to_keep: set[str],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Filter schema content to keep only specified fields. Sections always preserved."""
+    filtered: list[dict[str, Any]] = []
+    removed: list[str] = []
+
+    for node in content:
+        node_id = node.get("id", "")
+        category = node.get("category", "")
+
+        if category == "section":
+            new_section = copy.deepcopy(node)
+            if "children" in new_section and isinstance(new_section["children"], list):
+                new_children, section_removed = _filter_content(new_section["children"], fields_to_keep)
+                new_section["children"] = new_children
+                removed.extend(section_removed)
+            filtered.append(new_section)
+
+        elif category == "multivalue":
+            new_mv = copy.deepcopy(node)
+            mv_children_removed: list[str] = []
+
+            if "children" in new_mv and isinstance(new_mv["children"], dict):
+                tuple_node = new_mv["children"]
+                if "children" in tuple_node and isinstance(tuple_node["children"], list):
+                    tuple_children, mv_children_removed = _filter_content(tuple_node["children"], fields_to_keep)
+                    tuple_node["children"] = tuple_children
+
+            has_remaining_children = bool(new_mv.get("children", {}).get("children", []))
+
+            if node_id in fields_to_keep or has_remaining_children:
+                filtered.append(new_mv)
+                removed.extend(mv_children_removed)
+            else:
+                removed.append(node_id)
+                removed.extend(_collect_field_ids([node]) - {node_id})
+
+        else:
+            if node_id in fields_to_keep:
+                filtered.append(copy.deepcopy(node))
+            elif node_id:
+                removed.append(node_id)
+
+    return filtered, removed
+
+
+def _strip_invalid_rir_fields(content: list[dict[str, Any]], bad_names: set[str]) -> list[str]:
+    """Remove rir_field_names entries matching bad_names from all fields in content. Returns list of fixed field IDs."""
+    fixed: list[str] = []
+
+    def _walk(nodes: list[dict[str, Any]]) -> None:
+        for node in nodes:
+            rir = node.get("rir_field_names")
+            if isinstance(rir, list):
+                cleaned = [name for name in rir if name not in bad_names]
+                if len(cleaned) != len(rir):
+                    fixed.append(node.get("id", "?"))
+                    if cleaned:
+                        node["rir_field_names"] = cleaned
+                    else:
+                        del node["rir_field_names"]
+            children = node.get("children")
+            if isinstance(children, list):
+                _walk(children)
+            elif isinstance(children, dict):
+                _walk([children])
+
+    _walk(content)
+    return fixed
 
 
 def _section_label_from_id(section_id: str) -> str:
@@ -475,6 +510,17 @@ def _update_fields_in_content(
     return modified, updated
 
 
+def _update_schema_via_api(schema_id: int, content: list[dict[str, Any]]) -> None:
+    """Update schema content via direct Rossum API call (no MCP)."""
+    ctx = get_context()
+    base_url, token = ctx.require_rossum_credentials()
+    url = f"{base_url}/schemas/{schema_id}"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    sanitized = sanitize_schema_content(content)
+    response = httpx.patch(url, json={"content": sanitized}, headers=headers, timeout=60)
+    response.raise_for_status()
+
+
 def _apply_schema_changes(
     schema_id: int,
     current_content: list[dict[str, Any]],
@@ -482,7 +528,7 @@ def _apply_schema_changes(
     fields_to_add: list[dict[str, Any]] | None,
     fields_to_update: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Apply changes to schema content and PUT to API."""
+    """Apply changes to schema content and PATCH to API."""
     result: dict[str, Any] = {
         "schema_id": schema_id,
         "fields_removed": [],
@@ -509,9 +555,18 @@ def _apply_schema_changes(
         modified_content, updated = _update_fields_in_content(modified_content, fields_to_update)
         result["fields_updated"] = updated
 
-    mcp_result = call_mcp_tool("update_schema", {"schema_id": schema_id, "schema_data": {"content": modified_content}})
+    try:
+        _update_schema_via_api(schema_id, modified_content)
+    except Exception as e:
+        bad_names = set(_ENGINE_RESTRICTION_RE.findall(str(e)))
+        if not bad_names:
+            raise
+        fixed = _strip_invalid_rir_fields(modified_content, bad_names)
+        logger.info(f"Auto-fixed engine restriction: stripped rir_field_names from fields {fixed}")
+        _update_schema_via_api(schema_id, modified_content)
+
     result["fields_kept"] = sorted(_collect_field_ids(modified_content))
-    result["update_result"] = "success" if mcp_result else "failed"
+    result["update_result"] = "success"
 
     return result
 
@@ -528,7 +583,8 @@ def _execute_opus_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
         return json.dumps(plain_result, indent=2, default=str) if plain_result else "No data returned"
 
     if tool_name == "get_full_schema":
-        mcp_result = call_mcp_tool("get_schema", tool_input)
+        mcp_result = call_mcp_tool("get", {"entity": "schema", "entity_id": schema_id})
+        mcp_result = _unwrap_get_response(mcp_result)
         if mcp_result and schema_id:
             content = _extract_schema_content(mcp_result)
             if not content:
@@ -570,10 +626,6 @@ class SchemaPatchingSubAgent(SubAgent):
         """Execute a tool call from the LLM."""
         return _execute_opus_tool(tool_name, tool_input)
 
-    def process_response_block(self, block: Any, iteration: int, max_iterations: int) -> dict[str, Any] | None:
-        """No special block processing needed for schema patching."""
-        return None
-
 
 def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> SubAgentResult:
     """Call Opus model for schema patching with deterministic tool workflow.
@@ -586,7 +638,7 @@ def _call_opus_for_patching(schema_id: str, changes: list[dict[str, Any]]) -> Su
     schema_id_int = int(schema_id)
 
     tree_result = call_mcp_tool("get_schema_tree_structure", {"schema_id": schema_id_int})
-    schema_result = call_mcp_tool("get_schema", {"schema_id": schema_id_int})
+    schema_result = _unwrap_get_response(call_mcp_tool("get", {"entity": "schema", "entity_id": schema_id_int}))
     if schema_result:
         content = _extract_schema_content(schema_result)
         if not content:
@@ -639,8 +691,12 @@ Lookup fields MUST include: type "enum", ui_configuration {{"type": "lookup", "e
 
 Call apply_schema_changes with fields_to_keep (IDs to retain), fields_to_add, and/or fields_to_update, then return summary."""
 
-    sub_agent = SchemaPatchingSubAgent()
-    return sub_agent.run(user_content)
+    try:
+        sub_agent = SchemaPatchingSubAgent()
+        return sub_agent.run(user_content)
+    finally:
+        # Ensure cache is cleaned up even if the sub-agent fails or skips apply_schema_changes
+        _schema_content_cache.pop(schema_id_int, None)
 
 
 @beta_tool

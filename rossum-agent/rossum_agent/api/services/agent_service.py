@@ -22,13 +22,17 @@ from rossum_agent.agent.models import (
     StepType,
     TextDeltaStep,
     ThinkingStep,
+    ToolCall,
     ToolResult,
     ToolResultStep,
     ToolStartStep,
 )
 from rossum_agent.api.models.schemas import (
+    AgentQuestionEvent,
+    AgentQuestionItemSchema,
     DocumentContent,
     ImageContent,
+    QuestionOptionSchema,
     StepEvent,
     StreamDoneEvent,
     SubAgentProgressEvent,
@@ -42,6 +46,7 @@ from rossum_agent.redis_storage import RedisStorage
 from rossum_agent.rossum_mcp_integration import MCPConnection, connect_mcp_server
 from rossum_agent.tools.core import (
     AgentContext,
+    AgentQuestion,
     SubAgentProgress,
     SubAgentText,
     reset_context,
@@ -77,7 +82,7 @@ async def _log_commit_hook(commit: ConfigCommit) -> str | None:
 class _RequestContext:
     """Per-request context for agent execution."""
 
-    event_queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent] | None = None
+    event_queue: asyncio.Queue[QueuedAgentEvent] | None = None
     event_loop: asyncio.AbstractEventLoop | None = None
 
 
@@ -94,6 +99,9 @@ class _ChatRunState:
 
 _request_context: contextvars.ContextVar[_RequestContext] = contextvars.ContextVar("request_context")
 
+type QueuedAgentEvent = SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent | AgentQuestionEvent
+type StreamEvent = StepEvent | StreamDoneEvent | QueuedAgentEvent
+
 
 def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentProgressEvent:
     return SubAgentProgressEvent(
@@ -106,22 +114,40 @@ def convert_sub_agent_progress_to_event(progress: SubAgentProgress) -> SubAgentP
     )
 
 
-def _create_tool_start_event(step: ToolStartStep, current_tool: str) -> StepEvent:
-    current_tool_args = None
-    current_tool_call_id = None
-    for tc in step.tool_calls:
-        if tc.name == current_tool:
-            current_tool_args = tc.arguments
-            current_tool_call_id = tc.id
-            break
-    display_name = get_display_tool_name(current_tool, current_tool_args)
+def _resolve_tool_call(
+    step: ToolStartStep,
+    tool_call: ToolCall | None = None,
+    current_tool: str | None = None,
+) -> ToolCall | None:
+    if tool_call is not None:
+        return tool_call
+    if step.current_tool_call_id is not None:
+        for candidate in step.tool_calls:
+            if candidate.id == step.current_tool_call_id:
+                return candidate
+    if current_tool is None:
+        return None
+    for candidate in step.tool_calls:
+        if candidate.name == current_tool:
+            return candidate
+    return None
+
+
+def _create_tool_start_event(
+    step: ToolStartStep, tool_call: ToolCall | None = None, current_tool: str | None = None
+) -> StepEvent:
+    resolved_tool_call = _resolve_tool_call(step, tool_call, current_tool)
+    resolved_tool_name = resolved_tool_call.name if resolved_tool_call is not None else current_tool or ""
+    tool_arguments = resolved_tool_call.arguments if resolved_tool_call is not None else None
+
+    display_name = get_display_tool_name(resolved_tool_name, tool_arguments)
     return StepEvent(
         type="tool_start",
         step_number=step.step_number,
         tool_name=display_name,
-        tool_arguments=current_tool_args,
+        tool_arguments=tool_arguments,
         tool_progress=step.tool_progress,
-        tool_call_id=current_tool_call_id,
+        tool_call_id=resolved_tool_call.id if resolved_tool_call is not None else None,
     )
 
 
@@ -145,11 +171,7 @@ def _log_events(events: list[StepEvent]) -> None:
 
 
 def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
-    """Convert an AgentStep to StepEvents for SSE streaming.
-
-    Uses pattern matching on the discriminated union step types.
-    Returns a list because a single ToolResultStep may contain multiple tool results.
-    """
+    """Convert an agent step to SSE events."""
     match step:
         case ErrorStep():
             events = [StepEvent(type="error", step_number=step.step_number, content=step.error, is_final=True)]
@@ -184,13 +206,13 @@ def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
             total = len(step.tool_calls)
             events = []
             for idx, tc in enumerate(step.tool_calls, 1):
-                ev = _create_tool_start_event(step, tc.name)
+                ev = _create_tool_start_event(step, tool_call=tc)
                 ev.tool_progress = (idx, total)
                 events.append(ev)
 
         case ToolStartStep():
             # Single tool progress update
-            events = [_create_tool_start_event(step, step.current_tool)]
+            events = [_create_tool_start_event(step, current_tool=step.current_tool)]
 
         case ToolResultStep():
             events = [_create_tool_result_event(step.step_number, r) for r in step.tool_results]
@@ -308,11 +330,7 @@ class AgentService:
         state.last_memory = None
         return memory
 
-    def _enqueue_event_threadsafe(
-        self,
-        event: SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent,
-        event_name: str,
-    ) -> None:
+    def _enqueue_event_threadsafe(self, event: QueuedAgentEvent, event_name: str) -> None:
         """Thread-safe event enqueueing via call_soon_threadsafe.
 
         Callbacks may be invoked from thread pool executors, so we must marshal
@@ -344,12 +362,26 @@ class AgentService:
         event = TaskSnapshotEvent(tasks=snapshot)
         self._enqueue_event_threadsafe(event, "Task snapshot")
 
+    def _on_agent_question(self, question: AgentQuestion) -> None:
+        event = AgentQuestionEvent(
+            questions=[
+                AgentQuestionItemSchema(
+                    question=item.question,
+                    options=[
+                        QuestionOptionSchema(value=o.value, label=o.label, description=o.description)
+                        for o in item.options
+                    ],
+                    multi_select=item.multi_select,
+                )
+                for item in question.questions
+            ],
+        )
+        self._enqueue_event_threadsafe(event, "Agent question")
+
     @staticmethod
-    def _drain_queue(
-        queue: asyncio.Queue[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent],
-    ) -> list[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent]:
+    def _drain_queue(queue: asyncio.Queue[QueuedAgentEvent]) -> list[QueuedAgentEvent]:
         """Drain all pending events from the queue."""
-        events: list[SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent] = []
+        events: list[QueuedAgentEvent] = []
         while not queue.empty():
             try:
                 events.append(queue.get_nowait())
@@ -369,7 +401,7 @@ class AgentService:
         rossum_url: str | None = None,
         images: list[ImageContent] | None = None,
         documents: list[DocumentContent] | None = None,
-    ) -> AsyncIterator[StepEvent | StreamDoneEvent | SubAgentProgressEvent | SubAgentTextEvent | TaskSnapshotEvent]:
+    ) -> AsyncIterator[StreamEvent]:
         """Run the agent with a new prompt.
 
         Creates a fresh MCP connection, initializes the agent with conversation
@@ -407,6 +439,7 @@ class AgentService:
             text_callback=self._on_sub_agent_text,
             task_tracker=TaskTracker(),
             task_snapshot_callback=self._on_task_snapshot,
+            question_callback=self._on_agent_question,
         )
         ctx_token = set_context(agent_ctx)
 
@@ -428,7 +461,7 @@ class AgentService:
                     )
 
                     agent_ctx.mcp_connection = mcp_connection
-                    agent_ctx.mcp_event_loop = asyncio.get_event_loop()
+                    agent_ctx.mcp_event_loop = asyncio.get_running_loop()
                     agent_ctx.mcp_mode = mcp_mode
                     agent_ctx.commit_store = commit_store
                     agent_ctx.snapshot_store = snapshot_store

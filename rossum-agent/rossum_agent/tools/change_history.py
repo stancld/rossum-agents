@@ -15,7 +15,7 @@ from anthropic import beta_tool
 from rossum_api import APIClientError, AsyncRossumAPIClient
 from rossum_api.domain_logic.resources import Resource
 from rossum_api.dtos import Token
-from rossum_mcp.tools.schemas.validation import sanitize_schema_content
+from rossum_mcp.tools.validation import sanitize_schema_content
 
 from rossum_agent.change_tracking.models import EntityChange
 from rossum_agent.rossum_mcp_integration import unwrap
@@ -88,6 +88,21 @@ def _flush_pending_changes() -> None:
     ctx.mcp_connection.flush_and_commit("auto-flush before history query")
 
 
+def _unwrap_snapshot(data: dict) -> dict:
+    """Unwrap FastMCP and unified-get response wrappers from a snapshot.
+
+    Handles two layers:
+    1. FastMCP's {"result": ...} wrapper
+    2. Unified get tool's {"entity": ..., "id": ..., "data": {...}} wrapper
+
+    Defense-in-depth for snapshots stored in Redis before the _call_mcp fix.
+    """
+    inner = unwrap(data)
+    if "data" in inner and "entity" in inner and isinstance(inner["data"], dict):
+        return inner["data"]
+    return inner
+
+
 def _compute_revert_patch(before: dict, after: dict) -> dict:
     """Compute the minimal PATCH payload to revert after→before.
 
@@ -143,7 +158,7 @@ async def _revert_entity_update(api_base_url: str, token: str, change: EntityCha
     client = AsyncRossumAPIClient(base_url=api_base_url, credentials=Token(token=token))
 
     if change.entity_type == "schema":
-        before_inner = unwrap(change.before)
+        before_inner = _unwrap_snapshot(change.before)
         content = before_inner.get("content")
         if not isinstance(content, list):
             msg = f"Cannot revert schema {entity_id}: 'before' snapshot has no content"
@@ -482,7 +497,7 @@ async def _restore_entity(api_base_url: str, token: str, entity_type: str, entit
     client = AsyncRossumAPIClient(base_url=api_base_url, credentials=Token(token=token))
 
     if entity_type == "schema":
-        inner = unwrap(snapshot)
+        inner = _unwrap_snapshot(snapshot)
         content = inner.get("content")
         if not isinstance(content, list):
             msg = f"Cannot restore schema {entity_id}: snapshot has no content"
@@ -595,7 +610,7 @@ def restore_entity_version(entity_type: str, entity_id: str, commit_hash: str) -
         return json.dumps({"error": str(e), "entity_type": entity_type, "entity_id": entity_id})
 
 
-def _parse_json_arg(value: str) -> object:
+def _parse_json_arg(value: str | object) -> object:
     """Parse a JSON argument, tolerating dicts passed directly or double-encoded strings."""
     if not isinstance(value, str):
         # Agent passed a dict/list object directly instead of a JSON string

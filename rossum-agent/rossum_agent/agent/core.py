@@ -20,7 +20,7 @@ at multiple points to provide real-time updates to the client. The yield flow is
         │
         └── #7 forwards from _execute_tools_with_progress
                 ├── Tool starting (which tool is about to run)
-                └── Sub-agent progress (from nested agent tools like create_schema_with_subagent)
+                └── Sub-agent progress (from nested agent tools like patch_schema_with_subagent)
 
 Key concepts:
 - Initial text buffering (INITIAL_TEXT_BUFFER_DELAY=1.5s) allows determining step type
@@ -81,10 +81,11 @@ from rossum_agent.agent.models import (
     ToolStartStep,
     truncate_content,
 )
+from rossum_agent.agent.spillover import maybe_spill
 from rossum_agent.api.models.schemas import TokenUsageBreakdown
 from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
 from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
-from rossum_agent.tools import execute_internal_tool, execute_tool, get_internal_tool_names, get_internal_tools
+from rossum_agent.tools import execute_internal_tool, get_internal_tool_names, get_internal_tools
 from rossum_agent.tools.core import (
     AgentContext,
     SubAgentProgress,
@@ -92,12 +93,11 @@ from rossum_agent.tools.core import (
     get_context,
     set_context,
 )
-from rossum_agent.tools.deploy import DEPLOY_TOOLS, get_deploy_tool_names, get_deploy_tools
 from rossum_agent.tools.dynamic_tools import (
+    DELETE_TOOL_NAME,
     DISCOVERY_TOOL_NAME,
     get_dynamic_tools,
     get_tools_version,
-    is_skill_loaded,
     preload_categories_for_request,
     reset_dynamic_tools,
 )
@@ -159,6 +159,47 @@ def _parse_json_encoded_strings(arguments: dict) -> dict:
     return result
 
 
+def _tool_call_fingerprint(tool_call: ToolCall) -> str:
+    """Create a stable fingerprint for deduplicating identical tool calls in one step."""
+    return json.dumps(
+        {"name": tool_call.name, "arguments": tool_call.arguments},
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+
+
+def _deduplicate_tool_calls(
+    tool_calls: list[ToolCall], step_num: int
+) -> tuple[list[ToolCall], dict[str, list[ToolCall]]]:
+    """Deduplicate identical tool calls, returning unique calls and a map of duplicates by primary ID."""
+    deduped: list[ToolCall] = []
+    duplicate_calls_by_id: dict[str, list[ToolCall]] = {}
+    seen_fingerprints: dict[str, ToolCall] = {}
+
+    for tool_call in tool_calls:
+        fingerprint = _tool_call_fingerprint(tool_call)
+        primary_call = seen_fingerprints.get(fingerprint)
+        if primary_call is None:
+            seen_fingerprints[fingerprint] = tool_call
+            deduped.append(tool_call)
+            duplicate_calls_by_id[tool_call.id] = []
+        else:
+            duplicate_calls_by_id[primary_call.id].append(tool_call)
+
+    duplicate_count = len(tool_calls) - len(deduped)
+    if duplicate_count > 0:
+        logger.info(
+            "Step %s: deduplicated %s duplicate tool call(s) (%s requested, %s executed)",
+            step_num,
+            duplicate_count,
+            len(tool_calls),
+            len(deduped),
+        )
+
+    return deduped, duplicate_calls_by_id
+
+
 class _SchemaStagger:
     """Stagger schema patch calls to avoid 412 conflicts from concurrent writes."""
 
@@ -176,6 +217,10 @@ class _SchemaStagger:
         if delay > 0:
             logger.info("Staggering %s by %.1fs to avoid conflicts", tool_name, delay)
             await asyncio.sleep(delay)
+
+
+# How often to log streaming progress (seconds)
+_STREAM_PROGRESS_LOG_INTERVAL = 10.0
 
 
 @dataclasses.dataclass
@@ -197,6 +242,11 @@ class _StreamState:
     pending_tools: dict[int, dict[str, str]] = dataclasses.field(default_factory=dict)
     first_text_token_time: float | None = None
     initial_buffer_flushed: bool = False
+    # Streaming progress tracking
+    stream_start_time: float = dataclasses.field(default_factory=time.monotonic)
+    last_progress_log_time: float = dataclasses.field(default_factory=time.monotonic)
+    thinking_deltas: int = 0
+    text_deltas: int = 0
 
     def _should_flush_initial_buffer(self) -> bool:
         """Check if the initial buffer delay has elapsed and buffer should be flushed."""
@@ -228,6 +278,24 @@ class _StreamState:
     @property
     def contains_thinking(self) -> bool:
         return bool(self.thinking_text)
+
+    def maybe_log_progress(self, step_num: int) -> None:
+        """Log streaming progress periodically (every _STREAM_PROGRESS_LOG_INTERVAL seconds)."""
+        now = time.monotonic()
+        if now - self.last_progress_log_time < _STREAM_PROGRESS_LOG_INTERVAL:
+            return
+        self.last_progress_log_time = now
+        elapsed = now - self.stream_start_time
+        phase = "thinking" if not self.text_deltas else "text"
+        thinking_chars = len(self.thinking_text)
+        text_chars = len(self.response_text) + sum(len(t) for t in self.text_buffer)
+        total_chars = thinking_chars + text_chars
+        chars_per_sec = total_chars / elapsed if elapsed > 0 else 0
+        logger.info(
+            f"Step {step_num} streaming [{phase}]: {elapsed:.0f}s elapsed, "
+            f"chars={total_chars} ({chars_per_sec:.0f}/s), "
+            f"thinking={thinking_chars} chars, text={text_chars} chars"
+        )
 
 
 @dataclasses.dataclass
@@ -365,19 +433,18 @@ class RossumAgent:
         """Get all available tools in Anthropic format.
 
         Initially loads only the discovery tool from MCP (list_tool_categories)
-        plus internal tools. Deploy and spawn tools are loaded when the
-        rossum-deployment skill is activated. Additional MCP tools are loaded
-        dynamically via load_tool_category.
+        plus internal tools. Additional MCP tools are loaded dynamically via
+        load_tool.
         """
         current_version = get_tools_version()
         if self._tools_cache is None or self._tools_cache_version != current_version:
             mcp_tools = await self.mcp_connection.get_tools()
-            discovery_tools = [t for t in mcp_tools if t.name == DISCOVERY_TOOL_NAME]
+            always_loaded_names = {DISCOVERY_TOOL_NAME}
+            if not get_context().is_read_only:
+                always_loaded_names.add(DELETE_TOOL_NAME)
+            always_loaded = [t for t in mcp_tools if t.name in always_loaded_names]
             self._tools_cache = (
-                mcp_tools_to_anthropic_format(discovery_tools)
-                + get_internal_tools()
-                + (get_deploy_tools() if is_skill_loaded("rossum-deployment") else [])
-                + self.additional_tools
+                mcp_tools_to_anthropic_format(always_loaded) + get_internal_tools() + self.additional_tools
             )
             self._tools_cache_version = current_version
         # Include dynamically loaded tools
@@ -584,7 +651,9 @@ class RossumAgent:
 
             if delta.kind == "thinking":
                 state.thinking_text += delta.content
+                state.thinking_deltas += 1
                 state.first_text_token_time = state.first_text_token_time or time.monotonic()
+                state.maybe_log_progress(step_num)
                 # Yield #3: Streaming thinking tokens (extended thinking / chain-of-thought)
                 yield ThinkingStep(
                     step_number=step_num,
@@ -592,6 +661,8 @@ class RossumAgent:
                 )
                 continue
 
+            state.text_deltas += 1
+            state.maybe_log_progress(step_num)
             # Yield #4: Text delta - immediate flush after initial buffer period or when tool calls detected
             if step := self._handle_text_delta(step_num, delta.content, delta.kind, state):
                 yield step
@@ -610,6 +681,7 @@ class RossumAgent:
         tools = await self._get_tools()
         model_id = get_model_id()
         state = _StreamState()
+        logger.info(f"Step {step_num}: streaming started (model={model_id}, messages={len(messages)})")
 
         event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | Exception | None] = queue.Queue()
 
@@ -622,7 +694,7 @@ class RossumAgent:
                 event_queue.put(e)
 
         ctx = copy_context()
-        producer_task = asyncio.get_event_loop().run_in_executor(None, partial(ctx.run, producer))
+        producer_task = asyncio.get_running_loop().run_in_executor(None, partial(ctx.run, producer))
 
         try:
             # Yield #5: Forward all streaming steps from _process_stream_events (yields #1-4)
@@ -641,8 +713,10 @@ class RossumAgent:
         cache_read = getattr(state.final_message.usage, "cache_read_input_tokens", 0) or 0
         input_tokens = raw_input_tokens + cache_creation + cache_read
         self.tokens.accumulate_main(input_tokens, output_tokens, cache_creation, cache_read)
+        stream_elapsed = time.monotonic() - state.stream_start_time
         logger.info(
-            f"Step {step_num}: input_tokens={input_tokens}, output_tokens={output_tokens}, "
+            f"Step {step_num}: completed in {stream_elapsed:.1f}s, "
+            f"input_tokens={input_tokens}, output_tokens={output_tokens}, "
             f"cache_creation={cache_creation}, cache_read={cache_read}, "
             f"total_input={self.tokens.total_input}, total_output={self.tokens.total_output}"
         )
@@ -694,11 +768,12 @@ class RossumAgent:
             output_tokens=output_tokens,
         )
 
-        total_tools = len(tool_calls)
+        deduped_tool_calls, duplicate_calls_by_id = _deduplicate_tool_calls(tool_calls, step_num)
+        total_tools = len(deduped_tool_calls)
 
         yield ToolStartStep(
             step_number=step_num,
-            tool_calls=tool_calls,
+            tool_calls=deduped_tool_calls,
             tool_progress=(0, total_tools),
         )
 
@@ -708,20 +783,28 @@ class RossumAgent:
         # Stagger schema patch calls to avoid 412 conflicts from concurrent writes
         stagger = _SchemaStagger()
 
-        async def execute_single_tool(tool_call: ToolCall, idx: int) -> None:
+        async def execute_single_tool(tool_call: ToolCall, duplicate_calls: list[ToolCall], idx: int) -> None:
             await stagger.maybe_delay(tool_call.name)
 
             tool_progress = (idx, total_tools)
             async for progress_or_result in self._execute_tool_with_progress(
-                tool_call, step_num, tool_calls, tool_progress
+                tool_call, step_num, deduped_tool_calls, tool_progress
             ):
                 if isinstance(progress_or_result, ToolStartStep):
                     await progress_queue.put(progress_or_result)
                 elif isinstance(progress_or_result, ToolResult):
                     results_by_id[tool_call.id] = progress_or_result
+                    for duplicate_call in duplicate_calls:
+                        results_by_id[duplicate_call.id] = ToolResult(
+                            tool_call_id=duplicate_call.id,
+                            name=duplicate_call.name,
+                            content=progress_or_result.content,
+                            is_error=progress_or_result.is_error,
+                        )
 
         tasks = [
-            asyncio.create_task(execute_single_tool(tool_call, idx)) for idx, tool_call in enumerate(tool_calls, 1)
+            asyncio.create_task(execute_single_tool(tool_call, duplicate_calls_by_id[tool_call.id], idx))
+            for idx, tool_call in enumerate(deduped_tool_calls, 1)
         ]
 
         try:
@@ -741,14 +824,15 @@ class RossumAgent:
             await asyncio.gather(*tasks, return_exceptions=True)
             raise
 
-        tool_results = [results_by_id[tc.id] for tc in tool_calls if tc.id in results_by_id]
-        memory_step.tool_results = tool_results
+        memory_results = [results_by_id[tc.id] for tc in tool_calls if tc.id in results_by_id]
+        streamed_results = [results_by_id[tc.id] for tc in deduped_tool_calls if tc.id in results_by_id]
+        memory_step.tool_results = memory_results
         self.memory.add_step(memory_step)
 
         yield ToolResultStep(
             step_number=step_num,
-            tool_calls=tool_calls,
-            tool_results=tool_results,
+            tool_calls=deduped_tool_calls,
+            tool_results=streamed_results,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
         )
@@ -802,7 +886,7 @@ class RossumAgent:
                     set_context(tool_ctx)
                     return execute_internal_tool(name, arguments)
 
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 ctx = copy_context()
                 future = loop.run_in_executor(
                     None, partial(ctx.run, _run_internal_tool, tool_ctx, tool_call.name, tool_call.arguments)
@@ -816,6 +900,7 @@ class RossumAgent:
                             tool_calls=tool_calls,
                             tool_progress=tool_progress,
                             current_tool=tool_call.name,
+                            current_tool_call_id=tool_call.id,
                             sub_agent_progress=progress,
                         )
                     except queue.Empty:
@@ -829,19 +914,11 @@ class RossumAgent:
                 result = future.result()
                 content = str(result)
                 logger.info(f"Internal tool {tool_call.name} result: {content}")
-            elif tool_call.name in get_deploy_tool_names():
-                logger.info(f"Calling deploy tool {tool_call.name}")
-                loop = asyncio.get_event_loop()
-                ctx = copy_context()
-                future = loop.run_in_executor(
-                    None, partial(ctx.run, execute_tool, tool_call.name, tool_call.arguments, DEPLOY_TOOLS)
-                )
-                result = await future
-                content = str(result)
             else:
                 result = await self.mcp_connection.call_tool(tool_call.name, tool_call.arguments)
                 content = self._serialize_tool_result(result)
 
+            content = maybe_spill(content, tool_call.name, step_num, get_context().get_output_dir(), tool_call.id)
             content = truncate_content(content)
             yield ToolResult(tool_call_id=tool_call.id, name=tool_call.name, content=content)
 
@@ -887,7 +964,7 @@ class RossumAgent:
 
         Rate limiting is handled with exponential backoff and jitter.
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         agent_ctx = get_context()
         agent_ctx.mcp_connection = self.mcp_connection
         agent_ctx.mcp_event_loop = loop

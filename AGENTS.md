@@ -23,7 +23,7 @@
 
 ## Architecture
 
-- **rossum-mcp**: FastMCP server in `rossum_mcp/server.py`; tools registered from `rossum_mcp/tools/` modules, 70 tools
+- **rossum-mcp**: FastMCP server in `rossum_mcp/server.py`; tools registered from `rossum_mcp/tools/` modules
 - **rossum-agent**: AI agent with prompts in `rossum_agent/prompts/`, skills in `rossum_agent/skills/`
 - **rossum-agent-tui**: Development test-bed TUI for rossum-agent. Not production code — no tests required.
 - **New skills**: Add to `rossum_agent/prompts/base_prompt.py` ROSSUM_EXPERT_INTRO section
@@ -128,6 +128,7 @@ Backend (`messages.py`) emits these SSE event names with corresponding payloads:
 | `sub_agent_progress` | `SubAgentProgressEvent` | `SubAgentProgressEvent` | Sub-agent iteration updates |
 | `sub_agent_text` | `SubAgentTextEvent` | `SubAgentTextEvent` | Sub-agent text streaming |
 | `task_snapshot` | `TaskSnapshotEvent` | `TaskSnapshotEvent` | Task tracker state |
+| `agent_question` | `AgentQuestionEvent` | `AgentQuestionEvent` | Structured question from agent to user |
 | `file_created` | `FileCreatedEvent` | `FileCreatedEvent` | Output file notification |
 | `done` | `StreamDoneEvent` | `StreamDoneEvent` | Final event with token usage |
 
@@ -166,7 +167,7 @@ The agent signals tool usage through two paired `StepEvent` types sharing the sa
 
 **Rendering** (`ToolCall.tsx`): Tool calls are expandable. Collapsed shows tool name, args summary, status icon (✓/✗), and result preview. Expanded shows full arguments and full result.
 
-**During streaming**: While a tool is executing, the TUI shows a `StreamingIndicator` with a spinner and tool name/progress. Sub-agent progress (for compound tools like `create_schema_with_subagent`) is shown inline.
+**During streaming**: While a tool is executing, the TUI shows a `StreamingIndicator` with a spinner and tool name/progress. Sub-agent progress (for compound tools like `patch_schema_with_subagent`) is shown inline.
 
 ### Field Serialization
 
@@ -195,6 +196,16 @@ TUI types still declare `{ event: "error"; data: { message: string } }` in `SSEE
 | `ROSSUM_API_BASE_URL` | Required - API endpoint |
 | `REDIS_HOST`, `REDIS_PORT` | Optional - Redis connection (default port: 6379) |
 | `ROSSUM_MCP_MODE` | Optional - read-only or read-write |
+| `ROSSUM_MCP_LOG_LEVEL` | Optional - MCP server log level (default: INFO) |
+| `AWS_REGION` | Optional - AWS region for Bedrock (default: us-east-1) |
+| `AWS_BEDROCK_MODEL_ARN` | Optional - Custom ARN for Opus model |
+| `AWS_BEDROCK_MODEL_ARN_SMALL` | Optional - Custom ARN for Haiku model |
+| `ROSSUM_KB_DATA_PATH` | Optional - Path to local knowledge base JSON |
+| `ADDITIONAL_ALLOWED_ROSSUM_HOSTS` | Optional - Comma-separated regex for extra allowed API hosts |
+| `SLACK_BOT_TOKEN` | Optional - Slack bot token for reports |
+| `SLACK_CHANNEL` | Optional - Slack channel for reports |
+| `ROSSUM_AGENT_API_URL` | Optional - Agent API URL (rossum-agent-client) |
+| `ROSSUM_AGENT_PERSONA` | Optional - Agent persona: default or cautious |
 
 ## Planning Files
 

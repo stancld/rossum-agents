@@ -169,7 +169,11 @@ class MCPConnection:
         # because FastMCP's json_schema_to_type has a bug where nested dict fields
         # like config: dict[str, Any] become empty dataclasses, losing all data.
         if result.structured_content is not None:
-            return result.structured_content
+            raw = result.structured_content
+            # FastMCP sometimes wraps return values in {"result": ...}
+            if isinstance(raw, dict):
+                return unwrap(raw)
+            return raw
         if result.data is not None:
             return result.data
         if result.content:
@@ -195,9 +199,15 @@ class MCPConnection:
             self._read_cache[(entity_type, entity_id)] = data
 
     async def _handle_write(self, name: str, arguments: dict[str, Any]) -> Any:
-        entity_type = _extract_entity_type(name)
-        entity_id = _extract_entity_id(entity_type or "", arguments) if entity_type else None
-        operation = _classify_operation(name)
+        # Handle unified delete tool: delete(entity="queue", entity_id=123)
+        if name == "delete" and "entity" in arguments and "entity_id" in arguments:
+            entity_type = arguments["entity"]
+            entity_id = str(arguments["entity_id"])
+            operation: Literal["create", "update", "delete"] = "delete"
+        else:
+            entity_type = _extract_entity_type(name)
+            entity_id = _extract_entity_id(entity_type or "", arguments) if entity_type else None
+            operation = _classify_operation(name)
 
         self._auto_commit_if_needed(entity_type, entity_id, operation)
 
@@ -317,27 +327,29 @@ class MCPConnection:
             logger.warning(f"Could not extract entity identity from {name}({arguments})")
 
     async def _fetch_snapshot(self, entity_type: str, entity_id: str) -> dict | None:
-        """Fetch current entity state via its getter tool."""
-        getter = f"get_{entity_type}"
-        id_key = f"{entity_type}_id"
+        """Fetch current entity state via the unified get tool."""
         try:
             try:
                 typed_id: int | str = int(entity_id)
             except ValueError:
                 typed_id = entity_id
-            result = await self._call_mcp(getter, {id_key: typed_id})
+            result = await self._call_mcp("get", {"entity": entity_type, "entity_id": typed_id})
             as_dict = _to_dict(result)
             if as_dict is not None:
+                # Unwrap unified get response: {"entity": ..., "id": ..., "data": {...}}
+                if "data" in as_dict:
+                    data = as_dict["data"]
+                    if isinstance(data, dict):
+                        return data
                 return as_dict
             logger.warning(
-                "_fetch_snapshot %s(%s=%s): result is %s, not convertible to dict",
-                getter,
-                id_key,
+                "_fetch_snapshot get(%s, %s): result is %s, not convertible to dict",
+                entity_type,
                 entity_id,
                 type(result).__name__,
             )
         except Exception:
-            logger.warning("_fetch_snapshot %s(%s=%s) failed", getter, id_key, entity_id, exc_info=True)
+            logger.warning("_fetch_snapshot get(%s, %s) failed", entity_type, entity_id, exc_info=True)
         return None
 
     def _try_cache_read(self, name: str, arguments: dict[str, Any], result: Any) -> None:
@@ -345,6 +357,16 @@ class MCPConnection:
         as_dict = _to_dict(result)
         if as_dict is None:
             return
+
+        # Handle unified get tool: get(entity="queue", entity_id=123) → {"entity": "queue", "id": 123, "data": {...}}
+        if name == "get" and "entity" in arguments and "entity_id" in arguments:
+            entity_type = arguments["entity"]
+            entity_id = str(arguments["entity_id"])
+            data = as_dict.get("data", as_dict)
+            if isinstance(data, dict):
+                self._cache_set(entity_type, entity_id, data)
+            return
+
         entity_type = _extract_entity_type(name)
         if entity_type is None:
             return

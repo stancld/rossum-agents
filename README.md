@@ -19,7 +19,7 @@
 [![CodeFactor](https://www.codefactor.io/repository/github/stancld/rossum-agents/badge)](https://www.codefactor.io/repository/github/stancld/rossum-agents)
 
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
-[![MCP Tools](https://img.shields.io/badge/MCP_Tools-70-blue.svg)](#available-tools)
+[![Fully Typed](https://img.shields.io/badge/Fully_Typed-Pydantic_%2B_Literals-blue.svg)](#mcp-tools)
 [![Rossum API](https://img.shields.io/badge/Rossum-API-orange.svg)](https://github.com/rossumai/rossum-api)
 [![Claude Opus 4.6](https://img.shields.io/badge/Claude-Opus_4.6-blueviolet.svg)](https://www.anthropic.com/claude/opus)
 
@@ -273,10 +273,8 @@ The Rossum Agent includes specialized capabilities for complex workflows:
 
 | Skill | Purpose |
 |-------|---------|
-| `rossum-deployment` | Deploy configuration changes safely via sandbox with before/after diff |
 | `schema-patching` | Add, update, or remove individual schema fields |
-| `schema-pruning` | Remove unwanted fields from schema in one call |
-| `organization-setup` | Set up Rossum for new customers with regional templates |
+| `python-execution` | Constrained Python snippets, schema export of bulky structured outputs |
 | `ui-settings` | Update queue UI settings without corrupting structure |
 | `hooks` | Hook templates, token_owner, testing, debugging |
 | `txscript` | TxScript language reference for formula fields, serverless functions, and rule trigger conditions |
@@ -284,14 +282,12 @@ The Rossum Agent includes specialized capabilities for complex workflows:
 | `formula-fields` | Create/configure formula fields with TxScript |
 | `reasoning-fields` | Create AI-powered reasoning fields with prompt + context |
 | `lookup-fields` | Create/configure lookup fields backed by Master Data Hub datasets |
-| `schema-creation` | Create new schemas with sections, datapoints, multivalues, and tuples |
 
 **Sub-Agents** - Opus-powered components for complex iterative tasks:
 
 | Sub-Agent | Invoked Via | Purpose |
 |-----------|-------------|---------|
 | Knowledge Base | `search_knowledge_base(query)` | Search Rossum docs with Opus-powered analysis |
-| Schema Creation | `create_schema_with_subagent(...)` | Create new schemas via Opus sub-agent |
 | Schema Patching | `patch_schema_with_subagent(schema_id, changes)` | Programmatic bulk schema modifications |
 
 See the [full documentation](https://stancld.github.io/rossum-agents/skills_and_subagents.html) for details.
@@ -300,25 +296,24 @@ See the [full documentation](https://stancld.github.io/rossum-agents/skills_and_
 
 ## MCP Tools
 
-The MCP server provides **70 tools** organized into categories:
+The MCP server exposes a compact, fully-typed tool surface — Pydantic models, `Literal` unions, and consolidated APIs built for agents:
 
-| Category | Tools | Description |
-|----------|-------|-------------|
-| Document Processing | 8 | Upload, retrieve, update, confirm, copy, delete annotations |
-| Queue Management | 9 | Create, configure, delete, and list queues |
-| Schema Management | 8 | Define, modify, and delete field structures |
-| Engine Management | 6 | Configure extraction and splitting engines |
-| Extensions (Hooks) | 9 | Webhooks, serverless functions |
-| Rules & Actions | 6 | Business rules with triggers and actions |
-| Workspace Management | 4 | Organize and delete workspaces |
-| Organization Groups | 2 | View license groups across organizations |
-| Organization Limits | 1 | Email sending limits and usage counters |
-| User Management | 5 | Create, update, list users and roles |
-| Relations | 4 | Annotation and document relations |
-| Email Templates | 3 | Automated email responses |
-| MCP Mode & Discovery | 3 | Get/set mode, tool catalog |
+| Category | Description |
+|----------|-------------|
+| Read Layer | Get any entity by ID or search/list with typed filters |
+| Delete Layer | Unified delete for any supported entity by ID |
+| Document Processing | Upload documents, retrieve content, update/confirm/copy annotations |
+| Queue Management | Create, configure queues (including from templates) |
+| Schema Management | Define, modify, patch, and prune field structures |
+| Engine Management | Configure extraction and splitting engines |
+| Extensions (Hooks) | Webhooks, serverless functions, template-based creation, testing |
+| Rules & Actions | Business rules with TxScript triggers and actions |
+| Workspace Management | Create workspaces |
+| Organization & Users | Feature flags, user creation and updates |
+| Email Templates | Automated email responses |
+| MCP Mode | Get/set read-only or read-write mode at runtime |
 
-See [rossum-mcp/README.md](rossum-mcp/README.md) for the tool list and [rossum-mcp/TOOLS.md](rossum-mcp/TOOLS.md) for detailed API documentation.
+See [rossum-mcp/README.md](rossum-mcp/README.md) for the full tool list and [rossum-mcp/TOOLS.md](rossum-mcp/TOOLS.md) for detailed API documentation.
 
 ## Documentation
 

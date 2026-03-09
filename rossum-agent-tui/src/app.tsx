@@ -1,7 +1,14 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { Box, useInput } from "ink";
 import { ChatView } from "./components/ChatView.js";
 import { InputArea } from "./components/InputArea.js";
+import { QuestionSelector } from "./components/QuestionSelector.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { TaskList } from "./components/TaskList.js";
 import { useChat } from "./hooks/useChat.js";
@@ -16,6 +23,7 @@ import {
   type TextAttachment,
 } from "./utils/fileAttachments.js";
 import type {
+  AgentQuestionItem,
   AttachmentInfo,
   Config,
   ExpandState,
@@ -113,13 +121,15 @@ function isExpandable(kind: string): boolean {
   return (
     kind === "thinking" ||
     kind === "tool_call" ||
+    kind === "tool_group" ||
     kind === "intermediate" ||
     kind === "final_answer"
   );
 }
 
 export function App({ config }: AppProps) {
-  const { state, sendMessage, resetChat, abortStreaming } = useChat(config);
+  const { state, sendMessage, resetChat, abortStreaming, submitFeedback } =
+    useChat(config);
   const { commands } = useCommands(config);
   const { rows, columns } = useTerminalSize();
 
@@ -129,8 +139,25 @@ export function App({ config }: AppProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [inputAreaRows, setInputAreaRows] = useState(1);
   const [scrollNudge, setScrollNudge] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [questionAnswers, setQuestionAnswers] = useState<string[]>([]);
+  const [otherSelected, setOtherSelected] = useState(false);
 
-  const items = useMemo(() => buildChatItems(state), [state]);
+  // Reset question iteration state when a new question event arrives
+  const pendingRef = useRef(state.pendingQuestion);
+  useEffect(() => {
+    if (state.pendingQuestion !== pendingRef.current) {
+      pendingRef.current = state.pendingQuestion;
+      setQuestionIndex(0);
+      setQuestionAnswers([]);
+      setOtherSelected(false);
+    }
+  }, [state.pendingQuestion]);
+
+  const items = useMemo(
+    () => buildChatItems(state, questionIndex),
+    [state, questionIndex],
+  );
 
   // Layout: ChatView (flex) + InputArea (1+ rows) + TaskList (N rows) + StatusBar (3 rows with border)
   const taskListHeight = state.tasks.length;
@@ -194,6 +221,33 @@ export function App({ config }: AppProps) {
     [sendMessage],
   );
 
+  const handleQuestionAnswer = useCallback(
+    (answer: string) => {
+      const pq = state.pendingQuestion;
+      if (!pq) return;
+
+      const updatedAnswers = [...questionAnswers, answer];
+      if (updatedAnswers.length < pq.questions.length) {
+        setQuestionAnswers(updatedAnswers);
+        setQuestionIndex(updatedAnswers.length);
+        setOtherSelected(false);
+        return;
+      }
+
+      // All questions answered — format combined answer and send
+      const combined = pq.questions
+        .map(
+          (q: AgentQuestionItem, i: number) =>
+            `${i + 1}. ${q.question}\n${updatedAnswers[i]}`,
+        )
+        .join("\n\n");
+      setAutoScroll(true);
+      setExpandState({});
+      sendMessage(combined);
+    },
+    [state.pendingQuestion, questionAnswers, sendMessage],
+  );
+
   const sendQuickReply = useCallback(
     (message: string) => {
       if (mode !== "input") return;
@@ -254,6 +308,18 @@ export function App({ config }: AppProps) {
     [chatAreaHeight],
   );
 
+  const handleBrowseFeedback = useCallback(
+    (input: string) => {
+      if (input !== "+" && input !== "-") return false;
+      const item = items[selectedIndex];
+      if (item && item.kind === "final_answer") {
+        submitFeedback(item.turnIndex, input === "+");
+      }
+      return true;
+    },
+    [items, selectedIndex, submitFeedback],
+  );
+
   useInput(
     (input, key) => {
       if (input === "i" || key.tab) {
@@ -262,6 +328,7 @@ export function App({ config }: AppProps) {
       }
       if (handleBrowseNavigation(input, key)) return;
       if (handleBrowseScroll(input, key)) return;
+      if (handleBrowseFeedback(input)) return;
 
       if (key.return || input === " ") {
         const item = items[selectedIndex];
@@ -331,13 +398,30 @@ export function App({ config }: AppProps) {
         autoScrollToBottom={autoScroll && selectedIndex === items.length - 1}
         scrollNudge={scrollNudge}
       />
-      <InputArea
-        onSubmit={handleSendMessage}
-        connectionStatus={state.connectionStatus}
-        mode={mode}
-        commands={commands}
-        onHeightChange={setInputAreaRows}
-      />
+      {state.pendingQuestion &&
+      !otherSelected &&
+      state.pendingQuestion.questions[questionIndex]?.options.length ? (
+        <QuestionSelector
+          options={state.pendingQuestion.questions[questionIndex]!.options}
+          multiSelect={
+            state.pendingQuestion.questions[questionIndex]!.multi_select
+          }
+          onSubmit={handleQuestionAnswer}
+          onOtherSelected={() => setOtherSelected(true)}
+          mode={mode}
+          onHeightChange={setInputAreaRows}
+        />
+      ) : (
+        <InputArea
+          onSubmit={
+            state.pendingQuestion ? handleQuestionAnswer : handleSendMessage
+          }
+          connectionStatus={state.connectionStatus}
+          mode={mode}
+          commands={state.pendingQuestion ? [] : commands}
+          onHeightChange={setInputAreaRows}
+        />
+      )}
       {state.tasks.length > 0 && <TaskList tasks={state.tasks} />}
       <StatusBar
         connectionStatus={state.connectionStatus}
