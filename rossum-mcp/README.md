@@ -75,25 +75,16 @@ Configure Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_c
 
 Set `ROSSUM_MCP_MODE=read-only` to disable all CREATE, UPDATE, and UPLOAD operations. Only GET and LIST operations will be available.
 
-### Runtime Mode Switching
+### Checking the Current Mode
 
-Two tools allow dynamic mode control:
-
-| Tool | Description |
-|------|-------------|
-| `get_mcp_mode` | Returns current operation mode (`read-only` or `read-write`) |
-| `set_mcp_mode` | Switches between modes at runtime |
-
-**Use case:** Start in read-only mode for safe exploration, then switch to read-write when ready to make changes.
+Use `get_mcp_mode` to query the current operation mode:
 
 ```
 User: What mode are we in?
 Assistant: [calls get_mcp_mode] → "read-only"
-
-User: I'm ready to update the schema now.
-Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
-           [calls patch_schema(...)]
 ```
+
+To change the mode, restart the server with a different `ROSSUM_MCP_MODE` environment variable.
 
 ## Available Tools
 
@@ -158,7 +149,7 @@ Supported entities: `queue`, `schema`, `hook`, `rule`, `workspace`, `annotation`
 `create_email_template`
 
 **MCP Mode:**
-`get_mcp_mode`, `set_mcp_mode`
+`get_mcp_mode`
 
 **Tool Discovery:**
 `list_tool_categories`

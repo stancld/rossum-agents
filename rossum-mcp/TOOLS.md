@@ -573,25 +573,13 @@ Creates a new email template.
 
 ---
 
-## MCP Mode (2 tools)
+## MCP Mode (1 tool)
 
 ### get_mcp_mode
 
 Get the current MCP operation mode (read-only or read-write).
 
 **Returns:** `{"mode": "read-only" | "read-write"}`
-
-### set_mcp_mode
-
-Set the MCP operation mode. Use `read-only` to disable write operations, `read-write` to enable them.
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `mode` | `"read-only" \| "read-write"` | Yes | The operation mode to set |
-
-**Returns:** `{"message": "MCP mode set to '<mode>'"}`
 
 ---
 
