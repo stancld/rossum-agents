@@ -1002,27 +1002,6 @@ Returns the current MCP operation mode.
 
    {"mode": "read-only"}
 
-set_mcp_mode
-""""""""""""
-
-Sets the MCP operation mode at runtime.
-
-**Parameters:**
-
-- ``mode`` (string, required): The mode to set ("read-only" or "read-write")
-
-**Returns:**
-
-.. code-block:: json
-
-   {"message": "MCP mode set to 'read-write'"}
-
-If an invalid mode is provided:
-
-.. code-block:: json
-
-   {"error": "Invalid mode 'invalid'. Must be one of: ('read-only', 'read-write')"}
-
 Error Handling
 --------------
 

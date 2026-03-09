@@ -116,7 +116,6 @@ A compact, fully-typed tool surface — Pydantic models, ``Literal`` unions, and
 **MCP Mode**
 
 * **get_mcp_mode** - Get the current MCP operation mode (read-only or read-write)
-* **set_mcp_mode** - Set the MCP operation mode
 
 **Deployment Toolkit**
 
