@@ -590,6 +590,9 @@ list_tool_categories
    * - ``workspaces``
      - Workspace management: organize queues
      - workspace, organization
+   * - ``mcp_mode``
+     - MCP mode control: inspect or switch between read-only and read-write
+     - mode, read-only, read-write, safe, safety
 **Example:**
 
 .. code-block:: python

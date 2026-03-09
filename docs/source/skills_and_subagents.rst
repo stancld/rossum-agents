@@ -167,7 +167,7 @@ Use ``load_tool`` to load specific MCP tools by name:
 .. code-block:: python
 
    # Load specific tools
-   load_tool(tool_names=["get_queue", "list_schemas"])
+   load_tool(tool_names=["get", "patch_schema"])
 
 Available Categories
 ^^^^^^^^^^^^^^^^^^^^
@@ -212,6 +212,9 @@ Available Categories
    * - ``workspaces``
      - Workspace management: organize queues
      - workspace, organization
+   * - ``mcp_mode``
+     - MCP mode control: inspect or switch between read-only and read-write
+     - mode, read-only, read-write, safe, safety
 
 Automatic Pre-loading
 ^^^^^^^^^^^^^^^^^^^^^

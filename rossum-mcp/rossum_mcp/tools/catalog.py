@@ -60,6 +60,10 @@ CATEGORY_META: dict[str, CategoryMeta] = {
         description="Workspace management: organize queues into workspaces",
         keywords=["workspace", "organization"],
     ),
+    "mcp_mode": CategoryMeta(
+        description="MCP mode control: inspect or switch between read-only and read-write",
+        keywords=["mode", "read-only", "read-write", "safe", "safety"],
+    ),
 }
 
 

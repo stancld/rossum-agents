@@ -52,14 +52,20 @@ def create_app() -> FastMCP:
     register_create_tools(mcp, client, base_url)
     register_update_tools(mcp, client, base_url)
 
-    @mcp.tool(description="Get the current MCP operation mode (read-only or read-write).")
-    async def get_mcp_mode_tool() -> dict:
+    @mcp.tool(
+        description="Get the current MCP operation mode (read-only or read-write).",
+        tags={"mcp_mode"},
+        annotations={"readOnlyHint": True},
+    )
+    async def get_mcp_mode() -> dict:
         return {"mode": mcp_mode}
 
     @mcp.tool(
-        description="Set the MCP operation mode. Use 'read-only' to disable write operations, 'read-write' to enable them."
+        description="Set the MCP operation mode. Use 'read-only' to disable write operations, 'read-write' to enable them.",
+        tags={"mcp_mode", "write"},
+        annotations={"readOnlyHint": False},
     )
-    async def set_mcp_mode_tool(mode: Literal["read-only", "read-write"]) -> dict:
+    async def set_mcp_mode(mode: Literal["read-only", "read-write"]) -> dict:
         nonlocal mcp_mode
         mcp_mode = mode
         if mcp_mode == "read-only":

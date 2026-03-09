@@ -23,6 +23,7 @@ class TestCategoryMeta:
             "rules",
             "users",
             "workspaces",
+            "mcp_mode",
         }
         assert set(CATEGORY_META.keys()) == expected_categories
 
@@ -71,6 +72,14 @@ class TestDiscoveryTools:
         async def list_hooks() -> list:
             return []
 
+        @mcp.tool(tags={"mcp_mode"}, annotations={"readOnlyHint": True})
+        async def get_mcp_mode() -> dict:
+            return {"mode": "read-only"}
+
+        @mcp.tool(tags={"mcp_mode", "write"}, annotations={"readOnlyHint": False})
+        async def set_mcp_mode(mode: str) -> dict:
+            return {"message": f"MCP mode set to '{mode}'"}
+
         return mcp
 
     async def test_list_tool_categories_returns_all_categories(self, mcp_with_tools: FastMCP) -> None:
@@ -114,6 +123,22 @@ class TestDiscoveryTools:
         hooks_cat = next(cat for cat in result if cat["name"] == "hooks")
         assert "hook" in hooks_cat["keywords"]
         assert "webhook" in hooks_cat["keywords"]
+
+        mode_cat = next(cat for cat in result if cat["name"] == "mcp_mode")
+        assert "read-only" in mode_cat["keywords"]
+
+    async def test_list_tool_categories_includes_mode_tools(self, mcp_with_tools: FastMCP) -> None:
+        list_categories_tool = await mcp_with_tools.get_tool("list_tool_categories")
+
+        result = await list_categories_tool.fn()
+
+        mode_cat = next(cat for cat in result if cat["name"] == "mcp_mode")
+        tool_names = {tool["name"] for tool in mode_cat["tools"]}
+        assert tool_names == {"get_mcp_mode", "set_mcp_mode"}
+
+        tools_by_name = {tool["name"]: tool for tool in mode_cat["tools"]}
+        assert tools_by_name["get_mcp_mode"]["read_only"] is True
+        assert tools_by_name["set_mcp_mode"]["read_only"] is False
 
     async def test_list_tool_categories_empty_categories_have_zero_tools(self, mcp_with_tools: FastMCP) -> None:
         list_categories_tool = await mcp_with_tools.get_tool("list_tool_categories")

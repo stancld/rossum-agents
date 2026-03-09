@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - `create_hook` and `update_hook` now expose `token_owner`, `run_after`, and `secret` (update only) parameters — previously these fields were missing from the tool signatures [#247](https://github.com/stancld/rossum-agents/pull/247)
+- MCP mode tools are now exported under their documented names `get_mcp_mode` / `set_mcp_mode` instead of the internal `*_tool` function names, and `list_tool_categories` can discover them via the `mcp_mode` category [#249](https://github.com/stancld/rossum-agents/pull/249)
 
 ### Changed
 - Error handling in MCP tools now uses `raise ToolError(...)` instead of `return {"error": ...}` dicts — FastMCP surfaces these as proper MCP error responses, and return types are tightened by removing `| dict` unions [#236](https://github.com/stancld/rossum-agents/pull/236)

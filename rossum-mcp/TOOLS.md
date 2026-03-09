@@ -601,7 +601,7 @@ Set the MCP operation mode. Use `read-only` to disable write operations, `read-w
 
 Lists all available tool categories with descriptions, tool names, read/write status, and keywords for dynamic tool loading.
 
-**Available categories:** `read`, `annotations`, `queues`, `schemas`, `engines`, `hooks`, `email_templates`, `rules`, `users`, `workspaces`
+**Available categories:** `read`, `annotations`, `queues`, `schemas`, `engines`, `hooks`, `email_templates`, `rules`, `users`, `workspaces`, `mcp_mode`
 
 ---
 
