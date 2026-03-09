@@ -13,7 +13,7 @@ The read layer replaces all individual `get_X` and `list_X` tools with two gener
 Retrieves one or more entities by ID.
 
 **Parameters:**
-- `entity` (EntityType, required): One of `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `annotation`, `relation`, `document_relation`, `organization_limit`
+- `entity` (EntityType, required): One of `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `annotation`, `relation`, `document_relation`, `organization_limit`, `hook_secrets_keys`
 - `entity_id` (integer or list of integers, required): Single ID or list of IDs for batch retrieval
 - `include_related` (boolean, optional, default: false): Enriches with related data:
   - `queue` → `schema_tree`, `engine`, `hooks`

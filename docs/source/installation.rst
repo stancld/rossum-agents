@@ -184,4 +184,4 @@ Example workflow:
 
    User: I'm ready to update the schema now.
    Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
-              [calls update_schema(...)]
+              [calls patch_schema(...)]

@@ -92,7 +92,7 @@ Assistant: [calls get_mcp_mode] → "read-only"
 
 User: I'm ready to update the schema now.
 Assistant: [calls set_mcp_mode("read-write")] → Mode switched to read-write
-           [calls update_schema(...)]
+           [calls patch_schema(...)]
 ```
 
 ## Available Tools
@@ -121,7 +121,7 @@ A compact, fully-typed tool surface — Pydantic models, `Literal` unions, and c
 **Read Layer** (unified get + search replacing ~25 individual get_X/list_X tools):
 `get`, `search`
 
-Supported entities for `get` (by ID): `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`
+Supported entities for `get` (by ID): `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`, `hook_secrets_keys`
 
 Supported entities for `search` (with typed filters): all `get` entities plus `hook_log`, `hook_template`, `user_role`, `queue_template_name`
 

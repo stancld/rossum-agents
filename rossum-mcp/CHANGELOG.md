@@ -7,14 +7,15 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - YYYY-MM-DD
 
 ### Added
-- Added `get` tool: fetch any entity by ID with a single unified tool — supports `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`; `include_related=True` enriches with linked data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events) [#221](https://github.com/stancld/rossum-agents/pull/221)
+- Added `get` tool: fetch any entity by ID with a single unified tool — supports `queue`, `schema`, `hook`, `engine`, `rule`, `user`, `workspace`, `email_template`, `organization_group`, `organization_limit`, `annotation`, `relation`, `document_relation`, `hook_secrets_keys`; `include_related=True` enriches with linked data (queue→schema_tree+engine+hooks, schema→queues+rules, hook→queues+events) [#221](https://github.com/stancld/rossum-agents/pull/221)
 - Added `search` tool: list/filter any entity with typed, entity-specific query objects — covers all `get`-supported types plus search-only entities `hook_log`, `hook_template`, `user_role`, `queue_template_name` [#221](https://github.com/stancld/rossum-agents/pull/221)
+- Added `hook_secrets_keys` entity to the `get` tool — returns stored secret key names for a hook (values are write-only, never returned) [#247](https://github.com/stancld/rossum-agents/pull/247)
 
 ### Removed
 - Removed `are_lookup_fields_enabled` and `are_reasoning_fields_enabled` tools — feature availability is inferred by the agent from organization group data via the `get` / `search` tools
 
 ### Fixed
-- `create_hook` and `update_hook` now expose `token_owner`, `run_after`, and `secret` (update only) parameters — previously these fields were missing from the tool signatures [#247](https://github.com/stancld/rossum-agents/pull/247)
+- `create_hook` and `update_hook` now expose `token_owner`, `run_after`, `secrets`, and `sideload` parameters — previously these fields were missing from the tool signatures [#247](https://github.com/stancld/rossum-agents/pull/247)
 
 ### Changed
 - Error handling in MCP tools now uses `raise ToolError(...)` instead of `return {"error": ...}` dicts — FastMCP surfaces these as proper MCP error responses, and return types are tightened by removing `| dict` unions [#236](https://github.com/stancld/rossum-agents/pull/236)

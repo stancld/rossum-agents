@@ -471,9 +471,6 @@ patch_schema
 **MCP Tool:**
   ``patch_schema(schema_id: int, operation: str, node_id: str, node_data: dict | None, parent_id: str | None, position: int | None)``
 
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.update_schema(schema_id, data)`` (with modified content)
-
 **API Endpoint:**
   ``PATCH /v1/schemas/{schema_id}``
 
@@ -513,9 +510,6 @@ prune_schema_fields
 
 **MCP Tool:**
   ``prune_schema_fields(schema_id: int, fields_to_keep: list[str])``
-
-**Rossum SDK Method:**
-  ``AsyncRossumAPIClient.update_schema(schema_id, data)``
 
 **API Endpoint:**
   ``PUT /v1/schemas/{schema_id}``
