@@ -199,6 +199,9 @@ _SSE_EVENTS: dict[str, dict] = {
     },
 }
 
+# Schema names referenced in the SSEEvent oneOf union, derived from _SSE_EVENTS
+_SSE_EVENT_REFS = [v["$ref"].split("/")[-1] for v in _SSE_EVENTS.values()]
+
 _MESSAGES_PATH = "/api/v1/chats/{chat_id}/messages"
 
 
@@ -223,6 +226,16 @@ def _custom_openapi() -> dict:
             schemas.setdefault(def_name, def_schema)
         schemas[model.__name__] = model_schema
 
+    # Build a discriminated union schema (SSEEvent) for code generators
+    schemas["SSEEvent"] = {
+        "title": "SSEEvent",
+        "description": (
+            "Union of all SSE event payloads. The `event:` field in the SSE "
+            "frame determines the payload type (see x-sse-events)."
+        ),
+        "oneOf": [{"$ref": f"#/components/schemas/{ref}"} for ref in _SSE_EVENT_REFS],
+    }
+
     # Enrich the messages endpoint 200 response with SSE event documentation
     messages_post = schema["paths"].get(_MESSAGES_PATH, {}).get("post", {})
     sse_response = messages_post.get("responses", {}).get("200", {})
@@ -235,11 +248,7 @@ def _custom_openapi() -> dict:
     sse_response["content"] = {
         "text/event-stream": {
             "schema": {
-                "description": (
-                    "SSE stream. Each frame: `event: <type>\\ndata: <json>\\n\\n`. "
-                    "See x-sse-events for per-event-type schemas."
-                ),
-                "type": "string",
+                "$ref": "#/components/schemas/SSEEvent",
             },
         },
     }

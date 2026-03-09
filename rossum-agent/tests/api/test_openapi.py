@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from rossum_agent.api.main import _MESSAGES_PATH, _SSE_EVENT_MODELS, _SSE_EVENTS, app
+from rossum_agent.api.main import (
+    _MESSAGES_PATH,
+    _SSE_EVENT_MODELS,
+    _SSE_EVENT_REFS,
+    _SSE_EVENTS,
+    app,
+)
 
 
 def _get_fresh_schema() -> dict:
@@ -37,6 +43,17 @@ class TestOpenAPISchema:
             model_schema = schemas[model.__name__]
             assert "$defs" not in model_schema, f"{model.__name__} still has $defs"
 
+    def test_sse_event_union_schema(self):
+        schema = _get_fresh_schema()
+        schemas = schema["components"]["schemas"]
+
+        assert "SSEEvent" in schemas
+        sse_event = schemas["SSEEvent"]
+        assert "oneOf" in sse_event
+
+        refs = [entry["$ref"].split("/")[-1] for entry in sse_event["oneOf"]]
+        assert refs == _SSE_EVENT_REFS
+
     def test_messages_endpoint_sse_response(self):
         schema = _get_fresh_schema()
 
@@ -45,6 +62,9 @@ class TestOpenAPISchema:
 
         assert "text/event-stream" in response_200["content"]
         assert "SSE stream" in response_200["description"]
+        # Response schema references the SSEEvent union
+        sse_schema = response_200["content"]["text/event-stream"]["schema"]
+        assert sse_schema == {"$ref": "#/components/schemas/SSEEvent"}
 
     def test_x_sse_events_extension(self):
         schema = _get_fresh_schema()
