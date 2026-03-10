@@ -4,6 +4,7 @@ import { ChatItemDisplay } from "./ChatItemDisplay.js";
 import type { ChatItem, ExpandState } from "../types.js";
 import stripAnsi from "strip-ansi";
 import { getDisplayToolName, truncate } from "../utils/format.js";
+import { renderMarkdown } from "../utils/markdown.js";
 
 interface ChatViewProps {
   items: ChatItem[];
@@ -275,7 +276,8 @@ function estimateFinalAnswerHeight(
       w.content,
     );
   }
-  return 1 + countWrappedLines(item.content, w.indented);
+  const rendered = renderMarkdown(item.content, w.content);
+  return 1 + countWrappedLines(rendered, w.indented);
 }
 
 function estimateItemHeight(
