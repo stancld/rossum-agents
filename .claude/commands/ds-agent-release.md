@@ -21,6 +21,7 @@
 | Update changelog | Change `[Unreleased] - YYYY-MM-DD` to `[X.Y.Z] - <today's date>` |
 | Re-pin dependencies | Convert git dependencies to PyPI with version pins |
 | Run uv lock | Regenerate lockfile: `cd rossum-agent && uv lock` |
+| Verify OpenAPI | If `api/` routes or models changed, regenerate: `cd rossum-agent && python scripts/generate_openapi.py` then `cd rossum-agent-tui && npm run generate` |
 | Verify | Run `pre-commit run -a` and `pytest rossum-agent/` |
 | Output | Provide commit message |
 
