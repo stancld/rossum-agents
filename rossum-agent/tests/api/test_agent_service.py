@@ -1714,3 +1714,32 @@ class TestAfterLoopHook:
 
         hook_events = [e for e in events if isinstance(e, StepEvent) and e.is_hook_output]
         assert len(hook_events) == 0
+
+
+class TestResolveCautiousPreapprovals:
+    """Test AgentService._resolve_cautious_preapprovals."""
+
+    def test_empty_pending_returns_empty(self):
+        result = AgentService._resolve_cautious_preapprovals(set(), "Yes, proceed")
+        assert result == set()
+
+    def test_approval_returns_pending_copy(self):
+        pending = {"update_queue", "delete_workspace"}
+        result = AgentService._resolve_cautious_preapprovals(pending, "1. Do you want?\nYes, proceed")
+        assert result == pending
+        assert result is not pending  # must be a copy
+
+    def test_no_answer_returns_empty(self):
+        pending = {"update_queue"}
+        result = AgentService._resolve_cautious_preapprovals(pending, "1. Do you want?\nNo, cancel")
+        assert result == set()
+
+    def test_chat_answer_returns_empty(self):
+        pending = {"update_queue"}
+        result = AgentService._resolve_cautious_preapprovals(pending, "1. Do you want?\nLet me provide context")
+        assert result == set()
+
+    def test_freeform_answer_returns_empty(self):
+        pending = {"update_queue"}
+        result = AgentService._resolve_cautious_preapprovals(pending, "I'd rather not do this right now")
+        assert result == set()

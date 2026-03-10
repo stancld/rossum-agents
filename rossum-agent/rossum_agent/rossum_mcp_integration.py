@@ -53,7 +53,7 @@ _TOOL_OVERRIDES: dict[str, tuple[str, Literal["create", "update", "delete"]]] = 
 }
 
 
-def _extract_entity_type(tool_name: str) -> str | None:
+def extract_entity_type(tool_name: str) -> str | None:
     """Extract entity type from tool name (e.g., 'update_queue' -> 'queue')."""
     if tool_name in _TOOL_OVERRIDES:
         return _TOOL_OVERRIDES[tool_name][0]
@@ -63,7 +63,7 @@ def _extract_entity_type(tool_name: str) -> str | None:
     return None
 
 
-def _extract_entity_id(entity_type: str, arguments: dict[str, Any]) -> str | None:
+def extract_entity_id(entity_type: str, arguments: dict[str, Any]) -> str | None:
     """Extract entity ID from tool arguments (e.g., queue_id from update_queue args)."""
     id_key = f"{entity_type}_id"
     entity_id = arguments.get(id_key)
@@ -74,7 +74,7 @@ def _extract_entity_id(entity_type: str, arguments: dict[str, Any]) -> str | Non
     return None
 
 
-def _to_dict(obj: Any) -> dict | None:
+def to_dict(obj: Any) -> dict | None:
     """Convert MCP result to a plain dict. Handles Pydantic models, dataclasses, and dicts."""
     if isinstance(obj, dict):
         return obj
@@ -91,7 +91,7 @@ def unwrap(data: dict) -> dict:
     return inner if isinstance(inner, dict) else data
 
 
-def _extract_entity_name(data: dict | None) -> str:
+def extract_entity_name(data: dict | None) -> str:
     """Extract a human-readable name from entity data, unwrapping FastMCP wrapper."""
     if data is None:
         return ""
@@ -102,7 +102,7 @@ def _extract_entity_name(data: dict | None) -> str:
     return ""
 
 
-def _classify_operation(tool_name: str) -> Literal["create", "update", "delete"]:
+def classify_operation(tool_name: str) -> Literal["create", "update", "delete"]:
     """Classify the operation type from tool name."""
     if tool_name in _TOOL_OVERRIDES:
         return _TOOL_OVERRIDES[tool_name][1]
@@ -205,9 +205,9 @@ class MCPConnection:
             entity_id = str(arguments["entity_id"])
             operation: Literal["create", "update", "delete"] = "delete"
         else:
-            entity_type = _extract_entity_type(name)
-            entity_id = _extract_entity_id(entity_type or "", arguments) if entity_type else None
-            operation = _classify_operation(name)
+            entity_type = extract_entity_type(name)
+            entity_id = extract_entity_id(entity_type or "", arguments) if entity_type else None
+            operation = classify_operation(name)
 
         self._auto_commit_if_needed(entity_type, entity_id, operation)
 
@@ -242,7 +242,7 @@ class MCPConnection:
                 EntityChange(
                     entity_type=et,
                     entity_id=eid,
-                    entity_name=_extract_entity_name(data),
+                    entity_name=extract_entity_name(data),
                     operation=operation,
                     before=None,
                     after=data,
@@ -277,7 +277,7 @@ class MCPConnection:
             return None
         before = self._cache_get(entity_type, entity_id)
         if before is None and operation != "create":
-            before = await self._fetch_snapshot(entity_type, entity_id)
+            before = await self.fetch_snapshot(entity_type, entity_id)
             if before is not None:
                 self._cache_set(entity_type, entity_id, before)
         return before
@@ -290,7 +290,7 @@ class MCPConnection:
         result: Any,
     ) -> tuple[dict | None, str | None]:
         if operation == "create":
-            after = _to_dict(result)
+            after = to_dict(result)
             if after is not None and entity_id is None and entity_type:
                 source = unwrap(after)
                 entity_id = str(source.get("id", source.get(f"{entity_type}_id", "")))
@@ -298,7 +298,7 @@ class MCPConnection:
         if operation == "delete":
             return None, entity_id
         if entity_type and entity_id:
-            return await self._fetch_snapshot(entity_type, entity_id), entity_id
+            return await self.fetch_snapshot(entity_type, entity_id), entity_id
         return None, entity_id
 
     def _record_change(
@@ -316,7 +316,7 @@ class MCPConnection:
                 EntityChange(
                     entity_type=entity_type,
                     entity_id=entity_id,
-                    entity_name=_extract_entity_name(before) or _extract_entity_name(after),
+                    entity_name=extract_entity_name(before) or extract_entity_name(after),
                     operation=operation,
                     before=before,
                     after=after,
@@ -326,7 +326,7 @@ class MCPConnection:
         else:
             logger.warning(f"Could not extract entity identity from {name}({arguments})")
 
-    async def _fetch_snapshot(self, entity_type: str, entity_id: str) -> dict | None:
+    async def fetch_snapshot(self, entity_type: str, entity_id: str) -> dict | None:
         """Fetch current entity state via the unified get tool."""
         try:
             try:
@@ -334,7 +334,7 @@ class MCPConnection:
             except ValueError:
                 typed_id = entity_id
             result = await self._call_mcp("get", {"entity": entity_type, "entity_id": typed_id})
-            as_dict = _to_dict(result)
+            as_dict = to_dict(result)
             if as_dict is not None:
                 # Unwrap unified get response: {"entity": ..., "id": ..., "data": {...}}
                 if "data" in as_dict:
@@ -343,18 +343,18 @@ class MCPConnection:
                         return data
                 return as_dict
             logger.warning(
-                "_fetch_snapshot get(%s, %s): result is %s, not convertible to dict",
+                "fetch_snapshot get(%s, %s): result is %s, not convertible to dict",
                 entity_type,
                 entity_id,
                 type(result).__name__,
             )
         except Exception:
-            logger.warning("_fetch_snapshot get(%s, %s) failed", entity_type, entity_id, exc_info=True)
+            logger.warning("fetch_snapshot get(%s, %s) failed", entity_type, entity_id, exc_info=True)
         return None
 
     def _try_cache_read(self, name: str, arguments: dict[str, Any], result: Any) -> None:
         """Cache a read result if it looks like a single-entity get."""
-        as_dict = _to_dict(result)
+        as_dict = to_dict(result)
         if as_dict is None:
             return
 
@@ -367,10 +367,10 @@ class MCPConnection:
                 self._cache_set(entity_type, entity_id, data)
             return
 
-        entity_type = _extract_entity_type(name)
+        entity_type = extract_entity_type(name)
         if entity_type is None:
             return
-        entity_id = _extract_entity_id(entity_type, arguments)
+        entity_id = extract_entity_id(entity_type, arguments)
         if entity_id is None and name.startswith("get_"):
             entity_id = str(as_dict.get("id", ""))
         if not entity_id:

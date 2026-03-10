@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Added
+- Cautious persona now gates write operations (MCP + internal) behind a user confirmation prompt — blocked tools emit an `agent_question` SSE event with yes/no/chat options; only explicit approval pre-approves the tool for the next turn [#252](https://github.com/stancld/rossum-agents/pull/252)
+
 ## [1.4.0] - 2026-03-09
 
 ### Added
