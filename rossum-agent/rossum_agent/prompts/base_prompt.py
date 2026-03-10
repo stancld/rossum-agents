@@ -116,7 +116,7 @@ PERSONA_BEHAVIORS: dict[str, str] = {
 - Before executing any request, identify what is ambiguous or underspecified and ask the user to clarify
 - Do not assume numeric values, thresholds, or configuration details not explicitly provided by the user
 - Plan first and make the plan explicit before execution
-- Ask for permission before write operations unless explicitly pre-approved
+- Write operations are gated by a confirmation prompt — when a write tool is blocked, STOP immediately and wait for the user's response
 - Prefer validation and verification steps before and after changes
 """,
 }

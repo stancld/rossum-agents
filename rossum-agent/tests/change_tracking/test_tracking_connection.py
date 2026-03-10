@@ -11,11 +11,11 @@ from rossum_agent.change_tracking.commit_service import CommitService
 from rossum_agent.change_tracking.models import EntityChange
 from rossum_agent.rossum_mcp_integration import (
     MCPConnection,
-    _classify_operation,
-    _extract_entity_id,
-    _extract_entity_name,
-    _extract_entity_type,
-    _to_dict,
+    classify_operation,
+    extract_entity_id,
+    extract_entity_name,
+    extract_entity_type,
+    to_dict,
     unwrap,
 )
 from rossum_agent.tools.change_history import revert_commit
@@ -41,43 +41,43 @@ def conn(mock_client, write_tools):
 
 class TestExtractEntityType:
     def test_write_prefixes(self):
-        assert _extract_entity_type("create_queue") == "queue"
-        assert _extract_entity_type("update_schema") == "schema"
-        assert _extract_entity_type("delete_hook") == "hook"
-        assert _extract_entity_type("patch_inbox") == "inbox"
+        assert extract_entity_type("create_queue") == "queue"
+        assert extract_entity_type("update_schema") == "schema"
+        assert extract_entity_type("delete_hook") == "hook"
+        assert extract_entity_type("patch_inbox") == "inbox"
 
     def test_read_prefixes(self):
-        assert _extract_entity_type("get_queue") == "queue"
-        assert _extract_entity_type("list_queues") == "queues"
+        assert extract_entity_type("get_queue") == "queue"
+        assert extract_entity_type("list_queues") == "queues"
 
     def test_overrides(self):
-        assert _extract_entity_type("prune_schema_fields") == "schema"
-        assert _extract_entity_type("create_queue_from_template") == "queue"
-        assert _extract_entity_type("create_hook_from_template") == "hook"
+        assert extract_entity_type("prune_schema_fields") == "schema"
+        assert extract_entity_type("create_queue_from_template") == "queue"
+        assert extract_entity_type("create_hook_from_template") == "hook"
 
     def test_unknown_prefix(self):
-        assert _extract_entity_type("run_export") is None
-        assert _extract_entity_type("some_random_tool") is None
+        assert extract_entity_type("run_export") is None
+        assert extract_entity_type("some_random_tool") is None
 
 
 class TestExtractEntityId:
     def test_entity_type_id_key(self):
-        assert _extract_entity_id("queue", {"queue_id": 123}) == "123"
+        assert extract_entity_id("queue", {"queue_id": 123}) == "123"
 
     def test_generic_id_key(self):
-        assert _extract_entity_id("queue", {"id": 456}) == "456"
+        assert extract_entity_id("queue", {"id": 456}) == "456"
 
     def test_prefers_entity_type_key(self):
-        assert _extract_entity_id("queue", {"queue_id": 123, "id": 456}) == "123"
+        assert extract_entity_id("queue", {"queue_id": 123, "id": 456}) == "123"
 
     def test_no_id(self):
-        assert _extract_entity_id("queue", {"name": "test"}) is None
+        assert extract_entity_id("queue", {"name": "test"}) is None
 
 
 class TestToDict:
     def test_dict_passthrough(self):
         d = {"id": 1, "name": "test"}
-        assert _to_dict(d) is d
+        assert to_dict(d) is d
 
     def test_pydantic_model(self):
         from pydantic import BaseModel
@@ -87,7 +87,7 @@ class TestToDict:
             name: str
 
         model = FakeSchema(id=1, name="test")
-        result = _to_dict(model)
+        result = to_dict(model)
         assert result == {"id": 1, "name": "test"}
 
     def test_dataclass(self):
@@ -97,17 +97,17 @@ class TestToDict:
             name: str
 
         obj = FakeEntity(id=1, name="test")
-        result = _to_dict(obj)
+        result = to_dict(obj)
         assert result == {"id": 1, "name": "test"}
 
     def test_string_returns_none(self):
-        assert _to_dict("some string") is None
+        assert to_dict("some string") is None
 
     def test_none_returns_none(self):
-        assert _to_dict(None) is None
+        assert to_dict(None) is None
 
     def test_list_returns_none(self):
-        assert _to_dict([1, 2, 3]) is None
+        assert to_dict([1, 2, 3]) is None
 
 
 class TestUnwrap:
@@ -126,50 +126,50 @@ class TestUnwrap:
 
 class TestExtractEntityName:
     def test_name_field(self):
-        assert _extract_entity_name({"name": "My Queue"}) == "My Queue"
+        assert extract_entity_name({"name": "My Queue"}) == "My Queue"
 
     def test_label_field(self):
-        assert _extract_entity_name({"label": "My Label"}) == "My Label"
+        assert extract_entity_name({"label": "My Label"}) == "My Label"
 
     def test_title_field(self):
-        assert _extract_entity_name({"title": "My Title"}) == "My Title"
+        assert extract_entity_name({"title": "My Title"}) == "My Title"
 
     def test_subject_field(self):
-        assert _extract_entity_name({"subject": "My Subject"}) == "My Subject"
+        assert extract_entity_name({"subject": "My Subject"}) == "My Subject"
 
     def test_none_data(self):
-        assert _extract_entity_name(None) == ""
+        assert extract_entity_name(None) == ""
 
     def test_no_name_fields(self):
-        assert _extract_entity_name({"id": 1, "url": "http://..."}) == ""
+        assert extract_entity_name({"id": 1, "url": "http://..."}) == ""
 
     def test_unwraps_fastmcp_result_wrapper(self):
-        assert _extract_entity_name({"result": {"id": 1, "name": "Wrapped Name"}}) == "Wrapped Name"
+        assert extract_entity_name({"result": {"id": 1, "name": "Wrapped Name"}}) == "Wrapped Name"
 
     def test_unwraps_with_label(self):
-        assert _extract_entity_name({"result": {"id": 1, "label": "Wrapped Label"}}) == "Wrapped Label"
+        assert extract_entity_name({"result": {"id": 1, "label": "Wrapped Label"}}) == "Wrapped Label"
 
 
 class TestClassifyOperation:
     def test_create(self):
-        assert _classify_operation("create_queue") == "create"
+        assert classify_operation("create_queue") == "create"
 
     def test_update(self):
-        assert _classify_operation("update_queue") == "update"
+        assert classify_operation("update_queue") == "update"
 
     def test_patch(self):
-        assert _classify_operation("patch_queue") == "update"
+        assert classify_operation("patch_queue") == "update"
 
     def test_delete(self):
-        assert _classify_operation("delete_queue") == "delete"
+        assert classify_operation("delete_queue") == "delete"
 
     def test_overrides(self):
-        assert _classify_operation("prune_schema_fields") == "update"
-        assert _classify_operation("create_queue_from_template") == "create"
-        assert _classify_operation("create_hook_from_template") == "create"
+        assert classify_operation("prune_schema_fields") == "update"
+        assert classify_operation("create_queue_from_template") == "create"
+        assert classify_operation("create_hook_from_template") == "create"
 
     def test_unknown(self):
-        assert _classify_operation("unknown_tool") == "update"
+        assert classify_operation("unknown_tool") == "update"
 
 
 class TestGetTools:

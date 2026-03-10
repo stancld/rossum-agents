@@ -45,6 +45,7 @@ from rossum_agent.prompts import get_system_prompt
 from rossum_agent.redis_storage import RedisStorage
 from rossum_agent.rossum_mcp_integration import MCPConnection, connect_mcp_server
 from rossum_agent.tools.core import (
+    CAUTIOUS_APPROVAL_LABEL,
     AgentContext,
     AgentQuestion,
     SubAgentProgress,
@@ -95,6 +96,8 @@ class _ChatRunState:
     run_id: int = 0
     output_dir: Path | None = None
     last_memory: AgentMemory | None = None
+    # Cautious persona: write tools blocked last turn, pre-approved next turn
+    cautious_pending_writes: set[str] = dataclasses.field(default_factory=set)
 
 
 _request_context: contextvars.ContextVar[_RequestContext] = contextvars.ContextVar("request_context")
@@ -279,6 +282,19 @@ class AgentService:
             self._chat_runs[chat_id] = _ChatRunState()
         return self._chat_runs[chat_id]
 
+    @staticmethod
+    def _resolve_cautious_preapprovals(pending: set[str], prompt: str) -> set[str]:
+        """Only pre-approve blocked writes if the user's answer was affirmative.
+
+        The TUI formats question answers as "1. <question>\\n<selected_label>".
+        We check for the approval label to avoid pre-approving on "No" or "Chat" answers.
+        """
+        if not pending:
+            return set()
+        if CAUTIOUS_APPROVAL_LABEL in prompt:
+            return pending.copy()
+        return set()
+
     async def _register_run(self, chat_id: str) -> int:
         """Register a new run for a chat, cancelling any existing run.
 
@@ -423,7 +439,8 @@ class AgentService:
         _request_context.set(req_ctx)
 
         output_dir = create_session_output_dir()
-        self._get_chat_run_state(chat_id).output_dir = output_dir
+        chat_run_state = self._get_chat_run_state(chat_id)
+        chat_run_state.output_dir = output_dir
         logger.info(f"Created session output directory: {output_dir}")
 
         if documents:
@@ -435,12 +452,17 @@ class AgentService:
         agent_ctx = AgentContext(
             output_dir=output_dir,
             rossum_credentials=(rossum_api_base_url, rossum_api_token),
+            persona=persona,
+            cautious_preapproved_writes=self._resolve_cautious_preapprovals(
+                chat_run_state.cautious_pending_writes, prompt
+            ),
             progress_callback=self._on_sub_agent_progress,
             text_callback=self._on_sub_agent_text,
             task_tracker=TaskTracker(),
             task_snapshot_callback=self._on_task_snapshot,
             question_callback=self._on_agent_question,
         )
+        chat_run_state.cautious_pending_writes.clear()
         ctx_token = set_context(agent_ctx)
 
         system_prompt = self._build_system_prompt(rossum_url, persona)
@@ -491,7 +513,8 @@ class AgentService:
                         for sub_event in self._drain_queue(req_ctx.event_queue):
                             yield sub_event
 
-                        self._get_chat_run_state(chat_id).last_memory = agent.memory
+                        chat_run_state.last_memory = agent.memory
+                        chat_run_state.cautious_pending_writes = agent_ctx.cautious_blocked_writes.copy()
 
                         async for event in self._stream_finalization(
                             commit_store,

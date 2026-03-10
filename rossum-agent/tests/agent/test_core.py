@@ -1378,6 +1378,291 @@ class TestExecuteTool:
         assert "workspace" in result.content.lower()
 
 
+class TestCautiousWriteGate:
+    """Test the cautious persona write confirmation gate."""
+
+    def _create_agent(self) -> RossumAgent:
+        """Helper to create an agent with mocked dependencies."""
+        mock_client = MagicMock()
+        mock_mcp_connection = AsyncMock()
+        mock_mcp_connection.get_tools.return_value = []
+        config = AgentConfig()
+        return RossumAgent(
+            client=mock_client,
+            mcp_connection=mock_mcp_connection,
+            system_prompt="Test prompt",
+            config=config,
+        )
+
+    async def _get_final_result(self, agent: RossumAgent, tool_call: ToolCall) -> ToolResult:
+        """Helper to get the final ToolResult from _execute_tool_with_progress."""
+        result = None
+        async for item in agent._execute_tool_with_progress(tool_call, 1, [tool_call], (1, 1)):
+            if isinstance(item, ToolResult):
+                result = item
+        assert result is not None
+        return result
+
+    @pytest.mark.asyncio
+    async def test_blocks_mcp_write_tool_in_cautious_mode(self):
+        """Write MCP tools are blocked and an AgentQuestion is emitted."""
+        agent = self._create_agent()
+        agent.mcp_connection.fetch_snapshot = AsyncMock(return_value=None)
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={"queue_id": 123})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                result = await self._get_final_result(agent, tool_call)
+
+            assert result.is_error is True
+            assert "requires user confirmation" in result.content
+            assert "update_queue" in ctx.cautious_blocked_writes
+            assert len(question_received) == 1
+            assert "update_queue" in question_received[0].questions[0].question
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_blocks_internal_write_tool_in_cautious_mode(self):
+        """Internal write tools (revert_commit, etc.) are blocked in cautious mode."""
+        agent = self._create_agent()
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="revert_commit", arguments={"commit_hash": "abc123"})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=False):
+                result = await self._get_final_result(agent, tool_call)
+
+            assert result.is_error is True
+            assert "requires user confirmation" in result.content
+            assert "revert_commit" in ctx.cautious_blocked_writes
+            assert len(question_received) == 1
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_allows_preapproved_write_tool(self):
+        """Pre-approved write tools execute without blocking."""
+        agent = self._create_agent()
+        agent.mcp_connection.call_tool.return_value = {"status": "ok"}
+
+        ctx = AgentContext(
+            persona="cautious",
+            cautious_preapproved_writes={"update_queue"},
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={"queue_id": 123})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                result = await self._get_final_result(agent, tool_call)
+
+            assert result.is_error is False
+            assert "update_queue" not in ctx.cautious_preapproved_writes
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_does_not_block_in_default_persona(self):
+        """Write tools are not blocked when persona is default."""
+        agent = self._create_agent()
+        agent.mcp_connection.call_tool.return_value = {"status": "ok"}
+
+        ctx = AgentContext(persona="default")
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={"queue_id": 123})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                result = await self._get_final_result(agent, tool_call)
+
+            assert result.is_error is False
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_does_not_block_read_tools_in_cautious_mode(self):
+        """Read tools are not blocked even in cautious mode."""
+        agent = self._create_agent()
+        agent.mcp_connection.call_tool.return_value = {"queues": []}
+
+        ctx = AgentContext(persona="cautious")
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="list_queues", arguments={})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=False):
+                result = await self._get_final_result(agent, tool_call)
+
+            assert result.is_error is False
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_question_shows_diff_for_update_tool(self):
+        """Update tools show a field-level diff when existing object is found."""
+        agent = self._create_agent()
+        agent.mcp_connection.fetch_snapshot = AsyncMock(
+            return_value={"name": "Old Name", "locale": "en_US", "rir_url": "https://example.com"}
+        )
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={"queue_id": 456, "name": "New Name"})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                await self._get_final_result(agent, tool_call)
+
+            question_text = question_received[0].questions[0].question
+            # Should show unified diff with -/+ lines
+            assert "Changes to queue 456" in question_text
+            assert "```diff" in question_text
+            assert '-  "name": "Old Name"' in question_text
+            assert '+  "name": "New Name"' in question_text
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_question_falls_back_to_args_when_no_snapshot(self):
+        """Falls back to raw arguments when snapshot fetch returns None."""
+        agent = self._create_agent()
+        agent.mcp_connection.fetch_snapshot = AsyncMock(return_value=None)
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={"queue_id": 456, "name": "New Name"})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                await self._get_final_result(agent, tool_call)
+
+            question_text = question_received[0].questions[0].question
+            assert "Arguments" in question_text
+            assert "New Name" in question_text
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_question_shows_args_for_create_tool(self):
+        """Create tools show raw arguments (no existing object to diff against)."""
+        agent = self._create_agent()
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(
+                id="tc_1", name="create_hook", arguments={"name": "My Hook", "config": {"url": "https://x.com"}}
+            )
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                await self._get_final_result(agent, tool_call)
+
+            question_text = question_received[0].questions[0].question
+            assert "Arguments" in question_text
+            assert "My Hook" in question_text
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_question_shows_diff_with_nested_data(self):
+        """Update tools with nested *_data objects are flattened for diff."""
+        agent = self._create_agent()
+        agent.mcp_connection.fetch_snapshot = AsyncMock(return_value={"name": "Old", "locale": "en_US"})
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(
+                id="tc_1",
+                name="update_queue",
+                arguments={"queue_id": 1, "queue_data": {"name": "New", "locale": "cs_CZ"}},
+            )
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                await self._get_final_result(agent, tool_call)
+
+            question_text = question_received[0].questions[0].question
+            assert "Changes to queue 1" in question_text
+            assert "```diff" in question_text
+            assert '-  "name": "Old"' in question_text
+            assert '+  "name": "New"' in question_text
+            assert '-  "locale": "en_US"' in question_text
+            assert '+  "locale": "cs_CZ"' in question_text
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_question_has_yes_no_chat_options(self):
+        """The confirmation question offers yes/no/chat options."""
+        agent = self._create_agent()
+        agent.mcp_connection.fetch_snapshot = AsyncMock(return_value=None)
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                await self._get_final_result(agent, tool_call)
+
+            options = question_received[0].questions[0].options
+            option_values = {o.value for o in options}
+            assert option_values == {"yes", "no", "chat"}
+        finally:
+            reset_context(token)
+
+    def test_is_write_tool_internal(self):
+        """_is_write_tool recognizes internal write tools."""
+        agent = self._create_agent()
+        with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=False):
+            assert agent._is_write_tool("revert_commit") is True
+            assert agent._is_write_tool("restore_entity_version") is True
+            assert agent._is_write_tool("patch_schema_with_subagent") is True
+            assert agent._is_write_tool("search_knowledge_base") is False
+
+    def test_is_write_tool_mcp(self):
+        """_is_write_tool delegates to is_mcp_write_tool for non-internal tools."""
+        agent = self._create_agent()
+        with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+            assert agent._is_write_tool("update_queue") is True
+        with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=False):
+            assert agent._is_write_tool("list_queues") is False
+
+
 class TestExecuteToolsInParallel:
     """Test RossumAgent._execute_tools_with_progress parallel execution."""
 

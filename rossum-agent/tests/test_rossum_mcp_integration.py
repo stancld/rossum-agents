@@ -315,9 +315,9 @@ class TestHandleWriteUpdate:
     async def test_update_unwraps_fastmcp_result_wrapper_for_unified_get(self):
         """Regression: FastMCP wraps structured_content in {"result": ...}.
 
-        When _fetch_snapshot calls get(entity=..., entity_id=...), the response
+        When fetch_snapshot calls get(entity=..., entity_id=...), the response
         is {"entity": ..., "id": ..., "data": {actual_entity}}. If FastMCP wraps
-        this in {"result": ...}, _call_mcp must unwrap it so _fetch_snapshot can
+        this in {"result": ...}, _call_mcp must unwrap it so fetch_snapshot can
         extract the inner "data" dict. Without this fix, before/after snapshots
         for schemas would be missing the "content" field, breaking revert_commit.
         """
@@ -457,7 +457,7 @@ class TestHandleWriteAutoCommit:
         # patch_ also classifies as "update"
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result({"ok": True}))
 
-        # Need to also mock _fetch_snapshot for the after-snapshot
+        # Need to also mock fetch_snapshot for the after-snapshot
         async def mock_call_tool(name, args):
             return _make_mcp_result({"id": 1, "name": "Updated"})
 
@@ -585,7 +585,7 @@ class TestFetchSnapshot:
         conn = _make_connection()
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result({"id": 1, "name": "Q"}))
 
-        result = await conn._fetch_snapshot("queue", "1")
+        result = await conn.fetch_snapshot("queue", "1")
 
         assert result == {"id": 1, "name": "Q"}
 
@@ -594,7 +594,7 @@ class TestFetchSnapshot:
         conn = _make_connection()
         conn.client.call_tool = AsyncMock(side_effect=Exception("API error"))
 
-        result = await conn._fetch_snapshot("queue", "1")
+        result = await conn.fetch_snapshot("queue", "1")
 
         assert result is None
 
@@ -603,7 +603,7 @@ class TestFetchSnapshot:
         conn = _make_connection()
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(None))
 
-        result = await conn._fetch_snapshot("queue", "1")
+        result = await conn.fetch_snapshot("queue", "1")
 
         assert result is None
 
@@ -613,7 +613,7 @@ class TestFetchSnapshot:
         unified = {"entity": "queue", "id": 1, "data": {"id": 1, "name": "Q", "schema": "https://..."}}
         conn.client.call_tool = AsyncMock(return_value=_make_mcp_result(unified))
 
-        result = await conn._fetch_snapshot("queue", "1")
+        result = await conn.fetch_snapshot("queue", "1")
 
         assert result == {"id": 1, "name": "Q", "schema": "https://..."}
 
