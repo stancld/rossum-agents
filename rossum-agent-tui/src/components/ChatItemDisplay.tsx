@@ -41,7 +41,7 @@ function IntermediateBlock({
     return (
       <Text inverse={selected} dimColor>
         {arrow} {preview || "(empty)"}
-        {lineCount > 1 ? ` ... (${lineCount} lines)` : ""}
+        {preview && lineCount > 1 ? ` ... (${lineCount} lines)` : ""}
       </Text>
     );
   }

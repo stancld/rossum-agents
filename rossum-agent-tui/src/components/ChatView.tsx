@@ -3,7 +3,11 @@ import { Box, Text } from "ink";
 import { ChatItemDisplay } from "./ChatItemDisplay.js";
 import type { ChatItem, ExpandState } from "../types.js";
 import stripAnsi from "strip-ansi";
-import { getDisplayToolName, truncate } from "../utils/format.js";
+import {
+  getDisplayToolName,
+  thinkingPreviewLine,
+  truncate,
+} from "../utils/format.js";
 import { renderMarkdown } from "../utils/markdown.js";
 
 interface ChatViewProps {
@@ -234,7 +238,10 @@ function estimateThinkingHeight(
   expanded: boolean,
   w: Widths,
 ): number {
-  return expanded ? 1 + countWrappedLines(item.content, w.indented) : 1;
+  if (expanded) {
+    return 1 + countWrappedLines(item.content, w.indented);
+  }
+  return countWrappedLines(thinkingPreviewLine(item.content), w.content);
 }
 
 function estimateIntermediateHeight(
