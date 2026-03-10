@@ -1,11 +1,11 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { getDisplayToolName, truncate } from "../utils/format.js";
-import type { CompletedStep, JsonValue } from "../types.js";
+import type { CompletedStep } from "../types.js";
 
 const RESULT_PREVIEW_LEN = 100;
 
-function formatArgsSummary(args: Record<string, JsonValue> | null): string {
+function formatArgsSummary(args: Record<string, unknown> | null): string {
   if (!args) return "";
   const entries = Object.entries(args)
     .filter(([k]) => k !== "connection_id" && k !== "tool_name")
@@ -64,7 +64,7 @@ function ToolCallExpanded({
   result,
   isError,
 }: ToolCallSharedProps & {
-  args: Record<string, JsonValue> | null;
+  args: Record<string, unknown> | null;
   result: string | null;
   isError: boolean;
 }) {

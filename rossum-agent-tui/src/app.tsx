@@ -400,9 +400,11 @@ export function App({ config }: AppProps) {
       />
       {state.pendingQuestion &&
       !otherSelected &&
-      state.pendingQuestion.questions[questionIndex]?.options.length ? (
+      (state.pendingQuestion.questions[questionIndex]?.options ?? []).length ? (
         <QuestionSelector
-          options={state.pendingQuestion.questions[questionIndex]!.options}
+          options={
+            state.pendingQuestion.questions[questionIndex]!.options ?? []
+          }
           multiSelect={
             state.pendingQuestion.questions[questionIndex]!.multi_select
           }

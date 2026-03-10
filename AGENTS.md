@@ -99,13 +99,13 @@ When adding/modifying tools, update:
 |-----------|-----------------|
 | MCP tools | `rossum-mcp/README.md`, `docs/source/index.rst`, `docs/source/usage.rst`, `docs/source/mcp_reference.rst` |
 | Agent tools | `rossum-agent/README.md`, `docs/source/index.rst`, `docs/source/usage.rst`, `docs/source/skills_and_subagents.rst` |
-| Agent API | Regenerate `rossum-agent-client/openapi.json` via `cd rossum-agent && python scripts/generate_openapi.py ../rossum-agent-client/openapi.json` |
+| Agent API | Regenerate OpenAPI spec and TUI types (see [OpenAPI Spec](#openapi-spec-rossum-agent-client) section) |
 
 Include: tool name, description, parameters with types, return format with JSON examples.
 
 ### OpenAPI Spec (rossum-agent-client)
 
-The OpenAPI spec is the contract for `rossum-agent-client`. Keep it in sync when changing `rossum-agent/rossum_agent/api/` (routes, models, dependencies).
+The OpenAPI spec is the contract for `rossum-agent-client` and `rossum-agent-tui`. Keep it in sync when changing `rossum-agent/rossum_agent/api/` (routes, models, dependencies).
 
 | Trigger | Action |
 |---------|--------|
@@ -113,6 +113,27 @@ The OpenAPI spec is the contract for `rossum-agent-client`. Keep it in sync when
 | New/changed Pydantic model | Regenerate spec |
 | New SSE event type | Add model to `_SSE_EVENT_MODELS` list in `api/main.py`, regenerate spec |
 | Changed SSE event fields | Regenerate spec |
+
+Regeneration pipeline:
+
+```bash
+# 1. Regenerate OpenAPI spec from Python models
+cd rossum-agent && python scripts/generate_openapi.py
+
+# 2. Regenerate TUI TypeScript types from the spec
+cd rossum-agent-tui && npm run generate
+```
+
+### rossum-agent-tui Type Generation
+
+TUI types in `src/api/generated.ts` are auto-generated from the OpenAPI spec via `openapi-typescript`. Do not edit `generated.ts` manually.
+
+| Rule | Detail |
+|------|--------|
+| Source of truth | `rossum-agent/rossum_agent/api/openapi.json` |
+| Generate command | `cd rossum-agent-tui && npm run generate` |
+| Import types | Use types from `src/api/generated.ts` instead of hand-written interfaces |
+| After API changes | Always regenerate: OpenAPI spec first, then TUI types |
 
 ## Testing
 

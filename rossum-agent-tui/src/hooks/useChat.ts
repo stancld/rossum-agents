@@ -55,6 +55,7 @@ function stepToCompleted(step: StepEvent): CompletedStep {
     result: step.result,
     isError: step.is_error,
     toolCallId: step.tool_call_id,
+    isHookOutput: step.is_hook_output,
   };
 }
 
@@ -199,13 +200,6 @@ function reduceEvent(prev: ChatState, event: SSEEvent): ChatState {
       return {
         ...prev,
         files: [...prev.files, event.data as FileCreatedEvent],
-      };
-
-    case "error":
-      return {
-        ...prev,
-        error: (event.data as { message: string }).message,
-        connectionStatus: "error",
       };
 
     default:

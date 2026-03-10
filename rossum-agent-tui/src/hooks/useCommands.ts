@@ -3,14 +3,31 @@ import { listCommands } from "../api/client.js";
 import type { CommandInfo, Config } from "../types.js";
 
 const FALLBACK_COMMANDS: CommandInfo[] = [
-  { name: "/list-commands", description: "List all available slash commands" },
+  {
+    name: "/list-commands",
+    description: "List all available slash commands",
+    argument_suggestions: [],
+  },
   {
     name: "/list-commits",
     description: "List configuration commits made in this chat",
+    argument_suggestions: [],
   },
-  { name: "/list-skills", description: "List available agent skills" },
-  { name: "/list-mcp-tools", description: "List MCP tools by category" },
-  { name: "/list-agent-tools", description: "List built-in agent tools" },
+  {
+    name: "/list-skills",
+    description: "List available agent skills",
+    argument_suggestions: [],
+  },
+  {
+    name: "/list-mcp-tools",
+    description: "List MCP tools by category",
+    argument_suggestions: [],
+  },
+  {
+    name: "/list-agent-tools",
+    description: "List built-in agent tools",
+    argument_suggestions: [],
+  },
   {
     name: "/persona",
     description: "Get or switch the agent persona (e.g. `/persona cautious`)",

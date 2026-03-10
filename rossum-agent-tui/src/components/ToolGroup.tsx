@@ -1,9 +1,9 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { getDisplayToolName, truncate } from "../utils/format.js";
-import type { CompletedStep, JsonValue } from "../types.js";
+import type { CompletedStep } from "../types.js";
 
-function extractKeyArg(args: Record<string, JsonValue> | null): string | null {
+function extractKeyArg(args: Record<string, unknown> | null): string | null {
   if (!args) return null;
   for (const key of [
     "query",

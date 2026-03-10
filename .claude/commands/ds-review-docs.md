@@ -17,7 +17,7 @@
 | rossum-agent | `rossum-agent/README.md`, `rossum-agent/CHANGELOG.md` |
 | rossum-deploy | `rossum-deploy/README.md`, `rossum-deploy/CHANGELOG.md` |
 | rossum-agent-client | `rossum-agent-client/README.md`, `rossum-agent-client/CHANGELOG.md` |
-| OpenAPI spec | `rossum-agent-client/openapi.json` |
+| OpenAPI spec | `rossum-agent/rossum_agent/api/openapi.json` |
 | Shared docs | `docs/source/*.rst`, `README.md`, `CHANGELOG.md` |
 | Landing page | `docs/landing/index.html`, `docs/landing/blog/` |
 | Dev guidelines | `CLAUDE.md`, `AGENTS.md` |
@@ -32,7 +32,7 @@
 | API changes | Parameter changes, return type changes reflected in docs |
 | Examples | Code examples still valid after changes |
 | Env vars | New environment variables documented |
-| OpenAPI spec | Endpoints, request/response schemas, and SSE events in `rossum-agent-client/openapi.json` match source code |
+| OpenAPI spec | Endpoints, request/response schemas, and SSE events in `rossum-agent/rossum_agent/api/openapi.json` match source code |
 
 ## Approach
 
@@ -53,11 +53,11 @@ Each MCP tool requires:
 
 ## OpenAPI Spec Review
 
-The OpenAPI spec (`rossum-agent-client/openapi.json`) is the contract for the `rossum-agent-client` package. It must stay in sync with the actual `rossum-agent` API.
+The OpenAPI spec (`rossum-agent/rossum_agent/api/openapi.json`) is the contract for the `rossum-agent-client` package. It must stay in sync with the actual `rossum-agent` API.
 
 **Source of truth**: FastAPI routes in `rossum-agent/rossum_agent/api/routes/` and Pydantic models in `rossum-agent/rossum_agent/api/models/schemas.py`.
 
-**Regeneration**: `cd rossum-agent && python scripts/generate_openapi.py ../rossum-agent-client/openapi.json`
+**Regeneration**: `cd rossum-agent && python scripts/generate_openapi.py`
 
 | Check | What to verify |
 |-------|----------------|

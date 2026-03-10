@@ -82,7 +82,11 @@ function getCommandSuggestionState(
     const argPartial = trimmedText.slice(spaceIdx + 1).toLowerCase();
     const filtered = (matchedCommand.argument_suggestions ?? [])
       .filter((s) => s.value.startsWith(argPartial))
-      .map((s) => ({ name: s.value, description: s.description }));
+      .map((s) => ({
+        name: s.value,
+        description: s.description,
+        argument_suggestions: [],
+      }));
     return { show: true, filtered, matchedCommand, trimmedText };
   }
 

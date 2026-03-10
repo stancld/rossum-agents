@@ -1,8 +1,6 @@
-import type { JsonValue } from "../types.js";
-
 export function getDisplayToolName(
   toolName: string,
-  toolArguments: Record<string, JsonValue> | null,
+  toolArguments: Record<string, unknown> | null,
 ): string {
   if (toolName === "call_on_connection" && toolArguments) {
     const connectionId = toolArguments["connection_id"];
