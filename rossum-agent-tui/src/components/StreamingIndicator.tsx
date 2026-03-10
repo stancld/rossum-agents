@@ -3,6 +3,7 @@ import { Text, Box } from "ink";
 import { Spinner } from "@inkjs/ui";
 import { getDisplayToolName } from "../utils/format.js";
 import { renderMarkdown } from "../utils/markdown.js";
+import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import type {
   StepEvent,
   SubAgentProgressEvent,
@@ -76,6 +77,8 @@ export function StreamingIndicator({
   subAgentProgress,
   subAgentText,
 }: StreamingIndicatorProps) {
+  const { columns } = useTerminalSize();
+
   if (streaming.type === "final_answer" && streaming.content) {
     return (
       <Box flexDirection="column">
@@ -83,7 +86,7 @@ export function StreamingIndicator({
           <Text color="green" bold>
             {"● "}
           </Text>
-          {renderMarkdown(streaming.content)}
+          {renderMarkdown(streaming.content, columns)}
         </Text>
         <Spinner label=" Writing..." />
       </Box>
