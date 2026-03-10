@@ -211,14 +211,10 @@ The agent signals tool usage through two paired `StepEvent` types sharing the sa
 
 ### Known Issues & Contract Mismatches
 
-#### 1. `StreamDoneEvent` missing `type` field (minor mismatch)
-Python `StreamDoneEvent` has no `type` field; TUI type declares `type: "done"`. Not a runtime bug (TUI dispatches on the SSE event name, not `data.type`), but makes TS types inaccurate.
-**Fix**: Add `type: Literal["done"] = "done"` to Python `StreamDoneEvent`, or remove `type` from TS `StreamDoneEvent`.
-
-#### 2. `sub_agent_text` events not rendered (minor)
+#### 1. `sub_agent_text` events not rendered (minor)
 Backend emits `sub_agent_text` events; TUI handles them in dispatch but currently ignores them (`return prev`). Not a crash, but sub-agent text is not surfaced to the user.
 
-#### 3. TUI `SSEEvent` union includes legacy `event: "error"` variant
+#### 2. TUI `SSEEvent` union includes legacy `event: "error"` variant
 TUI types still declare `{ event: "error"; data: { message: string } }` in `SSEEvent`, but the backend no longer emits `event: error` — errors are emitted as `event: step` with `StepEvent(type="error")`. The TUI type is dead code.
 
 ## Environment Variables

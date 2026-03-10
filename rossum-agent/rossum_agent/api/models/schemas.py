@@ -423,6 +423,7 @@ class TokenUsageBreakdown(BaseModel):
 class StreamDoneEvent(BaseModel):
     """Final event emitted when streaming completes."""
 
+    type: Literal["done"] = "done"
     total_steps: int
     input_tokens: int
     output_tokens: int
