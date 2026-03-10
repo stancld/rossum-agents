@@ -209,14 +209,6 @@ The agent signals tool usage through two paired `StepEvent` types sharing the sa
 - TUI converts to camelCase `CompletedStep` via `stepToCompleted()` in `useChat.ts` for internal state
 - `tool_progress`: Python `tuple[int, int]` serializes as JSON `[int, int]`; TS declares `number[] | null` (works but could be tightened to `[number, number] | null`)
 
-### Known Issues & Contract Mismatches
-
-#### 1. `sub_agent_text` events not rendered (minor)
-Backend emits `sub_agent_text` events; TUI handles them in dispatch but currently ignores them (`return prev`). Not a crash, but sub-agent text is not surfaced to the user.
-
-#### 2. TUI `SSEEvent` union includes legacy `event: "error"` variant
-TUI types still declare `{ event: "error"; data: { message: string } }` in `SSEEvent`, but the backend no longer emits `event: error` — errors are emitted as `event: step` with `StepEvent(type="error")`. The TUI type is dead code.
-
 ## Environment Variables
 
 | Variable | Purpose |
