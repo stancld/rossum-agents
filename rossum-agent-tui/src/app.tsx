@@ -402,6 +402,7 @@ export function App({ config }: AppProps) {
       !otherSelected &&
       (state.pendingQuestion.questions[questionIndex]?.options ?? []).length ? (
         <QuestionSelector
+          key={questionIndex}
           options={
             state.pendingQuestion.questions[questionIndex]!.options ?? []
           }
