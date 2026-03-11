@@ -1,3 +1,4 @@
+import { renderMermaidASCII } from "beautiful-mermaid";
 import { Marked, type MarkedExtension, type Token } from "marked";
 import { markedTerminal } from "marked-terminal";
 
@@ -40,6 +41,22 @@ function getMarked(width: number): Marked {
     };
   }
   instance.use(terminalExtension as MarkedExtension);
+  instance.use({
+    renderer: {
+      code({ text, lang }: { text: string; lang?: string | null }) {
+        if (lang === "mermaid") {
+          try {
+            return (
+              "\n" + renderMermaidASCII(text, { colorMode: "none" }) + "\n"
+            );
+          } catch {
+            return false as unknown as string;
+          }
+        }
+        return false as unknown as string;
+      },
+    },
+  });
 
   cachedWidth = width;
   cachedMarked = instance;
