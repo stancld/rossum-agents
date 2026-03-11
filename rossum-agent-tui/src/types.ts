@@ -79,6 +79,7 @@ export interface Config {
   rossumUrl: string;
   mcpMode: McpMode;
   persona: Persona;
+  contextUrl?: string;
 }
 
 export type InteractionMode = "input" | "browse";

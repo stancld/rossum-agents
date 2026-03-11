@@ -6,6 +6,7 @@ interface CliFlags {
   rossumUrl?: string;
   mcpMode?: string;
   persona?: string;
+  contextUrl?: string;
 }
 
 function resolve(
@@ -50,11 +51,14 @@ export function resolveConfig(flags: CliFlags): Config {
     );
   }
 
+  const contextUrl = flags.contextUrl;
+
   return {
     apiUrl,
     token,
     rossumUrl,
     mcpMode: mcpModeRaw as McpMode,
     persona: personaRaw as Persona,
+    ...(contextUrl && { contextUrl }),
   };
 }

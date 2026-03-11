@@ -38,6 +38,7 @@ const cli = meow(
     --rossum-url   Rossum API base URL (env: ROSSUM_API_BASE_URL)
     --mcp-mode     MCP mode: read-only | read-write (default: read-only)
     --persona      Agent persona: default | cautious (default: default)
+    --context-url  Rossum app URL for context (e.g. queue/document page)
     --start-api    Start rossum-agent-api server automatically
 
   Examples
@@ -53,6 +54,7 @@ const cli = meow(
       rossumUrl: { type: "string" },
       mcpMode: { type: "string" },
       persona: { type: "string" },
+      contextUrl: { type: "string" },
       startApi: { type: "boolean", default: false },
     },
   },
