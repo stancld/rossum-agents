@@ -2608,6 +2608,38 @@ class TestStreamState:
         assert result.step_type == StepType.INTERMEDIATE
         assert result.text_delta == "Some response text"
 
+    def test_finalize_thinking_returns_step_on_first_call(self):
+        """Test that finalize_thinking returns a ThinkingStep on first call."""
+        state = _StreamState()
+        state.thinking_text = "Let me think about this..."
+
+        result = state.finalize_thinking(step_num=1)
+
+        assert result is not None
+        assert result.step_number == 1
+        assert result.thinking == "Let me think about this..."
+        assert result.is_streaming is False
+        assert state.thinking_finalized is True
+
+    def test_finalize_thinking_returns_none_on_second_call(self):
+        """Test that finalize_thinking returns None when already finalized."""
+        state = _StreamState()
+        state.thinking_text = "Let me think about this..."
+
+        state.finalize_thinking(step_num=1)
+        result = state.finalize_thinking(step_num=1)
+
+        assert result is None
+
+    def test_finalize_thinking_returns_none_when_no_thinking(self):
+        """Test that finalize_thinking returns None when no thinking text."""
+        state = _StreamState()
+
+        result = state.finalize_thinking(step_num=1)
+
+        assert result is None
+        assert state.thinking_finalized is False
+
 
 class TestPreloadInjection:
     """Test that pre-loaded tool categories are communicated to the agent."""

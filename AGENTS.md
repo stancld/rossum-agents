@@ -185,8 +185,8 @@ Backend (`messages.py`) emits these SSE event names with corresponding payloads:
 |----------|--------|
 | `is_streaming: true` | Step is still in progress; may be replaced by updated events with the same `step_number`/`type` |
 | `is_streaming: false` | Step is finalized; safe to commit to history |
-| No final event guarantee | Thinking, intermediate, and tool_start steps may **only** arrive as `is_streaming: true` — the server moves to the next step without sending a finalized (`is_streaming: false`) event for the previous one |
-| TUI implication | When `currentStreaming` changes to a different `step_number` or `type`, the previous streaming step must be committed to `completedSteps` before being replaced, otherwise it is silently lost |
+| Finalization guarantee | Every `is_streaming: true` step is eventually followed by an `is_streaming: false` event for the same `step_number`. The finalized event carries the authoritative type (e.g. text streamed as `final_answer` may be finalized as `intermediate` once tool_use blocks arrive). |
+| TUI implication | When a finalized event arrives for the same `step_number` as the current streaming step, replace (don't commit) the stale streaming version. When `step_number` differs, commit the previous streaming step before replacing. |
 
 ### Tool Use Event Flow
 

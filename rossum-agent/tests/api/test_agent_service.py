@@ -173,6 +173,36 @@ class TestConvertStepToEvents:
         assert events[0].content == "Final response text"
         assert events[0].is_streaming is True
 
+    def test_convert_intermediate_text_step_finalized(self):
+        """Test converting finalized intermediate text step passes is_streaming=False."""
+        step = TextDeltaStep(
+            step_number=1,
+            step_type=StepType.INTERMEDIATE,
+            text_delta="",
+            accumulated_text="Intermediate text",
+            is_streaming=False,
+        )
+        events = convert_step_to_events(step)
+
+        assert len(events) == 1
+        assert events[0].type == "intermediate"
+        assert events[0].is_streaming is False
+
+    def test_convert_final_answer_text_step_finalized(self):
+        """Test converting finalized final_answer text step passes is_streaming=False."""
+        step = TextDeltaStep(
+            step_number=2,
+            step_type=StepType.FINAL_ANSWER,
+            text_delta="",
+            accumulated_text="Final text",
+            is_streaming=False,
+        )
+        events = convert_step_to_events(step)
+
+        assert len(events) == 1
+        assert events[0].type == "final_answer"
+        assert events[0].is_streaming is False
+
     def test_convert_multi_tool_result_step(self):
         """Test that multiple tool results produce one event per result."""
         step = ToolResultStep(
