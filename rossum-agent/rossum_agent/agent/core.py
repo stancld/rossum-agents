@@ -123,8 +123,7 @@ from rossum_agent.tools.dynamic_tools import (
 from rossum_agent.utils import add_message_cache_breakpoint
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Iterator
-    from typing import Literal
+    from collections.abc import AsyncIterator
 
     from anthropic import AsyncAnthropicBedrock
 
@@ -296,10 +295,6 @@ class _StreamState:
             accumulated_text=self.response_text,
             thinking=self.thinking_text or None,
         )
-
-    @property
-    def contains_thinking(self) -> bool:
-        return bool(self.thinking_text)
 
     def finalize_thinking(self, step_num: int) -> ThinkingStep | None:
         """Return a finalized ThinkingStep if thinking exists and hasn't been finalized yet."""
@@ -567,9 +562,7 @@ class RossumAgent:
             if isinstance(block, ThinkingBlock)
         ]
 
-    def _handle_text_delta(
-        self, step_num: int, content: str, delta_kind: Literal["thinking", "text"], state: _StreamState
-    ) -> TextDeltaStep | None:
+    def _handle_text_delta(self, step_num: int, content: str, state: _StreamState) -> TextDeltaStep | None:
         """Handle a text delta, buffering or flushing as appropriate."""
         if state.first_text_token_time is None:
             state.first_text_token_time = time.monotonic()
@@ -580,23 +573,22 @@ class RossumAgent:
         state.text_buffer.append(content)
 
         if state.initial_buffer_flushed:
-            step_type = (
-                StepType.INTERMEDIATE if state.contains_thinking and delta_kind == "text" else state.get_step_type()
-            )
-            return state.flush_buffer(step_num, step_type)
+            return state.flush_buffer(step_num, state.get_step_type())
         if state.pending_tools or state.tool_calls:
             state.initial_buffer_flushed = True
             return state.flush_buffer(step_num, StepType.INTERMEDIATE)
         return None
 
-    def _finalize_thinking_and_handle_delta(
-        self, step_num: int, content: str, delta_kind: Literal["thinking", "text"], state: _StreamState
-    ) -> Iterator[AgentStep]:
-        """Finalize thinking (if needed) then handle text delta. Yields 0-2 steps."""
+    def _handle_text_delta_with_finalization(
+        self, step_num: int, content: str, state: _StreamState
+    ) -> list[AgentStep]:
+        """Finalize thinking (if needed) then handle text delta. Returns 0-2 steps."""
+        steps: list[AgentStep] = []
         if finalized := state.finalize_thinking(step_num):
-            yield finalized
-        if text_step := self._handle_text_delta(step_num, content, delta_kind, state):
-            yield text_step
+            steps.append(finalized)
+        if text_step := self._handle_text_delta(step_num, content, state):
+            steps.append(text_step)
+        return steps
 
     async def _process_stream_events(
         self,
@@ -665,8 +657,8 @@ class RossumAgent:
                 state.maybe_log_progress(step_num)
                 # Yield #4a: Finalize thinking before first text delta.
                 # Yield #4b: Text delta - immediate flush after initial buffer period or when tool calls detected.
-                for s in self._finalize_thinking_and_handle_delta(step_num, delta.content, delta.kind, state):
-                    yield s
+                for yielded_step in self._handle_text_delta_with_finalization(step_num, delta.content, state):
+                    yield yielded_step
         finally:
             if pending_next is not None and not pending_next.done():
                 pending_next.cancel()

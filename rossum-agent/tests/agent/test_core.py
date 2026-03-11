@@ -2547,20 +2547,6 @@ class TestStreamState:
 
         assert state.get_step_type() == StepType.FINAL_ANSWER
 
-    def test_contains_thinking_returns_true_when_has_thinking(self):
-        """Test contains_thinking returns True when thinking_text is non-empty."""
-        state = _StreamState()
-        state.thinking_text = "Let me analyze this..."
-
-        assert state.contains_thinking is True
-
-    def test_contains_thinking_returns_false_when_empty(self):
-        """Test contains_thinking returns False when thinking_text is empty."""
-        state = _StreamState()
-        state.thinking_text = ""
-
-        assert state.contains_thinking is False
-
     def test_thinking_block_followed_by_intermediate_step(self):
         """Test that a step with thinking always has content (tool calls or text).
 
@@ -2585,7 +2571,6 @@ class TestStreamState:
         state.tool_calls = [MagicMock()]
         state.pending_tools = {}
 
-        assert state.contains_thinking is True
         assert state.get_step_type() == StepType.INTERMEDIATE
 
     def test_get_step_type_with_text_and_tool_calls_returns_intermediate(self):
