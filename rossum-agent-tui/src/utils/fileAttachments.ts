@@ -79,7 +79,7 @@ function isSupportedFileExtension(ext: string): boolean {
   );
 }
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+export const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_TEXT_SIZE = 1 * 1024 * 1024; // 1MB
 

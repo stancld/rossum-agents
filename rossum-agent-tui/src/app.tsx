@@ -22,6 +22,7 @@ import {
   type DocumentAttachment,
   type TextAttachment,
 } from "./utils/fileAttachments.js";
+import { getClipboardImage } from "./utils/clipboard.js";
 import type {
   AgentQuestionItem,
   AttachmentInfo,
@@ -142,6 +143,7 @@ export function App({ config }: AppProps) {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [questionAnswers, setQuestionAnswers] = useState<string[]>([]);
   const [otherSelected, setOtherSelected] = useState(false);
+  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
 
   // Reset question iteration state when a new question event arrives
   const pendingRef = useRef(state.pendingQuestion);
@@ -200,25 +202,54 @@ export function App({ config }: AppProps) {
       setExpandState({});
 
       const paths = parseAtTokens(message);
-      if (paths.length === 0) {
+      const processed =
+        paths.length > 0
+          ? processAttachments(paths)
+          : {
+              images: [],
+              documents: [],
+              textFiles: [],
+              attachmentInfos: [],
+              errors: [],
+            };
+
+      // Merge clipboard-pasted images with @-file images
+      const allImages = [...pendingImages, ...processed.images];
+      const allInfos: AttachmentInfo[] = [
+        ...pendingImages.map((_, i) => ({
+          filename: `Pasted image ${i + 1}`,
+          type: "image" as const,
+        })),
+        ...processed.attachmentInfos,
+      ];
+
+      const hasAttachments =
+        allImages.length > 0 ||
+        processed.documents.length > 0 ||
+        processed.textFiles.length > 0;
+
+      if (!hasAttachments) {
         sendMessage(message);
-        return;
+      } else {
+        const content = buildMessageContent(
+          message,
+          processed.textFiles,
+          processed.errors,
+        );
+        const displayMessage = buildDisplayMessage(message);
+
+        sendMessage(content, {
+          displayMessage,
+          images: allImages.length > 0 ? allImages : undefined,
+          documents:
+            processed.documents.length > 0 ? processed.documents : undefined,
+          attachmentInfos: allInfos.length > 0 ? allInfos : undefined,
+        });
       }
 
-      const { images, documents, textFiles, attachmentInfos, errors } =
-        processAttachments(paths);
-      const content = buildMessageContent(message, textFiles, errors);
-      const displayMessage = buildDisplayMessage(message);
-
-      sendMessage(content, {
-        displayMessage,
-        images: images.length > 0 ? images : undefined,
-        documents: documents.length > 0 ? documents : undefined,
-        attachmentInfos:
-          attachmentInfos.length > 0 ? attachmentInfos : undefined,
-      });
+      setPendingImages([]);
     },
-    [sendMessage],
+    [sendMessage, pendingImages],
   );
 
   const handleQuestionAnswer = useCallback(
@@ -355,6 +386,37 @@ export function App({ config }: AppProps) {
     { isActive: mode === "input" },
   );
 
+  // Ctrl+V: paste image from clipboard
+  const isPastingRef = useRef(false);
+  useInput(
+    (input, key) => {
+      if (input === "v" && key.ctrl && !isPastingRef.current) {
+        const isDisabled =
+          state.connectionStatus === "connecting" ||
+          state.connectionStatus === "streaming";
+        if (isDisabled) return;
+
+        isPastingRef.current = true;
+        getClipboardImage()
+          .then((image) => {
+            if (image) {
+              setPendingImages((prev) =>
+                prev.length < 5 ? [...prev, image] : prev,
+              );
+            }
+          })
+          .finally(() => {
+            isPastingRef.current = false;
+          });
+      }
+      // Ctrl+U: clear pending images
+      if (input === "u" && key.ctrl && pendingImages.length > 0) {
+        setPendingImages([]);
+      }
+    },
+    { isActive: mode === "input" },
+  );
+
   useInput((input, key) => {
     if (input === "n" && key.ctrl) {
       resetChat();
@@ -362,6 +424,7 @@ export function App({ config }: AppProps) {
       setSelectedIndex(0);
       setAutoScroll(true);
       setMode("input");
+      setPendingImages([]);
     }
   });
 
@@ -423,6 +486,7 @@ export function App({ config }: AppProps) {
           mode={mode}
           commands={state.pendingQuestion ? [] : commands}
           onHeightChange={setInputAreaRows}
+          pendingImageCount={pendingImages.length}
         />
       )}
       {state.tasks.length > 0 && <TaskList tasks={state.tasks} />}
