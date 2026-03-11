@@ -357,7 +357,7 @@ wheels = [
 
 [[package]]
 name = "rossum-api"
-version = "3.11.0"
+version = "3.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -365,9 +365,9 @@ dependencies = [
     { name = "httpx" },
     { name = "tenacity" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/32/a9/a7113548ac62ee1863cf453aca9e57afd574dbe4306be3a2295747902140/rossum_api-3.11.0.tar.gz", hash = "sha256:92c774f15e1a74df3c36a93107d92975ea80113fd735221db9c0aa835ad39eed", size = 158500, upload-time = "2026-03-04T13:32:51.423Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3e/8a/491a96705eb094679df79eba0d2ca72ded99cff396c41090cde6a24f9a18/rossum_api-3.11.1.tar.gz", hash = "sha256:c5f09af4079cc59fe12a58c6026873b55451e3e700b950e25ce3efb1fa8640b9", size = 158860, upload-time = "2026-03-10T11:05:18.278Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/b3/2dc1bc97cdc60c44709b1dbf9ca7d6923b35db5eba69600636716e9d3d16/rossum_api-3.11.0-py3-none-any.whl", hash = "sha256:b789c5bfca82074f0d574817792b9e8eeb7accfc8739b7e94be6ad768ed3fbb6", size = 76725, upload-time = "2026-03-04T13:32:50.126Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/ee/e75faaec07c6a2a49905e83c4d066760dab7c392960f618d9df5003332c0/rossum_api-3.11.1-py3-none-any.whl", hash = "sha256:7775e1158bf4cfe348f6d170815d78905eae69cd563072354618d3bc6b55279f", size = 76862, upload-time = "2026-03-10T11:05:16.788Z" },
 ]
 
 [[package]]
