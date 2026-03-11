@@ -6,13 +6,14 @@ import React, {
   useRef,
 } from "react";
 import { Box, useInput } from "ink";
-import { ChatView } from "./components/ChatView.js";
+import { ChatView, estimateItemHeight } from "./components/ChatView.js";
 import { InputArea } from "./components/InputArea.js";
 import { QuestionSelector } from "./components/QuestionSelector.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { TaskList } from "./components/TaskList.js";
 import { useChat } from "./hooks/useChat.js";
 import { useCommands } from "./hooks/useCommands.js";
+import { useMouseScroll } from "./hooks/useMouseScroll.js";
 import { useTerminalSize } from "./hooks/useTerminalSize.js";
 import { buildChatItems } from "./utils/buildChatItems.js";
 import {
@@ -118,6 +119,19 @@ interface AppProps {
   config: Config;
 }
 
+const INTRA_SCROLL_STEP = 3;
+
+function computeMaxIntraOffset(
+  item: ReturnType<typeof buildChatItems>[number] | undefined,
+  expanded: boolean,
+  width: number,
+  viewportHeight: number,
+): number {
+  if (!item) return 0;
+  const h = estimateItemHeight(item, expanded, width);
+  return h > viewportHeight ? h - viewportHeight : 0;
+}
+
 function isExpandable(kind: string): boolean {
   return (
     kind === "thinking" ||
@@ -140,6 +154,7 @@ export function App({ config }: AppProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [inputAreaRows, setInputAreaRows] = useState(1);
   const [scrollNudge, setScrollNudge] = useState(0);
+  const [intraScrollOffset, setIntraScrollOffset] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [questionAnswers, setQuestionAnswers] = useState<string[]>([]);
   const [otherSelected, setOtherSelected] = useState(false);
@@ -170,8 +185,19 @@ export function App({ config }: AppProps) {
     if (autoScroll && items.length > 0) {
       const lastIndex = items.length - 1;
       setSelectedIndex((prev) => (prev === lastIndex ? prev : lastIndex));
+      const lastItem = items[lastIndex];
+      if (lastItem) {
+        const h = estimateItemHeight(
+          lastItem,
+          !!expandState[lastIndex],
+          columns,
+        );
+        if (h > chatAreaHeight) {
+          setIntraScrollOffset(Math.max(0, h - chatAreaHeight));
+        }
+      }
     }
-  }, [items, autoScroll]);
+  }, [items, autoScroll, expandState, columns, chatAreaHeight]);
 
   useEffect(() => {
     let latestFinalAnswerIndex = -1;
@@ -200,6 +226,7 @@ export function App({ config }: AppProps) {
     async (message: string) => {
       setAutoScroll(true);
       setExpandState({});
+      setIntraScrollOffset(0);
 
       const paths = parseAtTokens(message);
       const processed =
@@ -293,51 +320,147 @@ export function App({ config }: AppProps) {
     [handleSendMessage, mode, state.connectionStatus],
   );
 
+  const handleBrowseDown = useCallback(() => {
+    const maxOffset = computeMaxIntraOffset(
+      items[selectedIndex],
+      !!expandState[selectedIndex],
+      columns,
+      chatAreaHeight,
+    );
+    if (maxOffset > 0 && intraScrollOffset < maxOffset) {
+      setAutoScroll(false);
+      setIntraScrollOffset((prev) =>
+        Math.min(prev + INTRA_SCROLL_STEP, maxOffset),
+      );
+      return;
+    }
+    if (selectedIndex >= items.length - 1) return;
+    setIntraScrollOffset(0);
+    setSelectedIndex((prev) => {
+      const next = Math.min(prev + 1, items.length - 1);
+      if (next === items.length - 1) setAutoScroll(true);
+      return next;
+    });
+  }, [
+    items,
+    expandState,
+    columns,
+    chatAreaHeight,
+    selectedIndex,
+    intraScrollOffset,
+  ]);
+
+  const handleBrowseUp = useCallback(() => {
+    if (intraScrollOffset > 0) {
+      setAutoScroll(false);
+      setIntraScrollOffset((prev) => Math.max(prev - INTRA_SCROLL_STEP, 0));
+      return;
+    }
+    const nextIdx = Math.max(selectedIndex - 1, 0);
+    if (nextIdx < selectedIndex) {
+      setAutoScroll(false);
+      setIntraScrollOffset(
+        computeMaxIntraOffset(
+          items[nextIdx],
+          !!expandState[nextIdx],
+          columns,
+          chatAreaHeight,
+        ),
+      );
+    }
+    setSelectedIndex(nextIdx);
+  }, [
+    items,
+    expandState,
+    columns,
+    chatAreaHeight,
+    selectedIndex,
+    intraScrollOffset,
+  ]);
+
   const handleBrowseNavigation = useCallback(
     (input: string, key: { downArrow: boolean; upArrow: boolean }) => {
       if (input === "j" || key.downArrow) {
-        setSelectedIndex((prev) => {
-          const next = Math.min(prev + 1, items.length - 1);
-          if (next === items.length - 1) setAutoScroll(true);
-          return next;
-        });
+        handleBrowseDown();
         return true;
       }
       if (input === "k" || key.upArrow) {
-        setSelectedIndex((prev) => {
-          if (prev > 0) setAutoScroll(false);
-          return Math.max(prev - 1, 0);
-        });
+        handleBrowseUp();
         return true;
       }
       if (input === "G") {
-        setSelectedIndex(Math.max(items.length - 1, 0));
+        const lastIdx = Math.max(items.length - 1, 0);
+        setSelectedIndex(lastIdx);
         setAutoScroll(true);
+        setIntraScrollOffset(
+          computeMaxIntraOffset(
+            items[lastIdx],
+            !!expandState[lastIdx],
+            columns,
+            chatAreaHeight,
+          ),
+        );
         return true;
       }
       return false;
     },
-    [items.length],
+    [
+      handleBrowseDown,
+      handleBrowseUp,
+      items,
+      expandState,
+      columns,
+      chatAreaHeight,
+    ],
   );
 
   const handleBrowseScroll = useCallback(
     (input: string, key: { ctrl: boolean }) => {
       if (!key.ctrl) return false;
       const half = Math.max(Math.floor(chatAreaHeight / 2), 1);
+      const maxOffset = computeMaxIntraOffset(
+        items[selectedIndex],
+        !!expandState[selectedIndex],
+        columns,
+        chatAreaHeight,
+      );
       if (input === "d") {
         setAutoScroll(false);
-        setScrollNudge((prev) => prev + half);
+        if (maxOffset > 0) {
+          setIntraScrollOffset((prev) => Math.min(prev + half, maxOffset));
+        } else {
+          setScrollNudge((prev) => prev + half);
+        }
         return true;
       }
       if (input === "u") {
         setAutoScroll(false);
-        setScrollNudge((prev) => prev - half);
+        if (maxOffset > 0) {
+          setIntraScrollOffset((prev) => Math.max(prev - half, 0));
+        } else {
+          setScrollNudge((prev) => prev - half);
+        }
         return true;
       }
       return false;
     },
-    [chatAreaHeight],
+    [chatAreaHeight, items, selectedIndex, expandState, columns],
   );
+
+  const handleMouseScrollUp = useCallback(() => {
+    setAutoScroll(false);
+    setScrollNudge((prev) => prev - INTRA_SCROLL_STEP);
+  }, []);
+
+  const handleMouseScrollDown = useCallback(() => {
+    setAutoScroll(false);
+    setScrollNudge((prev) => prev + INTRA_SCROLL_STEP);
+  }, []);
+
+  useMouseScroll({
+    onScrollUp: handleMouseScrollUp,
+    onScrollDown: handleMouseScrollDown,
+  });
 
   const handleBrowseFeedback = useCallback(
     (input: string) => {
@@ -368,6 +491,7 @@ export function App({ config }: AppProps) {
             ...prev,
             [selectedIndex]: !prev[selectedIndex],
           }));
+          setIntraScrollOffset(0);
         }
       }
     },
@@ -423,6 +547,7 @@ export function App({ config }: AppProps) {
       setExpandState({});
       setSelectedIndex(0);
       setAutoScroll(true);
+      setIntraScrollOffset(0);
       setMode("input");
       setPendingImages([]);
     }
@@ -460,6 +585,7 @@ export function App({ config }: AppProps) {
         browseMode={mode === "browse"}
         autoScrollToBottom={autoScroll && selectedIndex === items.length - 1}
         scrollNudge={scrollNudge}
+        intraScrollOffset={intraScrollOffset}
       />
       {state.pendingQuestion &&
       !otherSelected &&
