@@ -36,13 +36,22 @@ def extract_text_from_content(content: str | list[dict[str, Any]] | None) -> str
     return ""
 
 
+def _preview_from_first_msg(msg: dict[str, Any] | None) -> str:
+    """Extract preview text from a single message dict."""
+    if not msg:
+        return ""
+    if msg.get("type") == "task_step":
+        return msg.get("task", "")
+    if msg.get("role") == "user":
+        return extract_text_from_content(msg.get("content"))
+    return ""
+
+
 def _extract_first_user_text(messages: list[dict[str, Any]]) -> str:
     """Extract text from the first user message, handling both legacy and task_step formats."""
     for msg in messages:
-        if msg.get("type") == "task_step":
-            return msg.get("task", "")
-        if msg.get("role") == "user":
-            return extract_text_from_content(msg.get("content"))
+        if text := _preview_from_first_msg(msg):
+            return text
     return ""
 
 

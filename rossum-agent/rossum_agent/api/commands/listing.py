@@ -129,14 +129,15 @@ async def handle_persona(ctx: CommandContext) -> str:
         available = ", ".join(f"`{persona}`" for persona in VALID_PERSONAS)
         return f"Unknown persona `{requested}`. Available personas: {available}"
 
-    chat_data.metadata.persona = cast("Persona", requested)
+    persona = cast("Persona", requested)
+    chat_data.metadata.persona = persona
     ctx.chat_service.save_messages(
         user_id=ctx.user_id,
         chat_id=ctx.chat_id,
         messages=chat_data.messages,
         metadata=chat_data.metadata,
     )
-    behavior = PERSONA_BEHAVIORS.get(requested, "")
+    behavior = PERSONA_BEHAVIORS.get(persona, "")
     parts = [f"Persona switched to **{requested}**."]
     if behavior:
         parts.append(f"\n{behavior.strip()}")

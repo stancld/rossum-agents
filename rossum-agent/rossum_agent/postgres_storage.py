@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import BYTEA, JSONB, insert
 from sqlalchemy.dialects.postgresql import array as pg_array
 
-from rossum_agent.storage import ChatData, ChatMetadata, _build_chat_list_item, extract_text_from_content
+from rossum_agent.storage import ChatData, ChatMetadata, _build_chat_list_item, _preview_from_first_msg
 
 if TYPE_CHECKING:
     from typing import Any
@@ -20,17 +20,6 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
 
 logger = logging.getLogger(__name__)
-
-
-def _preview_from_first_msg(msg: dict[str, Any] | None) -> str:
-    """Extract preview text from a single first-message dict (fetched via messages->0)."""
-    if not msg:
-        return ""
-    if msg.get("type") == "task_step":
-        return msg.get("task", "")
-    if msg.get("role") == "user":
-        return extract_text_from_content(msg.get("content"))
-    return ""
 
 
 sa_metadata = sa.MetaData()
@@ -288,6 +277,20 @@ class PostgresStorage:
             logger.error(f"Failed to list chats: {e}", exc_info=True)
             return []
 
+    @staticmethod
+    def _upsert_file(
+        conn: sa.Connection, chat_id: str, filename: str, content: bytes, expires_at: dt.datetime
+    ) -> None:
+        """Insert or update a file row within an existing connection/transaction."""
+        conn.execute(
+            insert(chat_files_table)
+            .values(chat_id=chat_id, filename=filename, size=len(content), content=content, expires_at=expires_at)
+            .on_conflict_do_update(
+                index_elements=["chat_id", "filename"],
+                set_={"size": len(content), "content": content, "created_at": sa.func.now(), "expires_at": expires_at},
+            )
+        )
+
     def save_file(self, chat_id: str, file_path: Path | str, content: bytes | None = None) -> bool:
         try:
             if isinstance(file_path, str):
@@ -296,33 +299,14 @@ class PostgresStorage:
             filename = file_path.name
 
             if content is None:
-                if not file_path.exists():
+                try:
+                    content = file_path.read_bytes()
+                except FileNotFoundError:
                     logger.error(f"File not found: {file_path}")
                     return False
-                content = file_path.read_bytes()
-
-            values = {
-                "chat_id": chat_id,
-                "filename": filename,
-                "size": len(content),
-                "content": content,
-                "expires_at": self._expires_at(),
-            }
 
             with self.engine.begin() as conn:
-                conn.execute(
-                    insert(chat_files_table)
-                    .values(**values)
-                    .on_conflict_do_update(
-                        index_elements=["chat_id", "filename"],
-                        set_={
-                            "size": values["size"],
-                            "content": values["content"],
-                            "created_at": sa.func.now(),
-                            "expires_at": values["expires_at"],
-                        },
-                    )
-                )
+                self._upsert_file(conn, chat_id, filename, content, self._expires_at())
 
             logger.info(f"Saved file {filename} for chat {chat_id} to PostgreSQL ({len(content)} bytes)")
             return True
@@ -420,27 +404,7 @@ class PostgresStorage:
             expires_at = self._expires_at()
             with self.engine.begin() as conn:
                 for file_path in files:
-                    content = file_path.read_bytes()
-                    values = {
-                        "chat_id": chat_id,
-                        "filename": file_path.name,
-                        "size": len(content),
-                        "content": content,
-                        "expires_at": expires_at,
-                    }
-                    conn.execute(
-                        insert(chat_files_table)
-                        .values(**values)
-                        .on_conflict_do_update(
-                            index_elements=["chat_id", "filename"],
-                            set_={
-                                "size": values["size"],
-                                "content": values["content"],
-                                "created_at": sa.func.now(),
-                                "expires_at": values["expires_at"],
-                            },
-                        )
-                    )
+                    self._upsert_file(conn, chat_id, file_path.name, file_path.read_bytes(), expires_at)
 
             logger.info(f"Saved {len(files)} files for chat {chat_id} to PostgreSQL")
             return len(files)

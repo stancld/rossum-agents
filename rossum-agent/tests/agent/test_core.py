@@ -1542,6 +1542,7 @@ class TestCautiousWriteGate:
         agent.mcp_connection.fetch_snapshot = AsyncMock(
             return_value={"name": "Old Name", "locale": "en_US", "rir_url": "https://example.com"}
         )
+        agent.mcp_connection._cache_set = MagicMock()
         question_received = []
 
         ctx = AgentContext(
@@ -1618,6 +1619,7 @@ class TestCautiousWriteGate:
         """Update tools with nested *_data objects are flattened for diff."""
         agent = self._create_agent()
         agent.mcp_connection.fetch_snapshot = AsyncMock(return_value={"name": "Old", "locale": "en_US"})
+        agent.mcp_connection._cache_set = MagicMock()
         question_received = []
 
         ctx = AgentContext(

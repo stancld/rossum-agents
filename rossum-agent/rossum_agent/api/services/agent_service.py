@@ -97,7 +97,7 @@ class _ChatRunState:
     output_dir: Path | None = None
     last_memory: AgentMemory | None = None
     # Cautious persona: write tools blocked last turn, pre-approved next turn
-    cautious_pending_writes: set[str] = dataclasses.field(default_factory=set)
+    cautious_blocked_last_turn: set[str] = dataclasses.field(default_factory=set)
 
 
 _request_context: contextvars.ContextVar[_RequestContext] = contextvars.ContextVar("request_context")
@@ -454,7 +454,7 @@ class AgentService:
             rossum_credentials=(rossum_api_base_url, rossum_api_token),
             persona=persona,
             cautious_preapproved_writes=self._resolve_cautious_preapprovals(
-                chat_run_state.cautious_pending_writes, prompt
+                chat_run_state.cautious_blocked_last_turn, prompt
             ),
             progress_callback=self._on_sub_agent_progress,
             text_callback=self._on_sub_agent_text,
@@ -462,7 +462,7 @@ class AgentService:
             task_snapshot_callback=self._on_task_snapshot,
             question_callback=self._on_agent_question,
         )
-        chat_run_state.cautious_pending_writes.clear()
+        chat_run_state.cautious_blocked_last_turn.clear()
         ctx_token = set_context(agent_ctx)
 
         system_prompt = self._build_system_prompt(rossum_url, persona)
@@ -514,7 +514,7 @@ class AgentService:
                             yield sub_event
 
                         chat_run_state.last_memory = agent.memory
-                        chat_run_state.cautious_pending_writes = agent_ctx.cautious_blocked_writes.copy()
+                        chat_run_state.cautious_blocked_last_turn = agent_ctx.cautious_blocked_writes.copy()
 
                         async for event in self._stream_finalization(
                             commit_store,

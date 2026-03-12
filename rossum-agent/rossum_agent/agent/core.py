@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import difflib
 import json
 import logging
 import queue
@@ -120,7 +119,7 @@ from rossum_agent.tools.dynamic_tools import (
     preload_categories_for_request,
     reset_dynamic_tools,
 )
-from rossum_agent.utils import add_message_cache_breakpoint
+from rossum_agent.utils import COMPACT_JSON_SEPARATORS, add_message_cache_breakpoint, compute_json_diff
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -484,7 +483,7 @@ class RossumAgent:
 
         # Handle dataclasses (check before pydantic since pydantic models aren't dataclasses)
         if dataclasses.is_dataclass(result) and not isinstance(result, type):
-            return json.dumps(dataclasses.asdict(result), separators=(",", ":"), default=str)
+            return json.dumps(dataclasses.asdict(result), separators=COMPACT_JSON_SEPARATORS, default=str)
 
         # Handle lists of dataclasses
         if isinstance(result, list) and result and dataclasses.is_dataclass(result[0]):
@@ -494,26 +493,26 @@ class RossumAgent:
                     for item in result
                     if dataclasses.is_dataclass(item) and not isinstance(item, type)
                 ],
-                separators=(",", ":"),
+                separators=COMPACT_JSON_SEPARATORS,
                 default=str,
             )
 
         # Handle pydantic models
         # Use mode='json' to ensure nested models are properly serialized to JSON-compatible dicts
         if isinstance(result, BaseModel):
-            return json.dumps(result.model_dump(mode="json"), separators=(",", ":"), default=str)
+            return json.dumps(result.model_dump(mode="json"), separators=COMPACT_JSON_SEPARATORS, default=str)
 
         # Handle lists of pydantic models
         if isinstance(result, list) and result and isinstance(result[0], BaseModel):
             return json.dumps(
                 [item.model_dump(mode="json") for item in result if isinstance(item, BaseModel)],
-                separators=(",", ":"),
+                separators=COMPACT_JSON_SEPARATORS,
                 default=str,
             )
 
         # Handle dicts and regular lists
         if isinstance(result, dict | list):
-            return json.dumps(result, separators=(",", ":"), default=str)
+            return json.dumps(result, separators=COMPACT_JSON_SEPARATORS, default=str)
 
         # Fallback to string representation
         return str(result)
@@ -946,6 +945,8 @@ class RossumAgent:
         if operation == "update" and entity_type and entity_id and self.mcp_connection:
             existing = await self.mcp_connection.fetch_snapshot(entity_type, entity_id)
             if existing is not None:
+                # Populate read cache so _get_before_snapshot doesn't re-fetch on approval
+                self.mcp_connection._cache_set(entity_type, entity_id, existing)
                 return self._format_field_diff(existing, args, entity_type, entity_id)
 
         # Fallback: raw arguments
@@ -984,18 +985,14 @@ class RossumAgent:
             args_json = json.dumps(arguments, indent=2, ensure_ascii=False)
             return f"**Arguments:**\n```json\n{args_json}\n```"
 
-        # Build the "after" object by applying updates to the existing state
         after = {**existing, **update_fields}
+        diff_text = compute_json_diff(
+            existing, after, fromfile="current", tofile="proposed", ensure_ascii=False, context_lines=2
+        )
 
-        before_lines = json.dumps(existing, indent=2, ensure_ascii=False).splitlines(keepends=True)
-        after_lines = json.dumps(after, indent=2, ensure_ascii=False).splitlines(keepends=True)
-
-        diff_lines = list(difflib.unified_diff(before_lines, after_lines, fromfile="current", tofile="proposed", n=2))
-
-        if not diff_lines:
+        if not diff_text:
             return f"**No effective changes to {entity_type} {entity_id}**"
 
-        diff_text = "".join(diff_lines)
         return f"**Changes to {entity_type} {entity_id}:**\n```diff\n{diff_text}```"
 
     async def _execute_tool_with_progress(
