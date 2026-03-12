@@ -14,7 +14,7 @@ import redis
 from dotenv import dotenv_values
 from rossum_agent.agent.core import RossumAgent
 from rossum_agent.agent.models import AgentConfig
-from rossum_agent.bedrock_client import create_bedrock_client
+from rossum_agent.bedrock_client import create_async_bedrock_client
 from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 from rossum_agent.prompts import get_system_prompt
 from rossum_agent.rossum_mcp_integration import connect_mcp_server
@@ -229,7 +229,7 @@ def create_live_agent(
             )
             token_ref = set_context(ctx)
 
-            client = create_bedrock_client()
+            client = create_async_bedrock_client()
             system_prompt = get_system_prompt(persona=case.persona)
 
             if case.rossum_url:

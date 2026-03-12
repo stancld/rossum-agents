@@ -701,13 +701,32 @@ class TestStreamModelResponse:
         )
 
     def _create_mock_stream(self, events: list, final_message: Message):
-        """Create a mock stream context manager that yields events."""
-        mock_stream = MagicMock()
-        mock_stream.__enter__ = MagicMock(return_value=mock_stream)
-        mock_stream.__exit__ = MagicMock(return_value=False)
-        mock_stream.__iter__ = MagicMock(return_value=iter(events))
-        mock_stream.get_final_message.return_value = final_message
-        return mock_stream
+        """Create a mock async stream context manager that yields events."""
+
+        class _AsyncStream:
+            def __init__(self):
+                self._iter = iter(events)
+                self._final_message = final_message
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                pass
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                try:
+                    return next(self._iter)
+                except StopIteration:
+                    raise StopAsyncIteration from None
+
+            async def get_final_message(self):
+                return self._final_message
+
+        return _AsyncStream()
 
     def _create_final_message(self, input_tokens: int = 100, output_tokens: int = 50) -> Message:
         """Create a mock final message with usage stats."""
@@ -924,20 +943,17 @@ class TestStreamModelResponse:
         assert "Let me analyze this..." in thinking_steps[-1].thinking
 
     @pytest.mark.asyncio
-    async def test_producer_exception_propagates(self):
-        """Exceptions raised during streaming propagate to the caller.
-
-        The producer thread catches exceptions and puts them on the queue so
-        _process_stream_events re-raises them instead of silently swallowing them.
-        """
+    async def test_stream_exception_propagates(self):
+        """Exceptions raised during async streaming propagate to the caller."""
         agent = self._create_agent()
         agent.memory.add_task("Test")
 
         error = ValueError("Stream failed mid-response")
         mock_stream = MagicMock()
-        mock_stream.__enter__ = MagicMock(return_value=mock_stream)
-        mock_stream.__exit__ = MagicMock(return_value=False)
-        mock_stream.__iter__ = MagicMock(side_effect=error)
+        mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+        mock_stream.__aexit__ = AsyncMock(return_value=False)
+        mock_stream.__aiter__ = MagicMock(return_value=mock_stream)
+        mock_stream.__anext__ = AsyncMock(side_effect=error)
 
         with (
             patch.object(agent.client.messages, "stream", return_value=mock_stream),
@@ -2262,7 +2278,7 @@ class TestCreateAgentFactory:
 
         mock_mcp = AsyncMock()
 
-        with patch("rossum_agent.agent.core.create_bedrock_client") as mock_create_client:
+        with patch("rossum_agent.agent.core.create_async_bedrock_client") as mock_create_client:
             mock_create_client.return_value = MagicMock()
 
             agent = await create_agent(
@@ -2281,7 +2297,7 @@ class TestCreateAgentFactory:
         mock_mcp = AsyncMock()
         config = AgentConfig(max_steps=10)
 
-        with patch("rossum_agent.agent.core.create_bedrock_client") as mock_create_client:
+        with patch("rossum_agent.agent.core.create_async_bedrock_client") as mock_create_client:
             mock_create_client.return_value = MagicMock()
 
             agent = await create_agent(

@@ -23,6 +23,8 @@ at multiple points to provide real-time updates to the client. The yield flow is
                 └── Sub-agent progress (from nested agent tools like patch_schema_with_subagent)
 
 Key concepts:
+- Uses AsyncAnthropicBedrock with async streaming (no thread pool bridge)
+- _process_stream_events uses asyncio.wait on anext() for timeout-based buffer flushing
 - Initial text buffering (INITIAL_TEXT_BUFFER_DELAY=1.5s) allows determining step type
   (INTERMEDIATE vs FINAL_ANSWER) before streaming to client
 - After initial flush, text tokens stream immediately
@@ -84,7 +86,7 @@ from rossum_agent.agent.models import (
 )
 from rossum_agent.agent.spillover import maybe_spill
 from rossum_agent.api.models.schemas import TokenUsageBreakdown
-from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
+from rossum_agent.bedrock_client import create_async_bedrock_client, get_model_id
 from rossum_agent.rossum_mcp_integration import (
     classify_operation,
     extract_entity_id,
@@ -121,10 +123,10 @@ from rossum_agent.tools.dynamic_tools import (
 from rossum_agent.utils import add_message_cache_breakpoint
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Iterator
+    from collections.abc import AsyncIterator
     from typing import Literal
 
-    from anthropic import AnthropicBedrock
+    from anthropic import AsyncAnthropicBedrock
 
     from rossum_agent.agent.types import UserContent
     from rossum_agent.rossum_mcp_integration import MCPConnection
@@ -139,6 +141,9 @@ RATE_LIMIT_MAX_DELAY = 60.0
 # whether this is an intermediate step (with tool calls) or final answer text.
 # This delay helps correctly classify the step type before streaming to the client.
 INITIAL_TEXT_BUFFER_DELAY = 1.5
+
+# Sentinel for detecting async generator exhaustion in anext()
+_STREAM_END = object()
 
 
 def _parse_json_encoded_strings(arguments: dict) -> dict:
@@ -394,7 +399,7 @@ class RossumAgent:
 
     def __init__(
         self,
-        client: AnthropicBedrock,
+        client: AsyncAnthropicBedrock,
         mcp_connection: MCPConnection,
         system_prompt: str,
         config: AgentConfig | None = None,
@@ -510,45 +515,6 @@ class RossumAgent:
         # Fallback to string representation
         return str(result)
 
-    def _sync_stream_events(
-        self, model_id: str, messages: list[MessageParam], tools: list[ToolParam]
-    ) -> Iterator[tuple[MessageStreamEvent | None, Message | None]]:
-        """Synchronous generator that yields stream events and final message.
-
-        This runs in a thread pool to avoid blocking the event loop.
-
-        Yields:
-            Tuples of (event, None) for each stream event, then (None, final_message) at the end.
-        """
-        thinking_config: ThinkingConfigAdaptiveParam = {"type": "adaptive"}
-
-        # Cache breakpoints: system prompt
-        system: list[TextBlockParam] = [
-            {"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}
-        ]
-
-        # Cache breakpoints: last tool definition
-        if tools:
-            tools = [*tools]  # shallow copy
-            tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}  # type: ignore[assignment]  # runtime addition of cache_control
-
-        # Cache breakpoints: last message content block
-        add_message_cache_breakpoint(messages)  # type: ignore[arg-type]  # MessageParam is dict at runtime
-
-        with self.client.messages.stream(
-            model=model_id,
-            max_tokens=self.config.max_output_tokens,
-            system=system,
-            messages=messages,
-            tools=tools if tools else Omit(),
-            thinking=thinking_config,
-            temperature=self.config.temperature,
-            output_config={"effort": self.config.effort},
-        ) as stream:
-            for event in stream:
-                yield (event, None)
-            yield (None, stream.get_final_message())
-
     def _process_stream_event(
         self, event: MessageStreamEvent, pending_tools: dict[int, dict[str, str]], tool_calls: list[ToolCall]
     ) -> StreamDelta | None:
@@ -618,7 +584,7 @@ class RossumAgent:
     async def _process_stream_events(
         self,
         step_num: int,
-        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | Exception | None],
+        stream: AsyncIterator[MessageStreamEvent],
         state: _StreamState,
     ) -> AsyncIterator[AgentStep]:
         """Process stream events and yield AgentSteps.
@@ -629,59 +595,63 @@ class RossumAgent:
         step type classification before streaming to the client.
 
         After the initial buffer is flushed, subsequent text tokens are streamed immediately.
+
+        Uses asyncio.wait with timeout on anext() to implement buffer flush during model
+        pauses without cancelling the underlying stream read.
         """
-        while True:
-            try:
-                item = await asyncio.to_thread(event_queue.get, timeout=INITIAL_TEXT_BUFFER_DELAY)
-            except queue.Empty:
-                # Yield #1: Timeout-based flush of initial text buffer (ensures responsiveness during model pauses)
-                if (
-                    state.text_buffer
-                    and state._should_flush_initial_buffer()
-                    and (step := state.flush_buffer(step_num, state.get_step_type()))
-                ):
-                    state.initial_buffer_flushed = True
-                    yield step
-                continue
+        pending_next: asyncio.Task | None = None
+        try:
+            while True:
+                if pending_next is None:
+                    pending_next = asyncio.ensure_future(anext(stream, _STREAM_END))
 
-            if isinstance(item, Exception):
-                raise item
+                done, _ = await asyncio.wait({pending_next}, timeout=INITIAL_TEXT_BUFFER_DELAY)
 
-            if item is None:
-                # Yield #2: Stream ended - flush any remaining buffered text
-                if step := state.flush_buffer(step_num, state.get_step_type()):
-                    yield step
-                break
+                if not done:
+                    # Yield #1: Timeout-based flush of initial text buffer (ensures responsiveness during model pauses)
+                    if (
+                        state.text_buffer
+                        and state._should_flush_initial_buffer()
+                        and (step := state.flush_buffer(step_num, state.get_step_type()))
+                    ):
+                        state.initial_buffer_flushed = True
+                        yield step
+                    continue
 
-            event, final_msg = item
-            if final_msg is not None:
-                state.final_message = final_msg
-                continue
+                item = pending_next.result()
+                pending_next = None
 
-            if event is None:
-                continue
+                if item is _STREAM_END:
+                    # Yield #2: Stream ended - flush any remaining buffered text
+                    if step := state.flush_buffer(step_num, state.get_step_type()):
+                        yield step
+                    break
 
-            delta = self._process_stream_event(event, state.pending_tools, state.tool_calls)
-            if not delta:
-                continue
+                event: MessageStreamEvent = item  # type: ignore[assignment]  # narrowed after _STREAM_END sentinel check
+                delta = self._process_stream_event(event, state.pending_tools, state.tool_calls)
+                if not delta:
+                    continue
 
-            if delta.kind == "thinking":
-                state.thinking_text += delta.content
-                state.thinking_deltas += 1
-                state.first_text_token_time = state.first_text_token_time or time.monotonic()
+                if delta.kind == "thinking":
+                    state.thinking_text += delta.content
+                    state.thinking_deltas += 1
+                    state.first_text_token_time = state.first_text_token_time or time.monotonic()
+                    state.maybe_log_progress(step_num)
+                    # Yield #3: Streaming thinking tokens (extended thinking / chain-of-thought)
+                    yield ThinkingStep(
+                        step_number=step_num,
+                        thinking=state.thinking_text,
+                    )
+                    continue
+
+                state.text_deltas += 1
                 state.maybe_log_progress(step_num)
-                # Yield #3: Streaming thinking tokens (extended thinking / chain-of-thought)
-                yield ThinkingStep(
-                    step_number=step_num,
-                    thinking=state.thinking_text,
-                )
-                continue
-
-            state.text_deltas += 1
-            state.maybe_log_progress(step_num)
-            # Yield #4: Text delta - immediate flush after initial buffer period or when tool calls detected
-            if step := self._handle_text_delta(step_num, delta.content, delta.kind, state):
-                yield step
+                # Yield #4: Text delta - immediate flush after initial buffer period or when tool calls detected
+                if step := self._handle_text_delta(step_num, delta.content, delta.kind, state):
+                    yield step
+        finally:
+            if pending_next is not None and not pending_next.done():
+                pending_next.cancel()
 
     async def _stream_model_response(self, step_num: int) -> AsyncIterator[AgentStep]:
         """Stream model response, yielding partial steps as thinking streams in.
@@ -699,25 +669,35 @@ class RossumAgent:
         state = _StreamState()
         logger.info(f"Step {step_num}: streaming started (model={model_id}, messages={len(messages)})")
 
-        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | Exception | None] = queue.Queue()
+        thinking_config: ThinkingConfigAdaptiveParam = {"type": "adaptive"}
 
-        def producer() -> None:
-            try:
-                for item in self._sync_stream_events(model_id, messages, tools):
-                    event_queue.put(item)
-                event_queue.put(None)
-            except Exception as e:
-                event_queue.put(e)
+        # Cache breakpoints: system prompt
+        system: list[TextBlockParam] = [
+            {"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}
+        ]
 
-        ctx = copy_context()
-        producer_task = asyncio.get_running_loop().run_in_executor(None, partial(ctx.run, producer))
+        # Cache breakpoints: last tool definition
+        if tools:
+            tools = [*tools]  # shallow copy
+            tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}  # type: ignore[assignment]  # runtime addition of cache_control
 
-        try:
+        # Cache breakpoints: last message content block
+        add_message_cache_breakpoint(messages)  # type: ignore[arg-type]  # MessageParam is dict at runtime
+
+        async with self.client.messages.stream(
+            model=model_id,
+            max_tokens=self.config.max_output_tokens,
+            system=system,
+            messages=messages,
+            tools=tools if tools else Omit(),
+            thinking=thinking_config,
+            temperature=self.config.temperature,
+            output_config={"effort": self.config.effort},
+        ) as stream:
             # Yield #5: Forward all streaming steps from _process_stream_events (yields #1-4)
-            async for step in self._process_stream_events(step_num, event_queue, state):
+            async for step in self._process_stream_events(step_num, stream, state):  # type: ignore[arg-type]  # AsyncMessageStream implements AsyncIterator protocol
                 yield step
-        finally:
-            await producer_task
+            state.final_message = await stream.get_final_message()
 
         if state.final_message is None:
             raise RuntimeError("Stream ended without final message")
@@ -1207,7 +1187,7 @@ async def create_agent(
     This is a convenience factory function that creates the Bedrock client
     and initializes the agent with the provided configuration.
     """
-    client = create_bedrock_client()
+    client = create_async_bedrock_client()
     return RossumAgent(
         client=client,
         mcp_connection=mcp_connection,
