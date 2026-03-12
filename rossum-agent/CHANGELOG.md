@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.4.0] - 2026-03-09
+## [1.5.0rc0] - 2026-03-12
 
 ### Added
 - Added PostgreSQL as chat persistence backend — `CHAT_STORAGE_BACKEND=postgres` (default) uses SQLAlchemy Core with `psycopg` for durable chat/file/feedback storage with configurable TTL; `redis` remains available as an alternative; added `docker-compose.yml` for local development [#248](https://github.com/rossumai/rossum-agents/pull/248)
