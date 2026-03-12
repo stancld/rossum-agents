@@ -2644,14 +2644,20 @@ class TestPreloadInjection:
             async for _ in agent.run("List all queues"):
                 pass
 
-        # Verify the prompt was modified with preload info
+        # Task text stays clean; preload info stored separately
         task_step = agent.memory.steps[0]
-        assert "[System: Loaded 5 tools" in task_step.task
-        assert "Use these tools directly" in task_step.task
+        assert task_step.task == "List all queues"
+        assert task_step.preload_info == (
+            "Loaded 5 tools from ['queues']: list_queues, get_queue, create_queue, update_queue, delete_queue"
+        )
+
+        # But messages sent to API still include the system info
+        messages = task_step.to_messages()
+        assert "[System: Loaded 5 tools" in messages[0]["content"]
 
     @pytest.mark.asyncio
     async def test_preload_result_injected_into_list_prompt(self):
-        """Test that preload result is injected into list content prompt."""
+        """Test that preload result is stored separately for list content prompt."""
         agent = self._create_agent()
 
         async def mock_stream_response(step_num):
@@ -2671,10 +2677,16 @@ class TestPreloadInjection:
                 pass
 
         task_step = agent.memory.steps[0]
-        # For list prompts, should be appended as text block
+        # Task stays clean — only the original 2 blocks
         assert isinstance(task_step.task, list)
-        assert len(task_step.task) == 3  # original 2 + injected text
-        assert "[System: Loaded 3 tools" in task_step.task[2]["text"]
+        assert len(task_step.task) == 2
+        assert task_step.preload_info == "Loaded 3 tools from ['schemas']"
+
+        # Messages for API include the injected text block
+        messages = task_step.to_messages()
+        msg_content = messages[0]["content"]
+        assert len(msg_content) == 3
+        assert "[System: Loaded 3 tools" in msg_content[2]["text"]
 
     @pytest.mark.asyncio
     async def test_no_injection_when_no_preload(self):
@@ -2695,7 +2707,7 @@ class TestPreloadInjection:
 
         task_step = agent.memory.steps[0]
         assert task_step.task == "Hello world"
-        assert "[System:" not in task_step.task
+        assert task_step.preload_info is None
 
 
 class TestCalculateRateLimitDelay:

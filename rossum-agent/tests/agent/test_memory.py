@@ -496,6 +496,97 @@ class TestAgentMemorySerialization:
         assert len(restored.steps[0].task) == 2
 
 
+class TestTaskStepPreloadInfo:
+    """Test TaskStep preload_info separation and backward compatibility."""
+
+    def test_preload_info_stored_separately(self):
+        step = TaskStep(task="List queues", preload_info="Loaded 5 tools from ['queues']")
+        assert step.task == "List queues"
+        assert step.preload_info == "Loaded 5 tools from ['queues']"
+
+    def test_preload_info_injected_into_messages(self):
+        step = TaskStep(task="List queues", preload_info="Loaded 5 tools from ['queues']")
+        messages = step.to_messages()
+        assert len(messages) == 1
+        content = messages[0]["content"]
+        assert "List queues" in content
+        assert "[System: Loaded 5 tools from ['queues']" in content
+
+    def test_preload_info_injected_into_multimodal_messages(self):
+        task = [{"type": "text", "text": "Analyze this"}]
+        step = TaskStep(task=task, preload_info="Loaded 3 tools from ['schemas']")
+        messages = step.to_messages()
+        msg_content = messages[0]["content"]
+        assert len(msg_content) == 2
+        assert msg_content[0]["text"] == "Analyze this"
+        assert "[System: Loaded 3 tools" in msg_content[1]["text"]
+
+    def test_no_preload_info_clean_messages(self):
+        step = TaskStep(task="Hello")
+        messages = step.to_messages()
+        assert messages[0]["content"] == "Hello"
+
+    def test_to_dict_includes_preload_info(self):
+        step = TaskStep(task="Hello", preload_info="Loaded 2 tools")
+        d = step.to_dict()
+        assert d["task"] == "Hello"
+        assert d["preload_info"] == "Loaded 2 tools"
+
+    def test_to_dict_omits_preload_info_when_none(self):
+        step = TaskStep(task="Hello")
+        d = step.to_dict()
+        assert "preload_info" not in d
+
+    def test_from_dict_with_preload_info(self):
+        data = {"type": "task_step", "task": "Hello", "preload_info": "Loaded 2 tools"}
+        step = TaskStep.from_dict(data)
+        assert step.task == "Hello"
+        assert step.preload_info == "Loaded 2 tools"
+
+    def test_legacy_string_task_extraction(self):
+        """Old format: preload info baked into task string."""
+        legacy_task = (
+            "Describe workflow\n\n"
+            "[System: Loaded 14 tools from ['read', 'annotations']: get, search. "
+            "Use these tools directly without calling list_tool_categories first.]"
+        )
+        step = TaskStep.from_dict({"type": "task_step", "task": legacy_task})
+        assert step.task == "Describe workflow"
+        assert step.preload_info == "Loaded 14 tools from ['read', 'annotations']: get, search"
+
+    def test_legacy_multimodal_task_extraction(self):
+        """Old format: preload info baked as last text block in multimodal task."""
+        legacy_task = [
+            {"type": "text", "text": "Analyze this"},
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "abc"}},
+            {
+                "type": "text",
+                "text": (
+                    "\n\n[System: Loaded 3 tools from ['schemas']: list_schemas, get_schema, update_schema. "
+                    "Use these tools directly without calling list_tool_categories first.]"
+                ),
+            },
+        ]
+        step = TaskStep.from_dict({"type": "task_step", "task": legacy_task})
+        assert isinstance(step.task, list)
+        assert len(step.task) == 2  # system block stripped
+        assert step.preload_info == "Loaded 3 tools from ['schemas']: list_schemas, get_schema, update_schema"
+
+    def test_roundtrip_with_preload_info(self):
+        original = TaskStep(task="Deploy schema", preload_info="Loaded 5 tools from ['queues']")
+        restored = TaskStep.from_dict(original.to_dict())
+        assert restored.task == original.task
+        assert restored.preload_info == original.preload_info
+
+    def test_add_task_with_preload_info(self):
+        memory = AgentMemory()
+        memory.add_task("Test task", preload_info="Loaded 2 tools")
+        step = memory.steps[0]
+        assert isinstance(step, TaskStep)
+        assert step.task == "Test task"
+        assert step.preload_info == "Loaded 2 tools"
+
+
 class TestCollapseToolResults:
     """Test collapsing of repeated collapsible tool results in write_to_messages."""
 
