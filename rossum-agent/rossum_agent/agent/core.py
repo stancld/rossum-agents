@@ -644,7 +644,6 @@ class RossumAgent:
                 if delta.kind == "thinking":
                     state.thinking_text += delta.content
                     state.thinking_deltas += 1
-                    state.first_text_token_time = state.first_text_token_time or time.monotonic()
                     state.maybe_log_progress(step_num)
                     # Yield #3: Streaming thinking tokens (extended thinking / chain-of-thought)
                     yield ThinkingStep(

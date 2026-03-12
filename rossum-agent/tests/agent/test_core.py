@@ -963,13 +963,13 @@ class TestStreamModelResponse:
                 pass
 
     @pytest.mark.asyncio
-    async def test_thinking_delta_starts_buffer_timer(self):
-        """Thinking deltas start the initial buffer timer before yielding.
+    async def test_thinking_delta_does_not_start_buffer_timer(self):
+        """Thinking deltas must NOT start the initial text buffer timer.
 
-        When thinking tokens arrive before text, first_text_token_time is set
-        at the thinking token, so subsequent text tokens measure elapsed time
-        from the thinking arrival. Text arriving after INITIAL_TEXT_BUFFER_DELAY
-        since the first thinking token is streamed immediately.
+        first_text_token_time is only set by actual text deltas.  If thinking
+        tokens started the timer, text arriving after a long thinking phase
+        would bypass the initial buffer and be prematurely classified as
+        final_answer before tool_use blocks have a chance to arrive.
         """
         from anthropic.types import ThinkingBlock, ThinkingDelta
 
@@ -995,14 +995,16 @@ class TestStreamModelResponse:
             [thinking_start, thinking_delta, thinking_stop, text_delta], final_message
         )
 
-        # Simulate: thinking token arrives at T=0, text token arrives at T=2.0
-        # (past INITIAL_TEXT_BUFFER_DELAY=1.5), so text should be flushed immediately.
+        # Simulate: thinking token at T=0, text token at T=2.0 (well past
+        # INITIAL_TEXT_BUFFER_DELAY=1.5s).  Because thinking does NOT set the
+        # timer, the buffer delay starts at T=2.0 (when text arrives) and
+        # the text stays buffered until the stream ends.
         # Calls: _StreamState init (stream_start_time, last_progress_log_time),
-        # thinking delta (first_text_token_time, maybe_log_progress),
-        # text delta (maybe_log_progress, _handle_text_delta elapsed check),
+        # thinking delta (maybe_log_progress),
+        # text delta (first_text_token_time, maybe_log_progress),
         # stream_elapsed after streaming completes.
         t0 = 1000.0
-        time_calls = iter([t0, t0, t0, t0, t0 + 2.0, t0 + 2.0, t0 + 2.0])
+        time_calls = iter([t0, t0, t0, t0 + 2.0, t0 + 2.0, t0 + 2.0])
 
         with (
             patch.object(agent.client.messages, "stream", return_value=mock_stream),
@@ -1013,10 +1015,15 @@ class TestStreamModelResponse:
             async for step in agent._stream_model_response(1):
                 steps.append(step)
 
-        # Text after elapsed thinking time should be streamed as intermediate step
-        streaming_intermediate = [s for s in steps if isinstance(s, TextDeltaStep) and s.is_streaming]
-        assert len(streaming_intermediate) >= 1
-        assert any("Here is the answer." in s.text_delta for s in streaming_intermediate)
+        # Text should be buffered until stream ends (not flushed prematurely).
+        # The finalized thinking step should also appear.
+        thinking_steps = [s for s in steps if isinstance(s, ThinkingStep)]
+        finalized_thinking = [s for s in thinking_steps if not s.is_streaming]
+        assert len(finalized_thinking) == 1
+
+        text_steps = [s for s in steps if isinstance(s, TextDeltaStep)]
+        assert len(text_steps) >= 1
+        assert any("Here is the answer." in s.text_delta for s in text_steps)
 
 
 class TestAgentRun:
