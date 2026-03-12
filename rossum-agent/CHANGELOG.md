@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Tool result serialization now uses compact JSON (`separators=(",", ":")`) instead of pretty-printed (`indent=2`) to reduce token usage in LLM context [#254](https://github.com/stancld/rossum-agents/pull/254)
+
+### Fixed
 - Preload info is now stored separately in `TaskStep` instead of being baked into the user's prompt text — keeps original task clean in DB while still injecting system hints into API messages; includes backward-compatible extraction of legacy format [#256](https://github.com/stancld/rossum-agents/pull/256)
 
 ## [1.4.0] - 2026-03-09
