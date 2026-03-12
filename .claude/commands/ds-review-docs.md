@@ -17,6 +17,7 @@
 | rossum-agent | `rossum-agent/README.md`, `rossum-agent/CHANGELOG.md` |
 | rossum-deploy | `rossum-deploy/README.md`, `rossum-deploy/CHANGELOG.md` |
 | rossum-agent-client | `rossum-agent-client/README.md`, `rossum-agent-client/CHANGELOG.md` |
+| OpenAPI spec | `rossum-agent/rossum_agent/api/openapi.json` |
 | Shared docs | `docs/source/*.rst`, `README.md`, `CHANGELOG.md` |
 | Landing page | `docs/landing/index.html`, `docs/landing/blog/` |
 | Dev guidelines | `CLAUDE.md`, `AGENTS.md` |
@@ -31,6 +32,7 @@
 | API changes | Parameter changes, return type changes reflected in docs |
 | Examples | Code examples still valid after changes |
 | Env vars | New environment variables documented |
+| OpenAPI spec | Endpoints, request/response schemas, and SSE events in `rossum-agent/rossum_agent/api/openapi.json` match source code |
 
 ## Approach
 
@@ -49,6 +51,26 @@ Each MCP tool requires:
 - Return format with JSON example
 - Entry in `docs/source/mcp_reference.rst`
 
+## OpenAPI Spec Review
+
+The OpenAPI spec (`rossum-agent/rossum_agent/api/openapi.json`) is the contract for the `rossum-agent-client` package. It must stay in sync with the actual `rossum-agent` API.
+
+**Source of truth**: FastAPI routes in `rossum-agent/rossum_agent/api/routes/` and Pydantic models in `rossum-agent/rossum_agent/api/models/schemas.py`.
+
+**Regeneration**: `cd rossum-agent && python scripts/generate_openapi.py`
+
+| Check | What to verify |
+|-------|----------------|
+| Endpoints | All FastAPI routes in `api/routes/*.py` present in spec paths |
+| Request/response schemas | Pydantic models in `api/models/schemas.py` match spec component schemas |
+| SSE events | All SSE event models (StepEvent, SubAgentProgressEvent, etc.) present in spec schemas |
+| SSE event mapping | `x-sse-events` extension on messages endpoint lists all event types |
+| Parameters | Required/optional headers, query params, path params match route signatures |
+| Error responses | ErrorResponse and HTTPValidationError on relevant endpoints |
+| Spec freshness | Run `generate_openapi.py` and diff — no unexpected changes |
+
+**When to flag**: Any change to `rossum-agent/rossum_agent/api/` (routes, models, dependencies) without a corresponding `openapi.json` update.
+
 ## Output Format
 
 Report findings as:
@@ -62,6 +84,11 @@ Report findings as:
 
 ### Outdated
 - [ ] `file.md:line` - parameter X removed but still documented
+
+### OpenAPI Spec Drift
+- [ ] `POST /api/v1/endpoint` - in routes but missing from spec
+- [ ] `SchemaModel` - in schemas.py but missing from spec components
+- [ ] Spec stale - `generate_openapi.py` output differs from committed spec
 
 ### Changelog Entries Needed
 - [ ] rossum-mcp/CHANGELOG.md - added tool_name

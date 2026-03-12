@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import difflib
 import json
 import logging
 import random
@@ -20,6 +19,7 @@ from rossum_mcp.tools.validation import sanitize_schema_content
 from rossum_agent.change_tracking.models import EntityChange
 from rossum_agent.rossum_mcp_integration import unwrap
 from rossum_agent.tools.core import get_context
+from rossum_agent.utils import compute_json_diff
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -646,10 +646,5 @@ def diff_objects(before: str, after: str) -> str:
     except json.JSONDecodeError as e:
         return json.dumps({"error": f"Invalid JSON: {e}"})
 
-    before_lines = json.dumps(before_obj, indent=2, sort_keys=True).splitlines(keepends=True)
-    after_lines = json.dumps(after_obj, indent=2, sort_keys=True).splitlines(keepends=True)
-
-    diff = list(difflib.unified_diff(before_lines, after_lines, fromfile="before", tofile="after"))
-    if not diff:
-        return "No differences found."
-    return "".join(diff)
+    diff_text = compute_json_diff(before_obj, after_obj, sort_keys=True)
+    return diff_text or "No differences found."

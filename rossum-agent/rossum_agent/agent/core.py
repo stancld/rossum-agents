@@ -23,6 +23,8 @@ at multiple points to provide real-time updates to the client. The yield flow is
                 └── Sub-agent progress (from nested agent tools like patch_schema_with_subagent)
 
 Key concepts:
+- Uses AsyncAnthropicBedrock with async streaming (no thread pool bridge)
+- _process_stream_events uses asyncio.wait on anext() for timeout-based buffer flushing
 - Initial text buffering (INITIAL_TEXT_BUFFER_DELAY=1.5s) allows determining step type
   (INTERMEDIATE vs FINAL_ANSWER) before streaming to client
 - After initial flush, text tokens stream immediately
@@ -83,11 +85,26 @@ from rossum_agent.agent.models import (
 )
 from rossum_agent.agent.spillover import maybe_spill
 from rossum_agent.api.models.schemas import TokenUsageBreakdown
-from rossum_agent.bedrock_client import create_bedrock_client, get_model_id
-from rossum_agent.rossum_mcp_integration import mcp_tools_to_anthropic_format
-from rossum_agent.tools import execute_internal_tool, get_internal_tool_names, get_internal_tools
+from rossum_agent.bedrock_client import create_async_bedrock_client, get_model_id
+from rossum_agent.rossum_mcp_integration import (
+    classify_operation,
+    extract_entity_id,
+    extract_entity_type,
+    mcp_tools_to_anthropic_format,
+)
+from rossum_agent.tools import (
+    INTERNAL_WRITE_TOOL_NAMES,
+    execute_internal_tool,
+    get_internal_tool_names,
+    get_internal_tools,
+)
 from rossum_agent.tools.core import (
+    CAUTIOUS_APPROVAL_LABEL,
+    CAUTIOUS_CONFIRMATION_MARKER,
     AgentContext,
+    AgentQuestion,
+    AgentQuestionItem,
+    QuestionOption,
     SubAgentProgress,
     SubAgentTokenUsage,
     get_context,
@@ -98,22 +115,21 @@ from rossum_agent.tools.dynamic_tools import (
     DISCOVERY_TOOL_NAME,
     get_dynamic_tools,
     get_tools_version,
+    is_mcp_write_tool,
     preload_categories_for_request,
     reset_dynamic_tools,
 )
-from rossum_agent.utils import add_message_cache_breakpoint
+from rossum_agent.utils import COMPACT_JSON_SEPARATORS, add_message_cache_breakpoint, compute_json_diff
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Iterator
-    from typing import Literal
+    from collections.abc import AsyncIterator
 
-    from anthropic import AnthropicBedrock
+    from anthropic import AsyncAnthropicBedrock
 
     from rossum_agent.agent.types import UserContent
     from rossum_agent.rossum_mcp_integration import MCPConnection
 
 logger = logging.getLogger(__name__)
-
 
 RATE_LIMIT_MAX_RETRIES = 5
 RATE_LIMIT_BASE_DELAY = 2.0
@@ -123,6 +139,9 @@ RATE_LIMIT_MAX_DELAY = 60.0
 # whether this is an intermediate step (with tool calls) or final answer text.
 # This delay helps correctly classify the step type before streaming to the client.
 INITIAL_TEXT_BUFFER_DELAY = 1.5
+
+# Sentinel for detecting async generator exhaustion in anext()
+_STREAM_END = object()
 
 
 def _parse_json_encoded_strings(arguments: dict) -> dict:
@@ -242,6 +261,7 @@ class _StreamState:
     pending_tools: dict[int, dict[str, str]] = dataclasses.field(default_factory=dict)
     first_text_token_time: float | None = None
     initial_buffer_flushed: bool = False
+    thinking_finalized: bool = False
     # Streaming progress tracking
     stream_start_time: float = dataclasses.field(default_factory=time.monotonic)
     last_progress_log_time: float = dataclasses.field(default_factory=time.monotonic)
@@ -275,9 +295,12 @@ class _StreamState:
             thinking=self.thinking_text or None,
         )
 
-    @property
-    def contains_thinking(self) -> bool:
-        return bool(self.thinking_text)
+    def finalize_thinking(self, step_num: int) -> ThinkingStep | None:
+        """Return a finalized ThinkingStep if thinking exists and hasn't been finalized yet."""
+        if not self.thinking_text or self.thinking_finalized:
+            return None
+        self.thinking_finalized = True
+        return ThinkingStep(step_number=step_num, thinking=self.thinking_text, is_streaming=False)
 
     def maybe_log_progress(self, step_num: int) -> None:
         """Log streaming progress periodically (every _STREAM_PROGRESS_LOG_INTERVAL seconds)."""
@@ -378,7 +401,7 @@ class RossumAgent:
 
     def __init__(
         self,
-        client: AnthropicBedrock,
+        client: AsyncAnthropicBedrock,
         mcp_connection: MCPConnection,
         system_prompt: str,
         config: AgentConfig | None = None,
@@ -460,7 +483,7 @@ class RossumAgent:
 
         # Handle dataclasses (check before pydantic since pydantic models aren't dataclasses)
         if dataclasses.is_dataclass(result) and not isinstance(result, type):
-            return json.dumps(dataclasses.asdict(result), indent=2, default=str)
+            return json.dumps(dataclasses.asdict(result), separators=COMPACT_JSON_SEPARATORS, default=str)
 
         # Handle lists of dataclasses
         if isinstance(result, list) and result and dataclasses.is_dataclass(result[0]):
@@ -470,68 +493,29 @@ class RossumAgent:
                     for item in result
                     if dataclasses.is_dataclass(item) and not isinstance(item, type)
                 ],
-                indent=2,
+                separators=COMPACT_JSON_SEPARATORS,
                 default=str,
             )
 
         # Handle pydantic models
         # Use mode='json' to ensure nested models are properly serialized to JSON-compatible dicts
         if isinstance(result, BaseModel):
-            return json.dumps(result.model_dump(mode="json"), indent=2, default=str)
+            return json.dumps(result.model_dump(mode="json"), separators=COMPACT_JSON_SEPARATORS, default=str)
 
         # Handle lists of pydantic models
         if isinstance(result, list) and result and isinstance(result[0], BaseModel):
             return json.dumps(
                 [item.model_dump(mode="json") for item in result if isinstance(item, BaseModel)],
-                indent=2,
+                separators=COMPACT_JSON_SEPARATORS,
                 default=str,
             )
 
         # Handle dicts and regular lists
         if isinstance(result, dict | list):
-            return json.dumps(result, indent=2, default=str)
+            return json.dumps(result, separators=COMPACT_JSON_SEPARATORS, default=str)
 
         # Fallback to string representation
         return str(result)
-
-    def _sync_stream_events(
-        self, model_id: str, messages: list[MessageParam], tools: list[ToolParam]
-    ) -> Iterator[tuple[MessageStreamEvent | None, Message | None]]:
-        """Synchronous generator that yields stream events and final message.
-
-        This runs in a thread pool to avoid blocking the event loop.
-
-        Yields:
-            Tuples of (event, None) for each stream event, then (None, final_message) at the end.
-        """
-        thinking_config: ThinkingConfigAdaptiveParam = {"type": "adaptive"}
-
-        # Cache breakpoints: system prompt
-        system: list[TextBlockParam] = [
-            {"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}
-        ]
-
-        # Cache breakpoints: last tool definition
-        if tools:
-            tools = [*tools]  # shallow copy
-            tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}  # type: ignore[assignment]  # runtime addition of cache_control
-
-        # Cache breakpoints: last message content block
-        add_message_cache_breakpoint(messages)  # type: ignore[arg-type]  # MessageParam is dict at runtime
-
-        with self.client.messages.stream(
-            model=model_id,
-            max_tokens=self.config.max_output_tokens,
-            system=system,
-            messages=messages,
-            tools=tools if tools else Omit(),
-            thinking=thinking_config,
-            temperature=self.config.temperature,
-            output_config={"effort": self.config.effort},
-        ) as stream:
-            for event in stream:
-                yield (event, None)
-            yield (None, stream.get_final_message())
 
     def _process_stream_event(
         self, event: MessageStreamEvent, pending_tools: dict[int, dict[str, str]], tool_calls: list[ToolCall]
@@ -577,9 +561,7 @@ class RossumAgent:
             if isinstance(block, ThinkingBlock)
         ]
 
-    def _handle_text_delta(
-        self, step_num: int, content: str, delta_kind: Literal["thinking", "text"], state: _StreamState
-    ) -> TextDeltaStep | None:
+    def _handle_text_delta(self, step_num: int, content: str, state: _StreamState) -> TextDeltaStep | None:
         """Handle a text delta, buffering or flushing as appropriate."""
         if state.first_text_token_time is None:
             state.first_text_token_time = time.monotonic()
@@ -590,19 +572,27 @@ class RossumAgent:
         state.text_buffer.append(content)
 
         if state.initial_buffer_flushed:
-            step_type = (
-                StepType.INTERMEDIATE if state.contains_thinking and delta_kind == "text" else state.get_step_type()
-            )
-            return state.flush_buffer(step_num, step_type)
+            return state.flush_buffer(step_num, state.get_step_type())
         if state.pending_tools or state.tool_calls:
             state.initial_buffer_flushed = True
             return state.flush_buffer(step_num, StepType.INTERMEDIATE)
         return None
 
+    def _handle_text_delta_with_finalization(
+        self, step_num: int, content: str, state: _StreamState
+    ) -> list[AgentStep]:
+        """Finalize thinking (if needed) then handle text delta. Returns 0-2 steps."""
+        steps: list[AgentStep] = []
+        if finalized := state.finalize_thinking(step_num):
+            steps.append(finalized)
+        if text_step := self._handle_text_delta(step_num, content, state):
+            steps.append(text_step)
+        return steps
+
     async def _process_stream_events(
         self,
         step_num: int,
-        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | Exception | None],
+        stream: AsyncIterator[MessageStreamEvent],
         state: _StreamState,
     ) -> AsyncIterator[AgentStep]:
         """Process stream events and yield AgentSteps.
@@ -613,59 +603,63 @@ class RossumAgent:
         step type classification before streaming to the client.
 
         After the initial buffer is flushed, subsequent text tokens are streamed immediately.
+
+        Uses asyncio.wait with timeout on anext() to implement buffer flush during model
+        pauses without cancelling the underlying stream read.
         """
-        while True:
-            try:
-                item = await asyncio.to_thread(event_queue.get, timeout=INITIAL_TEXT_BUFFER_DELAY)
-            except queue.Empty:
-                # Yield #1: Timeout-based flush of initial text buffer (ensures responsiveness during model pauses)
-                if (
-                    state.text_buffer
-                    and state._should_flush_initial_buffer()
-                    and (step := state.flush_buffer(step_num, state.get_step_type()))
-                ):
-                    state.initial_buffer_flushed = True
-                    yield step
-                continue
+        pending_next: asyncio.Task | None = None
+        try:
+            while True:
+                if pending_next is None:
+                    pending_next = asyncio.ensure_future(anext(stream, _STREAM_END))
 
-            if isinstance(item, Exception):
-                raise item
+                done, _ = await asyncio.wait({pending_next}, timeout=INITIAL_TEXT_BUFFER_DELAY)
 
-            if item is None:
-                # Yield #2: Stream ended - flush any remaining buffered text
-                if step := state.flush_buffer(step_num, state.get_step_type()):
-                    yield step
-                break
+                if not done:
+                    # Yield #1: Timeout-based flush of initial text buffer (ensures responsiveness during model pauses)
+                    if (
+                        state.text_buffer
+                        and state._should_flush_initial_buffer()
+                        and (step := state.flush_buffer(step_num, state.get_step_type()))
+                    ):
+                        state.initial_buffer_flushed = True
+                        yield step
+                    continue
 
-            event, final_msg = item
-            if final_msg is not None:
-                state.final_message = final_msg
-                continue
+                item = pending_next.result()
+                pending_next = None
 
-            if event is None:
-                continue
+                if item is _STREAM_END:
+                    # Yield #2: Stream ended - flush any remaining buffered text
+                    if step := state.flush_buffer(step_num, state.get_step_type()):
+                        yield step
+                    break
 
-            delta = self._process_stream_event(event, state.pending_tools, state.tool_calls)
-            if not delta:
-                continue
+                event: MessageStreamEvent = item  # type: ignore[assignment]  # narrowed after _STREAM_END sentinel check
+                delta = self._process_stream_event(event, state.pending_tools, state.tool_calls)
+                if not delta:
+                    continue
 
-            if delta.kind == "thinking":
-                state.thinking_text += delta.content
-                state.thinking_deltas += 1
-                state.first_text_token_time = state.first_text_token_time or time.monotonic()
+                if delta.kind == "thinking":
+                    state.thinking_text += delta.content
+                    state.thinking_deltas += 1
+                    state.maybe_log_progress(step_num)
+                    # Yield #3: Streaming thinking tokens (extended thinking / chain-of-thought)
+                    yield ThinkingStep(
+                        step_number=step_num,
+                        thinking=state.thinking_text,
+                    )
+                    continue
+
+                state.text_deltas += 1
                 state.maybe_log_progress(step_num)
-                # Yield #3: Streaming thinking tokens (extended thinking / chain-of-thought)
-                yield ThinkingStep(
-                    step_number=step_num,
-                    thinking=state.thinking_text,
-                )
-                continue
-
-            state.text_deltas += 1
-            state.maybe_log_progress(step_num)
-            # Yield #4: Text delta - immediate flush after initial buffer period or when tool calls detected
-            if step := self._handle_text_delta(step_num, delta.content, delta.kind, state):
-                yield step
+                # Yield #4a: Finalize thinking before first text delta.
+                # Yield #4b: Text delta - immediate flush after initial buffer period or when tool calls detected.
+                for yielded_step in self._handle_text_delta_with_finalization(step_num, delta.content, state):
+                    yield yielded_step
+        finally:
+            if pending_next is not None and not pending_next.done():
+                pending_next.cancel()
 
     async def _stream_model_response(self, step_num: int) -> AsyncIterator[AgentStep]:
         """Stream model response, yielding partial steps as thinking streams in.
@@ -683,25 +677,35 @@ class RossumAgent:
         state = _StreamState()
         logger.info(f"Step {step_num}: streaming started (model={model_id}, messages={len(messages)})")
 
-        event_queue: queue.Queue[tuple[MessageStreamEvent | None, Message | None] | Exception | None] = queue.Queue()
+        thinking_config: ThinkingConfigAdaptiveParam = {"type": "adaptive"}
 
-        def producer() -> None:
-            try:
-                for item in self._sync_stream_events(model_id, messages, tools):
-                    event_queue.put(item)
-                event_queue.put(None)
-            except Exception as e:
-                event_queue.put(e)
+        # Cache breakpoints: system prompt
+        system: list[TextBlockParam] = [
+            {"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}
+        ]
 
-        ctx = copy_context()
-        producer_task = asyncio.get_running_loop().run_in_executor(None, partial(ctx.run, producer))
+        # Cache breakpoints: last tool definition
+        if tools:
+            tools = [*tools]  # shallow copy
+            tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}  # type: ignore[assignment]  # runtime addition of cache_control
 
-        try:
+        # Cache breakpoints: last message content block
+        add_message_cache_breakpoint(messages)  # type: ignore[arg-type]  # MessageParam is dict at runtime
+
+        async with self.client.messages.stream(
+            model=model_id,
+            max_tokens=self.config.max_output_tokens,
+            system=system,
+            messages=messages,
+            tools=tools if tools else Omit(),
+            thinking=thinking_config,
+            temperature=self.config.temperature,
+            output_config={"effort": self.config.effort},
+        ) as stream:
             # Yield #5: Forward all streaming steps from _process_stream_events (yields #1-4)
-            async for step in self._process_stream_events(step_num, event_queue, state):
+            async for step in self._process_stream_events(step_num, stream, state):  # type: ignore[arg-type]  # AsyncMessageStream implements AsyncIterator protocol
                 yield step
-        finally:
-            await producer_task
+            state.final_message = await stream.get_final_message()
 
         if state.final_message is None:
             raise RuntimeError("Stream ended without final message")
@@ -721,6 +725,24 @@ class RossumAgent:
             f"total_input={self.tokens.total_input}, total_output={self.tokens.total_output}"
         )
 
+        # Yield #6: Finalize thinking if not already done (e.g. thinking → tool_use with no text)
+        if finalized := state.finalize_thinking(step_num):
+            yield finalized
+
+        # Yield #7: Finalized text event that corrects misclassification.
+        # During streaming, text may have been classified as final_answer before tool_use
+        # blocks arrived. Now that tool_calls is fully populated, emit the authoritative
+        # intermediate classification. Only needed when tool calls exist — otherwise
+        # FinalAnswerStep (yield #8) already serves as the finalization event.
+        if state.response_text and state.tool_calls:
+            yield TextDeltaStep(
+                step_number=step_num,
+                step_type=StepType.INTERMEDIATE,
+                text_delta="",
+                accumulated_text=state.response_text,
+                is_streaming=False,
+            )
+
         if not state.tool_calls:
             memory_step = MemoryStep(
                 step_number=step_num,
@@ -729,7 +751,7 @@ class RossumAgent:
                 output_tokens=output_tokens,
             )
             self.memory.add_step(memory_step)
-            # Yield #6: Final answer step (no tool calls, response complete)
+            # Yield #8: Final answer step (no tool calls, response complete)
             yield FinalAnswerStep(
                 step_number=step_num,
                 final_answer=state.response_text or "",
@@ -738,7 +760,7 @@ class RossumAgent:
             )
             return
 
-        # Yield #7: Forward tool execution progress steps from _execute_tools_with_progress
+        # Yield #9: Forward tool execution progress steps from _execute_tools_with_progress
         async for step_or_result in self._execute_tools_with_progress(
             step_num,
             response_text=state.response_text,
@@ -851,6 +873,128 @@ class RossumAgent:
             except queue.Empty:
                 break
 
+    @staticmethod
+    def _is_write_tool(name: str) -> bool:
+        """Check if a tool is a write operation (MCP or internal)."""
+        return name in INTERNAL_WRITE_TOOL_NAMES or is_mcp_write_tool(name)
+
+    async def _check_cautious_write_gate(self, tool_call: ToolCall, agent_ctx: AgentContext) -> ToolResult | None:
+        """Gate write tools behind user confirmation for cautious persona.
+
+        For update/patch operations, fetches the existing object and shows a
+        field-level diff instead of raw arguments.
+
+        Returns a ToolResult (blocking the tool) if confirmation is needed,
+        or None if the tool should proceed.
+        """
+        if agent_ctx.persona != "cautious":
+            return None
+        if not self._is_write_tool(tool_call.name):
+            return None
+        if tool_call.name in agent_ctx.cautious_preapproved_writes:
+            agent_ctx.cautious_preapproved_writes.discard(tool_call.name)
+            logger.info(f"Cautious persona: allowing pre-approved write tool {tool_call.name}")
+            return None
+
+        # Block the tool and ask the user for confirmation
+        agent_ctx.cautious_blocked_writes.add(tool_call.name)
+
+        change_preview = await self._build_change_preview(tool_call)
+        agent_ctx.report_question(
+            AgentQuestion(
+                questions=[
+                    AgentQuestionItem(
+                        question=(
+                            f"The agent wants to execute write operation **{tool_call.name}**\n\n"
+                            f"{change_preview}\n\n"
+                            "Do you want to proceed?"
+                        ),
+                        options=[
+                            QuestionOption(value="yes", label=CAUTIOUS_APPROVAL_LABEL),
+                            QuestionOption(value="no", label="No, cancel"),
+                            QuestionOption(value="chat", label="Let me provide context"),
+                        ],
+                    )
+                ]
+            )
+        )
+
+        logger.info(f"Cautious persona: blocked write tool {tool_call.name}, asking user for confirmation")
+        return ToolResult(
+            tool_call_id=tool_call.id,
+            name=tool_call.name,
+            content=(
+                f"Write operation `{tool_call.name}` {CAUTIOUS_CONFIRMATION_MARKER} (cautious persona). "
+                "Waiting for user response. STOP — do not call other tools or produce text in the same turn."
+            ),
+            is_error=True,
+        )
+
+    async def _build_change_preview(self, tool_call: ToolCall) -> str:
+        """Build a human-readable change preview for a write tool call.
+
+        For MCP update/patch operations, fetches the existing entity and shows
+        a field-level diff. Falls back to raw arguments for other operations.
+        """
+        args = tool_call.arguments
+        entity_type = extract_entity_type(tool_call.name)
+        entity_id = extract_entity_id(entity_type or "", args) if entity_type else None
+        operation = classify_operation(tool_call.name)
+
+        # Only fetch existing object for update operations on identifiable entities
+        if operation == "update" and entity_type and entity_id and self.mcp_connection:
+            existing = await self.mcp_connection.fetch_snapshot(entity_type, entity_id)
+            if existing is not None:
+                # Populate read cache so _get_before_snapshot doesn't re-fetch on approval
+                self.mcp_connection._cache_set(entity_type, entity_id, existing)
+                return self._format_field_diff(existing, args, entity_type, entity_id)
+
+        # Fallback: raw arguments
+        args_json = json.dumps(args, indent=2, ensure_ascii=False)
+        return f"**Arguments:**\n```json\n{args_json}\n```"
+
+    @staticmethod
+    def _extract_update_fields(arguments: dict, entity_type: str) -> dict:
+        """Extract the fields being changed from tool arguments.
+
+        Handles both flat args (update_hook: hook_id, name, active, ...) and
+        nested data objects (update_queue: queue_id, queue_data={...}).
+        """
+        id_key = f"{entity_type}_id"
+        update_fields: dict = {}
+
+        for key, value in arguments.items():
+            if key in (id_key, "id"):
+                continue
+            if value is None:
+                continue
+            # Nested data object (e.g. queue_data, engine_data) — flatten it
+            if isinstance(value, dict) and key.endswith("_data"):
+                update_fields.update(value)
+            else:
+                update_fields[key] = value
+
+        return update_fields
+
+    @staticmethod
+    def _format_field_diff(existing: dict, arguments: dict, entity_type: str, entity_id: str) -> str:
+        """Format a unified diff between existing object and proposed changes."""
+        update_fields = RossumAgent._extract_update_fields(arguments, entity_type)
+
+        if not update_fields:
+            args_json = json.dumps(arguments, indent=2, ensure_ascii=False)
+            return f"**Arguments:**\n```json\n{args_json}\n```"
+
+        after = {**existing, **update_fields}
+        diff_text = compute_json_diff(
+            existing, after, fromfile="current", tofile="proposed", ensure_ascii=False, context_lines=2
+        )
+
+        if not diff_text:
+            return f"**No effective changes to {entity_type} {entity_id}**"
+
+        return f"**Changes to {entity_type} {entity_id}:**\n```diff\n{diff_text}```"
+
     async def _execute_tool_with_progress(
         self, tool_call: ToolCall, step_num: int, tool_calls: list[ToolCall], tool_progress: tuple[int, int]
     ) -> AsyncIterator[ToolStartStep | ToolResult]:
@@ -859,6 +1003,13 @@ class RossumAgent:
         For tools with sub-agents, this yields ToolStartStep updates
         with sub_agent_progress. Always yields the final ToolResult.
         """
+        # Cautious persona: gate write operations behind user confirmation
+        agent_ctx = get_context()
+        blocked_result = await self._check_cautious_write_gate(tool_call, agent_ctx)
+        if blocked_result is not None:
+            yield blocked_result
+            return
+
         progress_queue: queue.Queue[SubAgentProgress] = queue.Queue()
         token_queue: queue.Queue[SubAgentTokenUsage] = queue.Queue()
 
@@ -939,16 +1090,6 @@ class RossumAgent:
                     text_parts.append(text)
         return " ".join(text_parts)
 
-    def _inject_preload_info(self, prompt: UserContent, preload_result: str) -> UserContent:
-        """Inject preload result info into the user prompt."""
-        suffix = (
-            f"\n\n[System: {preload_result}. Use these tools directly without calling list_tool_categories first.]"
-        )
-        if isinstance(prompt, str):
-            return prompt + suffix
-        system_block: TextBlockParam = {"type": "text", "text": suffix}
-        return [*prompt, system_block]
-
     def _calculate_rate_limit_delay(self, retries: int) -> float:
         """Calculate exponential backoff delay with jitter for rate limiting."""
         delay = min(RATE_LIMIT_BASE_DELAY * (2 ** (retries - 1)), RATE_LIMIT_MAX_DELAY)
@@ -977,11 +1118,7 @@ class RossumAgent:
             None, partial(ctx.run, preload_categories_for_request, request_text)
         )
 
-        # Inject pre-load info into the task so agent knows what tools are available
-        if preload_result:
-            prompt = self._inject_preload_info(prompt, preload_result)
-
-        self.memory.add_task(prompt)
+        self.memory.add_task(prompt, preload_info=preload_result)
 
         for step_num in range(1, self.config.max_steps + 1):
             rate_limit_retries = 0
@@ -1060,7 +1197,7 @@ async def create_agent(
     This is a convenience factory function that creates the Bedrock client
     and initializes the agent with the provided configuration.
     """
-    client = create_bedrock_client()
+    client = create_async_bedrock_client()
     return RossumAgent(
         client=client,
         mcp_connection=mcp_connection,

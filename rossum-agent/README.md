@@ -61,7 +61,7 @@ uv sync
 **With extras:**
 ```bash
 uv sync --extra all        # All extras (api, docs, tests)
-uv sync --extra api        # REST API (FastAPI, Redis)
+uv sync --extra api        # REST API (FastAPI, PostgreSQL, Redis)
 ```
 
 ## Environment Variables
@@ -74,8 +74,14 @@ uv sync --extra api        # REST API (FastAPI, Redis)
 | `AWS_REGION` | No | AWS region for Bedrock (default: `us-east-1`) |
 | `AWS_BEDROCK_MODEL_ARN` | No | Custom ARN for the Opus model in Bedrock |
 | `AWS_BEDROCK_MODEL_ARN_SMALL` | No | Custom ARN for the Haiku model in Bedrock |
-| `REDIS_HOST` | No | Redis host for chat persistence |
-| `REDIS_PORT` | No | Redis port (default: `6379`) |
+| `CHAT_STORAGE_BACKEND` | No | Chat persistence backend: `postgres` (default) or `redis` |
+| `POSTGRES_HOST` | No | PostgreSQL host (default: `localhost`) |
+| `POSTGRES_PORT` | No | PostgreSQL port (default: `5432`) |
+| `POSTGRES_DB` | No | PostgreSQL database name (default: `rossum_agent`) |
+| `POSTGRES_USER` | No | PostgreSQL user (default: `rossum`) |
+| `POSTGRES_PASSWORD` | No | PostgreSQL password (default: `rossum`) |
+| `REDIS_HOST` | No | Redis host for change tracking (default: `localhost`) |
+| `REDIS_PORT` | No | Redis port for change tracking (default: `6379`) |
 | `ROSSUM_MCP_MODE` | No | MCP mode: `read-only` (default) or `read-write` |
 | `ROSSUM_AGENT_PERSONA` | No | Agent persona: `default` (default) or `cautious` — read by the TUI client, not the server |
 | `ROSSUM_KB_DATA_PATH` | No | Path to local knowledge base JSON file |
@@ -267,6 +273,7 @@ MIT License - see [LICENSE](../LICENSE) for details.
 ## Resources
 
 - [Full Documentation](https://stancld.github.io/rossum-agents/)
+- [API Reference](https://stancld.github.io/rossum-agents/api-reference/)
 - [MCP Server README](../rossum-mcp/README.md)
 - [Rossum API Documentation](https://rossum.app/api/docs/)
 - [Main Repository](https://github.com/stancld/rossum-agents)

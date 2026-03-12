@@ -21,12 +21,14 @@ export interface StreamOptions {
 function buildRequestBody(
   opts: Pick<StreamOptions, "message" | "images" | "documents"> & {
     persona: string;
+    contextUrl?: string;
   },
 ): string {
   const body: Record<string, unknown> = {
     content: opts.message,
     persona: opts.persona,
   };
+  if (opts.contextUrl) body.rossum_url = opts.contextUrl;
   if (opts.images && opts.images.length > 0) body.images = opts.images;
   if (opts.documents && opts.documents.length > 0)
     body.documents = opts.documents;
@@ -75,7 +77,11 @@ export async function streamMessage(opts: StreamOptions): Promise<void> {
     res = await fetch(`${config.apiUrl}/api/v1/chats/${chatId}/messages`, {
       method: "POST",
       headers: buildHeaders(config),
-      body: buildRequestBody({ ...opts, persona: config.persona }),
+      body: buildRequestBody({
+        ...opts,
+        persona: config.persona,
+        contextUrl: config.contextUrl,
+      }),
       signal,
     });
   } catch (err) {

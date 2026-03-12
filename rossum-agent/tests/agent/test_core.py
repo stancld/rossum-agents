@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -700,13 +701,32 @@ class TestStreamModelResponse:
         )
 
     def _create_mock_stream(self, events: list, final_message: Message):
-        """Create a mock stream context manager that yields events."""
-        mock_stream = MagicMock()
-        mock_stream.__enter__ = MagicMock(return_value=mock_stream)
-        mock_stream.__exit__ = MagicMock(return_value=False)
-        mock_stream.__iter__ = MagicMock(return_value=iter(events))
-        mock_stream.get_final_message.return_value = final_message
-        return mock_stream
+        """Create a mock async stream context manager that yields events."""
+
+        class _AsyncStream:
+            def __init__(self):
+                self._iter = iter(events)
+                self._final_message = final_message
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                pass
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                try:
+                    return next(self._iter)
+                except StopIteration:
+                    raise StopAsyncIteration from None
+
+            async def get_final_message(self):
+                return self._final_message
+
+        return _AsyncStream()
 
     def _create_final_message(self, input_tokens: int = 100, output_tokens: int = 50) -> Message:
         """Create a mock final message with usage stats."""
@@ -923,20 +943,17 @@ class TestStreamModelResponse:
         assert "Let me analyze this..." in thinking_steps[-1].thinking
 
     @pytest.mark.asyncio
-    async def test_producer_exception_propagates(self):
-        """Exceptions raised during streaming propagate to the caller.
-
-        The producer thread catches exceptions and puts them on the queue so
-        _process_stream_events re-raises them instead of silently swallowing them.
-        """
+    async def test_stream_exception_propagates(self):
+        """Exceptions raised during async streaming propagate to the caller."""
         agent = self._create_agent()
         agent.memory.add_task("Test")
 
         error = ValueError("Stream failed mid-response")
         mock_stream = MagicMock()
-        mock_stream.__enter__ = MagicMock(return_value=mock_stream)
-        mock_stream.__exit__ = MagicMock(return_value=False)
-        mock_stream.__iter__ = MagicMock(side_effect=error)
+        mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+        mock_stream.__aexit__ = AsyncMock(return_value=False)
+        mock_stream.__aiter__ = MagicMock(return_value=mock_stream)
+        mock_stream.__anext__ = AsyncMock(side_effect=error)
 
         with (
             patch.object(agent.client.messages, "stream", return_value=mock_stream),
@@ -946,13 +963,13 @@ class TestStreamModelResponse:
                 pass
 
     @pytest.mark.asyncio
-    async def test_thinking_delta_starts_buffer_timer(self):
-        """Thinking deltas start the initial buffer timer before yielding.
+    async def test_thinking_delta_does_not_start_buffer_timer(self):
+        """Thinking deltas must NOT start the initial text buffer timer.
 
-        When thinking tokens arrive before text, first_text_token_time is set
-        at the thinking token, so subsequent text tokens measure elapsed time
-        from the thinking arrival. Text arriving after INITIAL_TEXT_BUFFER_DELAY
-        since the first thinking token is streamed immediately.
+        first_text_token_time is only set by actual text deltas.  If thinking
+        tokens started the timer, text arriving after a long thinking phase
+        would bypass the initial buffer and be prematurely classified as
+        final_answer before tool_use blocks have a chance to arrive.
         """
         from anthropic.types import ThinkingBlock, ThinkingDelta
 
@@ -978,14 +995,16 @@ class TestStreamModelResponse:
             [thinking_start, thinking_delta, thinking_stop, text_delta], final_message
         )
 
-        # Simulate: thinking token arrives at T=0, text token arrives at T=2.0
-        # (past INITIAL_TEXT_BUFFER_DELAY=1.5), so text should be flushed immediately.
+        # Simulate: thinking token at T=0, text token at T=2.0 (well past
+        # INITIAL_TEXT_BUFFER_DELAY=1.5s).  Because thinking does NOT set the
+        # timer, the buffer delay starts at T=2.0 (when text arrives) and
+        # the text stays buffered until the stream ends.
         # Calls: _StreamState init (stream_start_time, last_progress_log_time),
-        # thinking delta (first_text_token_time, maybe_log_progress),
-        # text delta (maybe_log_progress, _handle_text_delta elapsed check),
+        # thinking delta (maybe_log_progress),
+        # text delta (first_text_token_time, maybe_log_progress),
         # stream_elapsed after streaming completes.
         t0 = 1000.0
-        time_calls = iter([t0, t0, t0, t0, t0 + 2.0, t0 + 2.0, t0 + 2.0])
+        time_calls = iter([t0, t0, t0, t0 + 2.0, t0 + 2.0, t0 + 2.0])
 
         with (
             patch.object(agent.client.messages, "stream", return_value=mock_stream),
@@ -996,10 +1015,15 @@ class TestStreamModelResponse:
             async for step in agent._stream_model_response(1):
                 steps.append(step)
 
-        # Text after elapsed thinking time should be streamed as intermediate step
-        streaming_intermediate = [s for s in steps if isinstance(s, TextDeltaStep) and s.is_streaming]
-        assert len(streaming_intermediate) >= 1
-        assert any("Here is the answer." in s.text_delta for s in streaming_intermediate)
+        # Text should be buffered until stream ends (not flushed prematurely).
+        # The finalized thinking step should also appear.
+        thinking_steps = [s for s in steps if isinstance(s, ThinkingStep)]
+        finalized_thinking = [s for s in thinking_steps if not s.is_streaming]
+        assert len(finalized_thinking) == 1
+
+        text_steps = [s for s in steps if isinstance(s, TextDeltaStep)]
+        assert len(text_steps) >= 1
+        assert any("Here is the answer." in s.text_delta for s in text_steps)
 
 
 class TestAgentRun:
@@ -1378,6 +1402,293 @@ class TestExecuteTool:
         assert "workspace" in result.content.lower()
 
 
+class TestCautiousWriteGate:
+    """Test the cautious persona write confirmation gate."""
+
+    def _create_agent(self) -> RossumAgent:
+        """Helper to create an agent with mocked dependencies."""
+        mock_client = MagicMock()
+        mock_mcp_connection = AsyncMock()
+        mock_mcp_connection.get_tools.return_value = []
+        config = AgentConfig()
+        return RossumAgent(
+            client=mock_client,
+            mcp_connection=mock_mcp_connection,
+            system_prompt="Test prompt",
+            config=config,
+        )
+
+    async def _get_final_result(self, agent: RossumAgent, tool_call: ToolCall) -> ToolResult:
+        """Helper to get the final ToolResult from _execute_tool_with_progress."""
+        result = None
+        async for item in agent._execute_tool_with_progress(tool_call, 1, [tool_call], (1, 1)):
+            if isinstance(item, ToolResult):
+                result = item
+        assert result is not None
+        return result
+
+    @pytest.mark.asyncio
+    async def test_blocks_mcp_write_tool_in_cautious_mode(self):
+        """Write MCP tools are blocked and an AgentQuestion is emitted."""
+        agent = self._create_agent()
+        agent.mcp_connection.fetch_snapshot = AsyncMock(return_value=None)
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={"queue_id": 123})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                result = await self._get_final_result(agent, tool_call)
+
+            assert result.is_error is True
+            assert "requires user confirmation" in result.content
+            assert "update_queue" in ctx.cautious_blocked_writes
+            assert len(question_received) == 1
+            assert "update_queue" in question_received[0].questions[0].question
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_blocks_internal_write_tool_in_cautious_mode(self):
+        """Internal write tools (revert_commit, etc.) are blocked in cautious mode."""
+        agent = self._create_agent()
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="revert_commit", arguments={"commit_hash": "abc123"})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=False):
+                result = await self._get_final_result(agent, tool_call)
+
+            assert result.is_error is True
+            assert "requires user confirmation" in result.content
+            assert "revert_commit" in ctx.cautious_blocked_writes
+            assert len(question_received) == 1
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_allows_preapproved_write_tool(self):
+        """Pre-approved write tools execute without blocking."""
+        agent = self._create_agent()
+        agent.mcp_connection.call_tool.return_value = {"status": "ok"}
+
+        ctx = AgentContext(
+            persona="cautious",
+            cautious_preapproved_writes={"update_queue"},
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={"queue_id": 123})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                result = await self._get_final_result(agent, tool_call)
+
+            assert result.is_error is False
+            assert "update_queue" not in ctx.cautious_preapproved_writes
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_does_not_block_in_default_persona(self):
+        """Write tools are not blocked when persona is default."""
+        agent = self._create_agent()
+        agent.mcp_connection.call_tool.return_value = {"status": "ok"}
+
+        ctx = AgentContext(persona="default")
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={"queue_id": 123})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                result = await self._get_final_result(agent, tool_call)
+
+            assert result.is_error is False
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_does_not_block_read_tools_in_cautious_mode(self):
+        """Read tools are not blocked even in cautious mode."""
+        agent = self._create_agent()
+        agent.mcp_connection.call_tool.return_value = {"queues": []}
+
+        ctx = AgentContext(persona="cautious")
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="list_queues", arguments={})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=False):
+                result = await self._get_final_result(agent, tool_call)
+
+            assert result.is_error is False
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_question_shows_diff_for_update_tool(self):
+        """Update tools show a field-level diff when existing object is found."""
+        agent = self._create_agent()
+        agent.mcp_connection.fetch_snapshot = AsyncMock(
+            return_value={"name": "Old Name", "locale": "en_US", "rir_url": "https://example.com"}
+        )
+        agent.mcp_connection._cache_set = MagicMock()
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={"queue_id": 456, "name": "New Name"})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                await self._get_final_result(agent, tool_call)
+
+            question_text = question_received[0].questions[0].question
+            # Should show unified diff with -/+ lines
+            assert "Changes to queue 456" in question_text
+            assert "```diff" in question_text
+            assert '-  "name": "Old Name"' in question_text
+            assert '+  "name": "New Name"' in question_text
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_question_falls_back_to_args_when_no_snapshot(self):
+        """Falls back to raw arguments when snapshot fetch returns None."""
+        agent = self._create_agent()
+        agent.mcp_connection.fetch_snapshot = AsyncMock(return_value=None)
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={"queue_id": 456, "name": "New Name"})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                await self._get_final_result(agent, tool_call)
+
+            question_text = question_received[0].questions[0].question
+            assert "Arguments" in question_text
+            assert "New Name" in question_text
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_question_shows_args_for_create_tool(self):
+        """Create tools show raw arguments (no existing object to diff against)."""
+        agent = self._create_agent()
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(
+                id="tc_1", name="create_hook", arguments={"name": "My Hook", "config": {"url": "https://x.com"}}
+            )
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                await self._get_final_result(agent, tool_call)
+
+            question_text = question_received[0].questions[0].question
+            assert "Arguments" in question_text
+            assert "My Hook" in question_text
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_question_shows_diff_with_nested_data(self):
+        """Update tools with nested *_data objects are flattened for diff."""
+        agent = self._create_agent()
+        agent.mcp_connection.fetch_snapshot = AsyncMock(return_value={"name": "Old", "locale": "en_US"})
+        agent.mcp_connection._cache_set = MagicMock()
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(
+                id="tc_1",
+                name="update_queue",
+                arguments={"queue_id": 1, "queue_data": {"name": "New", "locale": "cs_CZ"}},
+            )
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                await self._get_final_result(agent, tool_call)
+
+            question_text = question_received[0].questions[0].question
+            assert "Changes to queue 1" in question_text
+            assert "```diff" in question_text
+            assert '-  "name": "Old"' in question_text
+            assert '+  "name": "New"' in question_text
+            assert '-  "locale": "en_US"' in question_text
+            assert '+  "locale": "cs_CZ"' in question_text
+        finally:
+            reset_context(token)
+
+    @pytest.mark.asyncio
+    async def test_question_has_yes_no_chat_options(self):
+        """The confirmation question offers yes/no/chat options."""
+        agent = self._create_agent()
+        agent.mcp_connection.fetch_snapshot = AsyncMock(return_value=None)
+        question_received = []
+
+        ctx = AgentContext(
+            persona="cautious",
+            question_callback=lambda q: question_received.append(q),
+        )
+        token = set_context(ctx)
+        try:
+            tool_call = ToolCall(id="tc_1", name="update_queue", arguments={})
+
+            with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+                await self._get_final_result(agent, tool_call)
+
+            options = question_received[0].questions[0].options
+            option_values = {o.value for o in options}
+            assert option_values == {"yes", "no", "chat"}
+        finally:
+            reset_context(token)
+
+    def test_is_write_tool_internal(self):
+        """_is_write_tool recognizes internal write tools."""
+        agent = self._create_agent()
+        with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=False):
+            assert agent._is_write_tool("revert_commit") is True
+            assert agent._is_write_tool("restore_entity_version") is True
+            assert agent._is_write_tool("patch_schema_with_subagent") is True
+            assert agent._is_write_tool("search_knowledge_base") is False
+
+    def test_is_write_tool_mcp(self):
+        """_is_write_tool delegates to is_mcp_write_tool for non-internal tools."""
+        agent = self._create_agent()
+        with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=True):
+            assert agent._is_write_tool("update_queue") is True
+        with patch("rossum_agent.agent.core.is_mcp_write_tool", return_value=False):
+            assert agent._is_write_tool("list_queues") is False
+
+
 class TestExecuteToolsInParallel:
     """Test RossumAgent._execute_tools_with_progress parallel execution."""
 
@@ -1661,8 +1972,8 @@ class TestSerializeToolResult:
         data = TestData(name="test", value=42)
         result = agent._serialize_tool_result(data)
 
-        assert '"name": "test"' in result
-        assert '"value": 42' in result
+        parsed = json.loads(result)
+        assert parsed == {"name": "test", "value": 42}
 
     def test_serialize_list_of_dataclasses(self):
         """Test that list of dataclasses is serialized to JSON."""
@@ -1676,8 +1987,8 @@ class TestSerializeToolResult:
         items = [Item(id=1), Item(id=2)]
         result = agent._serialize_tool_result(items)
 
-        assert '"id": 1' in result
-        assert '"id": 2' in result
+        parsed = json.loads(result)
+        assert parsed == [{"id": 1}, {"id": 2}]
 
     def test_serialize_pydantic_model(self):
         """Test that pydantic model is serialized to JSON."""
@@ -1690,7 +2001,8 @@ class TestSerializeToolResult:
         model = TestModel(field="value")
         result = agent._serialize_tool_result(model)
 
-        assert '"field": "value"' in result
+        parsed = json.loads(result)
+        assert parsed == {"field": "value"}
 
     def test_serialize_list_of_pydantic_models(self):
         """Test that list of pydantic models is serialized to JSON."""
@@ -1703,23 +2015,24 @@ class TestSerializeToolResult:
         models = [TestModel(id=1), TestModel(id=2)]
         result = agent._serialize_tool_result(models)
 
-        assert '"id": 1' in result
-        assert '"id": 2' in result
+        parsed = json.loads(result)
+        assert parsed == [{"id": 1}, {"id": 2}]
 
     def test_serialize_dict(self):
         """Test that dict is serialized to JSON."""
         agent = self._create_agent()
         result = agent._serialize_tool_result({"key": "value"})
 
-        assert '"key": "value"' in result
+        parsed = json.loads(result)
+        assert parsed == {"key": "value"}
 
     def test_serialize_list(self):
         """Test that list is serialized to JSON."""
         agent = self._create_agent()
         result = agent._serialize_tool_result([1, 2, 3])
 
-        assert "[" in result
-        assert "1" in result
+        parsed = json.loads(result)
+        assert parsed == [1, 2, 3]
 
     def test_serialize_string(self):
         """Test that string is returned as-is."""
@@ -1974,7 +2287,7 @@ class TestCreateAgentFactory:
 
         mock_mcp = AsyncMock()
 
-        with patch("rossum_agent.agent.core.create_bedrock_client") as mock_create_client:
+        with patch("rossum_agent.agent.core.create_async_bedrock_client") as mock_create_client:
             mock_create_client.return_value = MagicMock()
 
             agent = await create_agent(
@@ -1993,7 +2306,7 @@ class TestCreateAgentFactory:
         mock_mcp = AsyncMock()
         config = AgentConfig(max_steps=10)
 
-        with patch("rossum_agent.agent.core.create_bedrock_client") as mock_create_client:
+        with patch("rossum_agent.agent.core.create_async_bedrock_client") as mock_create_client:
             mock_create_client.return_value = MagicMock()
 
             agent = await create_agent(
@@ -2243,20 +2556,6 @@ class TestStreamState:
 
         assert state.get_step_type() == StepType.FINAL_ANSWER
 
-    def test_contains_thinking_returns_true_when_has_thinking(self):
-        """Test contains_thinking returns True when thinking_text is non-empty."""
-        state = _StreamState()
-        state.thinking_text = "Let me analyze this..."
-
-        assert state.contains_thinking is True
-
-    def test_contains_thinking_returns_false_when_empty(self):
-        """Test contains_thinking returns False when thinking_text is empty."""
-        state = _StreamState()
-        state.thinking_text = ""
-
-        assert state.contains_thinking is False
-
     def test_thinking_block_followed_by_intermediate_step(self):
         """Test that a step with thinking always has content (tool calls or text).
 
@@ -2281,7 +2580,6 @@ class TestStreamState:
         state.tool_calls = [MagicMock()]
         state.pending_tools = {}
 
-        assert state.contains_thinking is True
         assert state.get_step_type() == StepType.INTERMEDIATE
 
     def test_get_step_type_with_text_and_tool_calls_returns_intermediate(self):
@@ -2303,6 +2601,38 @@ class TestStreamState:
         assert result is not None
         assert result.step_type == StepType.INTERMEDIATE
         assert result.text_delta == "Some response text"
+
+    def test_finalize_thinking_returns_step_on_first_call(self):
+        """Test that finalize_thinking returns a ThinkingStep on first call."""
+        state = _StreamState()
+        state.thinking_text = "Let me think about this..."
+
+        result = state.finalize_thinking(step_num=1)
+
+        assert result is not None
+        assert result.step_number == 1
+        assert result.thinking == "Let me think about this..."
+        assert result.is_streaming is False
+        assert state.thinking_finalized is True
+
+    def test_finalize_thinking_returns_none_on_second_call(self):
+        """Test that finalize_thinking returns None when already finalized."""
+        state = _StreamState()
+        state.thinking_text = "Let me think about this..."
+
+        state.finalize_thinking(step_num=1)
+        result = state.finalize_thinking(step_num=1)
+
+        assert result is None
+
+    def test_finalize_thinking_returns_none_when_no_thinking(self):
+        """Test that finalize_thinking returns None when no thinking text."""
+        state = _StreamState()
+
+        result = state.finalize_thinking(step_num=1)
+
+        assert result is None
+        assert state.thinking_finalized is False
 
 
 class TestPreloadInjection:
@@ -2340,14 +2670,20 @@ class TestPreloadInjection:
             async for _ in agent.run("List all queues"):
                 pass
 
-        # Verify the prompt was modified with preload info
+        # Task text stays clean; preload info stored separately
         task_step = agent.memory.steps[0]
-        assert "[System: Loaded 5 tools" in task_step.task
-        assert "Use these tools directly" in task_step.task
+        assert task_step.task == "List all queues"
+        assert task_step.preload_info == (
+            "Loaded 5 tools from ['queues']: list_queues, get_queue, create_queue, update_queue, delete_queue"
+        )
+
+        # But messages sent to API still include the system info
+        messages = task_step.to_messages()
+        assert "[System: Loaded 5 tools" in messages[0]["content"]
 
     @pytest.mark.asyncio
     async def test_preload_result_injected_into_list_prompt(self):
-        """Test that preload result is injected into list content prompt."""
+        """Test that preload result is stored separately for list content prompt."""
         agent = self._create_agent()
 
         async def mock_stream_response(step_num):
@@ -2367,10 +2703,16 @@ class TestPreloadInjection:
                 pass
 
         task_step = agent.memory.steps[0]
-        # For list prompts, should be appended as text block
+        # Task stays clean — only the original 2 blocks
         assert isinstance(task_step.task, list)
-        assert len(task_step.task) == 3  # original 2 + injected text
-        assert "[System: Loaded 3 tools" in task_step.task[2]["text"]
+        assert len(task_step.task) == 2
+        assert task_step.preload_info == "Loaded 3 tools from ['schemas']"
+
+        # Messages for API include the injected text block
+        messages = task_step.to_messages()
+        msg_content = messages[0]["content"]
+        assert len(msg_content) == 3
+        assert "[System: Loaded 3 tools" in msg_content[2]["text"]
 
     @pytest.mark.asyncio
     async def test_no_injection_when_no_preload(self):
@@ -2391,7 +2733,7 @@ class TestPreloadInjection:
 
         task_step = agent.memory.steps[0]
         assert task_step.task == "Hello world"
-        assert "[System:" not in task_step.task
+        assert task_step.preload_info is None
 
 
 class TestCalculateRateLimitDelay:

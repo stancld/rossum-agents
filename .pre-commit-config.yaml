@@ -27,6 +27,7 @@ repos:
         exclude: >
           (?x)^(
             .*\.html|
+            .*package-lock\.json|
             regression_tests/data/schema\.json|
             rossum-agent/data/rossum-kb\.json|
             rossum-agent/rossum_agent/data/rossum-kb\.json|

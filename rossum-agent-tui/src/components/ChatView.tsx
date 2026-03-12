@@ -3,7 +3,12 @@ import { Box, Text } from "ink";
 import { ChatItemDisplay } from "./ChatItemDisplay.js";
 import type { ChatItem, ExpandState } from "../types.js";
 import stripAnsi from "strip-ansi";
-import { getDisplayToolName, truncate } from "../utils/format.js";
+import {
+  getDisplayToolName,
+  thinkingPreviewLine,
+  truncate,
+} from "../utils/format.js";
+import { renderMarkdown } from "../utils/markdown.js";
 
 interface ChatViewProps {
   items: ChatItem[];
@@ -14,6 +19,7 @@ interface ChatViewProps {
   browseMode: boolean;
   autoScrollToBottom: boolean;
   scrollNudge: number;
+  intraScrollOffset: number;
 }
 
 const ROSSUM_PATTERN = "ROSSUM";
@@ -233,7 +239,10 @@ function estimateThinkingHeight(
   expanded: boolean,
   w: Widths,
 ): number {
-  return expanded ? 1 + countWrappedLines(item.content, w.indented) : 1;
+  if (expanded) {
+    return 1 + countWrappedLines(item.content, w.indented);
+  }
+  return countWrappedLines(thinkingPreviewLine(item.content), w.content);
 }
 
 function estimateIntermediateHeight(
@@ -275,10 +284,11 @@ function estimateFinalAnswerHeight(
       w.content,
     );
   }
-  return 1 + countWrappedLines(item.content, w.indented);
+  const rendered = renderMarkdown(item.content, w.content);
+  return 1 + countWrappedLines(rendered, w.indented);
 }
 
-function estimateItemHeight(
+export function estimateItemHeight(
   item: ChatItem,
   expanded: boolean,
   width: number,
@@ -322,18 +332,18 @@ function computeScrollOffset(
     height: number;
     totalHeight: number;
     autoScrollToBottom: boolean;
-    movedUp: boolean;
+    intraScrollOffset: number;
   },
 ): number {
   const { topOfSelected, bottomOfSelected, height, totalHeight } = opts;
   let next = prev;
 
-  if (opts.selectedHeight > height && opts.autoScrollToBottom) {
-    next = bottomOfSelected - height;
-  } else if (opts.selectedHeight > height && opts.movedUp) {
-    // When moving up into a tall item, align to its top
-    if (topOfSelected < next) next = topOfSelected;
-    else if (bottomOfSelected > next + height) next = bottomOfSelected - height;
+  if (opts.selectedHeight > height) {
+    if (opts.autoScrollToBottom) {
+      next = bottomOfSelected - height;
+    } else {
+      next = topOfSelected + opts.intraScrollOffset;
+    }
   } else {
     if (bottomOfSelected > next + height) next = bottomOfSelected - height;
     if (topOfSelected < next) next = topOfSelected;
@@ -351,9 +361,9 @@ export const ChatView = React.memo(function ChatView({
   browseMode,
   autoScrollToBottom,
   scrollNudge,
+  intraScrollOffset,
 }: ChatViewProps) {
   const [scrollOffset, setScrollOffset] = useState(0);
-  const prevSelectedRef = useRef(selectedIndex);
   const prevScrollNudgeRef = useRef(scrollNudge);
   const emptyStateCircle = useMemo(
     () => buildRossumCircle(width, height),
@@ -374,11 +384,9 @@ export const ChatView = React.memo(function ChatView({
   useEffect(() => {
     if (totalHeight <= height) {
       setScrollOffset(0);
-      prevSelectedRef.current = selectedIndex;
       return;
     }
 
-    const movedUp = selectedIndex < prevSelectedRef.current;
     let topOfSelected = 0;
     for (let i = 0; i < selectedIndex; i++) {
       topOfSelected += heights[i] ?? 1;
@@ -394,11 +402,17 @@ export const ChatView = React.memo(function ChatView({
         height,
         totalHeight,
         autoScrollToBottom,
-        movedUp,
+        intraScrollOffset,
       }),
     );
-    prevSelectedRef.current = selectedIndex;
-  }, [heights, totalHeight, selectedIndex, height, autoScrollToBottom]);
+  }, [
+    heights,
+    totalHeight,
+    selectedIndex,
+    height,
+    autoScrollToBottom,
+    intraScrollOffset,
+  ]);
 
   useEffect(() => {
     const delta = scrollNudge - prevScrollNudgeRef.current;
@@ -410,7 +424,7 @@ export const ChatView = React.memo(function ChatView({
     );
   }, [scrollNudge, totalHeight, height]);
 
-  const { startIdx, endIdx } = useMemo(() => {
+  const { startIdx, endIdx, topClip } = useMemo(() => {
     let cumulative = 0;
     let start = 0;
     for (let i = 0; i < items.length; i++) {
@@ -421,6 +435,8 @@ export const ChatView = React.memo(function ChatView({
       cumulative += heights[i] ?? 1;
     }
 
+    const clip = scrollOffset - cumulative;
+
     let end = start;
     let visibleUsed = cumulative - scrollOffset;
     for (let i = start; i < items.length; i++) {
@@ -429,7 +445,11 @@ export const ChatView = React.memo(function ChatView({
       if (visibleUsed >= height) break;
     }
 
-    return { startIdx: start, endIdx: Math.min(end + 1, items.length) };
+    return {
+      startIdx: start,
+      endIdx: Math.min(end + 1, items.length),
+      topClip: clip,
+    };
   }, [items.length, heights, scrollOffset, height]);
 
   return (
@@ -456,18 +476,20 @@ export const ChatView = React.memo(function ChatView({
           </Box>
         </Box>
       ) : (
-        items.slice(startIdx, endIdx).map((item, visIdx) => {
-          const i = startIdx + visIdx;
-          return (
-            <Box key={i} flexDirection="column">
-              <ChatItemDisplay
-                item={item}
-                expanded={!!expandState[i]}
-                selected={browseMode && i === selectedIndex}
-              />
-            </Box>
-          );
-        })
+        <Box flexDirection="column" marginTop={-topClip}>
+          {items.slice(startIdx, endIdx).map((item, visIdx) => {
+            const i = startIdx + visIdx;
+            return (
+              <Box key={i} flexDirection="column">
+                <ChatItemDisplay
+                  item={item}
+                  expanded={!!expandState[i]}
+                  selected={browseMode && i === selectedIndex}
+                />
+              </Box>
+            );
+          })}
+        </Box>
       )}
     </Box>
   );

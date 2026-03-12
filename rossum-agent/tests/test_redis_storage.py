@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import ClassVar  # noqa: TC003 - used in class body annotation, not just type hints
 from unittest.mock import MagicMock, patch
 
-from rossum_agent.redis_storage import ChatData, ChatMetadata, RedisStorage, extract_text_from_content
+from rossum_agent.redis_storage import RedisStorage
+from rossum_agent.storage import ChatData, ChatMetadata, extract_text_from_content
 
 
 class TestExtractTextFromContent:

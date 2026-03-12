@@ -36,6 +36,9 @@ if TYPE_CHECKING:
     from anthropic._tools import BetaTool  # ty: ignore[unresolved-import] - private API
     from anthropic.types import ToolParam
 
+# Internal tools that perform write operations against the Rossum API
+INTERNAL_WRITE_TOOL_NAMES: set[str] = {"revert_commit", "restore_entity_version", "patch_schema_with_subagent"}
+
 _ALWAYS_INTERNAL_TOOLS: list[BetaTool[..., str]] = [
     write_file,
     diff_objects,

@@ -160,6 +160,13 @@ def get_write_tools() -> set[str]:
     return tools
 
 
+def is_mcp_write_tool(name: str) -> bool:
+    """Check if a tool name is a write operation based on cached catalog."""
+    if _catalog_cache is None:
+        return False
+    return name in _catalog_cache.write_tools or name == DELETE_TOOL_NAME
+
+
 def get_cached_category_tool_names() -> dict[str, set[str]] | None:
     """Get cached category→tool mapping, or None if catalog not yet fetched."""
     return _catalog_cache.catalog if _catalog_cache is not None else None

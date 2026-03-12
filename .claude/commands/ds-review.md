@@ -86,6 +86,21 @@ Provide MR-ready summary:
 <one-line rationale>
 ```
 
+### Commit Message Suggestion
+
+When reviewing staged changes (not a specific commit), include a suggested commit message after the verdict:
+
+```
+## Suggested Commit Message
+<package>: <concise description>
+```
+
+| Rule | Detail |
+|------|--------|
+| Package prefix | `rossum-agent`, `rossum-mcp`, `rossum-deploy`, `rossum-agent-client`, `rossum-agent-tui` — omit if changes span multiple packages |
+| Subject line | Imperative mood, capitalize first word after prefix, no period, under 72 chars |
+| Body | Only when the *why* isn't obvious from the subject line |
+
 ## Constraints
 
 - Ask before running tests (use `AskUserQuestion`)

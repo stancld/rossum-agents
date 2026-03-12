@@ -7,6 +7,7 @@ import { ToolGroup } from "./ToolGroup.js";
 import { StreamingIndicator } from "./StreamingIndicator.js";
 import { renderMarkdown } from "../utils/markdown.js";
 import { truncate } from "../utils/format.js";
+import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import type { ChatItem, ConfigCommitInfo } from "../types.js";
 
 interface ChatItemDisplayProps {
@@ -40,7 +41,7 @@ function IntermediateBlock({
     return (
       <Text inverse={selected} dimColor>
         {arrow} {preview || "(empty)"}
-        {lineCount > 1 ? ` ... (${lineCount} lines)` : ""}
+        {preview && lineCount > 1 ? ` ... (${lineCount} lines)` : ""}
       </Text>
     );
   }
@@ -92,6 +93,7 @@ function FinalAnswerBlock({
   selected: boolean;
   feedback: boolean | null;
 }) {
+  const { columns } = useTerminalSize();
   const lines = content.split("\n");
   const lineCount = lines.length;
 
@@ -124,7 +126,7 @@ function FinalAnswerBlock({
         <FeedbackBadge feedback={feedback} />
       </Text>
       <Box marginLeft={2}>
-        <Text wrap="wrap">{renderMarkdown(content)}</Text>
+        <Text wrap="wrap">{renderMarkdown(content, columns)}</Text>
       </Box>
     </Box>
   );

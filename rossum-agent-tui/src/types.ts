@@ -1,3 +1,39 @@
+// API types generated from OpenAPI spec — run `npm run generate` to update
+import type { components } from "./api/generated.js";
+
+type Schemas = components["schemas"];
+
+// Re-export API types (direct matches)
+export type ChatResponse = Schemas["ChatResponse"];
+export type ChatSummary = Schemas["ChatSummary"];
+export type ChatListResponse = Schemas["ChatListResponse"];
+export type StepEvent = Schemas["StepEvent"];
+export type SubAgentProgressEvent = Schemas["SubAgentProgressEvent"];
+export type SubAgentTextEvent = Schemas["SubAgentTextEvent"];
+export type AgentQuestionEvent = Schemas["AgentQuestionEvent"];
+export type FileCreatedEvent = Schemas["FileCreatedEvent"];
+export type StreamDoneEvent = Schemas["StreamDoneEvent"];
+export type TokenUsageBySource = Schemas["TokenUsageBySource"];
+export type TokenUsageBreakdown = Schemas["TokenUsageBreakdown"];
+export type SubAgentTokenUsageDetail = Schemas["SubAgentTokenUsageDetail"];
+export type CommandInfo = Schemas["CommandInfo"];
+export type ArgumentSuggestion = Schemas["ArgumentSuggestion"];
+
+// Re-export with name aliases (Python schema names differ from TUI names)
+export type AgentQuestionItem = Schemas["AgentQuestionItemSchema"];
+export type QuestionOption = Schemas["QuestionOptionSchema"];
+
+// Derived types
+export type StepType = StepEvent["type"];
+export type SubAgentStatus = SubAgentProgressEvent["status"];
+
+// TaskSnapshotEvent: spec uses untyped dicts, TUI adds structure via TaskItem
+export type TaskSnapshotEvent = Schemas["TaskSnapshotEvent"] & {
+  tasks: TaskItem[];
+};
+
+// --- TUI-only types below (not from the API spec) ---
+
 export type JsonValue =
   | string
   | number
@@ -6,73 +42,11 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-export interface ChatResponse {
-  chat_id: string;
-  created_at: string;
-}
-
-export interface ChatSummary {
-  chat_id: string;
-  timestamp: number;
-  message_count: number;
-  first_message: string;
-  preview: string | null;
-  summary: string | null;
-}
-
-export interface ChatListResponse {
-  chats: ChatSummary[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-export type StepType =
-  | "thinking"
-  | "intermediate"
-  | "tool_start"
-  | "tool_result"
-  | "final_answer"
-  | "error";
-
-export interface StepEvent {
-  type: StepType;
-  step_number: number;
-  content: string | null;
-  tool_name: string | null;
-  tool_arguments: Record<string, JsonValue> | null;
-  tool_progress: number[] | null; // [current, total] on the wire
-  result: string | null;
-  is_error: boolean;
-  is_streaming: boolean;
-  is_final: boolean;
-  tool_call_id: string | null;
-}
-
-export type SubAgentStatus =
-  | "thinking"
-  | "searching"
-  | "analyzing"
-  | "reasoning"
-  | "running_tool"
-  | "completed"
-  | "running";
-
-export interface SubAgentProgressEvent {
-  type: "sub_agent_progress";
-  tool_name: string;
-  iteration: number;
-  max_iterations: number;
-  current_tool: string | null;
-  tool_calls: string[];
-  status: SubAgentStatus;
-}
-
-export interface SubAgentTextEvent {
-  type: "sub_agent_text";
-  tool_name: string;
-  text: string;
-  is_final: boolean;
+export interface TaskItem {
+  id: string;
+  subject: string;
+  status: "pending" | "in_progress" | "completed";
+  [key: string]: JsonValue;
 }
 
 export interface SubAgentTextState {
@@ -81,75 +55,10 @@ export interface SubAgentTextState {
   is_final: boolean;
 }
 
-export interface TaskItem {
-  id: string;
-  subject: string;
-  status: "pending" | "in_progress" | "completed";
-  [key: string]: JsonValue;
-}
-
-export interface TaskSnapshotEvent {
-  type: "task_snapshot";
-  tasks: TaskItem[];
-}
-
-export interface QuestionOption {
-  value: string;
-  label: string;
-  description: string;
-}
-
-export interface AgentQuestionItem {
-  question: string;
-  options: QuestionOption[];
-  multi_select: boolean;
-}
-
-export interface AgentQuestionEvent {
-  type: "agent_question";
-  questions: AgentQuestionItem[];
-}
-
-export interface TokenUsageBySource {
-  input_tokens: number;
-  output_tokens: number;
-  total_tokens: number;
-}
-
-export interface SubAgentTokenUsageDetail {
-  input_tokens: number;
-  output_tokens: number;
-  total_tokens: number;
-  by_tool: Record<string, TokenUsageBySource>;
-}
-
-export interface TokenUsageBreakdown {
-  total: TokenUsageBySource;
-  main_agent: TokenUsageBySource;
-  sub_agents: SubAgentTokenUsageDetail;
-}
-
-export interface StreamDoneEvent {
-  type: "done";
-  total_steps: number;
-  input_tokens: number;
-  output_tokens: number;
-  token_usage_breakdown: TokenUsageBreakdown | null;
-  config_commit_hash: string | null;
-  config_commit_message: string | null;
-  config_changes_count: number;
-}
-
 export interface ConfigCommitInfo {
   hash: string;
   message: string;
   changesCount: number;
-}
-
-export interface FileCreatedEvent {
-  type: "file_created";
-  filename: string;
-  url: string;
 }
 
 export type SSEEvent =
@@ -159,8 +68,7 @@ export type SSEEvent =
   | { event: "task_snapshot"; data: TaskSnapshotEvent }
   | { event: "agent_question"; data: AgentQuestionEvent }
   | { event: "done"; data: StreamDoneEvent }
-  | { event: "file_created"; data: FileCreatedEvent }
-  | { event: "error"; data: { message: string } };
+  | { event: "file_created"; data: FileCreatedEvent };
 
 export type McpMode = "read-only" | "read-write";
 export type Persona = "default" | "cautious";
@@ -171,17 +79,7 @@ export interface Config {
   rossumUrl: string;
   mcpMode: McpMode;
   persona: Persona;
-}
-
-export interface ArgumentSuggestion {
-  value: string;
-  description: string;
-}
-
-export interface CommandInfo {
-  name: string;
-  description: string;
-  argument_suggestions?: ArgumentSuggestion[];
+  contextUrl?: string;
 }
 
 export type InteractionMode = "input" | "browse";
@@ -252,11 +150,12 @@ export interface CompletedStep {
   type: StepType;
   content: string | null;
   toolName: string | null;
-  toolArguments: Record<string, JsonValue> | null;
-  toolProgress: number[] | null;
+  toolArguments: Record<string, unknown> | null;
+  toolProgress: [number, number] | null;
   result: string | null;
   isError: boolean;
   toolCallId: string | null;
+  isHookOutput: boolean;
 }
 
 export interface ChatState {

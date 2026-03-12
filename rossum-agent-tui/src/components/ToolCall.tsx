@@ -1,11 +1,11 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { getDisplayToolName, truncate } from "../utils/format.js";
-import type { CompletedStep, JsonValue } from "../types.js";
+import type { CompletedStep } from "../types.js";
 
 const RESULT_PREVIEW_LEN = 100;
 
-function formatArgsSummary(args: Record<string, JsonValue> | null): string {
+function formatArgsSummary(args: Record<string, unknown> | null): string {
   if (!args) return "";
   const entries = Object.entries(args)
     .filter(([k]) => k !== "connection_id" && k !== "tool_name")
@@ -64,7 +64,7 @@ function ToolCallExpanded({
   result,
   isError,
 }: ToolCallSharedProps & {
-  args: Record<string, JsonValue> | null;
+  args: Record<string, unknown> | null;
   result: string | null;
   isError: boolean;
 }) {
@@ -100,6 +100,25 @@ function ToolCallExpanded({
   );
 }
 
+// Matches CAUTIOUS_CONFIRMATION_MARKER from rossum_agent.tools.core
+function isPendingConfirmation(resultStep?: CompletedStep): boolean {
+  return (
+    (resultStep?.isError ?? false) &&
+    typeof resultStep?.result === "string" &&
+    resultStep.result.includes("requires user confirmation")
+  );
+}
+
+function getToolStatus(resultStep?: CompletedStep): {
+  icon: string;
+  color: string;
+} {
+  if (!resultStep) return { icon: "…", color: "yellow" };
+  if (isPendingConfirmation(resultStep)) return { icon: "⏳", color: "yellow" };
+  if (resultStep.isError) return { icon: "✗", color: "red" };
+  return { icon: "✓", color: "green" };
+}
+
 interface ToolCallProps {
   step: CompletedStep;
   resultStep?: CompletedStep;
@@ -120,10 +139,8 @@ export function ToolCall({
   const progress = step.toolProgress
     ? ` [${step.toolProgress[0]}/${step.toolProgress[1]}]`
     : "";
-  const isPending = !resultStep;
+  const { icon: statusIcon, color: statusColor } = getToolStatus(resultStep);
   const isError = resultStep?.isError ?? false;
-  const statusIcon = isPending ? "…" : isError ? "✗" : "✓";
-  const statusColor = isPending ? "yellow" : isError ? "red" : "green";
   const result = resultStep?.result ?? null;
 
   if (!expanded) {

@@ -7,6 +7,19 @@ All notable changes to this project will be documented in this file.
 ## [1.4.0] - 2026-03-09
 
 ### Added
+- Added PostgreSQL as chat persistence backend — `CHAT_STORAGE_BACKEND=postgres` (default) uses SQLAlchemy Core with `psycopg` for durable chat/file/feedback storage with configurable TTL; `redis` remains available as an alternative; added `docker-compose.yml` for local development [#248](https://github.com/rossumai/rossum-agents/pull/248)
+- Cautious persona now gates write operations (MCP + internal) behind a user confirmation prompt — blocked tools emit an `agent_question` SSE event with yes/no/chat options; only explicit approval pre-approves the tool for the next turn [#252](https://github.com/stancld/rossum-agents/pull/252)
+
+### Changed
+- Tool result serialization now uses compact JSON (`separators=(",", ":")`) instead of pretty-printed (`indent=2`) to reduce token usage in LLM context [#254](https://github.com/stancld/rossum-agents/pull/254)
+
+### Fixed
+- Preload info is now stored separately in `TaskStep` instead of being baked into the user's prompt text — keeps original task clean in DB while still injecting system hints into API messages; includes backward-compatible extraction of legacy format [#256](https://github.com/stancld/rossum-agents/pull/256)
+- SSE streaming now emits finalization events (`is_streaming: false`) for all step types — fixes step type misclassification where text streamed as `final_answer` was never corrected to `intermediate` when tool_use blocks arrived later
+
+## [1.4.0] - 2026-03-09
+
+### Added
 - Auto-spillover for large tool results — results exceeding 30k chars are automatically saved to `{output_dir}/workspace/` and replaced with a compact summary + file path; agent uses `run_jq` or `run_grep` to query full content on demand [#240](https://github.com/rossumai/rossum-agents/pull/240)
 - Per-message boolean feedback (thumbs up/down) — `PUT/GET/DELETE /api/v1/chats/{chat_id}/feedback` endpoints for rating agent responses by turn index [#222](https://github.com/rossumai/rossum-agents/pull/222)
 - Streaming progress logging — logs model/message count at stream start, periodic progress every 10s (phase, elapsed time, character throughput), and total elapsed time on completion for visibility into long Bedrock generations

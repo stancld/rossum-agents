@@ -8,6 +8,7 @@
 |------|--------|
 | Run | `pre-commit run -a` |
 | Auto-fix | `ruff check --fix` then `ruff format` on failing files |
+| TUI lint | If TUI files changed: `cd rossum-agent-tui && npm run lint && npm run format:check && npm run typecheck` |
 | Iterate | Re-run pre-commit until clean |
 
 ## Output

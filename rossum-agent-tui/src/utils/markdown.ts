@@ -1,4 +1,5 @@
-import { type MarkedExtension, type Token, marked } from "marked";
+import { renderMermaidASCII } from "beautiful-mermaid";
+import { Marked, type MarkedExtension, type Token } from "marked";
 import { markedTerminal } from "marked-terminal";
 
 interface TerminalRendererExtension extends MarkedExtension {
@@ -11,29 +12,60 @@ function hasInlineTokens(token: Token): token is Token & { tokens: Token[] } {
   return "tokens" in token && Array.isArray(token.tokens);
 }
 
-// markedTerminal() returns a MarkedExtension at runtime, but @types declares
-// TerminalRenderer. We also patch `text` rendering so inline tokens nested in
-// list-item text (e.g. markdown links) are rendered instead of printed raw.
-const terminalExtension = markedTerminal({
-  width: process.stdout.columns || 80,
-}) as TerminalRendererExtension;
-const renderText = terminalExtension.renderer?.text;
-if (renderText && terminalExtension.renderer) {
-  terminalExtension.renderer.text = function (
-    this: { parser?: { parseInline: (tokens: Token[]) => string } },
-    token: Token,
-  ): string {
-    if (hasInlineTokens(token) && this.parser) {
-      return this.parser.parseInline(token.tokens);
-    }
-    return renderText.call(this, token);
-  };
-}
-marked.use(terminalExtension as MarkedExtension);
+// Single-entry cache: terminal width rarely changes, so we only keep the last
+// instance and rebuild when the width differs.
+let cachedWidth = 0;
+let cachedMarked: Marked | null = null;
 
-export function renderMarkdown(text: string): string {
+function getMarked(width: number): Marked {
+  if (cachedMarked && cachedWidth === width) return cachedMarked;
+
+  const instance = new Marked();
+
+  // markedTerminal() returns a MarkedExtension at runtime, but @types declares
+  // TerminalRenderer. We also patch `text` rendering so inline tokens nested in
+  // list-item text (e.g. markdown links) are rendered instead of printed raw.
+  const terminalExtension = markedTerminal({
+    width,
+  }) as TerminalRendererExtension;
+  const renderText = terminalExtension.renderer?.text;
+  if (renderText && terminalExtension.renderer) {
+    terminalExtension.renderer.text = function (
+      this: { parser?: { parseInline: (tokens: Token[]) => string } },
+      token: Token,
+    ): string {
+      if (hasInlineTokens(token) && this.parser) {
+        return this.parser.parseInline(token.tokens);
+      }
+      return renderText.call(this, token);
+    };
+  }
+  instance.use(terminalExtension as MarkedExtension);
+  instance.use({
+    renderer: {
+      code({ text, lang }: { text: string; lang?: string | null }) {
+        if (lang === "mermaid") {
+          try {
+            return (
+              "\n" + renderMermaidASCII(text, { colorMode: "none" }) + "\n"
+            );
+          } catch {
+            return false as unknown as string;
+          }
+        }
+        return false as unknown as string;
+      },
+    },
+  });
+
+  cachedWidth = width;
+  cachedMarked = instance;
+  return instance;
+}
+
+export function renderMarkdown(text: string, width: number): string {
   try {
-    const result = marked.parse(text) as string;
+    const result = getMarked(width).parse(text) as string;
     return result.trimEnd();
   } catch {
     return text;

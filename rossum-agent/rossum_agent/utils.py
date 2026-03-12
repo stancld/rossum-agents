@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import difflib
+import json
 import tempfile
 import uuid
 from pathlib import Path
@@ -7,6 +9,29 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
+
+# Compact JSON separators for token-efficient serialization
+COMPACT_JSON_SEPARATORS: tuple[str, str] = (",", ":")
+
+
+def compute_json_diff(
+    before: dict | list | Any,
+    after: dict | list | Any,
+    *,
+    fromfile: str = "before",
+    tofile: str = "after",
+    sort_keys: bool = False,
+    ensure_ascii: bool = True,
+    context_lines: int = 3,
+) -> str:
+    """Compute a unified diff between two JSON-serializable dicts."""
+    before_lines = json.dumps(before, indent=2, sort_keys=sort_keys, ensure_ascii=ensure_ascii).splitlines(
+        keepends=True
+    )
+    after_lines = json.dumps(after, indent=2, sort_keys=sort_keys, ensure_ascii=ensure_ascii).splitlines(keepends=True)
+    diff = list(difflib.unified_diff(before_lines, after_lines, fromfile=fromfile, tofile=tofile, n=context_lines))
+    return "".join(diff)
+
 
 # Base directory for all session outputs
 BASE_OUTPUT_DIR = Path(tempfile.gettempdir()) / "rossum_agent_outputs"

@@ -12,7 +12,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from rossum_agent.api.dependencies import RossumCredentials, get_chat_service, get_validated_credentials
-from rossum_agent.api.models.schemas import ReportToSlackRequest, ReportToSlackResponse
+from rossum_agent.api.models.schemas import ErrorResponse, ReportToSlackRequest, ReportToSlackResponse
 from rossum_agent.api.services.chat_service import ChatService
 from rossum_agent.api.services.slack_service import SlackService, SlackServiceError
 from rossum_agent.url_context import extract_url_context
@@ -91,7 +91,16 @@ def get_slack_config() -> SlackConfig:
     return SlackConfig(bot_token=bot_token, channel=channel)
 
 
-@router.post("/{chat_id}/report-to-slack", response_model=ReportToSlackResponse)
+@router.post(
+    "/{chat_id}/report-to-slack",
+    response_model=ReportToSlackResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Chat not found"},
+        501: {"model": ErrorResponse, "description": "Slack integration not installed"},
+        502: {"model": ErrorResponse, "description": "Slack service error"},
+        503: {"model": ErrorResponse, "description": "Slack not configured"},
+    },
+)
 @limiter.limit("5/minute")
 async def report_to_slack(
     request: Request,

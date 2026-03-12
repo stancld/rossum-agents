@@ -55,6 +55,7 @@ function stepToCompleted(step: StepEvent): CompletedStep {
     result: step.result,
     isError: step.is_error,
     toolCallId: step.tool_call_id,
+    isHookOutput: step.is_hook_output,
   };
 }
 
@@ -104,9 +105,13 @@ function handleStepEvent(prev: ChatState, step: StepEvent): ChatState {
   }
 
   const prevStream = prev.currentStreaming;
-  const extraSteps: CompletedStep[] = shouldCommitPrevious(prevStream, step)
-    ? [stepToCompleted(prevStream)]
-    : [];
+  // Same step_number = finalization/correction of the streaming step (e.g. text
+  // streamed as final_answer corrected to intermediate once tool_use arrived).
+  // Don't commit the stale streaming version — only commit the authoritative finalized event.
+  const extraSteps: CompletedStep[] =
+    prevStream && prevStream.step_number !== step.step_number
+      ? [stepToCompleted(prevStream)]
+      : [];
 
   return {
     ...prev,
@@ -199,13 +204,6 @@ function reduceEvent(prev: ChatState, event: SSEEvent): ChatState {
       return {
         ...prev,
         files: [...prev.files, event.data as FileCreatedEvent],
-      };
-
-    case "error":
-      return {
-        ...prev,
-        error: (event.data as { message: string }).message,
-        connectionStatus: "error",
       };
 
     default:

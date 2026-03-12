@@ -19,9 +19,16 @@ if TYPE_CHECKING:
 
     from anthropic.types import ToolParam
 
+    from rossum_agent.api.models.schemas import Persona
     from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
     from rossum_agent.rossum_mcp_integration import MCPConnection
     from rossum_agent.tools.task_tracker import TaskTracker
+
+
+# Shared constants for cautious persona write-gate contract.
+# These strings couple core.py, agent_service.py, and the TUI — keep in sync.
+CAUTIOUS_CONFIRMATION_MARKER = "requires user confirmation"
+CAUTIOUS_APPROVAL_LABEL = "Yes, proceed"
 
 
 @dataclass
@@ -128,6 +135,11 @@ class AgentContext:
     snapshot_store: SnapshotStore | None = None
     task_tracker: TaskTracker | None = None
     dynamic_tools: DynamicToolsState = field(default_factory=DynamicToolsState)
+    # Persona
+    persona: Persona = "default"
+    # Cautious persona: write confirmation tracking
+    cautious_preapproved_writes: set[str] = field(default_factory=set)
+    cautious_blocked_writes: set[str] = field(default_factory=set)
     # Callbacks
     progress_callback: SubAgentProgressCallback | None = None
     text_callback: SubAgentTextCallback | None = None

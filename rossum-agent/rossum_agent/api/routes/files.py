@@ -15,14 +15,16 @@ from rossum_agent.api.dependencies import (
     get_file_service,
     get_validated_credentials,
 )
-from rossum_agent.api.models.schemas import FileListResponse
+from rossum_agent.api.models.schemas import ErrorResponse, FileListResponse
 from rossum_agent.api.services.chat_service import ChatService
 from rossum_agent.api.services.file_service import FileService
 
 router = APIRouter(prefix="/chats/{chat_id}/files", tags=["files"])
 
 
-@router.get("", response_model=FileListResponse)
+@router.get(
+    "", response_model=FileListResponse, responses={404: {"model": ErrorResponse, "description": "Chat not found"}}
+)
 async def list_files(
     request: Request,
     chat_id: str,
@@ -55,7 +57,13 @@ def _sanitize_filename(filename: str) -> str:
     return safe_name[:255]
 
 
-@router.get("/{filename:path}")
+@router.get(
+    "/{filename:path}",
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid filename"},
+        404: {"model": ErrorResponse, "description": "Chat or file not found"},
+    },
+)
 async def download_file(
     request: Request,
     chat_id: str,

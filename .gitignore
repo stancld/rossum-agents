@@ -23,3 +23,6 @@ sandbox-after/
 after/
 before/
 notebooks/
+
+# Generated OpenAPI spec
+rossum-agent/rossum_agent/api/openapi.json

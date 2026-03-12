@@ -98,7 +98,7 @@ function appendTrailingItems(
       items.push({
         kind: "agent_question",
         question: currentQ.question,
-        options: currentQ.options,
+        options: currentQ.options ?? [],
         multiSelect: currentQ.multi_select,
         questionIndex: qi,
         totalQuestions: state.pendingQuestion.questions.length,

@@ -53,6 +53,7 @@
 | No trailing commas | Follow ruff-format output |
 | Logging | f-strings in `logger.*()` calls are fine — prefer `logger.info(f"...")` over `%s` style |
 | Noqa comments | Always explain: `# noqa: TC003 - reason` |
+| No hardcoded `/tmp` | Use `tempfile` module or `/mock/...` paths in tests — CodeFactor runs Bandit (B108) |
 
 ## FastMCP Tools (rossum-mcp)
 
@@ -99,8 +100,41 @@ When adding/modifying tools, update:
 |-----------|-----------------|
 | MCP tools | `rossum-mcp/README.md`, `docs/source/index.rst`, `docs/source/usage.rst`, `docs/source/mcp_reference.rst` |
 | Agent tools | `rossum-agent/README.md`, `docs/source/index.rst`, `docs/source/usage.rst`, `docs/source/skills_and_subagents.rst` |
+| Agent API | Regenerate OpenAPI spec and TUI types (see [OpenAPI Spec](#openapi-spec-rossum-agent-client) section) |
 
 Include: tool name, description, parameters with types, return format with JSON examples.
+
+### OpenAPI Spec (rossum-agent-client)
+
+The OpenAPI spec is the contract for `rossum-agent-client` and `rossum-agent-tui`. Keep it in sync when changing `rossum-agent/rossum_agent/api/` (routes, models, dependencies).
+
+| Trigger | Action |
+|---------|--------|
+| New/changed endpoint | Regenerate spec |
+| New/changed Pydantic model | Regenerate spec |
+| New SSE event type | Add model to `_SSE_EVENT_MODELS` list in `api/main.py`, regenerate spec |
+| Changed SSE event fields | Regenerate spec |
+
+Regeneration pipeline:
+
+```bash
+# 1. Regenerate OpenAPI spec from Python models
+cd rossum-agent && python scripts/generate_openapi.py
+
+# 2. Regenerate TUI TypeScript types from the spec
+cd rossum-agent-tui && npm run generate
+```
+
+### rossum-agent-tui Type Generation
+
+TUI types in `src/api/generated.ts` are auto-generated from the OpenAPI spec via `openapi-typescript`. Do not edit `generated.ts` manually.
+
+| Rule | Detail |
+|------|--------|
+| Source of truth | `rossum-agent/rossum_agent/api/openapi.json` |
+| Generate command | `cd rossum-agent-tui && npm run generate` |
+| Import types | Use types from `src/api/generated.ts` instead of hand-written interfaces |
+| After API changes | Always regenerate: OpenAPI spec first, then TUI types |
 
 ## Testing
 
@@ -151,8 +185,8 @@ Backend (`messages.py`) emits these SSE event names with corresponding payloads:
 |----------|--------|
 | `is_streaming: true` | Step is still in progress; may be replaced by updated events with the same `step_number`/`type` |
 | `is_streaming: false` | Step is finalized; safe to commit to history |
-| No final event guarantee | Thinking, intermediate, and tool_start steps may **only** arrive as `is_streaming: true` — the server moves to the next step without sending a finalized (`is_streaming: false`) event for the previous one |
-| TUI implication | When `currentStreaming` changes to a different `step_number` or `type`, the previous streaming step must be committed to `completedSteps` before being replaced, otherwise it is silently lost |
+| Finalization guarantee | Every `is_streaming: true` step is eventually followed by an `is_streaming: false` event for the same `step_number`. The finalized event carries the authoritative type (e.g. text streamed as `final_answer` may be finalized as `intermediate` once tool_use blocks arrive). |
+| TUI implication | When a finalized event arrives for the same `step_number` as the current streaming step, replace (don't commit) the stale streaming version. When `step_number` differs, commit the previous streaming step before replacing. |
 
 ### Tool Use Event Flow
 
@@ -176,25 +210,16 @@ The agent signals tool usage through two paired `StepEvent` types sharing the sa
 - TUI converts to camelCase `CompletedStep` via `stepToCompleted()` in `useChat.ts` for internal state
 - `tool_progress`: Python `tuple[int, int]` serializes as JSON `[int, int]`; TS declares `number[] | null` (works but could be tightened to `[number, number] | null`)
 
-### Known Issues & Contract Mismatches
-
-#### 1. `StreamDoneEvent` missing `type` field (minor mismatch)
-Python `StreamDoneEvent` has no `type` field; TUI type declares `type: "done"`. Not a runtime bug (TUI dispatches on the SSE event name, not `data.type`), but makes TS types inaccurate.
-**Fix**: Add `type: Literal["done"] = "done"` to Python `StreamDoneEvent`, or remove `type` from TS `StreamDoneEvent`.
-
-#### 2. `sub_agent_text` events not rendered (minor)
-Backend emits `sub_agent_text` events; TUI handles them in dispatch but currently ignores them (`return prev`). Not a crash, but sub-agent text is not surfaced to the user.
-
-#### 3. TUI `SSEEvent` union includes legacy `event: "error"` variant
-TUI types still declare `{ event: "error"; data: { message: string } }` in `SSEEvent`, but the backend no longer emits `event: error` — errors are emitted as `event: step` with `StepEvent(type="error")`. The TUI type is dead code.
-
 ## Environment Variables
 
 | Variable | Purpose |
 |----------|---------|
 | `ROSSUM_API_TOKEN` | Required - API authentication |
 | `ROSSUM_API_BASE_URL` | Required - API endpoint |
-| `REDIS_HOST`, `REDIS_PORT` | Optional - Redis connection (default port: 6379) |
+| `CHAT_STORAGE_BACKEND` | Optional - `postgres` (default) or `redis` for chat persistence |
+| `POSTGRES_HOST`, `POSTGRES_PORT` | Optional - PostgreSQL connection (default: localhost:5432) |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Optional - PostgreSQL credentials (default: rossum_agent/rossum/rossum) |
+| `REDIS_HOST`, `REDIS_PORT` | Optional - Redis connection for change tracking (default: localhost:6379) |
 | `ROSSUM_MCP_MODE` | Optional - read-only or read-write |
 | `ROSSUM_MCP_LOG_LEVEL` | Optional - MCP server log level (default: INFO) |
 | `AWS_REGION` | Optional - AWS region for Bedrock (default: us-east-1) |

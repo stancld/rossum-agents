@@ -16,6 +16,7 @@ interface InputAreaProps {
   mode: InteractionMode;
   commands: CommandInfo[];
   onHeightChange?: (rows: number) => void;
+  pendingImageCount?: number;
 }
 
 function getSuggestionRows(visible: boolean, count: number): number {
@@ -33,13 +34,15 @@ function computeInputAreaHeight(
   isDisabled: boolean,
   suggestionRows: number,
   currentText: string,
+  pendingImageCount: number,
 ): number {
   if (mode === "browse") return 1;
   const inputLineCount = currentText ? currentText.split("\n").length : 1;
   const visibleInputRows = Math.min(inputLineCount, 10);
   const inputFooterRows = inputLineCount > 1 ? 1 : 0;
   const mainInputRows = isDisabled ? 1 : visibleInputRows + inputFooterRows;
-  return suggestionRows + mainInputRows;
+  const imageRow = pendingImageCount > 0 ? 1 : 0;
+  return suggestionRows + imageRow + mainInputRows;
 }
 
 interface CommandSuggestionState {
@@ -82,7 +85,11 @@ function getCommandSuggestionState(
     const argPartial = trimmedText.slice(spaceIdx + 1).toLowerCase();
     const filtered = (matchedCommand.argument_suggestions ?? [])
       .filter((s) => s.value.startsWith(argPartial))
-      .map((s) => ({ name: s.value, description: s.description }));
+      .map((s) => ({
+        name: s.value,
+        description: s.description,
+        argument_suggestions: [],
+      }));
     return { show: true, filtered, matchedCommand, trimmedText };
   }
 
@@ -100,6 +107,7 @@ export function InputArea({
   mode,
   commands,
   onHeightChange,
+  pendingImageCount = 0,
 }: InputAreaProps) {
   const [currentText, setCurrentText] = useState("");
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
@@ -130,6 +138,7 @@ export function InputArea({
     isDisabled,
     suggestionRows,
     currentText,
+    pendingImageCount,
   );
 
   useEffect(() => {
@@ -255,6 +264,16 @@ export function InputArea({
         visible={showFileSuggestions}
         loading={fileSuggest.loading}
       />
+      {pendingImageCount > 0 && (
+        <Box gap={1}>
+          {Array.from({ length: pendingImageCount }, (_, i) => (
+            <Text key={i} color="cyan">
+              [Image {i + 1}]
+            </Text>
+          ))}
+          <Text dimColor>Ctrl+U to clear</Text>
+        </Box>
+      )}
       <Box>
         <Text color={isDisabled ? "gray" : "green"} bold>
           {"❯ "}
@@ -265,7 +284,7 @@ export function InputArea({
           <MultiLineInput
             ref={inputRef}
             isActive={!isDisabled}
-            placeholder="Type a message..."
+            placeholder="Type a message... (Ctrl+V to paste image)"
             onSubmit={onSubmit}
             onChange={handleTextChange}
             onCursorChange={handleCursorChange}

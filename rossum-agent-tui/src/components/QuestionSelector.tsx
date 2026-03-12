@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import type { InteractionMode, QuestionOption } from "../types.js";
 
@@ -24,6 +24,16 @@ export function QuestionSelector({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const isActive = mode === "input";
+
+  // Guard against Enter key repeat from the previous question's submission
+  // immediately triggering a selection in this newly mounted selector.
+  const readyRef = useRef(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      readyRef.current = true;
+    }, 150);
+    return () => clearTimeout(timer);
+  }, []);
 
   const totalRows = mode === "browse" ? 1 : totalItems + 1;
   useEffect(() => {
@@ -57,6 +67,7 @@ export function QuestionSelector({
         return;
       }
       if (key.return) {
+        if (!readyRef.current) return;
         if (focusedIndex === otherIndex) {
           onOtherSelected();
           return;

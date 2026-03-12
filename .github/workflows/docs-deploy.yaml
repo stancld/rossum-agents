@@ -32,10 +32,22 @@ jobs:
           uv sync --extra docs --no-install-project
         shell: bash
 
+      - name: Install rossum-agent API dependencies
+        run: |
+          cd rossum-agent
+          uv sync --extra api --no-install-project
+        shell: bash
+
       - name: Build documentation
         run: |
           cd docs
           uv run make html
+        shell: bash
+
+      - name: Generate OpenAPI spec
+        run: |
+          cd rossum-agent
+          uv run python scripts/generate_openapi.py openapi.json
         shell: bash
 
       - name: Prepare site structure
@@ -45,6 +57,10 @@ jobs:
           cp -r docs/landing/* _site/
           # Move Sphinx docs to /source/ subdirectory
           cp -r docs/build/html _site/source
+          # Add OpenAPI spec and Redoc viewer at /api-reference/
+          mkdir -p _site/api-reference
+          cp rossum-agent/openapi.json _site/api-reference/
+          cp rossum-agent/scripts/openapi_redoc.html _site/api-reference/index.html
         shell: bash
 
       - name: Upload artifact

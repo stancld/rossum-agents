@@ -8,6 +8,7 @@ This module implements the memory storage system following the smolagents patter
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
@@ -106,24 +107,63 @@ class MemoryStep:
         )
 
 
+_PRELOAD_PATTERN = re.compile(
+    r"\n\n\[System: (Loaded .+?)\. Use these tools directly without calling list_tool_categories first\.\]$"
+)
+
+
 @dataclass
 class TaskStep:
     """Represents the initial user task/prompt.
 
     Supports both text-only and multimodal content (with images).
+    preload_info is stored separately so the user's original text stays clean in DB.
     """
 
     task: UserContent
+    preload_info: str | None = None
 
     def to_messages(self) -> list[MessageParam]:
-        return [MessageParam(role="user", content=self.task)]
+        content = self.task
+        if self.preload_info:
+            suffix = f"\n\n[System: {self.preload_info}. Use these tools directly without calling list_tool_categories first.]"
+            if isinstance(content, str):
+                content = content + suffix
+            else:
+                content = [*content, TextBlockParam(type="text", text=suffix)]
+        return [MessageParam(role="user", content=content)]
 
     def to_dict(self) -> dict[str, Any]:
-        return {"type": "task_step", "task": self.task}
+        d: dict[str, Any] = {"type": "task_step", "task": self.task}
+        if self.preload_info:
+            d["preload_info"] = self.preload_info
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TaskStep:
-        return cls(task=data["task"])
+        task = data["task"]
+        preload_info = data.get("preload_info")
+        # Backward compat: extract preload info baked into old-format tasks
+        if preload_info is None:
+            task, preload_info = cls._extract_legacy_preload_info(task)
+        return cls(task=task, preload_info=preload_info)
+
+    @staticmethod
+    def _extract_legacy_preload_info(task: UserContent) -> tuple[UserContent, str | None]:
+        if isinstance(task, str):
+            if m := _PRELOAD_PATTERN.search(task):
+                return task[: m.start()], m.group(1)
+        elif isinstance(task, list) and task:
+            last = task[-1]
+            if isinstance(last, dict) and last.get("type") == "text":
+                text = last.get("text", "")
+                if m := _PRELOAD_PATTERN.search(text):
+                    cleaned_text = text[: m.start()]
+                    if cleaned_text:
+                        cleaned_block = TextBlockParam(type="text", text=cleaned_text)
+                        return [*task[:-1], cleaned_block], m.group(1)
+                    return task[:-1] if len(task) > 1 else task, m.group(1)
+        return task, None
 
 
 @dataclass
@@ -141,9 +181,9 @@ class AgentMemory:
         """Clear all steps."""
         self.steps = []
 
-    def add_task(self, task: UserContent) -> None:
+    def add_task(self, task: UserContent, preload_info: str | None = None) -> None:
         """Add initial user task (text or multimodal content)."""
-        self.steps.append(TaskStep(task=task))
+        self.steps.append(TaskStep(task=task, preload_info=preload_info))
 
     def add_step(self, step: MemoryStep) -> None:
         """Add a completed agent step."""

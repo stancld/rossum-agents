@@ -6,9 +6,9 @@
 
 | Input | Files to Analyze |
 |-------|------------------|
-| OpenAPI spec | `openapi.json` |
-| Client impl | `rossum_agent_client/client.py` |
-| Models | `rossum_agent_client/models/` |
+| OpenAPI spec | `rossum-agent/rossum_agent/api/openapi.json` |
+| Client impl | `rossum-agent-client/rossum_agent_client/client.py` |
+| Models | `rossum-agent-client/rossum_agent_client/models/` |
 
 ## What to Check
 
@@ -24,7 +24,7 @@
 
 | Step | Action |
 |------|--------|
-| Parse spec | Extract all paths, methods, parameters, schemas from `openapi.json` |
+| Parse spec | Extract all paths, methods, parameters, schemas from `rossum-agent/rossum_agent/api/openapi.json` |
 | Scan client | Identify all API methods, their HTTP calls, and parameters |
 | Map | Create endpoint-to-method mapping |
 | Diff | Identify gaps in both directions |
