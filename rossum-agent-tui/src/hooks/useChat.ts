@@ -105,9 +105,13 @@ function handleStepEvent(prev: ChatState, step: StepEvent): ChatState {
   }
 
   const prevStream = prev.currentStreaming;
-  const extraSteps: CompletedStep[] = shouldCommitPrevious(prevStream, step)
-    ? [stepToCompleted(prevStream)]
-    : [];
+  // Same step_number = finalization/correction of the streaming step (e.g. text
+  // streamed as final_answer corrected to intermediate once tool_use arrived).
+  // Don't commit the stale streaming version — only commit the authoritative finalized event.
+  const extraSteps: CompletedStep[] =
+    prevStream && prevStream.step_number !== step.step_number
+      ? [stepToCompleted(prevStream)]
+      : [];
 
   return {
     ...prev,

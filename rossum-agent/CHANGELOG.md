@@ -16,6 +16,9 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Preload info is now stored separately in `TaskStep` instead of being baked into the user's prompt text — keeps original task clean in DB while still injecting system hints into API messages; includes backward-compatible extraction of legacy format [#256](https://github.com/stancld/rossum-agents/pull/256)
 
+### Fixed
+- SSE streaming now emits finalization events (`is_streaming: false`) for all step types — fixes step type misclassification where text streamed as `final_answer` was never corrected to `intermediate` when tool_use blocks arrived later
+
 ## [1.4.0] - 2026-03-09
 
 ### Added

@@ -190,7 +190,7 @@ def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
                     type="intermediate",
                     step_number=step.step_number,
                     content=step.accumulated_text,
-                    is_streaming=True,
+                    is_streaming=step.is_streaming,
                 )
             ]
 
@@ -200,7 +200,7 @@ def convert_step_to_events(step: AgentStep) -> list[StepEvent]:
                     type="final_answer",
                     step_number=step.step_number,
                     content=step.accumulated_text,
-                    is_streaming=True,
+                    is_streaming=step.is_streaming,
                 )
             ]
 
