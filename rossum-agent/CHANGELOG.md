@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Cautious persona now gates write operations (MCP + internal) behind a user confirmation prompt — blocked tools emit an `agent_question` SSE event with yes/no/chat options; only explicit approval pre-approves the tool for the next turn [#252](https://github.com/stancld/rossum-agents/pull/252)
 
+### Changed
+- Tool result serialization now uses compact JSON (`separators=(",", ":")`) instead of pretty-printed (`indent=2`) to reduce token usage in LLM context [#254](https://github.com/stancld/rossum-agents/pull/254)
+
 ## [1.4.0] - 2026-03-09
 
 ### Added

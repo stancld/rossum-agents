@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -1946,8 +1947,8 @@ class TestSerializeToolResult:
         data = TestData(name="test", value=42)
         result = agent._serialize_tool_result(data)
 
-        assert '"name": "test"' in result
-        assert '"value": 42' in result
+        parsed = json.loads(result)
+        assert parsed == {"name": "test", "value": 42}
 
     def test_serialize_list_of_dataclasses(self):
         """Test that list of dataclasses is serialized to JSON."""
@@ -1961,8 +1962,8 @@ class TestSerializeToolResult:
         items = [Item(id=1), Item(id=2)]
         result = agent._serialize_tool_result(items)
 
-        assert '"id": 1' in result
-        assert '"id": 2' in result
+        parsed = json.loads(result)
+        assert parsed == [{"id": 1}, {"id": 2}]
 
     def test_serialize_pydantic_model(self):
         """Test that pydantic model is serialized to JSON."""
@@ -1975,7 +1976,8 @@ class TestSerializeToolResult:
         model = TestModel(field="value")
         result = agent._serialize_tool_result(model)
 
-        assert '"field": "value"' in result
+        parsed = json.loads(result)
+        assert parsed == {"field": "value"}
 
     def test_serialize_list_of_pydantic_models(self):
         """Test that list of pydantic models is serialized to JSON."""
@@ -1988,23 +1990,24 @@ class TestSerializeToolResult:
         models = [TestModel(id=1), TestModel(id=2)]
         result = agent._serialize_tool_result(models)
 
-        assert '"id": 1' in result
-        assert '"id": 2' in result
+        parsed = json.loads(result)
+        assert parsed == [{"id": 1}, {"id": 2}]
 
     def test_serialize_dict(self):
         """Test that dict is serialized to JSON."""
         agent = self._create_agent()
         result = agent._serialize_tool_result({"key": "value"})
 
-        assert '"key": "value"' in result
+        parsed = json.loads(result)
+        assert parsed == {"key": "value"}
 
     def test_serialize_list(self):
         """Test that list is serialized to JSON."""
         agent = self._create_agent()
         result = agent._serialize_tool_result([1, 2, 3])
 
-        assert "[" in result
-        assert "1" in result
+        parsed = json.loads(result)
+        assert parsed == [1, 2, 3]
 
     def test_serialize_string(self):
         """Test that string is returned as-is."""
