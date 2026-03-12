@@ -43,9 +43,11 @@ agent = [
 api = [
     "fastapi>=0.115.0",
     "gunicorn>=23.0.0",
+    "psycopg[binary]>=3.1.0",
     "python-multipart>=0.0.22",
     "redis>=7.0.0",
     "slowapi>=0.1.9",
+    "sqlalchemy>=2.0.0",
     "sse-starlette>=2.0.0",
     "uvicorn[standard]>=0.32.0",
 ]
@@ -90,6 +92,7 @@ all = [
     "mcp>=1.0.0",
     "myst-parser>=2.0.0",
     "pre-commit",
+    "psycopg[binary]>=3.1.0",
     "python-dotenv",
     "python-multipart>=0.0.22",
     "pytest>=7.0.0",
@@ -102,6 +105,7 @@ all = [
     "rossum-api>=3.9.1",
     "slack-sdk[optional]>=3.27.0",
     "slowapi>=0.1.9",
+    "sqlalchemy>=2.0.0",
     "sphinx>=7.0.0",
     "sphinx-autodoc-typehints>=1.25.0",
     "sphinx-copybutton>=0.5.2",

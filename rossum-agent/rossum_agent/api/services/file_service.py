@@ -3,19 +3,22 @@
 from __future__ import annotations
 
 import mimetypes
+from typing import TYPE_CHECKING
 
 from rossum_agent.api.models.schemas import FileInfo
-from rossum_agent.redis_storage import RedisStorage
+
+if TYPE_CHECKING:
+    from rossum_agent.storage import ChatStorage
 
 
 class FileService:
-    """Wraps RedisStorage file operations with MIME type detection."""
+    """Wraps storage file operations with MIME type detection."""
 
-    def __init__(self, redis_storage: RedisStorage | None = None) -> None:
-        self._storage = redis_storage or RedisStorage()
+    def __init__(self, storage: ChatStorage) -> None:
+        self._storage = storage
 
     @property
-    def storage(self) -> RedisStorage:
+    def storage(self) -> ChatStorage:
         return self._storage
 
     def list_files(self, chat_id: str) -> list[FileInfo]:

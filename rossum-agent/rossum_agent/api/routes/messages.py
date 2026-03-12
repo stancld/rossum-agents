@@ -44,7 +44,8 @@ from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
 from rossum_agent.bedrock_client import create_async_bedrock_client, get_small_model_id
 from rossum_agent.change_tracking.store import CommitStore
-from rossum_agent.redis_storage import ChatData, RedisStorage
+from rossum_agent.redis_storage import RedisStorage
+from rossum_agent.storage import ChatData
 
 # To prevent (legacy) proxy servers from dropping connections during long periods of thinking,
 # we are sending SSE_KEEPALIVE_COMMENT every SSE_KEEPALIVE_INTERVAL as per recommendation:

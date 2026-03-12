@@ -515,8 +515,10 @@ export interface components {
        * @enum {string}
        */
       status: "healthy" | "unhealthy";
-      /** Redis Connected */
-      redis_connected: boolean;
+      /** Storage Connected */
+      storage_connected: boolean;
+      /** Storage Backend */
+      storage_backend: string;
       /** Version */
       version: string;
     };

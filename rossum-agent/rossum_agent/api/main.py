@@ -15,6 +15,9 @@ from gunicorn.app.base import BaseApplication
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+    from rossum_agent.storage import ChatStorage
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
@@ -41,6 +44,9 @@ from rossum_agent.api.routes import chats, commands, files, health, messages, sl
 from rossum_agent.api.services.agent_service import AgentService
 from rossum_agent.api.services.chat_service import ChatService
 from rossum_agent.api.services.file_service import FileService
+from rossum_agent.postgres_storage import PostgresStorage
+from rossum_agent.redis_storage import RedisStorage
+from rossum_agent.storage import get_storage_backend
 
 logger = logging.getLogger(__name__)
 
@@ -74,17 +80,32 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
     )
 
 
+def _create_storage() -> ChatStorage:
+    """Create the chat storage backend based on CHAT_STORAGE_BACKEND env var."""
+    backend = get_storage_backend()
+    if backend == "redis":
+        return RedisStorage()
+    if backend == "postgres":
+        storage = PostgresStorage()
+        storage.initialize()
+        return storage
+    raise ValueError(f"Unknown CHAT_STORAGE_BACKEND: {backend!r}. Use 'postgres' or 'redis'.")
+
+
 def _init_services(app: FastAPI) -> None:
     """Initialize services and store them in app.state.
 
     Skips initialization if services are already set (e.g., during testing).
     """
     if not hasattr(app.state, "chat_service"):
-        app.state.chat_service = ChatService()
+        storage = _create_storage()
+        app.state.chat_service = ChatService(storage=storage)
     if not hasattr(app.state, "agent_service"):
         app.state.agent_service = AgentService()
     if not hasattr(app.state, "file_service"):
-        app.state.file_service = FileService(app.state.chat_service.storage)
+        app.state.file_service = FileService(storage=app.state.chat_service.storage)
+    if not hasattr(app.state, "redis_storage"):
+        app.state.redis_storage = RedisStorage()
 
 
 @asynccontextmanager
@@ -95,10 +116,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     _init_services(app)
 
+    backend = get_storage_backend()
     if app.state.chat_service.is_connected():
-        logger.info("Redis connection established")
+        logger.info(f"Chat storage ({backend}) connection established")
     else:
-        logger.warning("Redis connection failed - some features may not work")
+        logger.warning(f"Chat storage ({backend}) connection failed - some features may not work")
 
     yield
 

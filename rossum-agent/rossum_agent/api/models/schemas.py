@@ -457,7 +457,8 @@ class HealthResponse(BaseModel):
     """Response for health check endpoint."""
 
     status: Literal["healthy", "unhealthy"]
-    redis_connected: bool
+    storage_connected: bool
+    storage_backend: str
     version: str
 
 

@@ -18,7 +18,7 @@ def mock_storage():
 @pytest.fixture
 def file_service(mock_storage):
     """Create FileService with mock storage."""
-    return FileService(redis_storage=mock_storage)
+    return FileService(storage=mock_storage)
 
 
 class TestListFiles:

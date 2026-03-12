@@ -53,6 +53,7 @@
 | No trailing commas | Follow ruff-format output |
 | Logging | f-strings in `logger.*()` calls are fine — prefer `logger.info(f"...")` over `%s` style |
 | Noqa comments | Always explain: `# noqa: TC003 - reason` |
+| No hardcoded `/tmp` | Use `tempfile` module or `/mock/...` paths in tests — CodeFactor runs Bandit (B108) |
 
 ## FastMCP Tools (rossum-mcp)
 
@@ -215,7 +216,10 @@ The agent signals tool usage through two paired `StepEvent` types sharing the sa
 |----------|---------|
 | `ROSSUM_API_TOKEN` | Required - API authentication |
 | `ROSSUM_API_BASE_URL` | Required - API endpoint |
-| `REDIS_HOST`, `REDIS_PORT` | Optional - Redis connection (default port: 6379) |
+| `CHAT_STORAGE_BACKEND` | Optional - `postgres` (default) or `redis` for chat persistence |
+| `POSTGRES_HOST`, `POSTGRES_PORT` | Optional - PostgreSQL connection (default: localhost:5432) |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Optional - PostgreSQL credentials (default: rossum_agent/rossum/rossum) |
+| `REDIS_HOST`, `REDIS_PORT` | Optional - Redis connection for change tracking (default: localhost:6379) |
 | `ROSSUM_MCP_MODE` | Optional - read-only or read-write |
 | `ROSSUM_MCP_LOG_LEVEL` | Optional - MCP server log level (default: INFO) |
 | `AWS_REGION` | Optional - AWS region for Bedrock (default: us-east-1) |
