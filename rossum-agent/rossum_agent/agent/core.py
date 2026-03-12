@@ -476,7 +476,7 @@ class RossumAgent:
 
         # Handle dataclasses (check before pydantic since pydantic models aren't dataclasses)
         if dataclasses.is_dataclass(result) and not isinstance(result, type):
-            return json.dumps(dataclasses.asdict(result), indent=2, default=str)
+            return json.dumps(dataclasses.asdict(result), separators=(",", ":"), default=str)
 
         # Handle lists of dataclasses
         if isinstance(result, list) and result and dataclasses.is_dataclass(result[0]):
@@ -486,26 +486,26 @@ class RossumAgent:
                     for item in result
                     if dataclasses.is_dataclass(item) and not isinstance(item, type)
                 ],
-                indent=2,
+                separators=(",", ":"),
                 default=str,
             )
 
         # Handle pydantic models
         # Use mode='json' to ensure nested models are properly serialized to JSON-compatible dicts
         if isinstance(result, BaseModel):
-            return json.dumps(result.model_dump(mode="json"), indent=2, default=str)
+            return json.dumps(result.model_dump(mode="json"), separators=(",", ":"), default=str)
 
         # Handle lists of pydantic models
         if isinstance(result, list) and result and isinstance(result[0], BaseModel):
             return json.dumps(
                 [item.model_dump(mode="json") for item in result if isinstance(item, BaseModel)],
-                indent=2,
+                separators=(",", ":"),
                 default=str,
             )
 
         # Handle dicts and regular lists
         if isinstance(result, dict | list):
-            return json.dumps(result, indent=2, default=str)
+            return json.dumps(result, separators=(",", ":"), default=str)
 
         # Fallback to string representation
         return str(result)
