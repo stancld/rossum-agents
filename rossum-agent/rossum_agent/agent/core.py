@@ -1066,16 +1066,6 @@ class RossumAgent:
                     text_parts.append(text)
         return " ".join(text_parts)
 
-    def _inject_preload_info(self, prompt: UserContent, preload_result: str) -> UserContent:
-        """Inject preload result info into the user prompt."""
-        suffix = (
-            f"\n\n[System: {preload_result}. Use these tools directly without calling list_tool_categories first.]"
-        )
-        if isinstance(prompt, str):
-            return prompt + suffix
-        system_block: TextBlockParam = {"type": "text", "text": suffix}
-        return [*prompt, system_block]
-
     def _calculate_rate_limit_delay(self, retries: int) -> float:
         """Calculate exponential backoff delay with jitter for rate limiting."""
         delay = min(RATE_LIMIT_BASE_DELAY * (2 ** (retries - 1)), RATE_LIMIT_MAX_DELAY)
@@ -1104,11 +1094,7 @@ class RossumAgent:
             None, partial(ctx.run, preload_categories_for_request, request_text)
         )
 
-        # Inject pre-load info into the task so agent knows what tools are available
-        if preload_result:
-            prompt = self._inject_preload_info(prompt, preload_result)
-
-        self.memory.add_task(prompt)
+        self.memory.add_task(prompt, preload_info=preload_result)
 
         for step_num in range(1, self.config.max_steps + 1):
             rate_limit_retries = 0
