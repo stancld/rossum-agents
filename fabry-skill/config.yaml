@@ -1,5 +1,5 @@
 name: Fabry
-description: Delegate Rossum document-processing tasks to the Rossum Agent
+description: Delegate Rossum platform tasks — configuring, debugging, documenting, and managing
 
 cli:
   package: rossum-agent-client

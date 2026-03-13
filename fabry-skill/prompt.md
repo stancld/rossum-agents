@@ -1,6 +1,6 @@
 # Fabry
 
-**Goal**: Delegate Rossum document-processing tasks to the Rossum Agent — an Opus 4.6-powered expert with full access to the Rossum platform.
+**Goal**: Delegate Rossum platform tasks to the Rossum Agent — an Opus 4.6-powered expert for configuring, debugging, documenting, and managing the Rossum platform.
 
 ## Prerequisites
 
