@@ -703,7 +703,7 @@ class RossumAgent:
             max_tokens=self.config.max_output_tokens,
             system=system,
             messages=messages,
-            tools=tools if tools else Omit(),
+            tools=tools or Omit(),
             thinking=thinking_config,
             temperature=self.config.temperature,
             output_config={"effort": self.config.effort},
@@ -752,7 +752,7 @@ class RossumAgent:
         if not state.tool_calls:
             memory_step = MemoryStep(
                 step_number=step_num,
-                text=state.response_text if state.response_text else None,
+                text=state.response_text or None,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
             )

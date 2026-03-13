@@ -691,7 +691,7 @@ class AgentService:
             elif block_type == "text":
                 result.append({"type": "text", "text": block.get("text", "")})
 
-        return result if result else ""
+        return result or ""
 
     def build_updated_history(
         self,
