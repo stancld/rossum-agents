@@ -56,7 +56,7 @@ from rossum_agent.tools.core import (
 from rossum_agent.tools.dynamic_tools import get_write_tools_async
 from rossum_agent.tools.task_tracker import TaskTracker
 from rossum_agent.url_context import extract_url_context, format_context_for_prompt
-from rossum_agent.utils import create_session_output_dir, get_display_tool_name
+from rossum_agent.utils import create_session_output_dir
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -143,11 +143,10 @@ def _create_tool_start_event(
     resolved_tool_name = resolved_tool_call.name if resolved_tool_call is not None else current_tool or ""
     tool_arguments = resolved_tool_call.arguments if resolved_tool_call is not None else None
 
-    display_name = get_display_tool_name(resolved_tool_name, tool_arguments)
     return StepEvent(
         type="tool_start",
         step_number=step.step_number,
-        tool_name=display_name,
+        tool_name=resolved_tool_name,
         tool_arguments=tool_arguments,
         tool_progress=step.tool_progress,
         tool_call_id=resolved_tool_call.id if resolved_tool_call is not None else None,
