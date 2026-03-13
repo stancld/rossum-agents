@@ -4,13 +4,15 @@
 
 ## Prerequisites
 
-Three environment variables must be set. If any are missing, ask the user.
+Required environment variables (must be set by the calling agent before invoking this skill):
 
-| Variable | Purpose | Example |
-|----------|---------|---------|
-| `ROSSUM_AGENT_API_URL` | Agent API endpoint | `https://agent.rossum.app` |
-| `ROSSUM_API_BASE_URL` | Rossum API URL | `https://elis.rossum.ai/api/v1` |
-| `ROSSUM_API_TOKEN` | Authentication token | (from user) |
+| Variable | Purpose |
+|----------|---------|
+| `ROSSUM_AGENT_API_URL` | Agent API endpoint |
+| `ROSSUM_API_BASE_URL` | Rossum API URL |
+| `ROSSUM_API_TOKEN` | Authentication token |
+
+If any are missing, stop and report the error — do not prompt the user for values.
 
 Install the CLI if not available: `uv pip install rossum-agent-client`
 
