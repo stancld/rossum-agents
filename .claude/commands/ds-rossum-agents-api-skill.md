@@ -16,7 +16,7 @@ Install the CLI if not available: `uv pip install rossum-agent-client`
 
 ## Usage
 
-Send natural-language prompts to the Rossum Agent via `rossum-agent-client`. The agent understands the Rossum platform deeply and figures out the steps itself.
+Send natural-language prompts to the Rossum Agent via `rossum-agent-client`.
 
 ```bash
 # Read-only query (default)
@@ -50,101 +50,28 @@ rossum-agent-client --mcp-mode read-write --persona cautious -x "Delete the 'obs
 | **stderr** | Progress indicators, tool calls, token usage |
 | **Files** | Agent-created files (CSVs, PDFs, JSON) saved to current directory |
 
-## What the Rossum Agent Can Do
+## Capabilities
 
-### Queues & Workspaces
+| Category | What It Handles | Example Prompt |
+|----------|----------------|----------------|
+| Queues & Workspaces | Create, list, inspect, configure, delete queues and workspaces | "List all queues", "Create a queue from the Invoice template" |
+| Schemas | Read/modify fields, prune unused fields, all types (sections, multivalue, enums) | "Add a required 'vendor_vat' string field to the header section on queue 12345" |
+| Formula Fields | Deterministic computed fields via TxScript — math, strings, dates, aggregations | "Add a formula that calculates total_with_tax as amount * (1 + tax_rate/100)" |
+| AI Reasoning Fields | AI-powered fields for ambiguous formats, contextual interpretation, classification | "Add a reasoning field that determines payment terms from the invoice text" |
+| Lookup Fields | Fields fetching values from Master Data Hub — vendor matching, catalog lookups | "Add a lookup field that matches vendor_name against the vendor master data" |
+| Hooks & Extensions | Create, configure, test serverless functions; Rossum Store templates or custom Python 3.12 | "Create a hook from the 'Copy value to another field' template on queue 12345" |
+| Validation Rules | TxScript trigger conditions with error/warning/info/automate actions | "Add a rule that shows an error when amount_total > 1000000" |
+| Annotations & Documents | Query, inspect, update annotations; upload documents; copy between queues | "Show extracted data from annotation 99999", "Upload invoice.pdf to queue 12345" |
+| UI Settings | Queue UI layout — annotation list columns, sidebar ordering, field visibility | "Add 'vendor_name' and 'amount_total' columns to the annotation list table" |
+| Document Testing | Generate mock PDFs, upload, verify extraction, trigger hooks — end-to-end | "Generate a test PDF matching queue 12345's schema, upload it, verify extraction" |
+| Users & Permissions | Create/update users, manage roles and group assignments | "Create a user with email john@example.com as annotator on queue 12345" |
+| Email Templates | Automated notification templates with configurable recipients | "Create an auto-send email template for confirmed invoices on queue 12345" |
+| Change History | Audit trail, inspect diffs, revert commits, restore entity versions | "Show recent changes", "Revert the last commit" |
+| Knowledge Base | Search Rossum platform docs and API reference | "How do formula fields work in Rossum?" |
 
-Create, list, inspect, configure, and delete queues. Create workspaces. Query queue settings including inbox configuration and automation rules.
+## Prompt Tips
 
-**Example prompts**: "List all queues", "Create a queue from the Invoice template", "Show inbox settings for queue 12345", "Delete queue 67890"
-
-### Schemas
-
-Read full schema trees, add/update/remove individual fields, prune unused fields in bulk. Supports all field types including sections, multivalue (line items), enums, and nested structures.
-
-**Example prompts**: "Show the schema tree for queue 12345", "Add a required 'vendor_vat' string field to the header section", "Remove all fields except invoice_id, amount, and currency", "Move the 'tax' field into the line_items section"
-
-### Formula Fields
-
-Create fields that compute values deterministically from other fields using TxScript — math operations, string manipulation, conditional logic, date calculations, and aggregations over line items.
-
-**Example prompts**: "Add a formula field that calculates total_with_tax as amount * (1 + tax_rate/100)", "Create a field that concatenates vendor_name and vendor_id", "Add a formula that sums all line item amounts"
-
-### AI Reasoning Fields
-
-Create fields that use AI to interpret document context and extract values from natural-language instructions. Best for ambiguous formats, contextual interpretation, and unstructured text.
-
-**Example prompts**: "Add a reasoning field that determines the payment terms from the invoice text", "Create a field that classifies the document type as invoice, credit note, or purchase order"
-
-### Lookup Fields
-
-Create fields that fetch values from external datasets in the Rossum Master Data Hub — vendor matching, product catalog lookups, and reference data enrichment.
-
-**Example prompts**: "Add a lookup field that matches vendor_name against the vendor master data", "Create a lookup for product codes from the catalog dataset"
-
-### Hooks & Extensions
-
-Create, configure, test, and manage serverless hook functions. Supports creating from Rossum Store templates or custom Python 3.12 code. Can test hooks with auto-generated realistic payloads.
-
-**Example prompts**: "Create a hook from the 'Copy value to another field' template on queue 12345", "Write a custom hook that validates IBAN format", "Test the validation hook on queue 12345", "List all hooks and their events"
-
-### Validation Rules
-
-Create and manage validation rules using TxScript trigger conditions with configurable actions (errors, warnings, info, automates).
-
-**Example prompts**: "Add a rule that shows an error when amount_total > 1000000", "Create a warning rule when due_date is in the past", "List all rules on queue 12345 and their trigger conditions"
-
-### Annotations & Documents
-
-Query annotations, inspect extracted data, update field values, change annotation status (start reviewing, confirm), copy annotations between queues, upload new documents.
-
-**Example prompts**: "List recent annotations on queue 12345", "Show the extracted data from annotation 99999", "Upload invoice.pdf to queue 12345", "Copy annotations 111,222,333 to queue 67890 with re-import"
-
-### UI Settings
-
-Configure queue UI layout — which columns appear in the annotation list, sidebar ordering, and field visibility.
-
-**Example prompts**: "Show the current UI settings for queue 12345", "Add 'vendor_name' and 'amount_total' columns to the annotation list table"
-
-### Document Testing (End-to-End)
-
-Generate schema-aware mock PDF documents, upload them to a queue, verify extraction results, and optionally trigger hooks — a full end-to-end processing test.
-
-**Example prompts**: "Generate a test invoice PDF matching queue 12345's schema, upload it, and verify the extraction"
-
-### Users & Permissions
-
-Create and update users, manage roles and group assignments, list available roles.
-
-**Example prompts**: "List all users", "Create a user with email john@example.com as annotator on queue 12345", "Update user 555 to manager role"
-
-### Email Templates
-
-Create email templates for automated notifications with configurable recipients (annotators, constants, datapoint values).
-
-**Example prompts**: "Create an auto-send email template for confirmed invoices on queue 12345"
-
-### Change History & Rollback
-
-Review all configuration changes made by the agent, inspect diffs, and revert any commit. Full audit trail with entity-level version history and point-in-time restore.
-
-**Example prompts**: "Show recent changes", "Revert the last commit", "Show version history for schema 444 and restore the version from before today's changes"
-
-### Knowledge Base & Documentation
-
-Search Rossum platform documentation and API docs for feature explanations, configuration guides, and API reference.
-
-**Example prompts**: "How do formula fields work in Rossum?", "What events can hooks listen to?", "Explain the annotation lifecycle"
-
-## Writing Effective Prompts
-
-| Principle | Example |
-|-----------|---------|
-| Be specific about the target | "On queue **12345**, list all schema fields with their types" |
-| State the goal, not steps | "Add a required vendor_name field" — the agent figures out how |
-| Include IDs when known | "Queue 12345", "Hook 67890" — avoids ambiguity |
-| Request structured output when needed | "Return the result as JSON" or "Format as a markdown table" |
-| Combine read + write | "Check if queue 12345 has a tax_id field; if not, add it" |
+Include entity IDs when known. State goals, not steps. Request structured output ("as JSON", "as markdown table") when parsing the result.
 
 ## Choosing MCP Mode
 
@@ -152,8 +79,6 @@ Search Rossum platform documentation and API docs for feature explanations, conf
 |------|---------|
 | `read-only` | Querying, listing, inspecting, explaining — no side effects |
 | `read-write` | Creating, modifying, or deleting any Rossum resource |
-
-Default to `read-only`. Only use `read-write` when the task requires mutations.
 
 ## Choosing Persona
 
