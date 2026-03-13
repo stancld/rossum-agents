@@ -61,6 +61,7 @@ _SAFE_BUILTINS: dict[str, object] = {
     "map": map,
     "max": max,
     "min": min,
+    "ord": ord,
     "print": print,
     "range": range,
     "reversed": reversed,

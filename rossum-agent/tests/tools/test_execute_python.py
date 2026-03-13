@@ -238,5 +238,12 @@ class TestExecPython:
         assert parsed["status"] == "error"
         assert "schema_content()" in parsed["error"]
 
+    def test_ord_builtin_available(self) -> None:
+        result = execute_python(code="ord('A')")
+        parsed = json.loads(result)
+
+        assert parsed["status"] == "success"
+        assert parsed["result"] == 65
+
     def test_execute_python_alias_matches_execute_python(self) -> None:
         assert json.loads(execute_python(code="1 + 2"))["result"] == 3

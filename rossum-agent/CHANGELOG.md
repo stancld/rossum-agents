@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Added
+- Added `ord` to `execute_python` safe builtins
+
 ## [1.5.0] - 2026-03-13
 
 ### Added
