@@ -121,7 +121,7 @@ asyncio_mode = "auto"
 include = ["rossum_agent*"]
 
 [tool.setuptools.package-data]
-rossum_agent = ["assets/*.png", "skills/*.md"]
+rossum_agent = ["assets/*.png", "data/*.json", "skills/*.md"]
 
 [dependency-groups]
 dev = [
