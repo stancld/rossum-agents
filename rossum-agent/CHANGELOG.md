@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+## [1.5.0] - 2026-03-13
+
 ### Added
 - Added PostgreSQL as chat persistence backend — `CHAT_STORAGE_BACKEND=postgres` (default) uses SQLAlchemy Core with `psycopg` for durable chat/file/feedback storage with configurable TTL; `redis` remains available as an alternative; added `docker-compose.yml` for local development [#248](https://github.com/rossumai/rossum-agents/pull/248)
 - Cautious persona now gates write operations (MCP + internal) behind a user confirmation prompt — blocked tools emit an `agent_question` SSE event with yes/no/chat options; only explicit approval pre-approves the tool for the next turn [#252](https://github.com/stancld/rossum-agents/pull/252)
