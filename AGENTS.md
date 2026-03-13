@@ -194,7 +194,7 @@ The agent signals tool usage through two paired `StepEvent` types sharing the sa
 
 | Event type | Source | Key fields | When emitted |
 |------------|--------|------------|--------------|
-| `tool_start` | `agent_service._create_tool_start_event` | `tool_name`, `tool_arguments`, `tool_progress` | When the agent begins executing a tool; `tool_name` is display-formatted via `get_display_tool_name` |
+| `tool_start` | `agent_service._create_tool_start_event` | `tool_name`, `tool_arguments`, `tool_progress` | When the agent begins executing a tool |
 | `tool_result` | `agent_service._create_tool_result_event` | `tool_name`, `result`, `is_error` | After tool execution completes (only emitted when `is_streaming=false`) |
 
 **Pairing logic** (TUI `buildChatItems.ts`): `tool_result` steps are indexed by `stepNumber` into a map; each `tool_start` is paired with its matching `tool_result` to produce a single `ChatItem` of `kind: "tool_call"`.
