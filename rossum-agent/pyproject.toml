@@ -54,6 +54,7 @@ api = [
     "sqlalchemy[postgresql-psycopg]>=2.0.0",
     "sse-starlette>=2.0.0",
     "uvicorn>=0.32.0",
+    "uvicorn-worker>=0.3.0",
     "wsproto>=1.2.0",
 ]
 slack = [
@@ -102,6 +103,7 @@ all = [
     "furo",
     "sse-starlette>=2.0.0",
     "uvicorn>=0.32.0",
+    "uvicorn-worker>=0.3.0",
     "wsproto>=1.2.0",
 ]
 

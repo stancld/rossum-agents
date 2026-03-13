@@ -14,8 +14,10 @@ All notable changes to this project will be documented in this file.
 - Tool result serialization now uses compact JSON (`separators=(",", ":")`) instead of pretty-printed (`indent=2`) to reduce token usage in LLM context [#254](https://github.com/stancld/rossum-agents/pull/254)
 
 ### Fixed
+- Chat summary generation now receives URL context (queue ID, document ID, etc.) so the summarizer understands the user's current Rossum page context
 - Preload info is now stored separately in `TaskStep` instead of being baked into the user's prompt text — keeps original task clean in DB while still injecting system hints into API messages; includes backward-compatible extraction of legacy format [#256](https://github.com/stancld/rossum-agents/pull/256)
 - SSE streaming now emits finalization events (`is_streaming: false`) for all step types — fixes step type misclassification where text streamed as `final_answer` was never corrected to `intermediate` when tool_use blocks arrived later
+- First streaming step now defaults to `intermediate` type — prevents initial text from being briefly misclassified as `final_answer` before tool_use blocks arrive
 
 ## [1.4.0] - 2026-03-09
 

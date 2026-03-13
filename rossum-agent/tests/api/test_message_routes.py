@@ -480,3 +480,42 @@ class TestGenerateChatSummary:
         prompt = call_args.kwargs["messages"][0]["content"]
         assert "User deployed a schema" in prompt
         assert "Now configure a hook" in prompt
+
+    @pytest.mark.asyncio
+    async def test_includes_url_context_in_prompt(self):
+        """When url_context is provided, the prompt includes it."""
+        mock_response = MagicMock()
+        mock_text_block = MagicMock(spec=anthropic.types.TextBlock)
+        mock_text_block.text = "Queue 123 schema help."
+        mock_response.content = [mock_text_block]
+
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+        with patch("rossum_agent.api.routes.messages.create_async_bedrock_client", return_value=mock_client):
+            result = await _generate_chat_summary(
+                "Help me with this queue", url_context="Queue ID: 123, Page type: schema_settings"
+            )
+
+        assert result == "Queue 123 schema help."
+        call_args = mock_client.messages.create.call_args
+        prompt = call_args.kwargs["messages"][0]["content"]
+        assert "Queue ID: 123" in prompt
+
+    @pytest.mark.asyncio
+    async def test_no_url_context_prefix_when_none(self):
+        """When url_context is None, no context prefix is added."""
+        mock_response = MagicMock()
+        mock_text_block = MagicMock(spec=anthropic.types.TextBlock)
+        mock_text_block.text = "General help."
+        mock_response.content = [mock_text_block]
+
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+        with patch("rossum_agent.api.routes.messages.create_async_bedrock_client", return_value=mock_client):
+            await _generate_chat_summary("Help me")
+
+        call_args = mock_client.messages.create.call_args
+        prompt = call_args.kwargs["messages"][0]["content"]
+        assert not prompt.startswith("Context:")

@@ -250,8 +250,12 @@ class AgentMemory:
             if not isinstance(content, list):
                 continue
             for block_idx, block in enumerate(content):
-                if isinstance(block, dict) and block.get("type") == "tool_result":
-                    tool_name = tool_use_id_to_name.get(block.get("tool_use_id", ""))
+                if not isinstance(block, dict):
+                    continue
+                block_dict: dict[str, object] = block  # type: ignore[assignment]
+                if block_dict.get("type") == "tool_result":
+                    tool_use_id = str(block_dict.get("tool_use_id", ""))
+                    tool_name = tool_use_id_to_name.get(tool_use_id)
                     if tool_name:
                         positions.append((msg_idx, block_idx, tool_name))
         return positions

@@ -318,7 +318,7 @@ def _run_gunicorn(args: argparse.Namespace) -> None:
     options = {
         "bind": f"{args.host}:{args.port}",
         "workers": args.workers,
-        "worker_class": "uvicorn.workers.UvicornWorker",
+        "worker_class": "uvicorn_worker.UvicornWorker",
         "timeout": GUNICORN_TIMEOUT,
         "graceful_timeout": GUNICORN_GRACEFUL_TIMEOUT,
         "keepalive": GUNICORN_KEEPALIVE,

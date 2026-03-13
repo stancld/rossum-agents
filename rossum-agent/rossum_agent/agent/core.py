@@ -276,9 +276,15 @@ class _StreamState:
             return False
         return (time.monotonic() - self.first_text_token_time) >= INITIAL_TEXT_BUFFER_DELAY
 
-    def get_step_type(self) -> StepType:
-        """Get the step type based on whether tool calls are pending."""
-        return StepType.INTERMEDIATE if self.pending_tools or self.tool_calls else StepType.FINAL_ANSWER
+    def get_step_type(self, step_num: int) -> StepType:
+        """Get the step type based on whether tool calls are pending.
+
+        In the first step, default to INTERMEDIATE since the agent nearly always
+        uses tools before producing a final answer.
+        """
+        if self.pending_tools or self.tool_calls or step_num == 1:
+            return StepType.INTERMEDIATE
+        return StepType.FINAL_ANSWER
 
     def flush_buffer(self, step_num: int, step_type: StepType) -> TextDeltaStep | None:
         """Flush text buffer and return TextDeltaStep if buffer had content."""
@@ -572,7 +578,7 @@ class RossumAgent:
         state.text_buffer.append(content)
 
         if state.initial_buffer_flushed:
-            return state.flush_buffer(step_num, state.get_step_type())
+            return state.flush_buffer(step_num, state.get_step_type(step_num))
         if state.pending_tools or state.tool_calls:
             state.initial_buffer_flushed = True
             return state.flush_buffer(step_num, StepType.INTERMEDIATE)
@@ -620,7 +626,7 @@ class RossumAgent:
                     if (
                         state.text_buffer
                         and state._should_flush_initial_buffer()
-                        and (step := state.flush_buffer(step_num, state.get_step_type()))
+                        and (step := state.flush_buffer(step_num, state.get_step_type(step_num)))
                     ):
                         state.initial_buffer_flushed = True
                         yield step
@@ -631,7 +637,7 @@ class RossumAgent:
 
                 if item is _STREAM_END:
                     # Yield #2: Stream ended - flush any remaining buffered text
-                    if step := state.flush_buffer(step_num, state.get_step_type()):
+                    if step := state.flush_buffer(step_num, state.get_step_type(step_num)):
                         yield step
                     break
 

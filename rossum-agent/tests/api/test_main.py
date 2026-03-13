@@ -470,7 +470,7 @@ class TestMainCLIGunicorn:
         assert captured_app.app_uri == "rossum_agent.api.main:app"
         assert captured_app.options["bind"] == "127.0.0.1:8000"
         assert captured_app.options["workers"] == 2
-        assert captured_app.options["worker_class"] == "uvicorn.workers.UvicornWorker"
+        assert captured_app.options["worker_class"] == "uvicorn_worker.UvicornWorker"
         assert captured_app.options["timeout"] == GUNICORN_TIMEOUT
         assert captured_app.options["graceful_timeout"] == GUNICORN_GRACEFUL_TIMEOUT
         assert captured_app.options["keepalive"] == GUNICORN_KEEPALIVE

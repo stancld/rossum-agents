@@ -46,6 +46,7 @@ from rossum_agent.bedrock_client import create_async_bedrock_client, get_small_m
 from rossum_agent.change_tracking.store import CommitStore
 from rossum_agent.redis_storage import RedisStorage
 from rossum_agent.storage import ChatData
+from rossum_agent.url_context import extract_url_context
 
 # To prevent (legacy) proxy servers from dropping connections during long periods of thinking,
 # we are sending SSE_KEEPALIVE_COMMENT every SSE_KEEPALIVE_INTERVAL as per recommendation:
@@ -65,17 +66,21 @@ def _format_sse_event(event_type: str, data: str) -> str:
     return f"event: {event_type}\ndata: {data}\n\n"
 
 
-async def _generate_chat_summary(user_prompt: str, previous_summary: str | None = None) -> str | None:
+async def _generate_chat_summary(
+    user_prompt: str, previous_summary: str | None = None, url_context: str | None = None
+) -> str | None:
     """Generate a one-line chat summary via Claude Haiku. Updates previous summary if available."""
     try:
+        context_prefix = f"Context: {url_context}\n" if url_context else ""
         if previous_summary:
             prompt = (
+                f"{context_prefix}"
                 f"Current summary: {previous_summary}\n"
                 f"New user message: {user_prompt[:500]}\n\n"
                 f"Update the summary to cover the full conversation. One sentence, max 10 words."
             )
         else:
-            prompt = f"Summarize this in one sentence (max 10 words): {user_prompt[:500]}"
+            prompt = f"{context_prefix}Summarize this in one sentence (max 10 words): {user_prompt[:500]}"
 
         client = create_async_bedrock_client()
         response = await client.messages.create(
@@ -403,7 +408,10 @@ async def send_message(
 
         output_dir = agent_service.get_output_dir(chat_id)
         memory = agent_service.pop_last_memory(chat_id)
-        summary = await _generate_chat_summary(user_prompt, previous_summary=chat_data.metadata.summary)
+        url_context = extract_url_context(message.rossum_url).to_context_string() or None
+        summary = await _generate_chat_summary(
+            user_prompt, previous_summary=chat_data.metadata.summary, url_context=url_context
+        )
 
         _save_chat_history(
             chat_service=chat_service,
