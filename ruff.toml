@@ -59,12 +59,6 @@ ignore = [
 
 [lint.flake8-import-conventions.aliases]
 "datetime" = "dt"
-"numpy" = "np"
-"pandas" = "pd"
-
-[lint.flake8-import-conventions.extend-aliases]
-# modules
-"numpy.typing" = "npt"
 
 [lint.flake8-unused-arguments]
 # No error for unused *args and **kwargs
