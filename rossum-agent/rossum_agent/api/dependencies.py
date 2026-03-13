@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 _BASE_ALLOWED_HOSTS = r"elis\.rossum\.ai|api\.elis\.rossum\.ai|(.*\.)?api\.rossum\.ai|.*\.rossum\.(app|ai)|(elis|api\.elis)\.develop\.r8\.lol"
 
 # Additional hosts from environment variable (comma-separated regex patterns)
-# Example: ADDITIONAL_ALLOWED_ROSSUM_HOSTS=".*\.review\.r8\.lol,.*\.staging\.example\.com"
 _ADDITIONAL_HOSTS = os.environ.get("ADDITIONAL_ALLOWED_ROSSUM_HOSTS", "")
 
 

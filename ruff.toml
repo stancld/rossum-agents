@@ -24,6 +24,7 @@ select = [
 ]
 extend-select = [
     "ASYNC",  # asyncio
+    "ERA",  # eradicate
     "EXE",  # executable
     "ICN",  # import conventions
     "NPY",  # numpy-specific rules
