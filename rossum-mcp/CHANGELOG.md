@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - YYYY-MM-DD
 
+### Removed
+- Removed `update_rule` tool (PUT) — use `patch_rule` (PATCH) instead, which handles both partial and full updates [#259](https://github.com/stancld/rossum-agents/pull/259)
+
 ## [2.0.0] - 2026-03-09
 
 ### Added
