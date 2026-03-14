@@ -1,3 +1,6 @@
+// Raw OpenAPI types (for consumers that need schema-level access)
+export type { paths, components } from "./generated.js";
+
 // Types
 export type {
   // Config
