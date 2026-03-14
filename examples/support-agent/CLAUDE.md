@@ -22,6 +22,30 @@ On every conversation start, silently load both skills:
 
 Do not ask the user for permission — just load them.
 
+### Rossum Credentials Initialization
+
+After loading `/ds-fabry`, prompt for Rossum credentials using sequential `AskUserQuestion` calls before executing any `rossum-agent-client` command. This happens once per conversation.
+
+**Step 1** — Ask for the Rossum API base URL:
+- Use `AskUserQuestion` with a text prompt
+- Show the current `ROSSUM_API_BASE_URL` env var value as the default option
+- If the env var is unset, show a placeholder like `https://your-org.rossum.app/api/v1`
+
+**Step 2** — Ask for the Rossum API token:
+- Use `AskUserQuestion` with a text prompt
+- If `ROSSUM_API_TOKEN` is set, show a masked default option: `****…<last 4 chars>` (e.g., `****…a1b2`)
+- If the env var is unset, show `(not set)` as the default
+- Never display the full token value
+
+**After collection**, export both values so all subsequent `rossum-agent-client` calls use them:
+
+```bash
+export ROSSUM_API_BASE_URL="<collected value>"
+export ROSSUM_API_TOKEN="<collected value>"
+```
+
+Skip this flow if the user has already provided credentials earlier in the conversation.
+
 ## Workflow
 
 1. **Understand the request** — determine if it involves Jira, Rossum, or both
@@ -42,12 +66,10 @@ Do not ask the user for permission — just load them.
 
 ## Environment Variables
 
-These must be set before launching the agent:
-
-| Variable | Purpose |
-|----------|---------|
-| `ROSSUM_AGENT_API_URL` | Rossum Agent API endpoint |
-| `ROSSUM_API_BASE_URL` | Rossum API URL |
-| `ROSSUM_API_TOKEN` | Rossum authentication token |
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| `ROSSUM_AGENT_API_URL` | Rossum Agent API endpoint | Yes — must be set before launch |
+| `ROSSUM_API_BASE_URL` | Rossum API URL | Optional — prompted on first use if unset |
+| `ROSSUM_API_TOKEN` | Rossum authentication token | Optional — prompted on first use if unset |
 
 Jira CLI (`jira`) must be installed and configured separately.
