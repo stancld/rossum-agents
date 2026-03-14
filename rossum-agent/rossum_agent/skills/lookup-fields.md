@@ -35,7 +35,14 @@ evaluation = evaluate_lookup_field(
 
 For `patch_schema_with_subagent`, pass the `matching` object from the suggest result in the changes array.
 
-When matches fail, use `execute_python` to call `get_lookup_dataset_raw_values(...)` and `query_lookup_dataset(...)` to inspect raw data — start with `.[0] | keys` to discover columns — then re-call `suggest_lookup_field` with corrected hints.
+When matches fail, inspect raw data — then re-call `suggest_lookup_field` with corrected hints:
+
+```python
+get_lookup_dataset_raw_values(dataset="Approved Vendors")
+result = query_lookup_dataset(dataset="Approved Vendors", jq_query=".[0] | keys")
+```
+
+`get_lookup_dataset_raw_values` takes `dataset` and optional `limit` — no `schema_id`. Start with `.[0] | keys` to discover columns.
 
 For existing fields, pass `action: "update"` in `patch_schema_with_subagent` changes.
 
