@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 - Added `ord` to `execute_python` safe builtins
 - Bundled `rossum-kb.json` as package data and load it via `importlib.resources` instead of `Path(__file__)` traversal — works correctly when installed from wheel/zip
 
+### Fixed
+- Switched MDH dataset listing to `/v2/datasets` endpoint [#261](https://github.com/rossumai/rossum-agents/pull/261)
+- Clarified in lookup-fields skill and base prompt that lookup fields are native schema-level matching, not hook-based — prevents agent from incorrectly creating hooks for lookup fields [#261](https://github.com/rossumai/rossum-agents/pull/261)
+
 ## [1.5.0] - 2026-03-13
 
 ### Added

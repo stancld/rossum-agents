@@ -85,9 +85,10 @@ A false match is worse than no match. Apply this principle at every query tier:
 
 | Rule | Detail |
 |------|--------|
+| Not a hook | Lookup fields are native schema-level matching — they use `matching` config on the datapoint, not a hook. Never create or attach a hook for lookup fields. |
 | Feature flag required | `lookup_fields` must be enabled on organization group |
 | Always pass `dataset` | Pass dataset when known; `suggest_lookup_field` resolves it to an `imported-...` ID |
 | No wrong match | A false positive is worse than no match. Multiple candidates without a clear winner → leave unmatched. Fuzzy name-only fallback threshold must be ≥ 0.85 unless there is no other signal. |
 | No `rir_field_names` | Lookup fields cannot use AI extraction hints |
 | No `enabled_without_warning` | Edit mode cannot be `enabled_without_warning` |
-| `type` or `hook_interface` | Provide one, not both |
+| `type` field | Always `"enum"` for lookup fields |
