@@ -10,6 +10,20 @@ A lookup field **before configuration** has no `matching` property and an empty 
 
 If a configured lookup field is not producing matches, the issue is in the `matching` configuration or the dataset — never in missing hooks or automation. Always check the connected dataset from MDH first.
 
+## Determining Configuration State
+
+A lookup field is **fully configured** when its schema datapoint contains a `matching` object with `matching.type`, `matching.configuration.dataset`, `matching.configuration.queries`, and `matching.configuration.variables`. When all four are present, report the field as configured — do not report dataset connection or matching logic as missing.
+
+| Check | Configured when |
+|-------|----------------|
+| Dataset connection | `matching.configuration.dataset` exists (an `imported-...` ID) |
+| Matching logic | `matching.configuration.queries` is a non-empty array |
+| Variable bindings | `matching.configuration.variables` exists with at least one key |
+
+Empty `options: []` is always expected — lookup fields receive values dynamically from MDH at prediction time, never from a static options list.
+
+Never produce a diagnostic reporting "❌ Missing" for dataset connection, matching logic, or variable bindings when the corresponding property exists in the schema. A field with a `matching` object containing `dataset`, `queries`, and `variables` is working as designed.
+
 ## When to Use
 
 | Scenario | Use Lookup Field |
@@ -22,7 +36,7 @@ If a configured lookup field is not producing matches, the issue is in the `matc
 
 ## Approach
 
-Always use `execute_python` with `suggest_lookup_field` and `evaluate_lookup_field` — never hand-write matching configurations. Write to the schema only after evaluation passes. Re-generate at most 3 times; stop and report if results don't improve.
+All lookup helpers — `suggest_lookup_field`, `evaluate_lookup_field`, `get_lookup_dataset_raw_values`, `query_lookup_dataset` — are Python functions available only inside `execute_python`. Never try to load or call them as standalone tools. Never hand-write matching configurations. Write to the schema only after evaluation passes. Re-generate at most 3 times; stop and report if results don't improve.
 
 ```python
 suggested = suggest_lookup_field(
@@ -54,16 +68,16 @@ result = query_lookup_dataset(dataset="Approved Vendors", jq_query=".[0] | keys"
 
 For existing fields, pass `action: "update"` in `patch_schema_with_subagent` changes.
 
-## Match Quality — Prefer No Match Over Wrong Match
+## Match Quality — Unequivocal Matches Only
 
-A false match is worse than no match. Apply this principle at every query tier:
+Lookup fields return a match if and only if the result is unequivocal — exactly one candidate clearly corresponds to the document entity. When multiple candidates exist with no clear winner, or when similarity is too low, the field returns no match. A false match is always worse than no match.
 
-| Signal strength | Action |
+| Signal strength | Result |
 |-----------------|--------|
-| Strong identifier (VAT ID, exact code) | Match |
-| Name alone, near-exact (≥ 0.9 similarity) | Match |
-| Name alone, partial/low similarity | Do **not** match — leave unmatched |
-| Multiple candidates, none dominant | Do **not** match — leave unmatched |
+| Strong identifier (VAT ID, exact code), single result | Match — unequivocal |
+| Name alone, near-exact (≥ 0.9 similarity), single dominant result | Match — unequivocal |
+| Name alone, partial/low similarity | No match — ambiguous |
+| Multiple candidates, none clearly dominant | No match — ambiguous |
 
 **Fuzzy fallback queries are high-risk.** Only include a name-only fuzzy fallback when the dataset has no reliable identifier column and the name field is the sole matching signal. When you do use one, set the score threshold high (≥ 0.85) and verify during evaluation that no unrelated records are being matched. Lower the threshold only if the evaluation shows missed matches on records that are clearly the same entity — never to chase a higher match count.
 
@@ -99,7 +113,7 @@ Before configuration (expected initial state — no `matching`, empty `options`)
 }
 ```
 
-After `suggest_lookup_field` adds the `matching` config:
+After `suggest_lookup_field` adds the `matching` config (this is a **fully configured** lookup field — dataset ✅, queries ✅, variables ✅):
 
 ```json
 {
@@ -108,15 +122,40 @@ After `suggest_lookup_field` adds the `matching` config:
   "type": "enum",
   "category": "datapoint",
   "options": [],
-  "ui_configuration": {"type": "lookup", "edit": "disabled"},
+  "ui_configuration": {"type": "lookup", "edit": "enabled"},
   "matching": {
     "type": "master_data_hub",
     "configuration": {
       "dataset": "imported-0d652b68-fd8b-4fc8-9cee-d39105b1304b",
-      "queries": "[...]",
-      "variables": {"sender_vat": {"__formula": "field.sender_vat_id"}}
+      "queries": [
+        {
+          "//": "Exact normalized match on VAT ID",
+          "aggregate": [
+            {"$addFields": {"vat_norm": {"$toLower": {"$trim": {"input": {"$replaceAll": {"find": " ", "input": "$VAT ID"}}}}}, "search_vat_norm": {"$toLower": {"$trim": {"input": {"$replaceAll": {"find": " ", "input": "$sender_vat_id"}}}}}}},
+            {"$match": {"$expr": {"$eq": ["$vat_norm", "$search_vat_norm"]}}},
+            {"$limit": 5},
+            {"$project": {"label": "$Name", "value": "$ID"}}
+          ]
+        },
+        {
+          "//": "Fuzzy match on vendor name",
+          "aggregate": [
+            {"$search": {"text": {"path": "Name", "fuzzy": {"maxEdits": 1}, "query": "$sender_name"}}},
+            {"$addFields": {"score": {"$meta": "searchScore"}}},
+            {"$match": {"score": {"$gte": 2}}},
+            {"$sort": {"score": -1}},
+            {"$limit": 10},
+            {"$project": {"label": "$Name", "value": "$ID"}}
+          ]
+        }
+      ],
+      "variables": {
+        "sender_name": {"__formula": "default_to(field.sender_name, \"UNKNOWN\")"},
+        "sender_vat_id": {"__formula": "default_to(field.sender_vat_id, \"UNKNOWN\")"}
+      }
     }
-  }
+  },
+  "enum_value_type": "string"
 }
 ```
 

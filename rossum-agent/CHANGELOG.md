@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Allowed `try/except` blocks in `execute_python` sandbox — removes `ast.Try` from disallowed nodes and exposes common exception types (`Exception`, `ValueError`, `KeyError`, `TypeError`, etc.) as safe builtins
 
 ### Fixed
+- `run_jq` now accepts `dict` data directly — prevents `TypeError` when the model passes parsed JSON instead of a string [#261](https://github.com/rossumai/rossum-agents/pull/261)
 - Switched MDH dataset listing to `/v2/datasets` endpoint [#261](https://github.com/rossumai/rossum-agents/pull/261)
 - Clarified in lookup-fields skill and base prompt that lookup fields are native schema-level matching, not hook-based — prevents agent from incorrectly creating hooks for lookup fields [#261](https://github.com/rossumai/rossum-agents/pull/261)
 
