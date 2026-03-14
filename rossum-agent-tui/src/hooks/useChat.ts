@@ -1,6 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createChat, submitFeedback as apiFeedback } from "../api/client.js";
-import { streamMessage } from "../api/sse.js";
+import { streamMessage } from "rossum-agent-client";
+import type {
+  ClientConfig,
+  ImageContent,
+  DocumentContent,
+} from "rossum-agent-client";
 import {
   loadPersistedState,
   savePersistedState,
@@ -280,13 +285,21 @@ export function useChat(config: Config) {
 
         setState((prev) => ({ ...prev, connectionStatus: "streaming" }));
 
+        const clientConfig: ClientConfig = {
+          apiUrl: config.apiUrl,
+          token: config.token,
+          rossumUrl: config.rossumUrl,
+        };
+
         await streamMessage({
-          config,
+          config: clientConfig,
           chatId,
           message,
-          images: options?.images,
-          documents: options?.documents,
-          onEvent: dispatch,
+          persona: config.persona,
+          rossumUrl: config.contextUrl,
+          images: options?.images as ImageContent[] | undefined,
+          documents: options?.documents as DocumentContent[] | undefined,
+          onEvent: (event) => dispatch(event as SSEEvent),
           onError: (err) => {
             setState((prev) => ({
               ...prev,
