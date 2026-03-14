@@ -98,7 +98,6 @@ _DISALLOWED_AST_NODES = (
     ast.Nonlocal,
     ast.Raise,
     ast.TryStar,
-    ast.With,
     ast.Yield,
     ast.YieldFrom,
 )

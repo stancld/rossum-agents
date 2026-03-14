@@ -252,5 +252,19 @@ class TestExecPython:
         assert parsed["status"] == "success"
         assert parsed["result"] == 65
 
+    def test_allows_with_statement(self, tmp_path: Path) -> None:
+        file_path = tmp_path / "example.txt"
+        file_path.write_text("hello", encoding="utf-8")
+
+        set_context(AgentContext(output_dir=tmp_path))
+        try:
+            result = execute_python(code='with open("example.txt") as f:\n    data = f.read()\ndata')
+            parsed = json.loads(result)
+        finally:
+            set_context(AgentContext())
+
+        assert parsed["status"] == "success"
+        assert parsed["result"] == "hello"
+
     def test_execute_python_alias_matches_execute_python(self) -> None:
         assert json.loads(execute_python(code="1 + 2"))["result"] == 3
