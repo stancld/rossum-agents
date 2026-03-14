@@ -70,6 +70,8 @@ For existing fields, pass `action: "update"` in `patch_schema_with_subagent` cha
 
 ## Match Quality — Unequivocal Matches Only
 
+`score_threshold` on the matching configuration does **not** control whether a match is returned. Match/no-match is determined solely by the query pipeline (aggregation stages, `$match` filters, score `$gte` thresholds inside queries). Do not adjust `score_threshold` to fix missing or incorrect matches — modify the queries instead.
+
 Lookup fields return a match if and only if the result is unequivocal — exactly one candidate clearly corresponds to the document entity. When multiple candidates exist with no clear winner, or when similarity is too low, the field returns no match. A false match is always worse than no match.
 
 | Signal strength | Result |
