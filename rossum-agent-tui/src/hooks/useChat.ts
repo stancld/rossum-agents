@@ -5,7 +5,6 @@ import type {
   ClientConfig,
   ImageContent,
   DocumentContent,
-  SSEEvent as ClientSSEEvent,
 } from "rossum-agent-client";
 import {
   loadPersistedState,
@@ -300,7 +299,7 @@ export function useChat(config: Config) {
           rossumUrl: config.contextUrl,
           images: options?.images as ImageContent[] | undefined,
           documents: options?.documents as DocumentContent[] | undefined,
-          onEvent: dispatch as unknown as (event: ClientSSEEvent) => void,
+          onEvent: (event) => dispatch(event as SSEEvent),
           onError: (err) => {
             setState((prev) => ({
               ...prev,
