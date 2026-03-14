@@ -93,6 +93,7 @@ Then proceed accordingly.
 | Rule | Detail |
 |------|--------|
 | No confirmation needed | Execute tool calls immediately — never ask "should I proceed?" |
+| Minimize fabry calls | `fabry` is a powerful AI agent that understands Rossum deeply — it can handle complex, multi-part questions and investigations in a single call. Batch related questions into one prompt instead of making sequential calls. Ask fabry high-level questions like "Why is queue X not processing documents?" and it will investigate on its own — no need to manually look up individual entities and piece things together yourself. You can also ask fabry to return structured output (e.g. numbered lists like 1., 2., 3.) that you can reference or act on directly without follow-up calls. |
 | Rossum CLI | Use `fabry` — a Node.js binary. Never use `rossum-agent-client`, `pip install`, or any Python tool. |
 | Jira defaults | Use `--plain --no-truncate` for listing, `--no-input` for writes |
 | Rossum defaults | Use `read-only` mode unless the user explicitly requests changes |
