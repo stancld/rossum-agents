@@ -73,6 +73,16 @@ _SAFE_BUILTINS: dict[str, object] = {
     "tuple": tuple,
     "type": type,
     "zip": zip,
+    # Exception types for try-except
+    "Exception": Exception,
+    "AttributeError": AttributeError,
+    "IndexError": IndexError,
+    "KeyError": KeyError,
+    "RuntimeError": RuntimeError,
+    "StopIteration": StopIteration,
+    "TypeError": TypeError,
+    "ValueError": ValueError,
+    "ZeroDivisionError": ZeroDivisionError,
 }
 
 _DISALLOWED_AST_NODES = (
@@ -87,7 +97,6 @@ _DISALLOWED_AST_NODES = (
     ast.ImportFrom,
     ast.Nonlocal,
     ast.Raise,
-    ast.Try,
     ast.TryStar,
     ast.With,
     ast.Yield,
