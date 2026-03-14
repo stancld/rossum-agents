@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Added `ord` to `execute_python` safe builtins
 - Bundled `rossum-kb.json` as package data and load it via `importlib.resources` instead of `Path(__file__)` traversal — works correctly when installed from wheel/zip
+- Allowed `try/except` blocks in `execute_python` sandbox — removes `ast.Try` from disallowed nodes and exposes common exception types (`Exception`, `ValueError`, `KeyError`, `TypeError`, etc.) as safe builtins
 
 ### Fixed
 - Switched MDH dataset listing to `/v2/datasets` endpoint [#261](https://github.com/rossumai/rossum-agents/pull/261)

@@ -137,6 +137,13 @@ class TestExecPython:
         assert parsed["status"] == "success"
         assert parsed["result"] == "from-var"
 
+    def test_allows_try_except(self) -> None:
+        result = execute_python(code="try:\n  x = 1 / 0\nexcept ZeroDivisionError:\n  x = 42\nx")
+        parsed = json.loads(result)
+
+        assert parsed["status"] == "success"
+        assert parsed["result"] == 42
+
     def test_rejects_try_star(self) -> None:
         result = execute_python(code="try:\n  pass\nexcept* ValueError:\n  pass")
         parsed = json.loads(result)
