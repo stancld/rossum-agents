@@ -82,6 +82,51 @@ const chatId = chat.chat_id;
 let finalAnswer = "";
 const createdFiles = [];
 
+function handleStep(step) {
+  if (step.type === "final_answer") {
+    if (step.content) finalAnswer = step.content;
+    return;
+  }
+  if (step.type === "error") {
+    process.stderr.write(`Error: ${step.content}\n`);
+    return;
+  }
+  if (!showThinking) return;
+
+  if (step.type === "thinking" && step.content) {
+    process.stderr.write(`[thinking] ${step.content}\n`);
+  } else if (step.type === "tool_start") {
+    const progress = step.tool_progress
+      ? ` (${step.tool_progress[0]}/${step.tool_progress[1]})`
+      : "";
+    process.stderr.write(`[tool] ${step.tool_name}${progress}\n`);
+  } else if (step.type === "tool_result") {
+    const status = step.is_error ? "FAILED" : "OK";
+    process.stderr.write(`[tool] ${step.tool_name} → ${status}\n`);
+  } else if (step.type === "intermediate" && step.content) {
+    process.stderr.write(`${step.content}\n`);
+  }
+}
+
+function handleEvent(event) {
+  if (event.event === "step") {
+    handleStep(event.data);
+  } else if (event.event === "file_created") {
+    createdFiles.push(event.data);
+    process.stderr.write(`[file] ${event.data.filename}\n`);
+  } else if (event.event === "done") {
+    const usage = event.data;
+    process.stderr.write(
+      `[done] ${usage.total_steps} steps | ${usage.input_tokens} in / ${usage.output_tokens} out\n`,
+    );
+  } else if (event.event === "sub_agent_progress" && showThinking) {
+    const p = event.data;
+    process.stderr.write(
+      `[sub-agent] ${p.tool_name}: ${p.status} (${p.iteration}/${p.max_iterations})\n`,
+    );
+  }
+}
+
 await new Promise((resolvePromise, reject) => {
   streamMessage({
     config,
@@ -89,50 +134,7 @@ await new Promise((resolvePromise, reject) => {
     message: prompt,
     mcpMode,
     persona,
-    onEvent(event) {
-      if (event.event === "step") {
-        const step = event.data;
-
-        if (step.type === "final_answer") {
-          if (step.content) {
-            finalAnswer = step.content;
-          }
-        } else if (step.type === "error") {
-          process.stderr.write(`Error: ${step.content}\n`);
-        } else if (showThinking) {
-          if (step.type === "thinking" && step.content) {
-            process.stderr.write(`[thinking] ${step.content}\n`);
-          } else if (step.type === "tool_start") {
-            const progress = step.tool_progress
-              ? ` (${step.tool_progress[0]}/${step.tool_progress[1]})`
-              : "";
-            process.stderr.write(
-              `[tool] ${step.tool_name}${progress}\n`,
-            );
-          } else if (step.type === "tool_result") {
-            const status = step.is_error ? "FAILED" : "OK";
-            process.stderr.write(
-              `[tool] ${step.tool_name} → ${status}\n`,
-            );
-          } else if (step.type === "intermediate" && step.content) {
-            process.stderr.write(`${step.content}\n`);
-          }
-        }
-      } else if (event.event === "file_created") {
-        createdFiles.push(event.data);
-        process.stderr.write(`[file] ${event.data.filename}\n`);
-      } else if (event.event === "done") {
-        const usage = event.data;
-        process.stderr.write(
-          `[done] ${usage.total_steps} steps | ${usage.input_tokens} in / ${usage.output_tokens} out\n`,
-        );
-      } else if (event.event === "sub_agent_progress" && showThinking) {
-        const p = event.data;
-        process.stderr.write(
-          `[sub-agent] ${p.tool_name}: ${p.status} (${p.iteration}/${p.max_iterations})\n`,
-        );
-      }
-    },
+    onEvent: handleEvent,
     onError(err) {
       reject(err);
     },
