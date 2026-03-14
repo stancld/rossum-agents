@@ -2,6 +2,14 @@
 
 **Goal**: Create or update lookup fields that fetch values from external datasets (Master Data Hub).
 
+## How Lookup Fields Work
+
+Lookup fields are **schema-level configuration** — a `matching` object on the datapoint definition. The Rossum engine evaluates them automatically during **prediction**, the same as any other AI field. No hooks, no serverless functions, no external automation. Once the `matching` config is on the schema, the field is populated for every new document without any additional setup.
+
+A lookup field **before configuration** has no `matching` property and an empty `options` array — this is the expected initial state, not a defect. Do not flag missing `matching` or empty `options` as problems. The `suggest_lookup_field` tool adds the `matching` config, and `options` stay empty because values come dynamically from MDH at prediction time.
+
+If a configured lookup field is not producing matches, the issue is in the `matching` configuration or the dataset — never in missing hooks or automation. Always check the connected dataset from MDH first.
+
 ## When to Use
 
 | Scenario | Use Lookup Field |
@@ -61,14 +69,24 @@ A false match is worse than no match. Apply this principle at every query tier:
 
 ## Debugging Non-Matches
 
+**First step**: Always check the connected dataset from MDH — use `get_lookup_dataset_raw_values` and `query_lookup_dataset` to verify data exists and columns match expectations.
+
+A lookup field without a `matching` property or with empty `options` is **not broken** — it simply hasn't been configured yet. Use `suggest_lookup_field` to add the configuration. Do not report missing `matching` or empty `options` as errors.
+
+When a **configured** lookup field produces no match or wrong matches, the cause is in the `matching` configuration or the dataset content — never in missing hooks, automation, or external logic.
+
 | Root Cause | Symptom | Resolution |
 |------------|---------|------------|
-| Missing record | No match despite correct columns | Record doesn't exist — report |
-| Field mismatch | Wrong column name | Inspect with `query_lookup_dataset(dataset, ".[0] | keys")`, re-call `suggest_lookup_field` |
+| No `matching` config yet | Field exists with no `matching` and empty `options` | Expected initial state — run `suggest_lookup_field` to configure |
+| Wrong `matching` config | Field has `matching` but never matches | Inspect dataset with `query_lookup_dataset`, re-call `suggest_lookup_field` with corrected hints |
+| Missing record | No match despite correct config | Record doesn't exist in dataset — report to user |
+| Field mismatch | Wrong column name in query | Inspect with `query_lookup_dataset(dataset, ".[0] | keys")`, re-call `suggest_lookup_field` |
 | Normalization gap | Values differ by case/whitespace | Re-call `suggest_lookup_field` with hint about format difference |
 | Ambiguous results | Multiple candidates, none dominant | Re-call to tighten — if ambiguity persists, leave unmatched |
 
 ## Schema Config
+
+Before configuration (expected initial state — no `matching`, empty `options`):
 
 ```json
 {
@@ -76,13 +94,27 @@ A false match is worse than no match. Apply this principle at every query tier:
   "label": "Vendor Match",
   "type": "enum",
   "category": "datapoint",
+  "options": [],
+  "ui_configuration": {"type": "lookup", "edit": "disabled"}
+}
+```
+
+After `suggest_lookup_field` adds the `matching` config:
+
+```json
+{
+  "id": "vendor_match",
+  "label": "Vendor Match",
+  "type": "enum",
+  "category": "datapoint",
+  "options": [],
   "ui_configuration": {"type": "lookup", "edit": "disabled"},
   "matching": {
     "type": "master_data_hub",
     "configuration": {
       "dataset": "imported-0d652b68-fd8b-4fc8-9cee-d39105b1304b",
       "queries": "[...]",
-      "placeholders": {"sender_vat": {"__formula": "field.sender_vat_id"}}
+      "variables": {"sender_vat": {"__formula": "field.sender_vat_id"}}
     }
   }
 }
@@ -92,10 +124,10 @@ A false match is worse than no match. Apply this principle at every query tier:
 
 | Rule | Detail |
 |------|--------|
-| Not a hook | Lookup fields are native schema-level matching — they use `matching` config on the datapoint, not a hook. Never create or attach a hook for lookup fields. |
+| Not a hook | Lookup fields are populated during prediction like any other AI field. They require only a `matching` config on the schema datapoint. Never create, attach, or investigate hooks for lookup fields. Never suggest missing hooks as a root cause. |
 | Feature flag required | `lookup_fields` must be enabled on organization group |
 | Always pass `dataset` | Pass dataset when known; `suggest_lookup_field` resolves it to an `imported-...` ID |
 | No wrong match | A false positive is worse than no match. Multiple candidates without a clear winner → leave unmatched. Fuzzy name-only fallback threshold must be ≥ 0.85 unless there is no other signal. |
 | No `rir_field_names` | Lookup fields cannot use AI extraction hints |
 | No `enabled_without_warning` | Edit mode cannot be `enabled_without_warning` |
-| `type` field | Always `"enum"` for lookup fields |
+| `type` field | Typically `"enum"` (required when options are used), but `"string"` is also valid |
