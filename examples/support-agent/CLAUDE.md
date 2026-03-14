@@ -63,6 +63,7 @@ Skip this flow if the user has already provided credentials earlier in the conve
 | Rossum write ops | Switch to `--mcp-mode read-write` only when user asks to modify Rossum config |
 | Concise output | Summarize results — don't dump raw CLI output unless asked |
 | Cross-reference | When a Jira issue mentions a queue ID or Rossum entity, proactively look it up |
+| Backlog = status | "Backlog tickets" means issues with **status** Backlog, not issues in a project named Backlog |
 
 ## Environment Variables
 
