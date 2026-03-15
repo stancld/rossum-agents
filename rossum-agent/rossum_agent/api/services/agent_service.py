@@ -98,6 +98,7 @@ class _ChatRunState:
     run_id: int = 0
     output_dir: Path | None = None
     last_memory: AgentMemory | None = None
+    last_main_input_tokens: int = 0
     # Cautious persona: write tools blocked last turn, pre-approved next turn
     cautious_blocked_last_turn: set[str] = dataclasses.field(default_factory=set)
 
@@ -490,6 +491,8 @@ class AgentService:
                     agent_ctx.rossum_environment = environment
 
                     self._restore_conversation_history(agent, conversation_history)
+                    if chat_run_state.last_main_input_tokens:
+                        agent.tokens.last_main_input = chat_run_state.last_main_input_tokens
 
                     total_steps = 0
                     total_input_tokens = 0
@@ -518,6 +521,7 @@ class AgentService:
                             yield sub_event
 
                         chat_run_state.last_memory = agent.memory
+                        chat_run_state.last_main_input_tokens = agent.tokens.last_main_input
                         chat_run_state.cautious_blocked_last_turn = agent_ctx.cautious_blocked_writes.copy()
 
                         async for event in self._stream_finalization(
