@@ -2273,7 +2273,7 @@ wheels = [
 
 [[package]]
 name = "rossum-agent"
-version = "1.5.0.dev0"
+version = "1.6.0.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
