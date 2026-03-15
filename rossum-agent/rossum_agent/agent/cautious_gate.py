@@ -1,9 +1,7 @@
 """Cautious persona write gating for the Rossum agent.
 
-When the agent runs in "cautious" persona mode, all write operations (MCP and
-internal) are blocked until the user explicitly confirms them. For update
-operations on identifiable entities, a field-level diff is shown instead of raw
-arguments.
+When the agent runs in "cautious" persona mode, all write operations are blocked until the user explicitly confirms them.
+For update operations on identifiable entities, a field-level diff is shown instead of raw arguments.
 """
 
 from __future__ import annotations
@@ -13,6 +11,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from rossum_agent.agent.models import ToolCall, ToolResult
+from rossum_agent.api.models.schemas import Persona
 from rossum_agent.rossum_mcp_integration import classify_operation, extract_entity_id, extract_entity_type
 from rossum_agent.tools import INTERNAL_WRITE_TOOL_NAMES
 from rossum_agent.tools.core import (
@@ -42,13 +41,11 @@ async def check_cautious_write_gate(
 ) -> ToolResult | None:
     """Gate write tools behind user confirmation for cautious persona.
 
-    For update/patch operations, fetches the existing object and shows a
-    field-level diff instead of raw arguments.
+    For update/patch operations, fetches the existing object and shows a field-level diff instead of raw arguments.
 
-    Returns a ToolResult (blocking the tool) if confirmation is needed,
-    or None if the tool should proceed.
+    Returns a ToolResult (blocking the tool) if confirmation is needed, or None if the tool should proceed.
     """
-    if agent_ctx.persona != "cautious":
+    if agent_ctx.persona != Persona.CAUTIOUS:
         return None
     if not is_write_tool(tool_call.name):
         return None

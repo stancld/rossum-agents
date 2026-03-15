@@ -3,19 +3,23 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-type Persona = Literal["default", "cautious"]
+
+class Persona(StrEnum):
+    DEFAULT = "default"
+    CAUTIOUS = "cautious"
 
 
 class CreateChatRequest(BaseModel):
     """Request body for creating a new chat session."""
 
     mcp_mode: Literal["read-only", "read-write"] = "read-only"
-    persona: Persona = "default"
+    persona: Persona = Persona.DEFAULT
 
 
 class ChatResponse(BaseModel):
