@@ -50,7 +50,7 @@ class TestExecPython:
         assert parsed["result"] == "ok"
         assert parsed["stdout"] == "hello\n"
 
-    @patch("rossum_agent.tools.python_exec._suggest_rule")
+    @patch("rossum_agent.python_tools.copilot.rule.suggest_rule")
     def test_exposes_rule_helper(self, mock_suggest_rule) -> None:
         mock_suggest_rule.return_value = json.dumps(
             {"status": "success", "name": "Rule", "trigger_condition": "field.amount_total > 0", "actions": []}
@@ -67,7 +67,7 @@ class TestExecPython:
         assert parsed["result"]["name"] == "Rule"
         mock_suggest_rule.assert_called_once_with(user_query="Check total", queue_id=123)
 
-    @patch("rossum_agent.tools.python_exec._suggest_formula_field")
+    @patch("rossum_agent.python_tools.copilot.formula.suggest_formula_field")
     def test_exposes_copilot_namespace(self, mock_suggest_formula_field) -> None:
         mock_suggest_formula_field.return_value = json.dumps({"status": "success", "formula": "field.amount_total"})
 
