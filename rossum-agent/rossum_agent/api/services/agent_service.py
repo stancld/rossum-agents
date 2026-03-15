@@ -40,6 +40,7 @@ from rossum_agent.api.models.schemas import (
     SubAgentTextEvent,
     TaskSnapshotEvent,
 )
+from rossum_agent.bedrock_client import MAX_INPUT_TOKENS
 from rossum_agent.change_tracking.commit_service import CommitService
 from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 from rossum_agent.prompts import get_system_prompt
@@ -427,11 +428,10 @@ class AgentService:
             StepEvent objects during execution, SubAgentProgressEvent for sub-agent progress,
             SubAgentTextEvent for sub-agent text streaming, StreamDoneEvent at the end.
         """
-        logger.info(f"Starting agent run with {len(conversation_history)} history messages")
-        if images:
-            logger.info(f"Including {len(images)} images in the prompt")
-        if documents:
-            logger.info(f"Including {len(documents)} documents in the prompt")
+        logger.info(
+            f"Starting agent run with {len(conversation_history)} history messages, "
+            f"{len(images or [])} images, {len(documents or [])} documents"
+        )
 
         run_id = await self._register_run(chat_id)
 
@@ -503,6 +503,10 @@ class AgentService:
                                 yield sub_event
 
                             for event in convert_step_to_events(step):
+                                if not event.is_streaming and MAX_INPUT_TOKENS:
+                                    event.context_usage_fraction = min(
+                                        agent.tokens.last_main_input / MAX_INPUT_TOKENS, 1.0
+                                    )
                                 yield event
 
                             if isinstance(step, (ToolResultStep, FinalAnswerStep, ErrorStep)):
@@ -592,6 +596,10 @@ class AgentService:
             cache_creation_input_tokens=agent.tokens.total_cache_creation,
             cache_read_input_tokens=agent.tokens.total_cache_read,
             token_usage_breakdown=agent.get_token_usage_breakdown(),
+            max_input_tokens=MAX_INPUT_TOKENS,
+            context_usage_fraction=min(agent.tokens.last_main_input / MAX_INPUT_TOKENS, 1.0)
+            if MAX_INPUT_TOKENS
+            else 0.0,
             config_commit_hash=commit.hash if commit else None,
             config_commit_message=commit.message if commit else None,
             config_changes_count=len(commit.changes) if commit else 0,

@@ -1395,6 +1395,7 @@ class TestRossumAgentTokenTracking:
         assert mock_agent.tokens.sub_input == 0
         assert mock_agent.tokens.sub_output == 0
         assert mock_agent.tokens.sub_by_tool == {}
+        assert mock_agent.tokens.last_main_input == 0
 
     def test_reset_clears_all_token_counters(self, mock_agent):
         """Test reset clears all token tracking state."""
@@ -1403,6 +1404,7 @@ class TestRossumAgentTokenTracking:
         mock_agent.tokens.sub_input = 400
         mock_agent.tokens.sub_output = 200
         mock_agent.tokens.sub_by_tool = {"search_knowledge_base": (400, 200)}
+        mock_agent.tokens.last_main_input = 600
 
         mock_agent.reset()
 
@@ -1413,6 +1415,7 @@ class TestRossumAgentTokenTracking:
         assert mock_agent.tokens.sub_input == 0
         assert mock_agent.tokens.sub_output == 0
         assert mock_agent.tokens.sub_by_tool == {}
+        assert mock_agent.tokens.last_main_input == 0
 
     def test_get_token_usage_breakdown_with_no_usage(self, mock_agent):
         """Test get_token_usage_breakdown returns zeros when no tokens used."""
@@ -1459,6 +1462,20 @@ class TestRossumAgentTokenTracking:
         assert breakdown.sub_agents.by_tool["search_knowledge_base"].input_tokens == 1500
         assert breakdown.sub_agents.by_tool["search_knowledge_base"].total_tokens == 2200
         assert breakdown.sub_agents.by_tool["patch_schema_with_subagent"].total_tokens == 800
+
+    def test_accumulate_main_tracks_last_input(self, mock_agent):
+        """Test accumulate_main accumulates totals and tracks last_main_input."""
+        mock_agent.tokens.accumulate_main(input_tokens=500, output_tokens=200, cache_creation=10, cache_read=50)
+
+        assert mock_agent.tokens.main_input == 500
+        assert mock_agent.tokens.main_output == 200
+        assert mock_agent.tokens.last_main_input == 500
+
+        mock_agent.tokens.accumulate_main(input_tokens=800, output_tokens=300, cache_creation=20, cache_read=100)
+
+        assert mock_agent.tokens.main_input == 1300
+        assert mock_agent.tokens.main_output == 500
+        assert mock_agent.tokens.last_main_input == 800
 
     def test_accumulate_sub_agent_tokens(self, mock_agent):
         """Test tokens.accumulate_sub accumulates properly."""
