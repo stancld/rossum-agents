@@ -56,7 +56,7 @@ _STREAM_PROGRESS_LOG_INTERVAL = 10.0
 
 
 @dataclasses.dataclass
-class _StreamState:
+class StreamState:
     """Mutable state for streaming model response.
 
     Attributes:
@@ -186,7 +186,7 @@ def extract_thinking_blocks(message: Message) -> list[ThinkingBlockData]:
     ]
 
 
-def handle_text_delta(step_num: int, content: str, state: _StreamState) -> TextDeltaStep | None:
+def handle_text_delta(step_num: int, content: str, state: StreamState) -> TextDeltaStep | None:
     """Handle a text delta, buffering or flushing as appropriate."""
     if state.first_text_token_time is None:
         state.first_text_token_time = time.monotonic()
@@ -204,7 +204,7 @@ def handle_text_delta(step_num: int, content: str, state: _StreamState) -> TextD
     return None
 
 
-def handle_text_delta_with_finalization(step_num: int, content: str, state: _StreamState) -> list[AgentStep]:
+def handle_text_delta_with_finalization(step_num: int, content: str, state: StreamState) -> list[AgentStep]:
     """Finalize thinking (if needed) then handle text delta. Returns 0-2 steps."""
     steps: list[AgentStep] = []
     if finalized := state.finalize_thinking(step_num):
@@ -217,7 +217,7 @@ def handle_text_delta_with_finalization(step_num: int, content: str, state: _Str
 async def process_stream_events(
     step_num: int,
     stream: AsyncIterator[MessageStreamEvent],
-    state: _StreamState,
+    state: StreamState,
 ) -> AsyncIterator[AgentStep]:
     """Process stream events and yield AgentSteps.
 

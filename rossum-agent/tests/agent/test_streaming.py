@@ -24,7 +24,7 @@ from rossum_agent.agent.models import (
     ThinkingStep,
     ToolResultStep,
 )
-from rossum_agent.agent.streaming import _StreamState, process_stream_event
+from rossum_agent.agent.streaming import StreamState, process_stream_event
 
 
 class TestProcessStreamEvent:
@@ -131,17 +131,17 @@ class TestProcessStreamEvent:
 
 
 class TestStreamState:
-    """Test _StreamState class."""
+    """Test StreamState class."""
 
     def test_flush_buffer_returns_none_when_empty(self):
         """Test that flush_buffer returns None when buffer is empty."""
-        state = _StreamState()
+        state = StreamState()
         result = state.flush_buffer(step_num=1, step_type=StepType.FINAL_ANSWER)
         assert result is None
 
     def test_flush_buffer_returns_step_with_content(self):
         """Test that flush_buffer returns TextDeltaStep with accumulated content."""
-        state = _StreamState()
+        state = StreamState()
         state.text_buffer = ["Hello", " ", "world"]
         state.thinking_text = "I'm thinking"
 
@@ -157,7 +157,7 @@ class TestStreamState:
 
     def test_flush_buffer_clears_buffer(self):
         """Test that flush_buffer clears the text_buffer."""
-        state = _StreamState()
+        state = StreamState()
         state.text_buffer = ["some", "text"]
 
         state.flush_buffer(step_num=1, step_type=StepType.FINAL_ANSWER)
@@ -166,7 +166,7 @@ class TestStreamState:
 
     def test_flush_buffer_accumulates_response_text(self):
         """Test that flush_buffer accumulates into response_text."""
-        state = _StreamState()
+        state = StreamState()
         state.response_text = "Previous "
         state.text_buffer = ["new text"]
 
@@ -177,7 +177,7 @@ class TestStreamState:
 
     def test_flush_buffer_with_empty_thinking(self):
         """Test that thinking is None when thinking_text is empty."""
-        state = _StreamState()
+        state = StreamState()
         state.text_buffer = ["text"]
         state.thinking_text = ""
 
@@ -186,8 +186,8 @@ class TestStreamState:
         assert result.thinking is None
 
     def test_stream_state_initial_values(self):
-        """Test _StreamState has correct initial values."""
-        state = _StreamState()
+        """Test StreamState has correct initial values."""
+        state = StreamState()
         assert state.thinking_text == ""
         assert state.response_text == ""
         assert state.final_message is None
@@ -199,55 +199,55 @@ class TestStreamState:
 
     def test_should_flush_initial_buffer_when_already_flushed(self):
         """Test _should_flush_initial_buffer returns True when already flushed."""
-        state = _StreamState()
+        state = StreamState()
         state.initial_buffer_flushed = True
 
         assert state._should_flush_initial_buffer() is True
 
     def test_should_flush_initial_buffer_when_no_first_token(self):
         """Test _should_flush_initial_buffer returns False when no first token time."""
-        state = _StreamState()
+        state = StreamState()
         state.first_text_token_time = None
 
         assert state._should_flush_initial_buffer() is False
 
     def test_should_flush_initial_buffer_after_delay(self):
         """Test _should_flush_initial_buffer returns True after delay elapsed."""
-        state = _StreamState()
+        state = StreamState()
         state.first_text_token_time = time.monotonic() - 2.0
 
         assert state._should_flush_initial_buffer() is True
 
     def test_should_flush_initial_buffer_before_delay(self):
         """Test _should_flush_initial_buffer returns False before delay elapsed."""
-        state = _StreamState()
+        state = StreamState()
         state.first_text_token_time = time.monotonic()
 
         assert state._should_flush_initial_buffer() is False
 
     def test_get_step_type_with_pending_tools(self):
         """Test get_step_type returns INTERMEDIATE when tools pending."""
-        state = _StreamState()
+        state = StreamState()
         state.pending_tools = {0: {"name": "test_tool"}}
 
         assert state.get_step_type(step_num=2) == StepType.INTERMEDIATE
 
     def test_get_step_type_with_tool_calls(self):
         """Test get_step_type returns INTERMEDIATE when tool_calls exist."""
-        state = _StreamState()
+        state = StreamState()
         state.tool_calls = [MagicMock()]
 
         assert state.get_step_type(step_num=2) == StepType.INTERMEDIATE
 
     def test_get_step_type_final_answer(self):
         """Test get_step_type returns FINAL_ANSWER when no tools on non-first step."""
-        state = _StreamState()
+        state = StreamState()
 
         assert state.get_step_type(step_num=2) == StepType.FINAL_ANSWER
 
     def test_get_step_type_first_step_defaults_to_intermediate(self):
         """Test get_step_type returns INTERMEDIATE on step 1 even without tools."""
-        state = _StreamState()
+        state = StreamState()
 
         assert state.get_step_type(step_num=1) == StepType.INTERMEDIATE
 
@@ -257,7 +257,7 @@ class TestStreamState:
         This verifies the architectural invariant: in a single step, a thinking block
         is always followed by an intermediate block (tool calls or text response).
         """
-        state = _StreamState()
+        state = StreamState()
         state.thinking_text = "Analyzing the request..."
         state.text_buffer = ["Here is my response"]
 
@@ -270,7 +270,7 @@ class TestStreamState:
 
     def test_thinking_block_followed_by_tool_calls(self):
         """Test that thinking can be followed by tool calls in intermediate step."""
-        state = _StreamState()
+        state = StreamState()
         state.thinking_text = "I need to use a tool..."
         state.tool_calls = [MagicMock()]
         state.pending_tools = {}
@@ -284,7 +284,7 @@ class TestStreamState:
         response, the step type should be INTERMEDIATE (not FINAL_ANSWER). This ensures
         the stream-end flush correctly classifies the step based on actual state.
         """
-        state = _StreamState()
+        state = StreamState()
         state.text_buffer = ["Some response text"]
         state.response_text = "Previous text"
         state.tool_calls = [MagicMock()]
@@ -299,7 +299,7 @@ class TestStreamState:
 
     def test_finalize_thinking_returns_step_on_first_call(self):
         """Test that finalize_thinking returns a ThinkingStep on first call."""
-        state = _StreamState()
+        state = StreamState()
         state.thinking_text = "Let me think about this..."
 
         result = state.finalize_thinking(step_num=1)
@@ -312,7 +312,7 @@ class TestStreamState:
 
     def test_finalize_thinking_returns_none_on_second_call(self):
         """Test that finalize_thinking returns None when already finalized."""
-        state = _StreamState()
+        state = StreamState()
         state.thinking_text = "Let me think about this..."
 
         state.finalize_thinking(step_num=1)
@@ -322,7 +322,7 @@ class TestStreamState:
 
     def test_finalize_thinking_returns_none_when_no_thinking(self):
         """Test that finalize_thinking returns None when no thinking text."""
-        state = _StreamState()
+        state = StreamState()
 
         result = state.finalize_thinking(step_num=1)
 
@@ -384,7 +384,7 @@ class TestHandleTextDelta:
         """First call sets first_text_token_time."""
         from rossum_agent.agent.streaming import handle_text_delta
 
-        state = _StreamState()
+        state = StreamState()
         assert state.first_text_token_time is None
 
         handle_text_delta(step_num=1, content="Hello", state=state)
@@ -395,7 +395,7 @@ class TestHandleTextDelta:
         """Text is buffered and not flushed before initial buffer delay."""
         from rossum_agent.agent.streaming import handle_text_delta
 
-        state = _StreamState()
+        state = StreamState()
 
         result = handle_text_delta(step_num=1, content="Hello", state=state)
 
@@ -406,7 +406,7 @@ class TestHandleTextDelta:
         """Text is flushed immediately once initial buffer period elapsed."""
         from rossum_agent.agent.streaming import handle_text_delta
 
-        state = _StreamState()
+        state = StreamState()
         state.first_text_token_time = time.monotonic() - 2.0  # Well past delay
         state.initial_buffer_flushed = False
 
@@ -420,7 +420,7 @@ class TestHandleTextDelta:
         """Text flushes immediately when tool_calls are detected."""
         from rossum_agent.agent.streaming import handle_text_delta
 
-        state = _StreamState()
+        state = StreamState()
         state.tool_calls = [MagicMock()]
 
         result = handle_text_delta(step_num=1, content="Before tool", state=state)
@@ -433,7 +433,7 @@ class TestHandleTextDelta:
         """Text flushes immediately when pending_tools are detected."""
         from rossum_agent.agent.streaming import handle_text_delta
 
-        state = _StreamState()
+        state = StreamState()
         state.pending_tools = {0: {"name": "test_tool"}}
 
         result = handle_text_delta(step_num=1, content="Before tool", state=state)
@@ -450,7 +450,7 @@ class TestHandleTextDeltaWithFinalization:
         """Finalizes thinking and handles text delta, returning both steps."""
         from rossum_agent.agent.streaming import handle_text_delta_with_finalization
 
-        state = _StreamState()
+        state = StreamState()
         state.thinking_text = "I should respond"
         state.initial_buffer_flushed = True
 
@@ -466,7 +466,7 @@ class TestHandleTextDeltaWithFinalization:
         """Returns only text step when there's no thinking to finalize."""
         from rossum_agent.agent.streaming import handle_text_delta_with_finalization
 
-        state = _StreamState()
+        state = StreamState()
         state.initial_buffer_flushed = True
 
         steps = handle_text_delta_with_finalization(step_num=2, content="Answer", state=state)
@@ -478,7 +478,7 @@ class TestHandleTextDeltaWithFinalization:
         """Returns empty list when text is still buffering and no thinking."""
         from rossum_agent.agent.streaming import handle_text_delta_with_finalization
 
-        state = _StreamState()
+        state = StreamState()
 
         steps = handle_text_delta_with_finalization(step_num=1, content="Hello", state=state)
 
@@ -489,7 +489,7 @@ class TestHandleTextDeltaWithFinalization:
         """Second call doesn't produce another ThinkingStep."""
         from rossum_agent.agent.streaming import handle_text_delta_with_finalization
 
-        state = _StreamState()
+        state = StreamState()
         state.thinking_text = "Reasoning"
         state.initial_buffer_flushed = True
 
@@ -501,11 +501,11 @@ class TestHandleTextDeltaWithFinalization:
 
 
 class TestMaybeLogProgress:
-    """Test _StreamState.maybe_log_progress."""
+    """Test StreamState.maybe_log_progress."""
 
     def test_logs_after_interval(self):
         """Logs progress when enough time has elapsed."""
-        state = _StreamState()
+        state = StreamState()
         state.last_progress_log_time = time.monotonic() - 15.0
         state.thinking_text = "thinking..."
         state.text_deltas = 0
@@ -519,7 +519,7 @@ class TestMaybeLogProgress:
 
     def test_does_not_log_before_interval(self):
         """Does not log when interval hasn't elapsed."""
-        state = _StreamState()
+        state = StreamState()
         state.last_progress_log_time = time.monotonic()
 
         with patch("rossum_agent.agent.streaming.logger") as mock_logger:
@@ -528,7 +528,7 @@ class TestMaybeLogProgress:
 
     def test_logs_text_phase_when_text_deltas_exist(self):
         """Reports 'text' phase when text_deltas > 0."""
-        state = _StreamState()
+        state = StreamState()
         state.last_progress_log_time = time.monotonic() - 15.0
         state.text_deltas = 5
         state.response_text = "some text"
@@ -540,7 +540,7 @@ class TestMaybeLogProgress:
 
     def test_updates_last_progress_log_time(self):
         """Updates last_progress_log_time after logging."""
-        state = _StreamState()
+        state = StreamState()
         old_time = time.monotonic() - 15.0
         state.last_progress_log_time = old_time
 
@@ -865,7 +865,7 @@ class TestStreamModelResponse:
         # INITIAL_TEXT_BUFFER_DELAY=1.5s).  Because thinking does NOT set the
         # timer, the buffer delay starts at T=2.0 (when text arrives) and
         # the text stays buffered until the stream ends.
-        # Calls: _StreamState init (stream_start_time, last_progress_log_time),
+        # Calls: StreamState init (stream_start_time, last_progress_log_time),
         # thinking delta (maybe_log_progress),
         # text delta (first_text_token_time, maybe_log_progress),
         # stream_elapsed after streaming completes.

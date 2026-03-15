@@ -58,7 +58,7 @@ from rossum_agent.agent.models import (
     ThinkingStep,
 )
 from rossum_agent.agent.streaming import (
-    _StreamState,
+    StreamState,
     extract_thinking_blocks,
     process_stream_events,
 )
@@ -259,7 +259,7 @@ class RossumAgent:
         messages = self.memory.write_to_messages()
         tools = await self._get_tools()
         model_id = get_model_id()
-        state = _StreamState()
+        state = StreamState()
         logger.info(f"Step {step_num}: streaming started (model={model_id}, messages={len(messages)})")
 
         thinking_config: ThinkingConfigAdaptiveParam = {"type": "adaptive"}
