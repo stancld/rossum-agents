@@ -12,7 +12,6 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint 'src/**/*.ts'",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
     "generate": "openapi-typescript ../rossum-agent/rossum_agent/api/openapi.json -o src/generated.ts"
