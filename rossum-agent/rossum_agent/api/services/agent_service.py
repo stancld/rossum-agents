@@ -40,6 +40,7 @@ from rossum_agent.api.models.schemas import (
     SubAgentTextEvent,
     TaskSnapshotEvent,
 )
+from rossum_agent.bedrock_client import MAX_INPUT_TOKENS
 from rossum_agent.change_tracking.commit_service import CommitService
 from rossum_agent.change_tracking.store import CommitStore, SnapshotStore
 from rossum_agent.prompts import get_system_prompt
@@ -97,6 +98,7 @@ class _ChatRunState:
     run_id: int = 0
     output_dir: Path | None = None
     last_memory: AgentMemory | None = None
+    last_main_input_tokens: int = 0
     # Cautious persona: write tools blocked last turn, pre-approved next turn
     cautious_blocked_last_turn: set[str] = dataclasses.field(default_factory=set)
 
@@ -427,11 +429,10 @@ class AgentService:
             StepEvent objects during execution, SubAgentProgressEvent for sub-agent progress,
             SubAgentTextEvent for sub-agent text streaming, StreamDoneEvent at the end.
         """
-        logger.info(f"Starting agent run with {len(conversation_history)} history messages")
-        if images:
-            logger.info(f"Including {len(images)} images in the prompt")
-        if documents:
-            logger.info(f"Including {len(documents)} documents in the prompt")
+        logger.info(
+            f"Starting agent run with {len(conversation_history)} history messages, "
+            f"{len(images or [])} images, {len(documents or [])} documents"
+        )
 
         run_id = await self._register_run(chat_id)
 
@@ -490,6 +491,8 @@ class AgentService:
                     agent_ctx.rossum_environment = environment
 
                     self._restore_conversation_history(agent, conversation_history)
+                    if chat_run_state.last_main_input_tokens:
+                        agent.tokens.last_main_input = chat_run_state.last_main_input_tokens
 
                     total_steps = 0
                     total_input_tokens = 0
@@ -503,6 +506,10 @@ class AgentService:
                                 yield sub_event
 
                             for event in convert_step_to_events(step):
+                                if not event.is_streaming and MAX_INPUT_TOKENS:
+                                    event.context_usage_fraction = min(
+                                        agent.tokens.last_main_input / MAX_INPUT_TOKENS, 1.0
+                                    )
                                 yield event
 
                             if isinstance(step, (ToolResultStep, FinalAnswerStep, ErrorStep)):
@@ -514,6 +521,7 @@ class AgentService:
                             yield sub_event
 
                         chat_run_state.last_memory = agent.memory
+                        chat_run_state.last_main_input_tokens = agent.tokens.last_main_input
                         chat_run_state.cautious_blocked_last_turn = agent_ctx.cautious_blocked_writes.copy()
 
                         async for event in self._stream_finalization(
@@ -592,6 +600,10 @@ class AgentService:
             cache_creation_input_tokens=agent.tokens.total_cache_creation,
             cache_read_input_tokens=agent.tokens.total_cache_read,
             token_usage_breakdown=agent.get_token_usage_breakdown(),
+            max_input_tokens=MAX_INPUT_TOKENS,
+            context_usage_fraction=min(agent.tokens.last_main_input / MAX_INPUT_TOKENS, 1.0)
+            if MAX_INPUT_TOKENS
+            else 0.0,
             config_commit_hash=commit.hash if commit else None,
             config_commit_message=commit.message if commit else None,
             config_changes_count=len(commit.changes) if commit else 0,

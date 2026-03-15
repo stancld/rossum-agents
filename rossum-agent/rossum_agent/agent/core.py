@@ -108,6 +108,7 @@ class TokenTracker:
     sub_cache_read: int = 0
     sub_by_tool: dict[str, tuple[int, int]] = dataclasses.field(default_factory=dict)
     sub_cache_by_tool: dict[str, tuple[int, int]] = dataclasses.field(default_factory=dict)
+    last_main_input: int = 0
 
     @property
     def total_input(self) -> int:
@@ -130,6 +131,7 @@ class TokenTracker:
         self.main_output += output_tokens
         self.main_cache_creation += cache_creation
         self.main_cache_read += cache_read
+        self.last_main_input = input_tokens
 
     def accumulate_sub(self, usage: SubAgentTokenUsage) -> None:
         self.sub_input += usage.input_tokens

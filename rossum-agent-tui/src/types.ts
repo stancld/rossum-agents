@@ -173,5 +173,6 @@ export interface ChatState {
   error: string | null;
   userMessages: UserMessage[];
   feedback: Record<number, boolean>;
+  contextUsageFraction: number | null;
   pendingQuestion: AgentQuestionEvent | null;
 }

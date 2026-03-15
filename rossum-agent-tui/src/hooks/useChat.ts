@@ -41,6 +41,7 @@ const INITIAL_STATE: ChatState = {
   subAgentText: null,
   finalAnswer: null,
   tokenUsage: null,
+  contextUsageFraction: null,
   configCommit: null,
   files: [],
   error: null,
@@ -129,6 +130,8 @@ function handleStepEvent(prev: ChatState, step: StepEvent): ChatState {
     finalAnswer: step.is_final
       ? resolveFinalAnswer(step, prev.finalAnswer)
       : prev.finalAnswer,
+    contextUsageFraction:
+      step.context_usage_fraction ?? prev.contextUsageFraction,
   };
 }
 
@@ -177,6 +180,7 @@ function handleDoneEvent(
     subAgentProgress: null,
     subAgentText: null,
     tokenUsage: eventData.token_usage_breakdown as TokenUsageBreakdown | null,
+    contextUsageFraction: eventData.context_usage_fraction ?? null,
     configCommit: commitInfo,
   };
 }
