@@ -138,7 +138,7 @@ function handleSubAgentTextEvent(
 ): ChatState {
   const prevText =
     prev.subAgentText?.tool_name === textEvent.tool_name
-      ? prev.subAgentText.text
+      ? prev.subAgentText!.text
       : "";
   const nextText = textEvent.text.startsWith(prevText)
     ? textEvent.text
@@ -299,8 +299,9 @@ export function useChat(config: Config) {
           rossumUrl: config.contextUrl,
           images: options?.images as ImageContent[] | undefined,
           documents: options?.documents as DocumentContent[] | undefined,
-          onEvent: (event) => dispatch(event as SSEEvent),
-          onError: (err) => {
+          onEvent: (event: Record<string, unknown>) =>
+            dispatch(event as SSEEvent),
+          onError: (err: Error) => {
             setState((prev) => ({
               ...prev,
               error: err.message,
