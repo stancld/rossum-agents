@@ -8,7 +8,7 @@ import pytest
 from rossum_agent.agent import AgentConfig, RossumAgent, ToolCall, ToolResult
 from rossum_agent.agent.cautious_gate import is_write_tool
 from rossum_agent.agent.tool_execution import execute_tool_with_progress
-from rossum_agent.tools.core import AgentContext, reset_context, set_context
+from rossum_agent.tools.core import CAUTIOUS_CONFIRMATION_MARKER, AgentContext, reset_context, set_context
 
 
 class TestCautiousWriteGate:
@@ -57,7 +57,7 @@ class TestCautiousWriteGate:
                 result = await self._get_final_result(agent, tool_call)
 
             assert result.is_error is True
-            assert "requires user confirmation" in result.content
+            assert CAUTIOUS_CONFIRMATION_MARKER in result.content
             assert "update_queue" in ctx.cautious_blocked_writes
             assert len(question_received) == 1
             assert "update_queue" in question_received[0].questions[0].question
@@ -82,7 +82,7 @@ class TestCautiousWriteGate:
                 result = await self._get_final_result(agent, tool_call)
 
             assert result.is_error is True
-            assert "requires user confirmation" in result.content
+            assert CAUTIOUS_CONFIRMATION_MARKER in result.content
             assert "revert_commit" in ctx.cautious_blocked_writes
             assert len(question_received) == 1
         finally:

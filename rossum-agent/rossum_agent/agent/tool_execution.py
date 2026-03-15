@@ -143,6 +143,15 @@ class _SchemaStagger:
             await asyncio.sleep(delay)
 
 
+def _to_serializable(obj: object) -> object:
+    """Convert a dataclass or Pydantic model to a JSON-serializable form."""
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        return dataclasses.asdict(obj)
+    if isinstance(obj, BaseModel):
+        return obj.model_dump(mode="json")
+    return obj
+
+
 def serialize_tool_result(result: object) -> str:
     """Serialize a tool result to a string for storage in context.
 
@@ -151,40 +160,13 @@ def serialize_tool_result(result: object) -> str:
     if result is None:
         return "Tool executed successfully (no output)"
 
-    # Handle dataclasses (check before pydantic since pydantic models aren't dataclasses)
-    if dataclasses.is_dataclass(result) and not isinstance(result, type):
-        return json.dumps(dataclasses.asdict(result), separators=COMPACT_JSON_SEPARATORS, default=str)
+    result = _to_serializable(result)
+    if isinstance(result, list):
+        result = [_to_serializable(item) for item in result]
 
-    # Handle lists of dataclasses
-    if isinstance(result, list) and result and dataclasses.is_dataclass(result[0]):
-        return json.dumps(
-            [
-                dataclasses.asdict(item)
-                for item in result
-                if dataclasses.is_dataclass(item) and not isinstance(item, type)
-            ],
-            separators=COMPACT_JSON_SEPARATORS,
-            default=str,
-        )
-
-    # Handle pydantic models
-    # Use mode='json' to ensure nested models are properly serialized to JSON-compatible dicts
-    if isinstance(result, BaseModel):
-        return json.dumps(result.model_dump(mode="json"), separators=COMPACT_JSON_SEPARATORS, default=str)
-
-    # Handle lists of pydantic models
-    if isinstance(result, list) and result and isinstance(result[0], BaseModel):
-        return json.dumps(
-            [item.model_dump(mode="json") for item in result if isinstance(item, BaseModel)],
-            separators=COMPACT_JSON_SEPARATORS,
-            default=str,
-        )
-
-    # Handle dicts and regular lists
     if isinstance(result, dict | list):
         return json.dumps(result, separators=COMPACT_JSON_SEPARATORS, default=str)
 
-    # Fallback to string representation
     return str(result)
 
 
